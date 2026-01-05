@@ -1,0 +1,325 @@
+/**
+ * Microsoft Graph API operations for App Protection Policies (MAM)
+ */
+
+import { GraphClient } from "./client";
+import { AppProtectionPolicy } from "@/types/graph";
+
+const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+
+/**
+ * Get all iOS app protection policies
+ */
+export async function getiOSAppProtectionPolicies(
+  client: GraphClient
+): Promise<AppProtectionPolicy[]> {
+  return client.getCollection<AppProtectionPolicy>(
+    "/deviceAppManagement/iosManagedAppProtections"
+  );
+}
+
+/**
+ * Get all Android app protection policies
+ */
+export async function getAndroidAppProtectionPolicies(
+  client: GraphClient
+): Promise<AppProtectionPolicy[]> {
+  return client.getCollection<AppProtectionPolicy>(
+    "/deviceAppManagement/androidManagedAppProtections"
+  );
+}
+
+/**
+ * Get all app protection policies (iOS and Android)
+ */
+export async function getAllAppProtectionPolicies(
+  client: GraphClient
+): Promise<AppProtectionPolicy[]> {
+  const [iosPolicies, androidPolicies] = await Promise.all([
+    getiOSAppProtectionPolicies(client),
+    getAndroidAppProtectionPolicies(client),
+  ]);
+  return [...iosPolicies, ...androidPolicies];
+}
+
+/**
+ * Get app protection policies created by Intune Hydration Kit
+ */
+export async function getHydrationKitAppProtectionPolicies(
+  client: GraphClient
+): Promise<AppProtectionPolicy[]> {
+  const policies = await getAllAppProtectionPolicies(client);
+  return policies.filter((policy) => policy.description?.includes(HYDRATION_MARKER));
+}
+
+/**
+ * Get an app protection policy by ID
+ */
+export async function getAppProtectionPolicyById(
+  client: GraphClient,
+  policyId: string,
+  platform: "iOS" | "android"
+): Promise<AppProtectionPolicy> {
+  const endpoint =
+    platform === "iOS"
+      ? `/deviceAppManagement/iosManagedAppProtections/${policyId}`
+      : `/deviceAppManagement/androidManagedAppProtections/${policyId}`;
+
+  return client.get<AppProtectionPolicy>(endpoint);
+}
+
+/**
+ * Get an app protection policy by display name
+ */
+export async function getAppProtectionPolicyByName(
+  client: GraphClient,
+  displayName: string
+): Promise<AppProtectionPolicy | null> {
+  const policies = await getAllAppProtectionPolicies(client);
+  const found = policies.find(
+    (policy) => policy.displayName.toLowerCase() === displayName.toLowerCase()
+  );
+  return found || null;
+}
+
+/**
+ * Check if an app protection policy exists by display name (case-insensitive)
+ */
+export async function appProtectionPolicyExists(
+  client: GraphClient,
+  displayName: string
+): Promise<boolean> {
+  const policy = await getAppProtectionPolicyByName(client, displayName);
+  return policy !== null;
+}
+
+/**
+ * Create a new iOS app protection policy
+ */
+export async function createiOSAppProtectionPolicy(
+  client: GraphClient,
+  policy: AppProtectionPolicy
+): Promise<AppProtectionPolicy> {
+  // Ensure the hydration marker is in the description
+  if (!policy.description?.includes(HYDRATION_MARKER)) {
+    policy.description = `${policy.description || ""} ${HYDRATION_MARKER}`.trim();
+  }
+
+  return client.post<AppProtectionPolicy>(
+    "/deviceAppManagement/iosManagedAppProtections",
+    policy
+  );
+}
+
+/**
+ * Create a new Android app protection policy
+ */
+export async function createAndroidAppProtectionPolicy(
+  client: GraphClient,
+  policy: AppProtectionPolicy
+): Promise<AppProtectionPolicy> {
+  // Ensure the hydration marker is in the description
+  if (!policy.description?.includes(HYDRATION_MARKER)) {
+    policy.description = `${policy.description || ""} ${HYDRATION_MARKER}`.trim();
+  }
+
+  return client.post<AppProtectionPolicy>(
+    "/deviceAppManagement/androidManagedAppProtections",
+    policy
+  );
+}
+
+/**
+ * Create an app protection policy (auto-detects platform from @odata.type)
+ */
+export async function createAppProtectionPolicy(
+  client: GraphClient,
+  policy: AppProtectionPolicy
+): Promise<AppProtectionPolicy> {
+  const isiOS = policy["@odata.type"] === "#microsoft.graph.iosManagedAppProtection";
+  return isiOS
+    ? createiOSAppProtectionPolicy(client, policy)
+    : createAndroidAppProtectionPolicy(client, policy);
+}
+
+/**
+ * Update an existing app protection policy
+ */
+export async function updateAppProtectionPolicy(
+  client: GraphClient,
+  policyId: string,
+  platform: "iOS" | "android",
+  updates: Partial<AppProtectionPolicy>
+): Promise<AppProtectionPolicy> {
+  const endpoint =
+    platform === "iOS"
+      ? `/deviceAppManagement/iosManagedAppProtections/${policyId}`
+      : `/deviceAppManagement/androidManagedAppProtections/${policyId}`;
+
+  return client.patch<AppProtectionPolicy>(endpoint, updates);
+}
+
+/**
+ * Delete an iOS app protection policy by ID
+ * Only deletes if the policy was created by Intune Hydration Kit
+ */
+export async function deleteiOSAppProtectionPolicy(
+  client: GraphClient,
+  policyId: string
+): Promise<void> {
+  const policy = await getAppProtectionPolicyById(client, policyId, "iOS");
+
+  if (!policy.description?.includes(HYDRATION_MARKER)) {
+    throw new Error(
+      `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
+    );
+  }
+
+  await client.delete(`/deviceAppManagement/iosManagedAppProtections/${policyId}`);
+}
+
+/**
+ * Delete an Android app protection policy by ID
+ * Only deletes if the policy was created by Intune Hydration Kit
+ */
+export async function deleteAndroidAppProtectionPolicy(
+  client: GraphClient,
+  policyId: string
+): Promise<void> {
+  const policy = await getAppProtectionPolicyById(client, policyId, "android");
+
+  if (!policy.description?.includes(HYDRATION_MARKER)) {
+    throw new Error(
+      `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
+    );
+  }
+
+  await client.delete(`/deviceAppManagement/androidManagedAppProtections/${policyId}`);
+}
+
+/**
+ * Delete an app protection policy (auto-detects platform)
+ */
+export async function deleteAppProtectionPolicy(
+  client: GraphClient,
+  policyId: string,
+  platform: "iOS" | "android"
+): Promise<void> {
+  return platform === "iOS"
+    ? deleteiOSAppProtectionPolicy(client, policyId)
+    : deleteAndroidAppProtectionPolicy(client, policyId);
+}
+
+/**
+ * Get assignments for an app protection policy
+ */
+export async function getAppProtectionPolicyAssignments(
+  client: GraphClient,
+  policyId: string,
+  platform: "iOS" | "android"
+): Promise<unknown[]> {
+  const endpoint =
+    platform === "iOS"
+      ? `/deviceAppManagement/iosManagedAppProtections/${policyId}/assignments`
+      : `/deviceAppManagement/androidManagedAppProtections/${policyId}/assignments`;
+
+  return client.getCollection(endpoint);
+}
+
+/**
+ * Assign an app protection policy to a group
+ */
+export async function assignAppProtectionPolicy(
+  client: GraphClient,
+  policyId: string,
+  platform: "iOS" | "android",
+  groupId: string
+): Promise<unknown> {
+  const endpoint =
+    platform === "iOS"
+      ? `/deviceAppManagement/iosManagedAppProtections/${policyId}/assignments`
+      : `/deviceAppManagement/androidManagedAppProtections/${policyId}/assignments`;
+
+  const assignment = {
+    target: {
+      "@odata.type": "#microsoft.graph.groupAssignmentTarget",
+      groupId,
+    },
+  };
+
+  return client.post(endpoint, assignment);
+}
+
+/**
+ * Batch create multiple app protection policies
+ * Returns array of results with success/failure status
+ */
+export async function batchCreateAppProtectionPolicies(
+  client: GraphClient,
+  policies: AppProtectionPolicy[]
+): Promise<
+  Array<{ policy: AppProtectionPolicy; success: boolean; error?: string; id?: string }>
+> {
+  const results: Array<{
+    policy: AppProtectionPolicy;
+    success: boolean;
+    error?: string;
+    id?: string;
+  }> = [];
+
+  for (const policy of policies) {
+    try {
+      // Check if policy already exists
+      const exists = await appProtectionPolicyExists(client, policy.displayName);
+      if (exists) {
+        results.push({
+          policy,
+          success: false,
+          error: "Policy already exists",
+        });
+        continue;
+      }
+
+      // Create the policy
+      const createdPolicy = await createAppProtectionPolicy(client, policy);
+      results.push({
+        policy,
+        success: true,
+        id: createdPolicy.id,
+      });
+    } catch (error) {
+      results.push({
+        policy,
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Batch delete multiple app protection policies created by Intune Hydration Kit
+ */
+export async function batchDeleteAppProtectionPolicies(
+  client: GraphClient,
+  policies: Array<{ policyId: string; platform: "iOS" | "android" }>
+): Promise<Array<{ policyId: string; success: boolean; error?: string }>> {
+  const results: Array<{ policyId: string; success: boolean; error?: string }> = [];
+
+  for (const { policyId, platform } of policies) {
+    try {
+      await deleteAppProtectionPolicy(client, policyId, platform);
+      results.push({ policyId, success: true });
+    } catch (error) {
+      results.push({
+        policyId,
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      });
+    }
+  }
+
+  return results;
+}
