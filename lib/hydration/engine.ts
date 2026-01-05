@@ -268,8 +268,14 @@ async function executeGroupTask(
     };
   } else if (mode === "delete") {
     // Delete the group
-    await deleteGroupByName(client, template.displayName);
-    return { task, success: true, skipped: false };
+    try {
+      await deleteGroupByName(client, template.displayName);
+      return { task, success: true, skipped: false };
+    } catch (error) {
+      // Group not found or not created by hydration kit - skip
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { task, success: true, skipped: true, error: errorMessage };
+    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };
@@ -365,8 +371,14 @@ async function executeFilterTask(
     };
   } else if (mode === "delete") {
     // Delete the filter
-    await deleteFilterByName(client, template.displayName);
-    return { task, success: true, skipped: false };
+    try {
+      await deleteFilterByName(client, template.displayName);
+      return { task, success: true, skipped: false };
+    } catch (error) {
+      // Filter not found or not created by hydration kit - skip
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { task, success: true, skipped: true, error: errorMessage };
+    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };
@@ -422,8 +434,14 @@ async function executeComplianceTask(
     };
   } else if (mode === "delete") {
     // Delete the policy
-    await deleteCompliancePolicyByName(client, template.displayName);
-    return { task, success: true, skipped: false };
+    try {
+      await deleteCompliancePolicyByName(client, template.displayName);
+      return { task, success: true, skipped: false };
+    } catch (error) {
+      // Policy not found or not created by hydration kit - skip
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { task, success: true, skipped: true, error: errorMessage };
+    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };
@@ -493,8 +511,14 @@ async function executeConditionalAccessTask(
     };
   } else if (mode === "delete") {
     // Delete the policy (must be disabled first)
-    await deleteConditionalAccessPolicyByName(client, template.displayName);
-    return { task, success: true, skipped: false };
+    try {
+      await deleteConditionalAccessPolicyByName(client, template.displayName);
+      return { task, success: true, skipped: false };
+    } catch (error) {
+      // Policy not found or not created by hydration kit - skip
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      return { task, success: true, skipped: true, error: errorMessage };
+    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };
@@ -552,7 +576,8 @@ async function executeAppProtectionTask(
     // Get the policy to determine platform
     const policy = await getAppProtectionPolicyByName(client, template.displayName);
     if (!policy || !policy.id) {
-      return { task, success: false, skipped: false, error: "Policy not found" };
+      // Policy doesn't exist, skip deletion
+      return { task, success: true, skipped: true, error: "Policy not found in tenant" };
     }
 
     const platform = policy["@odata.type"] === "#microsoft.graph.iosManagedAppProtection" ? "iOS" : "android";

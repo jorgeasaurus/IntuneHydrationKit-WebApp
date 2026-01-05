@@ -2,6 +2,8 @@
 
 A web-based version of the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit) that enables IT administrators to bootstrap Microsoft Intune tenants with best-practice configurations through an intuitive browser interface.
 
+![Intune Hydration Kit Landing Page](./LandingPage.jpeg)
+
 ## Features
 
 - **Multi-step Wizard**: Guided configuration process with 5 clear steps

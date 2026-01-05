@@ -228,6 +228,12 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
   const appProtectionFiles = [
     "AppProtection/Android-App-Protection.json",
     "AppProtection/iOS-App-Protection.json",
+    "AppProtection/level-1-enterprise-basic-data-protection-Android.json",
+    "AppProtection/level-1-enterprise-basic-data-protection-iOS.json",
+    "AppProtection/level-2-enterprise-enhanced-data-protection-Android.json",
+    "AppProtection/level-2-enterprise-enhanced-data-protection-iOS.json",
+    "AppProtection/level-3-enterprise-high-data-protection-Android.json",
+    "AppProtection/level-3-enterprise-high-data-protection-iOS.json",
   ];
 
   const allPolicies: AppProtectionTemplate[] = [];
