@@ -212,9 +212,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 - [x] TypeScript strict mode compliance
 - [x] Build optimization
+- [x] Deployment documentation (see [DEPLOYMENT.md](DEPLOYMENT.md))
 - [ ] End-to-end testing
 - [ ] Production deployment
-- [ ] Documentation updates
+- [ ] Final documentation review
 
 ## Wizard Workflow
 
@@ -287,6 +288,55 @@ The application supports multiple Microsoft cloud environments:
 - **Duplicate Prevention**: Execution lock prevents React Strict Mode double-invocation
 - **Error Recovery**: Comprehensive error handling with retry logic (max 3 attempts)
 - **Graceful Degradation**: Failed tasks don't block subsequent operations
+
+## Deployment
+
+This application requires a platform that supports Next.js SSR/SSG and cannot be deployed to GitHub Pages.
+
+### Recommended Platforms
+
+1. **Vercel** ⭐ (Recommended)
+   - Zero-configuration deployment
+   - Automatic HTTPS and global CDN
+   - Perfect Next.js optimization
+   - Free tier available
+   - Deploy: `vercel --prod`
+
+2. **Azure Static Web Apps** ⭐
+   - Microsoft ecosystem integration
+   - Seamless Entra ID integration
+   - Built-in authentication providers
+   - Free tier available
+
+3. **Netlify**
+   - Alternative to Vercel
+   - Easy deployment
+   - Good Next.js support
+   - Free tier available
+
+4. **Self-Hosted (Docker)**
+   - Full control
+   - On-premises deployment
+   - Air-gapped environments
+   - Infrastructure costs only
+
+**📖 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions and configuration.**
+
+### Quick Deploy to Vercel
+
+```bash
+# Install Vercel CLI
+npm install -g vercel
+
+# Deploy
+vercel
+
+# Configure environment variables in Vercel Dashboard
+# Deploy to production
+vercel --prod
+```
+
+**Important**: After deployment, update your Entra ID app registration with the production redirect URI.
 
 ## Troubleshooting
 
