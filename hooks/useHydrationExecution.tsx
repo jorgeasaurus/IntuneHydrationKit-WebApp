@@ -31,20 +31,29 @@ export function useHydrationExecution() {
 
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
+  const executionLockRef = useRef(false);
 
   /**
    * Start execution
    */
   const startExecution = useCallback(async () => {
+    // Prevent duplicate execution (React Strict Mode protection)
+    if (executionLockRef.current) {
+      console.log("[Execution Hook] Execution already in progress, ignoring duplicate call");
+      return;
+    }
+
     if (!state.tenantConfig || !state.operationMode || state.selectedTargets.length === 0) {
       throw new Error("Invalid wizard state. Please complete the wizard first.");
     }
 
-    // Build task queue with real templates from PowerShell repository
+    // Acquire execution lock
+    executionLockRef.current = true;
+
+    // Build task queue with real templates from local IntuneTemplates directory
     const tasks = await buildTaskQueueAsync(
       state.selectedTargets,
-      state.operationMode,
-      state.baselineConfig
+      state.operationMode
     );
     const startTime = new Date();
 
@@ -122,6 +131,9 @@ export function useHydrationExecution() {
         endTime: new Date(),
       }));
       throw error;
+    } finally {
+      // Release execution lock
+      executionLockRef.current = false;
     }
   }, [state]);
 

@@ -9,7 +9,6 @@ interface WizardContextType {
   setTenantConfig: (config: TenantConfig) => void;
   setOperationMode: (mode: OperationMode) => void;
   setSelectedTargets: (targets: TaskCategory[]) => void;
-  setBaselineConfig: (config: { repoUrl: string; branch: string; version?: string }) => void;
   setConfirmed: (confirmed: boolean) => void;
   resetWizard: () => void;
   nextStep: () => void;
@@ -43,10 +42,6 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, selectedTargets: targets }));
   };
 
-  const setBaselineConfig = (config: { repoUrl: string; branch: string; version?: string }) => {
-    setState((prev) => ({ ...prev, baselineConfig: config }));
-  };
-
   const setConfirmed = (confirmed: boolean) => {
     setState((prev) => ({ ...prev, confirmed }));
   };
@@ -56,7 +51,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   };
 
   const nextStep = () => {
-    setState((prev) => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 5) }));
+    setState((prev) => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 4) }));
   };
 
   const previousStep = () => {
@@ -71,7 +66,6 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         setTenantConfig,
         setOperationMode,
         setSelectedTargets,
-        setBaselineConfig,
         setConfirmed,
         resetWizard,
         nextStep,

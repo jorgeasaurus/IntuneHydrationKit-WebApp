@@ -161,6 +161,53 @@ export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
         </CardContent>
       </Card>
 
+      {/* Successfully Imported Items */}
+      {(() => {
+        const successfulTasks = tasks.filter((task) => task.status === "success");
+        return successfulTasks.length > 0 ? (
+          <Card className="border-green-200 dark:border-green-900">
+            <CardHeader>
+              <CardTitle className="text-green-600 dark:text-green-400">
+                Successfully {summary.operationMode === "create" ? "Created" : "Deleted"} Items ({successfulTasks.length})
+              </CardTitle>
+              <CardDescription>
+                Items that were successfully {summary.operationMode === "create" ? "created" : "deleted"} in your tenant
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2 max-h-[400px] overflow-y-auto">
+                {Object.entries(
+                  successfulTasks.reduce((acc, task) => {
+                    if (!acc[task.category]) acc[task.category] = [];
+                    acc[task.category].push(task);
+                    return acc;
+                  }, {} as Record<string, HydrationTask[]>)
+                ).map(([category, categoryTasks]) => (
+                  <div key={category} className="space-y-2">
+                    <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                      {category.charAt(0).toUpperCase() + category.slice(1)} ({categoryTasks.length})
+                    </h4>
+                    <div className="space-y-1 ml-2">
+                      {categoryTasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-2 p-2 rounded border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20"
+                        >
+                          <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 flex-shrink-0" />
+                          <span className="text-sm text-green-900 dark:text-green-100">
+                            {task.itemName}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ) : null;
+      })()}
+
       {/* Errors */}
       {summary.errors.length > 0 && (
         <Card className="border-red-200 dark:border-red-900">

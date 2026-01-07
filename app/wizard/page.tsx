@@ -5,7 +5,6 @@ import { useWizardState } from "@/hooks/useWizardState";
 import { TenantConfig } from "@/components/wizard/TenantConfig";
 import { OperationModeSelection } from "@/components/wizard/OperationMode";
 import { TargetSelection } from "@/components/wizard/TargetSelection";
-import { BaselineConfig } from "@/components/wizard/BaselineConfig";
 import { ReviewConfirm } from "@/components/wizard/ReviewConfirm";
 import { Progress } from "@/components/ui/progress";
 import { useMsal } from "@azure/msal-react";
@@ -18,7 +17,6 @@ const STEP_TITLES = [
   "Tenant Configuration",
   "Operation Mode",
   "Target Selection",
-  "Baseline Configuration",
   "Review & Confirm",
 ];
 
@@ -32,7 +30,7 @@ function WizardContent() {
     router.push("/");
   };
 
-  const progress = (state.currentStep / 5) * 100;
+  const progress = (state.currentStep / 4) * 100;
 
   const renderStep = () => {
     switch (state.currentStep) {
@@ -43,8 +41,6 @@ function WizardContent() {
       case 3:
         return <TargetSelection />;
       case 4:
-        return <BaselineConfig />;
-      case 5:
         return <ReviewConfirm />;
       default:
         return null;
@@ -85,7 +81,7 @@ function WizardContent() {
                   {STEP_TITLES[state.currentStep - 1]}
                 </h2>
                 <p className="text-muted-foreground">
-                  Step {state.currentStep} of 5
+                  Step {state.currentStep} of 4
                 </p>
               </div>
             </div>

@@ -13,6 +13,10 @@ export const metadata: Metadata = {
   title: "Intune Hydration Kit",
   description:
     "Bootstrap Microsoft Intune tenants with best-practice configurations",
+  icons: {
+    icon: "/IHTLogoClear.png",
+    apple: "/IHTLogoClear.png",
+  },
 };
 
 export default function RootLayout({

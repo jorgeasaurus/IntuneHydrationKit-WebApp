@@ -110,21 +110,6 @@ export function ReviewConfirm() {
               )}
             </div>
           </div>
-
-          {state.baselineConfig && (
-            <div>
-              <p className="text-sm font-medium mb-2">Baseline Configuration</p>
-              <div className="rounded-md border p-4 space-y-1">
-                <p className="text-sm">
-                  <span className="font-medium">Repository:</span>{" "}
-                  {state.baselineConfig.repoUrl}
-                </p>
-                <p className="text-sm">
-                  <span className="font-medium">Branch:</span> {state.baselineConfig.branch}
-                </p>
-              </div>
-            </div>
-          )}
         </div>
 
         {state.operationMode !== "preview" && (

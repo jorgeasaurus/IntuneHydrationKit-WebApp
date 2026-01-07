@@ -41,7 +41,7 @@ export const TEMPLATE_METADATA = {
   appProtection: {
     displayName: "App Protection",
     description: "Mobile application management (MAM) policies",
-    count: 8,
+    count: 10,
     icon: "Smartphone",
   },
   enrollment: {

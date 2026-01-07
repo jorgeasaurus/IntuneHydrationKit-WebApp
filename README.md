@@ -6,12 +6,15 @@ A web-based version of the [IntuneHydrationKit PowerShell module](https://github
 
 ## Features
 
-- **Multi-step Wizard**: Guided configuration process with 5 clear steps
+- **Streamlined 4-Step Wizard**: Guided configuration process from tenant setup to execution
 - **MSAL Authentication**: Secure authentication with Microsoft Entra ID
 - **Multi-Cloud Support**: Compatible with Global, USGov, Germany, and China clouds
+- **Local Templates**: 183+ pre-built templates bundled with the app (no external dependencies)
 - **Safety First**: Built-in safeguards prevent accidental deletions
-- **Real-time Progress**: Live updates during policy deployment (Phase 2)
-- **Comprehensive Coverage**: Deploy 127+ policies, groups, filters, and more
+- **Real-time Progress**: Live updates during policy deployment with pause/resume/cancel controls
+- **Comprehensive Coverage**: Deploy 47 groups, 24 filters, 10 compliance policies, 10 app protection policies, 21 conditional access policies, and more
+- **Optimized Performance**: Pre-fetch optimization reduces API calls by 90% for App Protection operations
+- **Execution Control**: Pause, resume, or cancel operations mid-execution
 
 ## Tech Stack
 
@@ -105,6 +108,33 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
+## Recent Updates
+
+### January 2026
+
+**Wizard Simplification**
+- Reduced wizard from 5 steps to 4 by removing OpenIntuneBaseline configuration
+- All templates now load instantly from local `public/IntuneTemplates/` directory
+- No external GitHub API dependencies for template loading
+
+**App Protection Policies**
+- Updated to 10 App Protection policies (added 2 BYOD baseline templates)
+- Implemented pre-fetch optimization reducing API calls by 90%
+- Added PowerShell module parity for policy creation
+- Fixed platform detection for iOS vs Android policies
+
+**Execution Improvements**
+- Added execution lock to prevent duplicate runs in React Strict Mode
+- Implemented pause/resume/cancel controls
+- Added success items display in results summary
+- Cache versioning for automatic invalidation on template updates
+
+**UI Enhancements**
+- Added application favicon
+- Improved mobile responsiveness
+- Enhanced dark mode support
+- Real-time task status updates
+
 ## Available Scripts
 
 - `npm run dev` - Start development server with Turbopack
@@ -119,21 +149,26 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ├── app/                      # Next.js App Router pages
 │   ├── layout.tsx           # Root layout with providers
 │   ├── page.tsx             # Landing page
-│   ├── wizard/              # Multi-step wizard
-│   └── dashboard/           # Execution dashboard
+│   ├── wizard/              # 4-step configuration wizard
+│   ├── dashboard/           # Real-time execution dashboard
+│   └── results/             # Execution results and reporting
 ├── components/
 │   ├── ui/                  # shadcn/ui components
 │   ├── auth/                # Authentication components
 │   ├── wizard/              # Wizard step components
+│   ├── dashboard/           # Dashboard components (progress, task list, controls)
 │   └── providers/           # React providers
 ├── lib/
 │   ├── auth/                # MSAL configuration
-│   ├── graph/               # Graph API client
-│   ├── hydration/           # Execution engine (Phase 2)
+│   ├── graph/               # Graph API client & operations
+│   ├── hydration/           # Task execution engine
+│   ├── templates/           # Template loader (local files)
 │   └── utils/               # Utility functions
+├── public/
+│   └── IntuneTemplates/     # 183+ bundled policy templates
 ├── types/                   # TypeScript type definitions
 ├── hooks/                   # Custom React hooks
-└── templates/               # Intune policy templates (Phase 2)
+└── templates/               # Template metadata
 ```
 
 ## Development Status
@@ -142,23 +177,73 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 - [x] Next.js 15 project setup with TypeScript
 - [x] MSAL authentication flow
-- [x] Basic 5-step wizard shell
+- [x] 4-step wizard with streamlined workflow
 - [x] shadcn/ui component library
 - [x] Graph API client wrapper with retry logic
 
-### 🚧 Phase 2: Core Hydration (In Progress)
+### ✅ Phase 2: Core Hydration (Completed)
 
-- [ ] Template TypeScript files
-- [ ] Task execution engine
-- [ ] Graph API service functions
-- [ ] Pre-flight validation
-- [ ] Error handling and retry logic
+- [x] Local template system (183+ templates)
+- [x] Task execution engine with queue management
+- [x] Graph API service functions for all policy types
+- [x] Pre-flight validation
+- [x] Error handling and retry logic with exponential backoff
+- [x] Real-time progress tracking
 
-### 📋 Phase 3-5: Coming Soon
+### ✅ Phase 3: UI & UX (Completed)
 
-- Phase 3: UI & UX improvements
-- Phase 4: Advanced features (drift detection, conflict resolution)
-- Phase 5: Testing and deployment
+- [x] Real-time execution dashboard
+- [x] Pause/Resume/Cancel controls
+- [x] Task status indicators
+- [x] Execution results and summary page
+- [x] Dark mode support
+- [x] Mobile-responsive design
+
+### ✅ Phase 4: Advanced Features (Completed)
+
+- [x] Session storage caching with version control
+- [x] App Protection policy pre-fetch optimization (90% API reduction)
+- [x] Duplicate execution prevention
+- [x] PowerShell module parity for App Protection policies
+- [x] Success items display in results
+- [x] Execution lock pattern for React Strict Mode compatibility
+
+### 📋 Phase 5: Testing & Deployment (Current)
+
+- [x] TypeScript strict mode compliance
+- [x] Build optimization
+- [ ] End-to-end testing
+- [ ] Production deployment
+- [ ] Documentation updates
+
+## Wizard Workflow
+
+The application guides you through a streamlined 4-step process:
+
+### Step 1: Tenant Configuration
+- Enter your Tenant ID and optional display name
+- Select your cloud environment (Global, USGov, USGovDoD, Germany, China)
+- Authenticate with Microsoft Entra ID
+
+### Step 2: Operation Mode
+- **Create**: Deploy new configurations (skips if already exists)
+- **Delete**: Remove configurations created by this tool (with safety checks)
+- **Preview**: See what would be deployed without making changes
+
+### Step 3: Target Selection
+Select which policy categories to deploy:
+- **Dynamic Groups** (47 items) - Device categorization groups
+- **Device Filters** (24 items) - Assignment filters for targeting
+- **Compliance Policies** (10 items) - Platform-specific compliance rules
+- **App Protection** (10 items) - MAM policies for iOS and Android
+- **Conditional Access** (21 items) - Zero Trust access policies
+- **Enrollment Profiles** (3 items) - Autopilot and DEP profiles
+
+### Step 4: Review & Confirm
+- Review all selections
+- View estimated object count
+- Confirm understanding of tenant modifications
+- Start execution
 
 ## Configuration
 
@@ -176,7 +261,7 @@ The application supports multiple Microsoft cloud environments:
 
 1. **Create** - Deploy new configurations (skips existing objects)
 2. **Preview** - Show what would happen without making changes
-3. **Delete** - Remove configurations created by this tool
+3. **Delete** - Remove configurations created by this tool (only deletes items with hydration marker)
 
 ## Security Considerations
 
@@ -185,6 +270,23 @@ The application supports multiple Microsoft cloud environments:
 - Content Security Policy headers configured
 - No sensitive data logging
 - Session timeout after 1 hour of inactivity
+
+## Performance Optimizations
+
+### Template Loading
+- **Local Storage**: All 183+ templates load from `public/IntuneTemplates/` in <100ms
+- **Session Caching**: Templates cached with automatic version invalidation
+- **No Network Dependency**: No GitHub API calls during template loading
+
+### API Efficiency
+- **Pre-fetch Optimization**: App Protection operations reduced from 10 API calls to 1 (90% reduction)
+- **Smart Caching**: Policies cached in execution context and synchronized after create/delete
+- **Rate Limiting Protection**: 2-second delay between tasks + exponential backoff on 429 errors
+
+### Execution Reliability
+- **Duplicate Prevention**: Execution lock prevents React Strict Mode double-invocation
+- **Error Recovery**: Comprehensive error handling with retry logic (max 3 attempts)
+- **Graceful Degradation**: Failed tasks don't block subsequent operations
 
 ## Troubleshooting
 

@@ -37,6 +37,7 @@ import {
   appProtectionPolicyExists,
   getAppProtectionPolicyByName,
   deleteAppProtectionPolicy,
+  getAllAppProtectionPolicies,
 } from "@/lib/graph/appProtection";
 import * as Templates from "@/templates";
 import {
@@ -47,7 +48,6 @@ import {
   fetchConditionalAccessPolicies,
   fetchAppProtectionPolicies,
   fetchEnrollmentProfiles,
-  fetchBaselinePolicies,
   getCachedTemplates,
   cacheTemplates,
   GroupTemplate,
@@ -69,6 +69,8 @@ export interface ExecutionContext {
   onTaskError?: (task: HydrationTask, error: Error) => void;
   shouldCancel?: () => boolean;
   shouldPause?: () => boolean;
+  // Pre-fetched data caches to avoid repeated API calls
+  cachedAppProtectionPolicies?: AppProtectionPolicy[];
 }
 
 /**
@@ -125,7 +127,7 @@ async function executeTask(
         result = await executeConditionalAccessTask(task, client, operationMode);
         break;
       case "appProtection":
-        result = await executeAppProtectionTask(task, client, operationMode);
+        result = await executeAppProtectionTask(task, context);
         break;
       default:
         result = {
@@ -529,9 +531,10 @@ async function executeConditionalAccessTask(
  */
 async function executeAppProtectionTask(
   task: HydrationTask,
-  client: GraphClient,
-  mode: OperationMode
+  context: ExecutionContext
 ): Promise<ExecutionResult> {
+  const { client, operationMode: mode } = context;
+
   if (mode === "preview") {
     return { task, success: true, skipped: false };
   }
@@ -553,9 +556,12 @@ async function executeAppProtectionTask(
   }
 
   if (mode === "create") {
-    // Check if policy already exists
-    const exists = await appProtectionPolicyExists(client, template.displayName);
-    if (exists) {
+    // Check if policy already exists using cached policies
+    const existingPolicy = context.cachedAppProtectionPolicies?.find(
+      (p) => p.displayName.toLowerCase() === template!.displayName.toLowerCase()
+    );
+
+    if (existingPolicy) {
       return {
         task,
         success: false,
@@ -566,6 +572,12 @@ async function executeAppProtectionTask(
 
     // Create the policy
     const created = await createAppProtectionPolicy(client, template);
+
+    // Add the newly created policy to the cache
+    if (context.cachedAppProtectionPolicies) {
+      context.cachedAppProtectionPolicies.push(created);
+    }
+
     return {
       task,
       success: true,
@@ -573,17 +585,60 @@ async function executeAppProtectionTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
-    // Get the policy to determine platform
-    const policy = await getAppProtectionPolicyByName(client, template.displayName);
+    // Get the policy from cache instead of making an API call
+    const policy = context.cachedAppProtectionPolicies?.find(
+      (p) => p.displayName.toLowerCase() === template.displayName.toLowerCase()
+    );
+
     if (!policy || !policy.id) {
       // Policy doesn't exist, skip deletion
       return { task, success: true, skipped: true, error: "Policy not found in tenant" };
     }
 
-    const platform = policy["@odata.type"] === "#microsoft.graph.iosManagedAppProtection" ? "iOS" : "android";
+    // Log the policy object to debug platform detection
+    console.log(`[App Protection Delete] Policy object for "${template.displayName}":`, {
+      id: policy.id,
+      displayName: policy.displayName,
+      odataType: policy["@odata.type"],
+      allKeys: Object.keys(policy)
+    });
+
+    // Determine platform from @odata.type
+    const odataType = policy["@odata.type"];
+    let platform: "iOS" | "android";
+
+    if (odataType === "#microsoft.graph.iosManagedAppProtection") {
+      platform = "iOS";
+    } else if (odataType === "#microsoft.graph.androidManagedAppProtection") {
+      platform = "android";
+    } else {
+      // Fallback: check template's @odata.type if policy doesn't have it
+      console.warn(`[App Protection Delete] Policy missing or invalid @odata.type: ${odataType}`);
+      const templateOdataType = template["@odata.type"];
+      console.log(`[App Protection Delete] Using template @odata.type: ${templateOdataType}`);
+
+      if (templateOdataType === "#microsoft.graph.iosManagedAppProtection") {
+        platform = "iOS";
+      } else if (templateOdataType === "#microsoft.graph.androidManagedAppProtection") {
+        platform = "android";
+      } else {
+        throw new Error(`Unable to determine platform for policy "${template.displayName}". @odata.type: ${odataType}, template @odata.type: ${templateOdataType}`);
+      }
+    }
+
+    console.log(`[App Protection Delete] Detected platform: ${platform}`);
 
     // Delete the policy
     await deleteAppProtectionPolicy(client, policy.id, platform);
+
+    // Remove the deleted policy from the cache
+    if (context.cachedAppProtectionPolicies) {
+      const index = context.cachedAppProtectionPolicies.findIndex((p) => p.id === policy.id);
+      if (index !== -1) {
+        context.cachedAppProtectionPolicies.splice(index, 1);
+      }
+    }
+
     return { task, success: true, skipped: false };
   }
 
@@ -599,6 +654,20 @@ export async function executeTasks(
 ): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
   const TASK_DELAY_MS = 2000; // 2 second delay between tasks
+
+  // Pre-fetch App Protection policies if any appProtection tasks exist
+  const hasAppProtectionTasks = tasks.some((task) => task.category === "appProtection");
+  if (hasAppProtectionTasks && !context.cachedAppProtectionPolicies) {
+    console.log("[Execute Tasks] Pre-fetching all App Protection policies...");
+    try {
+      context.cachedAppProtectionPolicies = await getAllAppProtectionPolicies(context.client);
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedAppProtectionPolicies.length} App Protection policies`);
+    } catch (error) {
+      console.error("[Execute Tasks] Failed to pre-fetch App Protection policies:", error);
+      // Continue execution - individual tasks will handle errors
+      context.cachedAppProtectionPolicies = [];
+    }
+  }
 
   for (const task of tasks) {
     // Check for cancellation before starting task
@@ -696,12 +765,11 @@ export function buildTaskQueue(
 
 /**
  * Build task queue from selected categories (async version)
- * Fetches real templates from PowerShell repository
+ * Fetches real templates from local IntuneTemplates directory
  */
 export async function buildTaskQueueAsync(
   selectedCategories: TaskCategory[],
-  operationMode: OperationMode,
-  baselineConfig?: { repoUrl: string; branch: string }
+  operationMode: OperationMode
 ): Promise<HydrationTask[]> {
   console.log(`[Task Queue] Building task queue for categories:`, selectedCategories);
   const tasks: HydrationTask[] = [];
@@ -735,21 +803,6 @@ export async function buildTaskQueueAsync(
           items = await fetchFilters();
           console.log(`[Task Queue] ✓ Fetched ${items.length} filters`);
           cacheTemplates(category, items);
-          break;
-        case "baseline":
-          if (baselineConfig) {
-            const baselinePolicies = await fetchBaselinePolicies(
-              baselineConfig.repoUrl,
-              baselineConfig.branch
-            );
-            items = baselinePolicies as Array<{ displayName: string }>;
-            cacheTemplates(category, items);
-          } else {
-            // Fallback to placeholder
-            items = Array.from({ length: 70 }, (_, i) => ({
-              displayName: `Baseline Policy ${i + 1}`,
-            }));
-          }
           break;
         case "compliance":
           items = await fetchCompliancePolicies();

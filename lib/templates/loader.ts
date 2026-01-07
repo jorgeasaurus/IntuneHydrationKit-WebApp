@@ -1,10 +1,13 @@
 /**
  * Template loader for Intune Hydration Kit
- * Fetches real templates from the PowerShell repository
+ * Loads templates from local IntuneTemplates directory
  */
 
-const REPO_BASE_URL = "https://raw.githubusercontent.com/jorgeasaurus/IntuneHydrationKit/main/Templates";
+const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+
+// Cache version - increment this when templates change to invalidate old caches
+const CACHE_VERSION = 2; // Updated for 10 App Protection policies
 
 export interface GroupTemplate {
   displayName: string;
@@ -42,7 +45,7 @@ export interface AppProtectionTemplate {
 }
 
 /**
- * Fetch dynamic groups from PowerShell repository
+ * Fetch dynamic groups from local templates
  */
 export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
   const groupFiles = [
@@ -58,7 +61,7 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
 
   for (const file of groupFiles) {
     try {
-      const response = await fetch(`${REPO_BASE_URL}/${file}`);
+      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
       if (!response.ok) {
         console.error(`Failed to fetch ${file}: ${response.statusText}`);
         continue;
@@ -85,11 +88,11 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
 }
 
 /**
- * Fetch static groups from PowerShell repository
+ * Fetch static groups from local templates
  */
 export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
   try {
-    const response = await fetch(`${REPO_BASE_URL}/StaticGroups/Static-Groups.json`);
+    const response = await fetch(`${TEMPLATES_BASE_PATH}/StaticGroups/Static-Groups.json`);
     if (!response.ok) {
       console.error(`Failed to fetch static groups: ${response.statusText}`);
       return [];
@@ -114,21 +117,22 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
 }
 
 /**
- * Fetch device filters from PowerShell repository
+ * Fetch device filters from local templates
  */
 export async function fetchFilters(): Promise<FilterTemplate[]> {
   const filterFiles = [
-    "Filters/Autopilot-Filters.json",
-    "Filters/Manufacturer-Filters.json",
-    "Filters/OS-Filters.json",
-    "Filters/Ownership-Filters.json",
+    "Filters/Android-Filters.json",
+    "Filters/Windows-Manufacturer-Filters.json",
+    "Filters/Windows-VM-Filters.json",
+    "Filters/iOS-Filters.json",
+    "Filters/macOS-Filters.json",
   ];
 
   const allFilters: FilterTemplate[] = [];
 
   for (const file of filterFiles) {
     try {
-      const response = await fetch(`${REPO_BASE_URL}/${file}`);
+      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
       if (!response.ok) {
         console.error(`Failed to fetch ${file}: ${response.statusText}`);
         continue;
@@ -154,21 +158,27 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
 }
 
 /**
- * Fetch compliance policies from PowerShell repository
+ * Fetch compliance policies from local templates
  */
 export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
   const complianceFiles = [
-    "Compliance/Android-Compliance.json",
-    "Compliance/iOS-Compliance.json",
-    "Compliance/macOS-Compliance.json",
-    "Compliance/Windows-Compliance.json",
+    "Compliance/Android-Compliance-FullyManaged-Basic.json",
+    "Compliance/Android-Compliance-FullyManaged-Strict.json",
+    "Compliance/Linux-Compliance-Basic.json",
+    "Compliance/Linux-Compliance-Strict.json",
+    "Compliance/Windows-Compliance-Policy.json",
+    "Compliance/Windows-Custom-Compliance.json",
+    "Compliance/iOS-Compliance-Basic.json",
+    "Compliance/iOS-Compliance-Strict.json",
+    "Compliance/macOS-Compliance-Basic.json",
+    "Compliance/macOS-Compliance-Strict.json",
   ];
 
   const allPolicies: ComplianceTemplate[] = [];
 
   for (const file of complianceFiles) {
     try {
-      const response = await fetch(`${REPO_BASE_URL}/${file}`);
+      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
       if (!response.ok) {
         console.error(`Failed to fetch ${file}: ${response.statusText}`);
         continue;
@@ -176,14 +186,15 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
 
       const data = await response.json();
 
-      if (data.policies && Array.isArray(data.policies)) {
-        const policies = data.policies.map((policy: ComplianceTemplate) => ({
-          ...policy,
-          description: policy.description
-            ? `${policy.description} ${HYDRATION_MARKER}`
+      // Compliance files contain single policy objects, not arrays
+      if (data["@odata.type"]) {
+        const policy: ComplianceTemplate = {
+          ...data,
+          description: data.description
+            ? `${data.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
-        }));
-        allPolicies.push(...policies);
+        };
+        allPolicies.push(policy);
       }
     } catch (error) {
       console.error(`Error fetching ${file}:`, error);
@@ -194,39 +205,68 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
 }
 
 /**
- * Fetch conditional access policies from PowerShell repository
+ * Fetch conditional access policies from local templates
  */
 export async function fetchConditionalAccessPolicies(): Promise<ConditionalAccessTemplate[]> {
-  try {
-    const response = await fetch(`${REPO_BASE_URL}/ConditionalAccess/CA-Policies.json`);
-    if (!response.ok) {
-      console.error(`Failed to fetch CA policies: ${response.statusText}`);
-      return [];
+  // Get list of all CA policy files
+  const caFiles = [
+    "ConditionalAccess/Block access for unknown or unsupported device platform.json",
+    "ConditionalAccess/Block access to Office365 apps for users with insider risk.json",
+    "ConditionalAccess/Block all agent identities from accessing resources.json",
+    "ConditionalAccess/Block all agent users from accessing resources.json",
+    "ConditionalAccess/Block high risk agent identities from accessing resources.json",
+    "ConditionalAccess/Block legacy authentication.json",
+    "ConditionalAccess/No persistent browser session.json",
+    "ConditionalAccess/Require MDM-enrolled and compliant device to access cloud apps for all users (Preview).json",
+    "ConditionalAccess/Require compliant or hybrid Azure AD joined device for admins.json",
+    "ConditionalAccess/Require compliant or hybrid Azure AD joined device or multifactor authentication for all users.json",
+    "ConditionalAccess/Require multifactor authentication for admin portals.json",
+    "ConditionalAccess/Require multifactor authentication for admins.json",
+    "ConditionalAccess/Require multifactor authentication for all users.json",
+    "ConditionalAccess/Require multifactor authentication for Azure management.json",
+    "ConditionalAccess/Require multifactor authentication for guest access.json",
+    "ConditionalAccess/Require multifactor authentication for risky sign-in (all users).json",
+    "ConditionalAccess/Require password change for high-risk users.json",
+    "ConditionalAccess/Securing security info registration.json",
+    "ConditionalAccess/Use application enforced restrictions for unmanaged devices.json",
+  ];
+
+  const allPolicies: ConditionalAccessTemplate[] = [];
+
+  for (const file of caFiles) {
+    try {
+      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
+      if (!response.ok) {
+        console.error(`Failed to fetch ${file}: ${response.statusText}`);
+        continue;
+      }
+
+      const data = await response.json();
+
+      // CA policy files contain single policy objects
+      if (data.displayName) {
+        const policy: ConditionalAccessTemplate = {
+          ...data,
+          state: "disabled", // CA policies are always created in disabled state
+        };
+        allPolicies.push(policy);
+      }
+    } catch (error) {
+      console.error(`Error fetching ${file}:`, error);
     }
-
-    const data = await response.json();
-
-    if (data.policies && Array.isArray(data.policies)) {
-      // CA policies are created in disabled state
-      return data.policies.map((policy: ConditionalAccessTemplate) => ({
-        ...policy,
-        state: "disabled",
-      }));
-    }
-
-    return [];
-  } catch (error) {
-    console.error("Error fetching CA policies:", error);
-    return [];
   }
+
+  return allPolicies;
 }
 
 /**
- * Fetch app protection policies from PowerShell repository
+ * Fetch app protection policies from local templates
  */
 export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplate[]> {
   const appProtectionFiles = [
+    "AppProtection/Android - Baseline - BYOD - App Protection.json",
     "AppProtection/Android-App-Protection.json",
+    "AppProtection/iOS - Baseline - BYOD - App Protection.json",
     "AppProtection/iOS-App-Protection.json",
     "AppProtection/level-1-enterprise-basic-data-protection-Android.json",
     "AppProtection/level-1-enterprise-basic-data-protection-iOS.json",
@@ -240,7 +280,7 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
 
   for (const file of appProtectionFiles) {
     try {
-      const response = await fetch(`${REPO_BASE_URL}/${file}`);
+      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
       if (!response.ok) {
         console.error(`Failed to fetch ${file}: ${response.statusText}`);
         continue;
@@ -267,11 +307,11 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
 }
 
 /**
- * Fetch enrollment profiles from PowerShell repository
+ * Fetch enrollment profiles from local templates
  */
 export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
   try {
-    const response = await fetch(`${REPO_BASE_URL}/Enrollment/Autopilot-Profiles.json`);
+    const response = await fetch(`${TEMPLATES_BASE_PATH}/Enrollment/Autopilot-Profiles.json`);
     if (!response.ok) {
       console.error(`Failed to fetch enrollment profiles: ${response.statusText}`);
       return [];
@@ -280,7 +320,12 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
     const data = await response.json();
 
     if (data.profiles && Array.isArray(data.profiles)) {
-      return data.profiles;
+      return data.profiles.map((profile: { description?: string }) => ({
+        ...profile,
+        description: profile.description
+          ? `${profile.description} ${HYDRATION_MARKER}`
+          : HYDRATION_MARKER,
+      }));
     }
 
     return [];
@@ -291,45 +336,37 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
 }
 
 /**
- * Fetch OpenIntuneBaseline policies from GitHub
- * Uses the baseline config from wizard state
+ * Fetch notification templates from local templates
  */
-export async function fetchBaselinePolicies(
-  repoUrl: string = "https://github.com/SkipToTheEndpoint/OpenIntuneBaseline",
-  branch: string = "main"
-): Promise<unknown[]> {
-  // Extract owner and repo from GitHub URL
-  const urlParts = repoUrl.replace("https://github.com/", "").split("/");
-  if (urlParts.length < 2) {
-    throw new Error("Invalid GitHub repository URL");
-  }
-  const [owner, repo] = urlParts;
-
-  const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}`;
-
-  const platforms = ["Windows", "macOS", "iOS", "Android"];
-  const allPolicies: unknown[] = [];
-
-  for (const platform of platforms) {
-    try {
-      // Fetch the platform directory to get list of JSON files
-      const response = await fetch(`${baseUrl}/${platform}/`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${platform} baseline: ${response.statusText}`);
-        continue;
-      }
-
-      // Note: We can't list directory contents via raw.githubusercontent.com
-      // We need to use GitHub API or fetch known file names
-      // For now, we'll return placeholder data
-      console.log(`Baseline policies for ${platform} would be fetched from ${baseUrl}/${platform}/`);
-
-    } catch (error) {
-      console.error(`Error fetching ${platform} baseline:`, error);
+export async function fetchNotificationTemplates(): Promise<unknown[]> {
+  try {
+    const response = await fetch(`${TEMPLATES_BASE_PATH}/Notifications/Notification-Templates.json`);
+    if (!response.ok) {
+      console.error(`Failed to fetch notification templates: ${response.statusText}`);
+      return [];
     }
-  }
 
-  return allPolicies;
+    const data = await response.json();
+
+    if (data.templates && Array.isArray(data.templates)) {
+      return data.templates;
+    }
+
+    return [];
+  } catch (error) {
+    console.error("Error fetching notification templates:", error);
+    return [];
+  }
+}
+
+/**
+ * Fetch OpenIntuneBaseline policies from local templates
+ */
+export async function fetchBaselinePolicies(): Promise<unknown[]> {
+  // OpenIntuneBaseline is in a separate directory
+  // We'll implement this when the baseline structure is finalized
+  console.log("OpenIntuneBaseline loading from local files (not yet implemented)");
+  return [];
 }
 
 /**
@@ -342,6 +379,7 @@ export function cacheTemplates(category: string, templates: unknown[]): void {
       JSON.stringify({
         templates,
         timestamp: Date.now(),
+        version: CACHE_VERSION,
       })
     );
   } catch (error) {
@@ -351,18 +389,28 @@ export function cacheTemplates(category: string, templates: unknown[]): void {
 
 /**
  * Get cached templates from session storage
- * Returns null if cache is expired (> 1 hour)
+ * Returns null if cache is expired (> 1 hour) or version mismatch
  */
 export function getCachedTemplates(category: string): unknown[] | null {
   try {
     const cached = sessionStorage.getItem(`intune-hydration-templates-${category}`);
     if (!cached) return null;
 
-    const { templates, timestamp } = JSON.parse(cached);
+    const { templates, timestamp, version } = JSON.parse(cached);
+
+    // Check cache version - invalidate if mismatch
+    if (version !== CACHE_VERSION) {
+      console.log(`[Cache] Invalidating ${category} cache - version mismatch (cached: ${version}, current: ${CACHE_VERSION})`);
+      sessionStorage.removeItem(`intune-hydration-templates-${category}`);
+      return null;
+    }
+
+    // Check age
     const age = Date.now() - timestamp;
     const ONE_HOUR = 60 * 60 * 1000;
 
     if (age > ONE_HOUR) {
+      console.log(`[Cache] Invalidating ${category} cache - expired (age: ${Math.round(age / 60000)} minutes)`);
       sessionStorage.removeItem(`intune-hydration-templates-${category}`);
       return null;
     }

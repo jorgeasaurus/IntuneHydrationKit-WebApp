@@ -76,8 +76,6 @@ export interface TenantConfig {
 
 export interface AppSettings {
   defaultCloudEnvironment: CloudEnvironment;
-  defaultBaselineRepo: string;
-  defaultBaselineBranch: string;
   stopOnFirstError: boolean;
   enableVerboseLogging: boolean;
   autoDownloadReports: boolean;
@@ -89,10 +87,5 @@ export interface WizardState {
   tenantConfig?: TenantConfig;
   operationMode?: OperationMode;
   selectedTargets: TaskCategory[];
-  baselineConfig?: {
-    repoUrl: string;
-    branch: string;
-    version?: string;
-  };
   confirmed: boolean;
 }

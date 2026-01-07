@@ -39,6 +39,12 @@ export async function getAllAppProtectionPolicies(
     getiOSAppProtectionPolicies(client),
     getAndroidAppProtectionPolicies(client),
   ]);
+
+  // Log each policy's @odata.type for debugging
+  console.log(`[getAllAppProtectionPolicies] Retrieved ${iosPolicies.length} iOS policies, ${androidPolicies.length} Android policies`);
+  iosPolicies.forEach(p => console.log(`  iOS: ${p.displayName} - @odata.type: ${p["@odata.type"]}`));
+  androidPolicies.forEach(p => console.log(`  Android: ${p.displayName} - @odata.type: ${p["@odata.type"]}`));
+
   return [...iosPolicies, ...androidPolicies];
 }
 
@@ -100,14 +106,30 @@ export async function createiOSAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
+  // Clone the policy to avoid mutating the original
+  const policyBody = { ...policy };
+
   // Ensure the hydration marker is in the description
-  if (!policy.description?.includes(HYDRATION_MARKER)) {
-    policy.description = `${policy.description || ""} ${HYDRATION_MARKER}`.trim();
+  if (!policyBody.description?.includes(HYDRATION_MARKER)) {
+    const existingDesc = policyBody.description || "";
+    policyBody.description = existingDesc
+      ? `${existingDesc} - ${HYDRATION_MARKER}`
+      : HYDRATION_MARKER;
+  }
+
+  // Remove read-only properties (per PowerShell script logic)
+  delete policyBody.apps;
+  delete policyBody.assignments;
+  delete policyBody.targetedAppManagementLevels;
+
+  // Remove empty iOS device model allowlist (per PowerShell script logic)
+  if (policyBody.allowedIosDeviceModels === "") {
+    delete policyBody.allowedIosDeviceModels;
   }
 
   return client.post<AppProtectionPolicy>(
     "/deviceAppManagement/iosManagedAppProtections",
-    policy
+    policyBody
   );
 }
 
@@ -118,14 +140,30 @@ export async function createAndroidAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
+  // Clone the policy to avoid mutating the original
+  const policyBody = { ...policy };
+
   // Ensure the hydration marker is in the description
-  if (!policy.description?.includes(HYDRATION_MARKER)) {
-    policy.description = `${policy.description || ""} ${HYDRATION_MARKER}`.trim();
+  if (!policyBody.description?.includes(HYDRATION_MARKER)) {
+    const existingDesc = policyBody.description || "";
+    policyBody.description = existingDesc
+      ? `${existingDesc} - ${HYDRATION_MARKER}`
+      : HYDRATION_MARKER;
+  }
+
+  // Remove read-only properties (per PowerShell script logic)
+  delete policyBody.apps;
+  delete policyBody.assignments;
+  delete policyBody.targetedAppManagementLevels;
+
+  // Remove empty Android device manufacturer allowlist (per PowerShell script logic)
+  if (policyBody.allowedAndroidDeviceManufacturers === "") {
+    delete policyBody.allowedAndroidDeviceManufacturers;
   }
 
   return client.post<AppProtectionPolicy>(
     "/deviceAppManagement/androidManagedAppProtections",
-    policy
+    policyBody
   );
 }
 

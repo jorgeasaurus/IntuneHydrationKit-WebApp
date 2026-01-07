@@ -508,12 +508,12 @@ export default function Home() {
                 PowerShell Module
               </a>
               <a
-                href="https://github.com/jorgeasaurus/OpenIntuneBaseline"
+                href="https://github.com/skiptotheendpoint/OpenIntuneBaseline"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-primary transition-colors"
               >
-                OpenIntuneBaseline (Maintained Fork)
+                OpenIntuneBaseline
               </a>
               <a
                 href="https://learn.microsoft.com/en-us/graph/api/overview"
