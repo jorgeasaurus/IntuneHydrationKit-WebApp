@@ -117,3 +117,27 @@ export const loginRequest = {
  * Create a new MSAL instance
  */
 export const msalInstance = new PublicClientApplication(msalConfig);
+
+/**
+ * Initialize MSAL instance - must be called before any authentication operations
+ * Required for MSAL 3.x browser applications
+ */
+let msalInitialized = false;
+let msalInitPromise: Promise<void> | null = null;
+
+export async function initializeMsal(): Promise<void> {
+  if (msalInitialized) {
+    return;
+  }
+
+  if (msalInitPromise) {
+    return msalInitPromise;
+  }
+
+  msalInitPromise = msalInstance.initialize().then(() => {
+    msalInitialized = true;
+    console.log("[MSAL] Instance initialized successfully");
+  });
+
+  return msalInitPromise;
+}
