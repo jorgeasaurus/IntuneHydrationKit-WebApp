@@ -2,6 +2,8 @@
  * Type definitions for Intune Hydration Kit application
  */
 
+import { PrerequisiteCheckResult } from "./prerequisites";
+
 export type CloudEnvironment =
   | "global"
   | "usgov"
@@ -51,6 +53,7 @@ export interface HydrationSummary {
     [category: string]: {
       total: number;
       success: number;
+      skipped: number;
       failed: number;
     };
   };
@@ -88,4 +91,5 @@ export interface WizardState {
   operationMode?: OperationMode;
   selectedTargets: TaskCategory[];
   confirmed: boolean;
+  prerequisiteResult?: PrerequisiteCheckResult;
 }

@@ -40,6 +40,44 @@ function calculateDelay(
 }
 
 /**
+ * Check if an error has a status code that should be retried
+ * Retryable: 429 (Too Many Requests), 5xx (Server Errors)
+ * Non-retryable: 4xx (Client Errors) except 429
+ */
+function isRetryableError(error: unknown): boolean {
+  // Check for status property on error (added by GraphClient)
+  const errorWithStatus = error as { status?: number };
+  if (typeof errorWithStatus.status === "number") {
+    const status = errorWithStatus.status;
+    // Only retry 429 and 5xx errors
+    return status === 429 || (status >= 500 && status < 600);
+  }
+
+  // Check if it's a Response object
+  if (error instanceof Response) {
+    const status = error.status;
+    return status === 429 || (status >= 500 && status < 600);
+  }
+
+  // For other errors (network errors, etc.), retry by default
+  return true;
+}
+
+/**
+ * Get status code from error if available
+ */
+function getErrorStatus(error: unknown): number | undefined {
+  const errorWithStatus = error as { status?: number };
+  if (typeof errorWithStatus.status === "number") {
+    return errorWithStatus.status;
+  }
+  if (error instanceof Response) {
+    return error.status;
+  }
+  return undefined;
+}
+
+/**
  * Retry a function with exponential backoff
  */
 export async function retryWithBackoff<T>(
@@ -60,33 +98,31 @@ export async function retryWithBackoff<T>(
         break;
       }
 
-      // Check if error is retryable (429 Too Many Requests or 5xx errors)
-      if (error instanceof Response) {
-        const status = error.status;
-        const shouldRetry = status === 429 || (status >= 500 && status < 600);
-
-        if (!shouldRetry) {
-          throw error;
-        }
-
-        // Get Retry-After header if present
-        const retryAfter = error.headers.get("Retry-After");
-        const retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined;
-
-        const delay = calculateDelay(attempt, opts, retryAfterSeconds);
-        console.warn(
-          `Request failed with status ${status}. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${opts.maxRetries})`
-        );
-
-        await sleep(delay);
-      } else {
-        // For non-HTTP errors, still retry with backoff
-        const delay = calculateDelay(attempt, opts);
-        console.warn(
-          `Request failed. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${opts.maxRetries})`
-        );
-        await sleep(delay);
+      // Check if error is retryable
+      if (!isRetryableError(error)) {
+        // Non-retryable error (4xx except 429) - throw immediately
+        const status = getErrorStatus(error);
+        console.warn(`Request failed with status ${status}. Not retrying (non-retryable error).`);
+        throw error;
       }
+
+      // Get status for logging
+      const status = getErrorStatus(error);
+
+      // Check for Retry-After header if it's a Response
+      let retryAfterSeconds: number | undefined;
+      if (error instanceof Response) {
+        const retryAfter = error.headers.get("Retry-After");
+        retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined;
+      }
+
+      const delay = calculateDelay(attempt, opts, retryAfterSeconds);
+      const statusInfo = status ? ` with status ${status}` : "";
+      console.warn(
+        `Request failed${statusInfo}. Retrying in ${delay}ms... (Attempt ${attempt + 1}/${opts.maxRetries})`
+      );
+
+      await sleep(delay);
     }
   }
 

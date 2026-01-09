@@ -9,9 +9,11 @@ import { ResultsSummary } from "@/components/dashboard";
 import { HydrationSummary, HydrationTask } from "@/types/hydration";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
+import { useWizardState } from "@/hooks/useWizardState";
 
 export default function ResultsPage() {
   const router = useRouter();
+  const { resetWizard } = useWizardState();
   const [summary, setSummary] = useState<HydrationSummary | null>(null);
   const [tasks, setTasks] = useState<HydrationTask[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +57,9 @@ export default function ResultsPage() {
     // Clear previous results
     sessionStorage.removeItem("hydration-summary");
     sessionStorage.removeItem("hydration-tasks");
+
+    // Reset wizard state to step 1
+    resetWizard();
 
     // Navigate to wizard
     router.push("/wizard");

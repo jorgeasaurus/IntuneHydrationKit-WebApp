@@ -19,23 +19,8 @@ export function ProgressBar({ tasks, title, description }: ProgressBarProps) {
   const failed = tasks.filter((t) => t.status === "failed").length;
   const skipped = tasks.filter((t) => t.status === "skipped").length;
   const running = tasks.filter((t) => t.status === "running").length;
-  const currentTask = tasks.find((t) => t.status === "running");
 
   const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
-
-  // Format category name for display
-  const formatCategory = (category: string) => {
-    const names: Record<string, string> = {
-      groups: "Dynamic Groups",
-      filters: "Device Filters",
-      compliance: "Compliance Policies",
-      conditionalAccess: "Conditional Access",
-      appProtection: "App Protection",
-      enrollment: "Enrollment Profiles",
-      baseline: "OpenIntuneBaseline",
-    };
-    return names[category] || category;
-  };
 
   return (
     <Card>
@@ -53,27 +38,6 @@ export function ProgressBar({ tasks, title, description }: ProgressBarProps) {
           </div>
           <Progress value={percentage} className="h-2" />
         </div>
-
-        {/* Current Task Display */}
-        {currentTask && (
-          <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900">
-            <div className="flex items-start gap-3">
-              <div className="mt-0.5">
-                <div className="animate-spin h-4 w-4 border-2 border-blue-600 dark:border-blue-400 border-t-transparent rounded-full" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
-                  Currently Processing
-                </p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                  <span className="font-semibold">{formatCategory(currentTask.category)}</span>
-                  {" → "}
-                  <span className="truncate">{currentTask.itemName}</span>
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="space-y-1">

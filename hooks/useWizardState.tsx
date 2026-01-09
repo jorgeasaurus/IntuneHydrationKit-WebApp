@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, ReactNode } from "react";
 import { WizardState, OperationMode, TaskCategory, TenantConfig } from "@/types/hydration";
+import { PrerequisiteCheckResult } from "@/types/prerequisites";
 
 interface WizardContextType {
   state: WizardState;
@@ -10,6 +11,7 @@ interface WizardContextType {
   setOperationMode: (mode: OperationMode) => void;
   setSelectedTargets: (targets: TaskCategory[]) => void;
   setConfirmed: (confirmed: boolean) => void;
+  setPrerequisiteResult: (result: PrerequisiteCheckResult) => void;
   resetWizard: () => void;
   nextStep: () => void;
   previousStep: () => void;
@@ -46,6 +48,10 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, confirmed }));
   };
 
+  const setPrerequisiteResult = (result: PrerequisiteCheckResult) => {
+    setState((prev) => ({ ...prev, prerequisiteResult: result }));
+  };
+
   const resetWizard = () => {
     setState(initialState);
   };
@@ -67,6 +73,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         setOperationMode,
         setSelectedTargets,
         setConfirmed,
+        setPrerequisiteResult,
         resetWizard,
         nextStep,
         previousStep,

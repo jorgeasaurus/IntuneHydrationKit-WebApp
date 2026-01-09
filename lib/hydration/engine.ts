@@ -15,12 +15,11 @@ import {
 import {
   createGroup,
   deleteGroupByName,
-  groupExists,
+  getIntuneGroups,
 } from "@/lib/graph/groups";
 import {
   createFilter,
-  deleteFilterByName,
-  filterExists,
+  getAllFilters,
 } from "@/lib/graph/filters";
 import {
   createCompliancePolicy,
@@ -32,6 +31,7 @@ import {
   deleteConditionalAccessPolicyByName,
   conditionalAccessPolicyExists,
 } from "@/lib/graph/conditionalAccess";
+import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import {
   createAppProtectionPolicy,
   appProtectionPolicyExists,
@@ -71,6 +71,11 @@ export interface ExecutionContext {
   shouldPause?: () => boolean;
   // Pre-fetched data caches to avoid repeated API calls
   cachedAppProtectionPolicies?: AppProtectionPolicy[];
+  cachedIntuneGroups?: DeviceGroup[];
+  cachedFilters?: DeviceFilter[];
+  // License flags for conditional skipping
+  hasPremiumP2License?: boolean;
+  hasWindowsDriverUpdateLicense?: boolean;
 }
 
 /**
@@ -112,19 +117,38 @@ async function executeTask(
   try {
     let result: ExecutionResult;
 
+    // Check for Windows Driver Update license requirement
+    // Driver update profiles have names like "Win - OIB - WUfB Drivers - ..."
+    const isDriverUpdateProfile = task.itemName.toLowerCase().includes("wufb drivers") ||
+      task.itemName.toLowerCase().includes("driver update");
+
+    if (isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
+      console.log(`[Execute Task] Skipping driver update profile (no Windows E3/E5 license): "${task.itemName}"`);
+      task.status = "skipped";
+      task.error = "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)";
+      task.endTime = new Date();
+      context.onTaskComplete?.(task);
+      return {
+        task,
+        success: true,
+        skipped: true,
+        error: task.error,
+      };
+    }
+
     console.log(`[Execute Task] Routing to handler for category: ${task.category}`);
     switch (task.category) {
       case "groups":
-        result = await executeGroupTask(task, client, operationMode);
+        result = await executeGroupTask(task, context);
         break;
       case "filters":
-        result = await executeFilterTask(task, client, operationMode);
+        result = await executeFilterTask(task, context);
         break;
       case "compliance":
         result = await executeComplianceTask(task, client, operationMode);
         break;
       case "conditionalAccess":
-        result = await executeConditionalAccessTask(task, client, operationMode);
+        result = await executeConditionalAccessTask(task, context);
         break;
       case "appProtection":
         result = await executeAppProtectionTask(task, context);
@@ -181,9 +205,10 @@ async function executeTask(
  */
 async function executeGroupTask(
   task: HydrationTask,
-  client: GraphClient,
-  mode: OperationMode
+  context: ExecutionContext
 ): Promise<ExecutionResult> {
+  const { client, operationMode: mode } = context;
+
   if (mode === "preview") {
     return { task, success: true, skipped: false };
   }
@@ -220,10 +245,13 @@ async function executeGroupTask(
   }
 
   if (mode === "create") {
-    // Check if group already exists
+    // Check if group already exists using pre-fetched cache
     console.log(`[Group Task] Checking if group exists: "${template.displayName}"`);
-    const exists = await groupExists(client, template.displayName);
-    if (exists) {
+    const existingGroup = context.cachedIntuneGroups?.find(
+      (g) => g.displayName.toLowerCase() === template!.displayName.toLowerCase()
+    );
+
+    if (existingGroup) {
       console.log(`[Group Task] Group already exists, skipping: "${template.displayName}"`);
       return {
         task,
@@ -262,6 +290,12 @@ async function executeGroupTask(
     console.log(`[Group Task] Creating group: "${fullGroupTemplate.displayName}"`);
     const created = await createGroup(client, fullGroupTemplate);
     console.log(`[Group Task] ✓ Group created successfully with ID: ${created.id}`);
+
+    // Add the newly created group to the cache
+    if (context.cachedIntuneGroups) {
+      context.cachedIntuneGroups.push(created);
+    }
+
     return {
       task,
       success: true,
@@ -288,9 +322,11 @@ async function executeGroupTask(
  */
 async function executeFilterTask(
   task: HydrationTask,
-  client: GraphClient,
-  mode: OperationMode
+  context: ExecutionContext
 ): Promise<ExecutionResult> {
+  const { client, operationMode: mode } = context;
+  const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+
   if (mode === "preview") {
     return { task, success: true, skipped: false };
   }
@@ -298,11 +334,11 @@ async function executeFilterTask(
   // Try to get template from cache first, fallback to hardcoded templates
   console.log(`[Filter Task] Looking up template for: "${task.itemName}"`);
   let template: FilterTemplate | DeviceFilter | undefined;
-  const cachedFilters = getCachedTemplates("filters");
+  const cachedFilterTemplates = getCachedTemplates("filters");
 
-  if (cachedFilters && Array.isArray(cachedFilters)) {
-    console.log(`[Filter Task] Found ${cachedFilters.length} cached filter templates`);
-    template = (cachedFilters as FilterTemplate[]).find((f) => f.displayName === task.itemName);
+  if (cachedFilterTemplates && Array.isArray(cachedFilterTemplates)) {
+    console.log(`[Filter Task] Found ${cachedFilterTemplates.length} cached filter templates`);
+    template = (cachedFilterTemplates as FilterTemplate[]).find((f) => f.displayName === task.itemName);
     if (template) {
       console.log(`[Filter Task] ✓ Found template in cache: "${template.displayName}"`);
     } else {
@@ -327,10 +363,13 @@ async function executeFilterTask(
   }
 
   if (mode === "create") {
-    // Check if filter already exists
+    // Check if filter already exists using pre-fetched cache
     console.log(`[Filter Task] Checking if filter exists: "${template.displayName}"`);
-    const exists = await filterExists(client, template.displayName);
-    if (exists) {
+    const existingFilter = context.cachedFilters?.find(
+      (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
+    );
+
+    if (existingFilter) {
       console.log(`[Filter Task] Filter already exists, skipping: "${template.displayName}"`);
       return {
         task,
@@ -365,6 +404,12 @@ async function executeFilterTask(
     console.log(`[Filter Task] Creating filter: "${fullFilterTemplate.displayName}"`);
     const created = await createFilter(client, fullFilterTemplate);
     console.log(`[Filter Task] ✓ Filter created successfully with ID: ${created.id}`);
+
+    // Add the newly created filter to the cache
+    if (context.cachedFilters) {
+      context.cachedFilters.push(created);
+    }
+
     return {
       task,
       success: true,
@@ -372,15 +417,36 @@ async function executeFilterTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
-    // Delete the filter
-    try {
-      await deleteFilterByName(client, template.displayName);
-      return { task, success: true, skipped: false };
-    } catch (error) {
-      // Filter not found or not created by hydration kit - skip
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, error: errorMessage };
+    // Check if filter exists in tenant using pre-fetched cache
+    const existingFilter = context.cachedFilters?.find(
+      (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
+    );
+
+    if (!existingFilter) {
+      console.log(`[Filter Task] Filter not found in tenant, skipping: "${template.displayName}"`);
+      return { task, success: true, skipped: true, error: "Filter not found in tenant" };
     }
+
+    // Check if it was created by the hydration kit
+    if (!existingFilter.description?.includes(HYDRATION_MARKER)) {
+      console.log(`[Filter Task] Filter not created by Hydration Kit, skipping: "${template.displayName}"`);
+      return { task, success: true, skipped: true, error: "Filter not created by Intune Hydration Kit" };
+    }
+
+    // Delete the filter directly using its ID
+    console.log(`[Filter Task] Deleting filter: "${template.displayName}" (ID: ${existingFilter.id})`);
+    await client.delete(`/deviceManagement/assignmentFilters/${existingFilter.id}`);
+    console.log(`[Filter Task] ✓ Filter deleted successfully`);
+
+    // Remove from cache
+    if (context.cachedFilters) {
+      const index = context.cachedFilters.findIndex((f) => f.id === existingFilter.id);
+      if (index !== -1) {
+        context.cachedFilters.splice(index, 1);
+      }
+    }
+
+    return { task, success: true, skipped: false };
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };
@@ -454,9 +520,10 @@ async function executeComplianceTask(
  */
 async function executeConditionalAccessTask(
   task: HydrationTask,
-  client: GraphClient,
-  mode: OperationMode
+  context: ExecutionContext
 ): Promise<ExecutionResult> {
+  const { client, operationMode: mode } = context;
+
   if (mode === "preview") {
     return { task, success: true, skipped: false };
   }
@@ -475,6 +542,21 @@ async function executeConditionalAccessTask(
 
   if (!template) {
     return { task, success: false, skipped: false, error: "Template not found" };
+  }
+
+  // Check if policy requires Premium P2 and tenant doesn't have it (PowerShell parity)
+  if (mode === "create" && context.hasPremiumP2License === false) {
+    if (policyRequiresPremiumP2(template as ConditionalAccessPolicy)) {
+      console.log(
+        `[Conditional Access] Skipped: ${template.displayName} - requires Azure AD Premium P2 license (uses risk-based conditions)`
+      );
+      return {
+        task,
+        success: false,
+        skipped: true,
+        error: "Requires Premium P2 license",
+      };
+    }
   }
 
   if (mode === "create") {
@@ -654,6 +736,34 @@ export async function executeTasks(
 ): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
   const TASK_DELAY_MS = 2000; // 2 second delay between tasks
+
+  // Pre-fetch "Intune - " groups if any group tasks exist
+  const hasGroupTasks = tasks.some((task) => task.category === "groups");
+  if (hasGroupTasks && !context.cachedIntuneGroups) {
+    console.log("[Execute Tasks] Pre-fetching all 'Intune - ' groups...");
+    try {
+      context.cachedIntuneGroups = await getIntuneGroups(context.client);
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedIntuneGroups.length} 'Intune - ' groups`);
+    } catch (error) {
+      console.error("[Execute Tasks] Failed to pre-fetch groups:", error);
+      // Continue execution - individual tasks will handle errors
+      context.cachedIntuneGroups = [];
+    }
+  }
+
+  // Pre-fetch all filters if any filter tasks exist
+  const hasFilterTasks = tasks.some((task) => task.category === "filters");
+  if (hasFilterTasks && !context.cachedFilters) {
+    console.log("[Execute Tasks] Pre-fetching all device filters...");
+    try {
+      context.cachedFilters = await getAllFilters(context.client);
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedFilters.length} device filters`);
+    } catch (error) {
+      console.error("[Execute Tasks] Failed to pre-fetch filters:", error);
+      // Continue execution - individual tasks will handle errors
+      context.cachedFilters = [];
+    }
+  }
 
   // Pre-fetch App Protection policies if any appProtection tasks exist
   const hasAppProtectionTasks = tasks.some((task) => task.category === "appProtection");

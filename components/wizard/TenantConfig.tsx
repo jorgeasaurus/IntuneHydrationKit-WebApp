@@ -3,168 +3,316 @@
 import { useState, useEffect } from "react";
 import { useMsal } from "@azure/msal-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CloudEnvironment } from "@/types/hydration";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { PrerequisiteCheckResult, PrerequisiteCheckStatus } from "@/types/prerequisites";
 import { useWizardState } from "@/hooks/useWizardState";
-import { InfoIcon, Loader2 } from "lucide-react";
+import { InfoIcon, Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
 import { createGraphClient } from "@/lib/graph/client";
+import { validatePrerequisites } from "@/lib/graph/prerequisites";
 
 export function TenantConfig() {
-  const { state, setTenantConfig, nextStep } = useWizardState();
+  const { state, setTenantConfig, setPrerequisiteResult: setWizardPrerequisiteResult, nextStep } = useWizardState();
   const { accounts } = useMsal();
-  const [tenantId, setTenantId] = useState(state.tenantConfig?.tenantId || "");
-  const [tenantName, setTenantName] = useState(state.tenantConfig?.tenantName || "");
-  const [cloudEnvironment, setCloudEnvironment] = useState<CloudEnvironment>(
-    state.tenantConfig?.cloudEnvironment || "global"
-  );
-  const [isLoadingTenantName, setIsLoadingTenantName] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [prerequisiteStatus, setPrerequisiteStatus] = useState<PrerequisiteCheckStatus>("pending");
+  const [prerequisiteResult, setPrerequisiteResult] = useState<PrerequisiteCheckResult | null>(null);
 
-  // Auto-populate tenant info from signed-in account
+  // Get tenant info directly from signed-in account
+  const tenantId = accounts.length > 0 ? accounts[0].tenantId : "";
+  const tenantName = prerequisiteResult?.organization?.displayName || "";
+
+  // Run prerequisite checks when component mounts or account changes
   useEffect(() => {
-    async function fetchTenantInfo() {
+    async function runPrerequisiteChecks() {
       if (accounts.length > 0 && !state.tenantConfig) {
-        const account = accounts[0];
-
-        // Get tenant ID from the account
-        if (account.tenantId) {
-          setTenantId(account.tenantId);
-        }
-
-        // Fetch the actual organization display name from Graph API
         try {
-          setIsLoadingTenantName(true);
-          const graphClient = createGraphClient(cloudEnvironment);
+          setIsLoading(true);
+          setPrerequisiteStatus("checking");
 
-          interface Organization {
-            displayName: string;
-            id: string;
-          }
+          // Always use global cloud environment (user's signed-in environment)
+          const graphClient = createGraphClient("global");
 
-          // The /organization endpoint returns a collection
-          const orgs = await graphClient.getCollection<Organization>("/organization", "v1.0");
+          // Validate prerequisites (includes organization info, licenses, permissions)
+          const result = await validatePrerequisites(graphClient);
+          setPrerequisiteResult(result);
+          setWizardPrerequisiteResult(result); // Store in wizard state for execution
 
-          if (orgs && orgs.length > 0 && orgs[0].displayName) {
-            setTenantName(orgs[0].displayName);
+          // Set status based on validation result
+          if (result.errors.length > 0) {
+            setPrerequisiteStatus("error");
+          } else if (result.warnings.length > 0) {
+            setPrerequisiteStatus("warning");
+          } else {
+            setPrerequisiteStatus("success");
           }
         } catch (error) {
-          console.error("Failed to fetch organization name:", error);
-
-          // Fallback: extract from username domain
-          if (account.username) {
-            const domain = account.username.split("@")[1];
-            if (domain) {
-              const name = domain.replace(".onmicrosoft.com", "").split(".")[0];
-              const displayName = name.charAt(0).toUpperCase() + name.slice(1);
-              setTenantName(displayName);
-            }
-          }
+          console.error("Failed to validate prerequisites:", error);
+          setPrerequisiteStatus("error");
+          setPrerequisiteResult({
+            organization: null,
+            licenses: null,
+            permissions: null,
+            isValid: false,
+            warnings: [],
+            errors: [error instanceof Error ? error.message : "Unknown error"],
+            timestamp: new Date(),
+          });
         } finally {
-          setIsLoadingTenantName(false);
+          setIsLoading(false);
         }
       }
     }
 
-    fetchTenantInfo();
-  }, [accounts, state.tenantConfig, cloudEnvironment]);
+    runPrerequisiteChecks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accounts, state.tenantConfig]);
+
+  const handleRecheck = async () => {
+    if (accounts.length === 0) return;
+
+    try {
+      setPrerequisiteStatus("checking");
+      const graphClient = createGraphClient("global");
+      const result = await validatePrerequisites(graphClient);
+      setPrerequisiteResult(result);
+      setWizardPrerequisiteResult(result); // Store in wizard state for execution
+
+      // Set status based on validation result
+      if (result.errors.length > 0) {
+        setPrerequisiteStatus("error");
+      } else if (result.warnings.length > 0) {
+        setPrerequisiteStatus("warning");
+      } else {
+        setPrerequisiteStatus("success");
+      }
+    } catch (error) {
+      console.error("Failed to recheck prerequisites:", error);
+      setPrerequisiteStatus("error");
+    }
+  };
 
   const handleContinue = () => {
     setTenantConfig({
       tenantId,
       tenantName: tenantName || undefined,
-      cloudEnvironment,
+      cloudEnvironment: "global", // Always use global environment
     });
     nextStep();
   };
 
-  const isValid = tenantId.length > 0;
-
-  const isAutoPopulated = accounts.length > 0 && accounts[0].tenantId === tenantId;
+  const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Tenant Configuration</CardTitle>
         <CardDescription>
-          Configure your Microsoft Intune tenant connection settings
+          Validate your Microsoft Intune tenant prerequisites
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {isAutoPopulated && (
-          <Alert>
-            <InfoIcon className="h-4 w-4" />
-            <AlertDescription>
-              Tenant information has been auto-populated from your signed-in account. You can
-              modify it if you want to manage a different tenant.
-            </AlertDescription>
-          </Alert>
-        )}
+        <Alert>
+          <InfoIcon className="h-4 w-4" />
+          <AlertDescription>
+            Managing tenant: <strong>{tenantName || tenantId || "Loading..."}</strong>
+            <br />
+            To manage a different tenant, sign out and sign in with that account.
+          </AlertDescription>
+        </Alert>
 
-        <div className="space-y-2">
-          <Label htmlFor="tenantId">Tenant ID (Required)</Label>
-          <Input
-            id="tenantId"
-            placeholder="00000000-0000-0000-0000-000000000000"
-            value={tenantId}
-            onChange={(e) => setTenantId(e.target.value)}
-          />
-          <p className="text-sm text-muted-foreground">
-            {isAutoPopulated
-              ? "Auto-populated from your signed-in account"
-              : "Your Azure AD Tenant ID (GUID format)"}
-          </p>
+        {/* Tenant Information Display */}
+        <div className="rounded-lg border bg-muted/50 p-4 space-y-3">
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-muted-foreground">Organization</Label>
+            <p className="text-sm font-medium">
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-3 w-3 animate-spin" />
+                  Loading organization info...
+                </span>
+              ) : (
+                tenantName || "Unknown Organization"
+              )}
+            </p>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-muted-foreground">Tenant ID</Label>
+            <p className="text-sm font-mono">{tenantId || "Not signed in"}</p>
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs font-medium text-muted-foreground">Cloud Environment</Label>
+            <p className="text-sm">Global (Commercial)</p>
+          </div>
+
+          {accounts.length > 0 && accounts[0].username && (
+            <div className="space-y-1">
+              <Label className="text-xs font-medium text-muted-foreground">Signed in as</Label>
+              <p className="text-sm">{accounts[0].username}</p>
+            </div>
+          )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="tenantName">Tenant Display Name (Optional)</Label>
-          <div className="relative">
-            <Input
-              id="tenantName"
-              placeholder="Contoso"
-              value={tenantName}
-              onChange={(e) => setTenantName(e.target.value)}
-              disabled={isLoadingTenantName}
-            />
-            {isLoadingTenantName && (
-              <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-              </div>
+        {/* Prerequisite Checks */}
+        {accounts.length > 0 && (
+          <div className="space-y-3 border-t pt-4">
+            <div className="flex items-center justify-between">
+              <Label>Prerequisite Checks</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRecheck}
+                disabled={prerequisiteStatus === "checking"}
+              >
+                {prerequisiteStatus === "checking" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                <span className="ml-2">Recheck</span>
+              </Button>
+            </div>
+
+            {prerequisiteStatus === "checking" && (
+              <Alert>
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription>
+                  Validating tenant prerequisites...
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {prerequisiteStatus === "success" && prerequisiteResult && (
+              <Alert className="border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950">
+                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <AlertTitle className="text-green-800 dark:text-green-200">
+                  All Prerequisites Met
+                </AlertTitle>
+                <AlertDescription className="text-green-700 dark:text-green-300">
+                  <div className="mt-2 space-y-1 text-sm">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-3 w-3" />
+                      <span>
+                        Organization: {prerequisiteResult.organization?.displayName}
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      <div className="space-y-0.5">
+                        <p>
+                          Intune License: Found ({prerequisiteResult.licenses?.intuneServicePlans.length || 0} plan
+                          {(prerequisiteResult.licenses?.intuneServicePlans.length || 0) !== 1 ? "s" : ""})
+                        </p>
+                        {prerequisiteResult.licenses?.intuneServicePlans && prerequisiteResult.licenses.intuneServicePlans.length > 0 && (
+                          <ul className="list-disc list-inside ml-2">
+                            {prerequisiteResult.licenses.intuneServicePlans.map((plan, idx) => (
+                              <li key={idx} className="text-xs">{plan}</li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    </div>
+                    {prerequisiteResult.licenses?.hasPremiumP2License && (
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        <div className="space-y-0.5">
+                          <p>
+                            Azure AD Premium P2: Found ({prerequisiteResult.licenses.premiumP2ServicePlans.length} plan
+                            {prerequisiteResult.licenses.premiumP2ServicePlans.length !== 1 ? "s" : ""})
+                          </p>
+                          {prerequisiteResult.licenses.premiumP2ServicePlans.length > 0 && (
+                            <ul className="list-disc list-inside ml-2">
+                              {prerequisiteResult.licenses.premiumP2ServicePlans.map((plan, idx) => (
+                                <li key={idx} className="text-xs">{plan}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {prerequisiteStatus === "warning" && prerequisiteResult && (
+              <Alert className="border-blue-200 bg-blue-50 dark:border-blue-900/50 dark:bg-blue-950/30">
+                <AlertTriangle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <AlertTitle className="text-blue-900 dark:text-blue-100">
+                  Prerequisites Met with Warnings
+                </AlertTitle>
+                <AlertDescription className="text-blue-800 dark:text-blue-200">
+                  <div className="mt-2 space-y-2 text-sm">
+                    {prerequisiteResult.organization && (
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                        <span>
+                          Organization: {prerequisiteResult.organization.displayName}
+                        </span>
+                      </div>
+                    )}
+                    {prerequisiteResult.licenses?.hasIntuneLicense && (
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3 w-3 mt-0.5 flex-shrink-0 text-green-600 dark:text-green-400" />
+                        <div className="space-y-0.5">
+                          <p>
+                            Intune License: Found ({prerequisiteResult.licenses.intuneServicePlans.length} plan
+                            {prerequisiteResult.licenses.intuneServicePlans.length !== 1 ? "s" : ""})
+                          </p>
+                          {prerequisiteResult.licenses.intuneServicePlans.length > 0 && (
+                            <ul className="list-disc list-inside ml-2">
+                              {prerequisiteResult.licenses.intuneServicePlans.map((plan, idx) => (
+                                <li key={idx} className="text-xs">{plan}</li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {prerequisiteResult.warnings.map((warning, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                        <span>{warning}</span>
+                      </div>
+                    ))}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {prerequisiteStatus === "error" && prerequisiteResult && (
+              <Alert className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950">
+                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <AlertTitle className="text-red-800 dark:text-red-200">
+                  Prerequisite Check Failed
+                </AlertTitle>
+                <AlertDescription className="text-red-700 dark:text-red-300">
+                  <div className="mt-2 space-y-2 text-sm">
+                    {prerequisiteResult.errors.map((error, index) => (
+                      <div key={index} className="flex items-start gap-2">
+                        <XCircle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                        <span>{error}</span>
+                      </div>
+                    ))}
+                    {prerequisiteResult.warnings.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-red-200 dark:border-red-800">
+                        {prerequisiteResult.warnings.map((warning, index) => (
+                          <div key={index} className="flex items-start gap-2">
+                            <AlertTriangle className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                            <span>{warning}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {isLoadingTenantName
-              ? "Fetching organization name from Microsoft Graph..."
-              : "A friendly name for your tenant (for display purposes)"}
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="cloudEnvironment">Cloud Environment</Label>
-          <Select
-            value={cloudEnvironment}
-            onValueChange={(value) => setCloudEnvironment(value as CloudEnvironment)}
-          >
-            <SelectTrigger id="cloudEnvironment">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="global">Global (Commercial)</SelectItem>
-              <SelectItem value="usgov">US Government (GCC High)</SelectItem>
-              <SelectItem value="usgovdod">US Government (DoD)</SelectItem>
-              <SelectItem value="germany">Germany</SelectItem>
-              <SelectItem value="china">China (21Vianet)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        )}
 
         <div className="pt-4">
           <Button onClick={handleContinue} disabled={!isValid} className="w-full">

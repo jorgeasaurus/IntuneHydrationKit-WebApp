@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HydrationSummary, HydrationTask } from "@/types/hydration";
-import { Download, FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle } from "lucide-react";
+import { Download, FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import {
   generateMarkdownReport,
   generateJSONReport,
@@ -131,32 +131,64 @@ export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
           <CardDescription>Results grouped by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {Object.entries(summary.categoryBreakdown).map(([category, stats]) => (
-              <div
-                key={category}
-                className="flex items-center justify-between p-3 rounded-lg border"
-              >
-                <div className="space-y-1">
-                  <p className="font-medium">
-                    {category.charAt(0).toUpperCase() + category.slice(1)}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {stats.total} {stats.total === 1 ? "item" : "items"}
-                  </p>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                    <span className="text-sm font-medium">{stats.success}</span>
+          <div className="space-y-4">
+            {Object.entries(summary.categoryBreakdown).map(([category, stats]) => {
+              const categoryTasks = tasks.filter((task) => task.category === category);
+              return (
+                <div key={category} className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg border">
+                    <div className="space-y-1">
+                      <p className="font-medium">
+                        {category.charAt(0).toUpperCase() + category.slice(1)}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {stats.total} {stats.total === 1 ? "item" : "items"}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-1">
+                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                        <span className="text-sm font-medium">{stats.success}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                        <span className="text-sm font-medium">{stats.skipped}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                        <span className="text-sm font-medium">{stats.failed}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                    <span className="text-sm font-medium">{stats.failed}</span>
+                  {/* Individual items */}
+                  <div className="ml-4 space-y-1">
+                    {categoryTasks.map((task) => (
+                      <div
+                        key={task.id}
+                        className={`flex items-center gap-2 p-2 rounded text-sm ${
+                          task.status === "success"
+                            ? "text-green-700 dark:text-green-300"
+                            : task.status === "skipped"
+                              ? "text-amber-700 dark:text-amber-300"
+                              : task.status === "failed"
+                                ? "text-red-700 dark:text-red-300"
+                                : "text-muted-foreground"
+                        }`}
+                      >
+                        {task.status === "success" ? (
+                          <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                        ) : task.status === "skipped" ? (
+                          <MinusCircle className="h-3 w-3 flex-shrink-0" />
+                        ) : task.status === "failed" ? (
+                          <XCircle className="h-3 w-3 flex-shrink-0" />
+                        ) : null}
+                        <span className="truncate">{task.itemName}</span>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </CardContent>
       </Card>

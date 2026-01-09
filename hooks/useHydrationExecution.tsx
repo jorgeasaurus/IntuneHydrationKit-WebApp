@@ -80,6 +80,8 @@ export function useHydrationExecution() {
         client,
         operationMode: state.operationMode,
         stopOnFirstError: false, // Could come from settings
+        hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true, // Default to true if not checked
+        hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true, // Default to true if not checked
         onTaskStart: (task) => {
           setExecutionState((prev) => ({
             ...prev,

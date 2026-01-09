@@ -180,13 +180,16 @@ export function createSummary(
       categoryBreakdown[task.category] = {
         total: 0,
         success: 0,
+        skipped: 0,
         failed: 0,
       };
     }
 
     categoryBreakdown[task.category].total++;
-    if (task.status === "success" || task.status === "skipped") {
+    if (task.status === "success") {
       categoryBreakdown[task.category].success++;
+    } else if (task.status === "skipped") {
+      categoryBreakdown[task.category].skipped++;
     } else if (task.status === "failed") {
       categoryBreakdown[task.category].failed++;
     }

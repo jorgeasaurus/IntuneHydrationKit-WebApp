@@ -23,6 +23,15 @@ export async function getHydrationKitGroups(client: GraphClient): Promise<Device
 }
 
 /**
+ * Get all groups that start with "Intune - " prefix
+ * Used for efficient existence checking before group creation
+ */
+export async function getIntuneGroups(client: GraphClient): Promise<DeviceGroup[]> {
+  const filter = "startswith(displayName,'Intune - ')";
+  return client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter)}`);
+}
+
+/**
  * Get a group by ID
  */
 export async function getGroupById(

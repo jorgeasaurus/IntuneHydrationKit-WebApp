@@ -113,17 +113,17 @@ export function ReviewConfirm() {
         </div>
 
         {state.operationMode !== "preview" && (
-          <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 bg-amber-50 dark:bg-amber-950/30 border-amber-200 dark:border-amber-900">
+          <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50">
             <Checkbox
               id="acknowledge"
               checked={acknowledged}
               onCheckedChange={(checked) => setAcknowledged(checked as boolean)}
             />
             <div className="space-y-1">
-              <Label htmlFor="acknowledge" className="font-medium cursor-pointer">
+              <Label htmlFor="acknowledge" className="font-medium cursor-pointer text-blue-900 dark:text-blue-100">
                 I understand this will modify my Intune tenant
               </Label>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-blue-700 dark:text-blue-300">
                 This operation will {state.operationMode === "create" ? "create new" : "delete existing"} configurations in your Intune tenant.
               </p>
             </div>
