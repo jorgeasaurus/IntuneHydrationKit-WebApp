@@ -11,6 +11,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import {
@@ -23,12 +29,12 @@ import {
   Users,
   Filter,
   Lock,
-  Github,
   ArrowRight,
   UserCircle,
   Settings,
   Play,
   Download,
+  HelpCircle,
 } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 
@@ -84,22 +90,19 @@ export default function Home() {
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
             )}
-            <Button
-              variant="outline"
-              size="lg"
-              className="text-lg px-8"
-              asChild
-            >
-              <a
-                href="https://github.com/jorgeasaurus/IntuneHydrationKit"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Github className="mr-2 h-5 w-5" />
-                View on GitHub
-              </a>
-            </Button>
           </div>
+          <p className="text-sm text-muted-foreground pt-2">
+            Prefer PowerShell?{" "}
+            <a
+              href="https://github.com/jorgeasaurus/IntuneHydrationKit"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline inline-flex items-center gap-1"
+            >
+              Check out the PowerShell module
+              <ArrowRight className="h-3 w-3" />
+            </a>
+          </p>
         </div>
       </section>
 
@@ -454,6 +457,100 @@ export default function Home() {
               </div>
             </CardContent>
           </Card>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="container mx-auto px-4 py-16 scroll-mt-16">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="flex items-center justify-center gap-3 mb-4">
+              <HelpCircle className="h-8 w-8 text-primary" />
+              <h2 className="text-3xl sm:text-4xl font-bold">Frequently Asked Questions</h2>
+            </div>
+            <p className="text-lg text-muted-foreground">
+              Common questions about the Intune Hydration Kit
+            </p>
+          </div>
+
+          <Accordion type="single" collapsible className="w-full">
+            <AccordionItem value="item-1">
+              <AccordionTrigger>Is this tool safe to use in production?</AccordionTrigger>
+              <AccordionContent>
+                Yes. The tool includes multiple safety features: all created objects are marked with
+                &quot;Imported by Intune-Hydration-Kit&quot; in their description, delete operations only remove
+                objects with this marker, and Conditional Access policies are created in a disabled state
+                so you can review them before enabling. We recommend testing in a dev/test tenant first.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-2">
+              <AccordionTrigger>What permissions do I need?</AccordionTrigger>
+              <AccordionContent>
+                You need to be a Global Administrator or Intune Administrator with the ability to consent
+                to the required Microsoft Graph API permissions. The permissions include read/write access
+                to device management configurations, groups, policies, and conditional access. Admin consent
+                is required during sign-in.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-3">
+              <AccordionTrigger>What licenses are required?</AccordionTrigger>
+              <AccordionContent>
+                At minimum, you need an Intune license (included in Microsoft 365 E3/E5, Business Premium,
+                or standalone Intune). For risk-based Conditional Access policies, Azure AD Premium P2 is
+                required. For Windows Driver Update profiles, Windows E3/E5 or equivalent is needed. The
+                tool will automatically skip features that require licenses you don&apos;t have.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4">
+              <AccordionTrigger>Can I undo or rollback changes?</AccordionTrigger>
+              <AccordionContent>
+                Yes. Use the Delete operation mode to remove all objects created by this tool. The delete
+                operation only removes objects that have the hydration kit marker in their description,
+                so your existing configurations are safe. Note that Conditional Access policies must be
+                in a disabled state to be deleted.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-5">
+              <AccordionTrigger>What is OpenIntuneBaseline?</AccordionTrigger>
+              <AccordionContent>
+                OpenIntuneBaseline is an open-source community project that provides 70+ security and
+                configuration policies for Windows and macOS. These policies follow Microsoft&apos;s security
+                recommendations and industry best practices. The Intune Hydration Kit can automatically
+                download and deploy the latest baseline from GitHub.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-6">
+              <AccordionTrigger>Does this work with government cloud environments?</AccordionTrigger>
+              <AccordionContent>
+                Yes. The tool supports multiple cloud environments including Global (Commercial),
+                US Government (GCC High), US Government DoD, Germany, and China (21Vianet). Select
+                your cloud environment during the tenant configuration step.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-7">
+              <AccordionTrigger>How long does the hydration process take?</AccordionTrigger>
+              <AccordionContent>
+                A full deployment of all 127+ objects typically takes 5-10 minutes. The tool processes
+                tasks sequentially to avoid API throttling and includes automatic retry logic for
+                transient errors. You can monitor progress in real-time on the dashboard.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-8">
+              <AccordionTrigger>What happens if an object already exists?</AccordionTrigger>
+              <AccordionContent>
+                In Create mode, the tool checks for existing objects by name before creating new ones.
+                If an object with the same name already exists, it will be skipped and marked as
+                &quot;Skipped&quot; in the results. This prevents duplicates and ensures idempotent operations.
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </div>
       </section>
 

@@ -24,7 +24,7 @@ export interface GraphResponse<T> {
 }
 
 export interface DeviceFilter {
-  "@odata.type": "#microsoft.graph.assignmentFilter";
+  "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter";
   id?: string;
   displayName: string;
   description: string;

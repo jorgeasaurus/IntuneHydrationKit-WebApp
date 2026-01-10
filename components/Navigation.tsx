@@ -64,12 +64,10 @@ export function Navigation() {
               What Gets Deployed
             </Link>
             <Link
-              href="https://github.com/jorgeasaurus/IntuneHydrationKit"
-              target="_blank"
-              rel="noopener noreferrer"
+              href="#faq"
               className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
             >
-              Documentation
+              FAQs
             </Link>
           </div>
 

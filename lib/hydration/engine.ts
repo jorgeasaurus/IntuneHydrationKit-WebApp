@@ -385,7 +385,7 @@ async function executeFilterTask(
       console.log(`[Filter Task] Converting simple template to full DeviceFilter format`);
       const simpleTemplate = template as FilterTemplate;
       fullFilterTemplate = {
-        "@odata.type": "#microsoft.graph.assignmentFilter",
+        "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
         displayName: simpleTemplate.displayName,
         description: simpleTemplate.description,
         platform: simpleTemplate.platform as "android" | "iOS" | "macOS" | "windows10AndLater",
