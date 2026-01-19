@@ -5,7 +5,7 @@
 
 import { DeviceFilter } from "@/types/graph";
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 export const DEVICE_FILTERS: DeviceFilter[] = [
   {

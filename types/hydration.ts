@@ -23,7 +23,8 @@ export type TaskCategory =
   | "conditionalAccess"
   | "enrollment"
   | "notification"
-  | "baseline";
+  | "baseline"
+  | "cisBaseline";
 
 export interface HydrationTask {
   id: string;
@@ -85,11 +86,67 @@ export interface AppSettings {
   theme: "light" | "dark" | "system";
 }
 
+/**
+ * CIS Baseline category IDs for sub-selection
+ */
+export type CISCategoryId =
+  | "cis-android"
+  | "cis-apple"
+  | "cis-browser"
+  | "cis-windows-cis"
+  | "cis-linux"
+  | "cis-endpoint-security"
+  | "cis-visual-studio"
+  | "cis-windows-11"
+  | "cis-cloud-pc";
+
+/**
+ * OpenIntuneBaseline platform IDs
+ */
+export type OIBPlatformId = "WINDOWS" | "MACOS" | "BYOD" | "WINDOWS365";
+
+/**
+ * Selected baseline policies - can select by platform or individual policies
+ */
+export interface BaselineSelection {
+  // Selected platforms (all policies in platform will be included)
+  platforms: OIBPlatformId[];
+  // Individual policy paths that are selected (overrides platform selection)
+  selectedPolicies: string[];
+  // Individual policy paths that are excluded (even if platform is selected)
+  excludedPolicies: string[];
+}
+
+/**
+ * Generic selection for any category - tracks selected item names
+ */
+export interface CategorySelection {
+  // Names of selected items within the category
+  selectedItems: string[];
+}
+
+/**
+ * All category selections tracked in wizard state
+ */
+export interface CategorySelections {
+  groups?: CategorySelection;
+  filters?: CategorySelection;
+  compliance?: CategorySelection;
+  conditionalAccess?: CategorySelection;
+  appProtection?: CategorySelection;
+  enrollment?: CategorySelection;
+  baseline?: BaselineSelection;
+  cisBaseline?: CategorySelection;
+}
+
 export interface WizardState {
   currentStep: number;
   tenantConfig?: TenantConfig;
   operationMode?: OperationMode;
   selectedTargets: TaskCategory[];
+  selectedCISCategories: CISCategoryId[];
+  categorySelections?: CategorySelections;
+  baselineSelection?: BaselineSelection; // Keep for backwards compatibility
   confirmed: boolean;
   prerequisiteResult?: PrerequisiteCheckResult;
 }

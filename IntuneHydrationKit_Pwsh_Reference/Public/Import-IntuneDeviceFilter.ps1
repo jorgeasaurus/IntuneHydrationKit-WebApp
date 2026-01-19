@@ -71,7 +71,7 @@ function Import-IntuneDeviceFilter {
     }
 
     # Remove existing filters if requested
-    # SAFETY: Only delete filters that have "Imported by Intune-Hydration-Kit" in description
+    # SAFETY: Only delete filters that have "Imported by Intune Hydration Kit" in description
     if ($RemoveExisting) {
         foreach ($filterName in $existingFilters.Keys) {
             $filterInfo = $existingFilters[$filterName]
@@ -141,9 +141,9 @@ function Import-IntuneDeviceFilter {
                     if ($PSCmdlet.ShouldProcess($filter.displayName, "Create device filter")) {
                         # Build description with hydration kit marker
                         $description = if ($filter.description) {
-                            "$($filter.description) - Imported by Intune-Hydration-Kit"
+                            "$($filter.description) - Imported by Intune Hydration Kit"
                         } else {
-                            "Imported by Intune-Hydration-Kit"
+                            "Imported by Intune Hydration Kit"
                         }
 
                         $filterBody = @{

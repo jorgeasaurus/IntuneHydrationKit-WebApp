@@ -73,7 +73,7 @@ export function OperationModeSelection() {
             <AlertTitle>Warning: Delete Mode</AlertTitle>
             <AlertDescription>
               Delete mode will remove configurations created by this tool. Only objects with
-              &quot;Imported by Intune-Hydration-Kit&quot; in the description will be deleted.
+              &quot;Imported by Intune Hydration Kit&quot; in the description will be deleted.
               Conditional Access policies must be disabled to be deleted.
             </AlertDescription>
           </Alert>

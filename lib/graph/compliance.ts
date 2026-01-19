@@ -5,7 +5,7 @@
 import { GraphClient } from "./client";
 import { CompliancePolicy } from "@/types/graph";
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 /**
  * Get all compliance policies in the tenant

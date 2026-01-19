@@ -54,7 +54,7 @@ function New-IntuneDynamicGroup {
 
         # Create new dynamic group
         if ($PSCmdlet.ShouldProcess($DisplayName, "Create dynamic group")) {
-            $fullDescription = if ($Description) { "$Description - Imported by Intune-Hydration-Kit" } else { "Imported by Intune-Hydration-Kit" }
+            $fullDescription = if ($Description) { "$Description - Imported by Intune Hydration Kit" } else { "Imported by Intune Hydration Kit" }
             $groupBody = @{
                 displayName = $DisplayName
                 description = $fullDescription

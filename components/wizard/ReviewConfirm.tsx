@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useWizardState } from "@/hooks/useWizardState";
 import { useRouter } from "next/navigation";
 import { TEMPLATE_METADATA } from "@/templates";
-import { getEstimatedTaskCount } from "@/lib/hydration/engine";
+import { getEstimatedTaskCount, getEstimatedCategoryCount } from "@/lib/hydration/engine";
 
 export function ReviewConfirm() {
   const { state, setConfirmed, previousStep } = useWizardState();
@@ -93,18 +93,19 @@ export function ReviewConfirm() {
                 <ul className="text-sm space-y-2">
                   {state.selectedTargets.map((target) => {
                     const meta = TEMPLATE_METADATA[target as keyof typeof TEMPLATE_METADATA];
+                    const count = getEstimatedCategoryCount(target, state.categorySelections);
                     return (
                       <li key={target} className="flex justify-between">
                         <span>{meta?.displayName || target}</span>
                         <span className="text-muted-foreground">
-                          {meta?.count || 0} items
+                          {count} items
                         </span>
                       </li>
                     );
                   })}
                   <li className="flex justify-between border-t pt-2 mt-2 font-medium">
                     <span>Total</span>
-                    <span>{getEstimatedTaskCount(state.selectedTargets)} objects</span>
+                    <span>{getEstimatedTaskCount(state.selectedTargets, state.categorySelections)} objects</span>
                   </li>
                 </ul>
               )}

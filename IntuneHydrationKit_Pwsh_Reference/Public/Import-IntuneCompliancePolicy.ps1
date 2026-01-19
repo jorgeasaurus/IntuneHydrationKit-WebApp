@@ -73,7 +73,7 @@ function Import-IntuneCompliancePolicy {
     $results = @()
 
     # Remove existing policies if requested
-    # SAFETY: Only delete policies that have "Imported by Intune-Hydration-Kit" in description
+    # SAFETY: Only delete policies that have "Imported by Intune Hydration Kit" in description
     if ($RemoveExisting) {
         foreach ($policyName in $existingPolicies.Keys) {
             $policyInfo = $existingPolicies[$policyName]
@@ -151,7 +151,7 @@ function Import-IntuneCompliancePolicy {
 
             # Add hydration kit tag to description
             $existingDesc = if ($importBody.description) { $importBody.description } else { "" }
-            $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune-Hydration-Kit" } else { "Imported by Intune-Hydration-Kit" }
+            $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune Hydration Kit" } else { "Imported by Intune Hydration Kit" }
 
             # Linux endpoint expects 'name' instead of displayName; ensure it's present
             if ($isLinuxCompliance) {

@@ -5,7 +5,7 @@
 import { GraphClient } from "./client";
 import { AppProtectionPolicy } from "@/types/graph";
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 /**
  * Get all iOS app protection policies

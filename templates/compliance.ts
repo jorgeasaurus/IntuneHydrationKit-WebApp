@@ -5,7 +5,7 @@
 
 import { CompliancePolicy } from "@/types/graph";
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 export const COMPLIANCE_POLICIES: CompliancePolicy[] = [
   {

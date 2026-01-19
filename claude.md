@@ -88,7 +88,7 @@ interface LicenseCheck {
 - Warning banner for Delete mode:
   ```
   ⚠️ Delete mode will remove configurations created by this tool.
-  Only objects with "Imported by Intune-Hydration-Kit" marker will be deleted.
+  Only objects with "Imported by Intune Hydration Kit" marker will be deleted.
   Conditional Access policies must be disabled to be deleted.
   ```
 
@@ -148,7 +148,7 @@ interface HydrationTask {
 
 **Safety Checks** (enforce in code):
 - Create mode: Skip if object already exists (case-insensitive name match)
-- Delete mode: Only delete objects with "Imported by Intune-Hydration-Kit" in description
+- Delete mode: Only delete objects with "Imported by Intune Hydration Kit" in description
 - Conditional Access: Only delete if policy is in `disabled` state
 - Preview mode: No Graph API mutations, only GET requests
 
@@ -294,7 +294,7 @@ interface HydrationSummary {
 interface PolicyTemplate {
   '@odata.type': string;
   displayName: string;
-  description: string;  // Must include: "Imported by Intune-Hydration-Kit"
+  description: string;  // Must include: "Imported by Intune Hydration Kit"
   [key: string]: any;  // Policy-specific properties
 }
 
@@ -302,7 +302,7 @@ interface PolicyTemplate {
 export const WINDOWS_11_COMPLIANCE: PolicyTemplate = {
   '@odata.type': '#microsoft.graph.windows10CompliancePolicy',
   displayName: 'Windows 11 - Security Baseline',
-  description: 'Windows 11 compliance policy with security baseline requirements. Imported by Intune-Hydration-Kit',
+  description: 'Windows 11 compliance policy with security baseline requirements. Imported by Intune Hydration Kit',
   passwordRequired: true,
   passwordMinimumLength: 14,
   osMinimumVersion: '10.0.22000.0',

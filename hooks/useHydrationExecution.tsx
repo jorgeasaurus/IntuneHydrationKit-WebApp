@@ -53,7 +53,12 @@ export function useHydrationExecution() {
     // Build task queue with real templates from local IntuneTemplates directory
     const tasks = await buildTaskQueueAsync(
       state.selectedTargets,
-      state.operationMode
+      state.operationMode,
+      {
+        selectedCISCategories: state.selectedCISCategories,
+        baselineSelection: state.baselineSelection,
+        categorySelections: state.categorySelections,
+      }
     );
     const startTime = new Date();
 

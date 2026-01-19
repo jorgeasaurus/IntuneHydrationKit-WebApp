@@ -6,7 +6,7 @@
 import { GraphClient } from "./client";
 import { ConditionalAccessPolicy } from "@/types/graph";
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 /**
  * Get all conditional access policies in the tenant

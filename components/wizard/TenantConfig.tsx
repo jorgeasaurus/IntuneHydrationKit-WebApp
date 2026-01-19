@@ -11,6 +11,17 @@ import { useWizardState } from "@/hooks/useWizardState";
 import { InfoIcon, Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
 import { createGraphClient } from "@/lib/graph/client";
 import { validatePrerequisites } from "@/lib/graph/prerequisites";
+import { getSelectedCloudEnvironment } from "@/lib/auth/authUtils";
+import { CloudEnvironment } from "@/types/hydration";
+
+// Cloud environment display labels
+const CLOUD_ENVIRONMENT_LABELS: Record<CloudEnvironment, string> = {
+  global: "Global (Commercial)",
+  usgov: "US Government (GCC High)",
+  usgovdod: "US Government (DoD)",
+  germany: "Germany",
+  china: "China (21Vianet)",
+};
 
 export function TenantConfig() {
   const { state, setTenantConfig, setPrerequisiteResult: setWizardPrerequisiteResult, nextStep } = useWizardState();
@@ -31,8 +42,9 @@ export function TenantConfig() {
           setIsLoading(true);
           setPrerequisiteStatus("checking");
 
-          // Always use global cloud environment (user's signed-in environment)
-          const graphClient = createGraphClient("global");
+          // Use the cloud environment selected during sign-in
+          const cloudEnv = getSelectedCloudEnvironment();
+          const graphClient = createGraphClient(cloudEnv);
 
           // Validate prerequisites (includes organization info, licenses, permissions)
           const result = await validatePrerequisites(graphClient);
@@ -74,7 +86,8 @@ export function TenantConfig() {
 
     try {
       setPrerequisiteStatus("checking");
-      const graphClient = createGraphClient("global");
+      const cloudEnv = getSelectedCloudEnvironment();
+      const graphClient = createGraphClient(cloudEnv);
       const result = await validatePrerequisites(graphClient);
       setPrerequisiteResult(result);
       setWizardPrerequisiteResult(result); // Store in wizard state for execution
@@ -94,10 +107,11 @@ export function TenantConfig() {
   };
 
   const handleContinue = () => {
+    const cloudEnv = getSelectedCloudEnvironment();
     setTenantConfig({
       tenantId,
       tenantName: tenantName || undefined,
-      cloudEnvironment: "global", // Always use global environment
+      cloudEnvironment: cloudEnv,
     });
     nextStep();
   };
@@ -145,7 +159,7 @@ export function TenantConfig() {
 
           <div className="space-y-1">
             <Label className="text-xs font-medium text-muted-foreground">Cloud Environment</Label>
-            <p className="text-sm">Global (Commercial)</p>
+            <p className="text-sm">{CLOUD_ENVIRONMENT_LABELS[getSelectedCloudEnvironment()]}</p>
           </div>
 
           {accounts.length > 0 && accounts[0].username && (

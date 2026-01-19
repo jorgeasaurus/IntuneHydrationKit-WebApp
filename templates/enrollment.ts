@@ -3,7 +3,7 @@
  * Windows Autopilot and Apple enrollment profiles
  */
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 /**
  * Windows Autopilot Profile Template

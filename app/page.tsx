@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -37,20 +38,32 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
+import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
+import { CloudEnvironment } from "@/types/hydration";
 
 export default function Home() {
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
+  const [showCloudSelector, setShowCloudSelector] = useState(false);
 
-  const handleSignIn = async () => {
+  const handleSignInClick = () => {
+    setShowCloudSelector(true);
+  };
+
+  const handleCloudSelect = async (environment: CloudEnvironment) => {
+    setShowCloudSelector(false);
     try {
-      await signIn();
+      await signIn(environment);
       toast.success("Successfully signed in!");
       router.push("/wizard");
     } catch (error) {
       toast.error("Failed to sign in. Please try again.");
       console.error("Sign in error:", error);
     }
+  };
+
+  const handleCloudSelectorCancel = () => {
+    setShowCloudSelector(false);
   };
 
   const handleContinue = () => {
@@ -75,7 +88,7 @@ export default function Home() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             {!isAuthenticated ? (
-              <Button onClick={handleSignIn} size="lg" className="text-lg px-8 text-white">
+              <Button onClick={handleSignInClick} size="lg" className="text-lg px-8 text-white">
                 <svg className="mr-2 h-5 w-5" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                   <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
@@ -91,6 +104,12 @@ export default function Home() {
               </Button>
             )}
           </div>
+
+          <CloudEnvironmentSelector
+            open={showCloudSelector}
+            onSelect={handleCloudSelect}
+            onCancel={handleCloudSelectorCancel}
+          />
           <p className="text-sm text-muted-foreground pt-2">
             Prefer PowerShell?{" "}
             <a
@@ -478,7 +497,7 @@ export default function Home() {
               <AccordionTrigger>Is this tool safe to use in production?</AccordionTrigger>
               <AccordionContent>
                 Yes. The tool includes multiple safety features: all created objects are marked with
-                &quot;Imported by Intune-Hydration-Kit&quot; in their description, delete operations only remove
+                &quot;Imported by Intune Hydration Kit&quot; in their description, delete operations only remove
                 objects with this marker, and Conditional Access policies are created in a disabled state
                 so you can review them before enabling. We recommend testing in a dev/test tenant first.
               </AccordionContent>
@@ -567,7 +586,7 @@ export default function Home() {
               </CardDescription>
               <div className="pt-4">
                 {!isAuthenticated ? (
-                  <Button onClick={handleSignIn} size="lg" className="text-lg px-8 text-white">
+                  <Button onClick={handleSignInClick} size="lg" className="text-lg px-8 text-white">
                     <svg className="mr-2 h-5 w-5" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                       <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>

@@ -36,7 +36,7 @@ function Import-IntuneEnrollmentProfile {
     $results = @()
 
     # Remove existing enrollment profiles if requested
-    # SAFETY: Only delete profiles that have "Imported by Intune-Hydration-Kit" in description
+    # SAFETY: Only delete profiles that have "Imported by Intune Hydration Kit" in description
     if ($RemoveExisting) {
         # Delete matching Autopilot profiles
         try {
@@ -187,7 +187,7 @@ function Import-IntuneEnrollmentProfile {
                     }
                     elseif ($PSCmdlet.ShouldProcess($profileName, "Create Enrollment Status Page profile")) {
                         # Build ESP body
-                        $espDescriptionText = if ($template.description) { "$($template.description) - Imported by Intune-Hydration-Kit" } else { "Imported by Intune-Hydration-Kit" }
+                        $espDescriptionText = if ($template.description) { "$($template.description) - Imported by Intune Hydration Kit" } else { "Imported by Intune Hydration Kit" }
                         $espBody = @{
                             "@odata.type" = "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration"
                             displayName = $template.displayName

@@ -41,7 +41,8 @@ export function TaskList({ tasks }: TaskListProps) {
 
   // Filter tasks
   const filteredTasks = tasks.filter((task) => {
-    const matchesSearch = task.itemName.toLowerCase().includes(searchTerm.toLowerCase());
+    const itemName = task.itemName || "";
+    const matchesSearch = itemName.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || task.status === statusFilter;
     const matchesCategory = categoryFilter === "all" || task.category === categoryFilter;
     return matchesSearch && matchesStatus && matchesCategory;

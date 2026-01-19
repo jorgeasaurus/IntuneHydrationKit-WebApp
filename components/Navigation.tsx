@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -7,14 +8,22 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
+import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
+import { CloudEnvironment } from "@/types/hydration";
 
 export function Navigation() {
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
+  const [showCloudSelector, setShowCloudSelector] = useState(false);
 
-  const handleSignIn = async () => {
+  const handleSignInClick = () => {
+    setShowCloudSelector(true);
+  };
+
+  const handleCloudSelect = async (environment: CloudEnvironment) => {
+    setShowCloudSelector(false);
     try {
-      await signIn();
+      await signIn(environment);
       toast.success("Successfully signed in!");
       router.push("/wizard");
     } catch (error) {
@@ -23,11 +32,15 @@ export function Navigation() {
     }
   };
 
+  const handleCloudSelectorCancel = () => {
+    setShowCloudSelector(false);
+  };
+
   const handleGetStarted = () => {
     if (isAuthenticated) {
       router.push("/wizard");
     } else {
-      handleSignIn();
+      handleSignInClick();
     }
   };
 
@@ -85,6 +98,13 @@ export function Navigation() {
           </Button>
         </div>
       </div>
+
+      {/* Cloud Environment Selector Dialog */}
+      <CloudEnvironmentSelector
+        open={showCloudSelector}
+        onSelect={handleCloudSelect}
+        onCancel={handleCloudSelectorCancel}
+      />
     </nav>
   );
 }

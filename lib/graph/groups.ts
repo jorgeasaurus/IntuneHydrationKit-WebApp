@@ -5,7 +5,7 @@
 import { GraphClient } from "./client";
 import { DeviceGroup } from "@/types/graph";
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 /**
  * Get all groups in the tenant

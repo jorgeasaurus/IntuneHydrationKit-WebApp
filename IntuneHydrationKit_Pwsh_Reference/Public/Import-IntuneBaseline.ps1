@@ -120,7 +120,7 @@ function Import-IntuneBaseline {
     $hasDriverUpdateLicense = $null  # Lazy-loaded when needed
 
     # Remove existing baseline policies if requested
-    # SAFETY: Only delete policies that have "Imported by Intune-Hydration-Kit" in description
+    # SAFETY: Only delete policies that have "Imported by Intune Hydration Kit" in description
     if ($RemoveExisting) {
         # Delete from main endpoints used by baselines
         $deleteEndpoints = @(
@@ -306,7 +306,7 @@ function Import-IntuneBaseline {
 
                         # Add hydration kit tag to description
                         $existingDesc = if ($importBody.description) { $importBody.description } else { "" }
-                        $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune-Hydration-Kit" } else { "Imported by Intune-Hydration-Kit" }
+                        $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune Hydration Kit" } else { "Imported by Intune Hydration Kit" }
 
                         # Remove properties with @odata annotations (metadata) except @odata.type
                         # Also remove #microsoft.graph.* action properties
@@ -515,7 +515,7 @@ function Import-IntuneBaseline {
 
                     # Add hydration kit tag to description
                     $existingDesc = if ($importBody.description) { $importBody.description } else { "" }
-                    $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune-Hydration-Kit" } else { "Imported by Intune-Hydration-Kit" }
+                    $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune Hydration Kit" } else { "Imported by Intune Hydration Kit" }
 
                     # Create the policy
                     $null = Invoke-MgGraphRequest -Method POST -Uri "beta/$endpoint" -Body ($importBody | ConvertTo-Json -Depth 100) -ContentType 'application/json' -ErrorAction Stop

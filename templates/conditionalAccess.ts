@@ -5,7 +5,7 @@
 
 import { ConditionalAccessPolicy } from "@/types/graph";
 
-const HYDRATION_MARKER = "Imported by Intune-Hydration-Kit";
+const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 export const CONDITIONAL_ACCESS_POLICIES: ConditionalAccessPolicy[] = [
   {

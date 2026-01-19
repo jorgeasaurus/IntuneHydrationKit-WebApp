@@ -393,7 +393,7 @@ function Invoke-IntuneHydration {
             Write-HydrationLog -Message "Step 3: $stepAction Dynamic Groups" -Level Info
 
             # Delete existing dynamic groups if RemoveExisting is set
-            # SAFETY: Only delete groups that have "Imported by Intune-Hydration-Kit" in description
+            # SAFETY: Only delete groups that have "Imported by Intune Hydration Kit" in description
             if ($RemoveExisting) {
 
                 try {
@@ -463,7 +463,7 @@ function Invoke-IntuneHydration {
             Write-HydrationLog -Message "Step 3b: $stepAction Static Groups" -Level Info
 
             # Delete existing static groups if RemoveExisting is set
-            # SAFETY: Only delete groups that have "Imported by Intune-Hydration-Kit" in description
+            # SAFETY: Only delete groups that have "Imported by Intune Hydration Kit" in description
             if ($RemoveExisting) {
                 try {
                     # Get all security groups (non-dynamic) with hydration kit marker in description

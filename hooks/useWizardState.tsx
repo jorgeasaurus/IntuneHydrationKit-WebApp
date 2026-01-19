@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, ReactNode } from "react";
-import { WizardState, OperationMode, TaskCategory, TenantConfig } from "@/types/hydration";
+import { WizardState, OperationMode, TaskCategory, TenantConfig, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
 import { PrerequisiteCheckResult } from "@/types/prerequisites";
 
 interface WizardContextType {
@@ -10,6 +10,9 @@ interface WizardContextType {
   setTenantConfig: (config: TenantConfig) => void;
   setOperationMode: (mode: OperationMode) => void;
   setSelectedTargets: (targets: TaskCategory[]) => void;
+  setSelectedCISCategories: (categories: CISCategoryId[]) => void;
+  setBaselineSelection: (selection: BaselineSelection) => void;
+  setCategorySelections: (selections: CategorySelections) => void;
   setConfirmed: (confirmed: boolean) => void;
   setPrerequisiteResult: (result: PrerequisiteCheckResult) => void;
   resetWizard: () => void;
@@ -22,6 +25,7 @@ const WizardContext = createContext<WizardContextType | undefined>(undefined);
 const initialState: WizardState = {
   currentStep: 1,
   selectedTargets: [],
+  selectedCISCategories: [],
   confirmed: false,
 };
 
@@ -42,6 +46,18 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
   const setSelectedTargets = (targets: TaskCategory[]) => {
     setState((prev) => ({ ...prev, selectedTargets: targets }));
+  };
+
+  const setSelectedCISCategories = (categories: CISCategoryId[]) => {
+    setState((prev) => ({ ...prev, selectedCISCategories: categories }));
+  };
+
+  const setBaselineSelection = (selection: BaselineSelection) => {
+    setState((prev) => ({ ...prev, baselineSelection: selection }));
+  };
+
+  const setCategorySelections = (selections: CategorySelections) => {
+    setState((prev) => ({ ...prev, categorySelections: selections }));
   };
 
   const setConfirmed = (confirmed: boolean) => {
@@ -72,6 +88,9 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         setTenantConfig,
         setOperationMode,
         setSelectedTargets,
+        setSelectedCISCategories,
+        setBaselineSelection,
+        setCategorySelections,
         setConfirmed,
         setPrerequisiteResult,
         resetWizard,

@@ -42,7 +42,7 @@ function Import-IntuneAppProtectionPolicy {
     $results = @()
 
     # Remove existing app protection policies if requested
-    # SAFETY: Only delete policies that have "Imported by Intune-Hydration-Kit" in description
+    # SAFETY: Only delete policies that have "Imported by Intune Hydration Kit" in description
     if ($RemoveExisting) {
         foreach ($endpoint in $typeToEndpoint.Values) {
             $listUri = $endpoint
@@ -134,7 +134,7 @@ function Import-IntuneAppProtectionPolicy {
 
             # Add hydration kit tag to description
             $existingDesc = if ($importBody.description) { $importBody.description } else { "" }
-            $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune-Hydration-Kit" } else { "Imported by Intune-Hydration-Kit" }
+            $importBody.description = if ($existingDesc) { "$existingDesc - Imported by Intune Hydration Kit" } else { "Imported by Intune Hydration Kit" }
 
             # Remove empty manufacturer/model allowlists
             if ($importBody.allowedAndroidDeviceManufacturers -eq "") {
