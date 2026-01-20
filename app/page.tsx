@@ -40,10 +40,12 @@ import {
 import { Navigation } from "@/components/Navigation";
 import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { CloudEnvironment } from "@/types/hydration";
+import { useWizardState } from "@/hooks/useWizardState";
 
 export default function Home() {
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
+  const { resetWizard } = useWizardState();
   const [showCloudSelector, setShowCloudSelector] = useState(false);
 
   const handleSignInClick = () => {
@@ -55,6 +57,7 @@ export default function Home() {
     try {
       await signIn(environment);
       toast.success("Successfully signed in!");
+      resetWizard();
       router.push("/wizard");
     } catch (error) {
       toast.error("Failed to sign in. Please try again.");
@@ -67,6 +70,7 @@ export default function Home() {
   };
 
   const handleContinue = () => {
+    resetWizard();
     router.push("/wizard");
   };
 
@@ -83,8 +87,8 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto">
-            Deploy 127+ Microsoft Intune best-practice policies, groups, and filters.
-            One click. Zero hassle.
+            Deploy up to 900+ Microsoft Intune best-practice policies, groups, filters, and more.
+            Select only what you need. Zero hassle.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             {!isAuthenticated ? (
@@ -151,7 +155,7 @@ export default function Home() {
                 <Zap className="h-10 w-10 mb-3 text-primary" />
                 <CardTitle>Quick Deployment</CardTitle>
                 <CardDescription>
-                  Deploy 127+ policies, groups, filters, and conditional access policies in under 10 minutes.
+                  Deploy 900+ policies, groups, filters, and conditional access policies in under 10 minutes.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -297,19 +301,19 @@ export default function Home() {
                     <ul className="space-y-2 text-sm text-muted-foreground">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        70+ Security baselines
+                        98 OpenIntuneBaseline policies
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        8 App protection policies
+                        728 CIS security benchmarks
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        17 Mobile apps
+                        10 Compliance policies
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Notification templates
+                        10 App protection policies
                       </li>
                     </ul>
                   </div>
@@ -328,7 +332,7 @@ export default function Home() {
                     <ul className="space-y-2 text-sm text-muted-foreground">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        43 Dynamic device groups
+                        47 Device groups
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -336,11 +340,11 @@ export default function Home() {
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Platform-specific targeting
+                        3 Enrollment profiles
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Enrollment profiles
+                        Platform-specific targeting
                       </li>
                     </ul>
                   </div>
@@ -555,7 +559,7 @@ export default function Home() {
             <AccordionItem value="item-7">
               <AccordionTrigger>How long does the hydration process take?</AccordionTrigger>
               <AccordionContent>
-                A full deployment of all 127+ objects typically takes 5-10 minutes. The tool processes
+                A full deployment of all 900+ objects typically takes 10-30 minutes. The tool processes
                 tasks sequentially to avoid API throttling and includes automatic retry logic for
                 transient errors. You can monitor progress in real-time on the dashboard.
               </AccordionContent>

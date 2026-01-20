@@ -4,8 +4,7 @@
 
 import { GraphClient } from "./client";
 import { AppProtectionPolicy } from "@/types/graph";
-
-const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
+import { HYDRATION_MARKER, hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
  * Get all iOS app protection policies
@@ -31,6 +30,7 @@ export async function getAndroidAppProtectionPolicies(
 
 /**
  * Get all app protection policies (iOS and Android)
+ * Tags each policy with _platform property for delete operations
  */
 export async function getAllAppProtectionPolicies(
   client: GraphClient
@@ -40,12 +40,16 @@ export async function getAllAppProtectionPolicies(
     getAndroidAppProtectionPolicies(client),
   ]);
 
-  // Log each policy's @odata.type for debugging
-  console.log(`[getAllAppProtectionPolicies] Retrieved ${iosPolicies.length} iOS policies, ${androidPolicies.length} Android policies`);
-  iosPolicies.forEach(p => console.log(`  iOS: ${p.displayName} - @odata.type: ${p["@odata.type"]}`));
-  androidPolicies.forEach(p => console.log(`  Android: ${p.displayName} - @odata.type: ${p["@odata.type"]}`));
+  // Tag each policy with its platform (Graph API collection responses don't include @odata.type reliably)
+  const taggedIosPolicies = iosPolicies.map(p => ({ ...p, _platform: "iOS" as const }));
+  const taggedAndroidPolicies = androidPolicies.map(p => ({ ...p, _platform: "android" as const }));
 
-  return [...iosPolicies, ...androidPolicies];
+  // Log each policy for debugging
+  console.log(`[getAllAppProtectionPolicies] Retrieved ${iosPolicies.length} iOS policies, ${androidPolicies.length} Android policies`);
+  taggedIosPolicies.forEach(p => console.log(`  iOS: ${p.displayName} - _platform: ${p._platform}`));
+  taggedAndroidPolicies.forEach(p => console.log(`  Android: ${p.displayName} - _platform: ${p._platform}`));
+
+  return [...taggedIosPolicies, ...taggedAndroidPolicies];
 }
 
 /**
@@ -55,7 +59,7 @@ export async function getHydrationKitAppProtectionPolicies(
   client: GraphClient
 ): Promise<AppProtectionPolicy[]> {
   const policies = await getAllAppProtectionPolicies(client);
-  return policies.filter((policy) => policy.description?.includes(HYDRATION_MARKER));
+  return policies.filter((policy) => hasHydrationMarker(policy.description));
 }
 
 /**
@@ -100,22 +104,72 @@ export async function appProtectionPolicyExists(
 }
 
 /**
+ * Recursively clean a policy object to remove OData metadata
+ * Keeps @odata.type but removes all other @odata.* properties, ids, timestamps, etc.
+ */
+function cleanAppProtectionPolicyRecursively(obj: unknown, isRoot: boolean = true): unknown {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => cleanAppProtectionPolicyRecursively(item, false));
+  }
+
+  if (typeof obj === "object") {
+    const cleaned: Record<string, unknown> = {};
+    const excludeFields = [
+      "@odata.context", "@odata.id", "@odata.editLink",
+      "createdDateTime", "lastModifiedDateTime", "version",
+      "#microsoft.graph.assign",
+    ];
+
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      // Skip excluded fields
+      if (excludeFields.includes(key)) {
+        continue;
+      }
+
+      // Skip any property containing @odata. (except @odata.type)
+      if (key.includes("@odata.") && key !== "@odata.type") {
+        continue;
+      }
+
+      // Skip id fields in nested objects (but keep at root level if needed)
+      if (key === "id" && !isRoot) {
+        continue;
+      }
+
+      // Skip properties starting with # (OData actions)
+      if (key.startsWith("#")) {
+        continue;
+      }
+
+      // Recursively clean nested objects and arrays
+      cleaned[key] = cleanAppProtectionPolicyRecursively(value, false);
+    }
+
+    return cleaned;
+  }
+
+  return obj;
+}
+
+/**
  * Create a new iOS app protection policy
  */
 export async function createiOSAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
-  // Clone the policy to avoid mutating the original
-  const policyBody = { ...policy };
+  // Recursively clean the policy to remove all OData metadata
+  const policyBody = cleanAppProtectionPolicyRecursively(policy, true) as AppProtectionPolicy;
+
+  // Remove root-level id
+  delete policyBody.id;
 
   // Ensure the hydration marker is in the description
-  if (!policyBody.description?.includes(HYDRATION_MARKER)) {
-    const existingDesc = policyBody.description || "";
-    policyBody.description = existingDesc
-      ? `${existingDesc} - ${HYDRATION_MARKER}`
-      : HYDRATION_MARKER;
-  }
+  policyBody.description = addHydrationMarker(policyBody.description);
 
   // Remove read-only properties (per PowerShell script logic)
   delete policyBody.apps;
@@ -126,6 +180,8 @@ export async function createiOSAppProtectionPolicy(
   if (policyBody.allowedIosDeviceModels === "") {
     delete policyBody.allowedIosDeviceModels;
   }
+
+  console.log(`[App Protection] Creating iOS policy: "${policyBody.displayName}" with description: "${policyBody.description}"`);
 
   return client.post<AppProtectionPolicy>(
     "/deviceAppManagement/iosManagedAppProtections",
@@ -140,16 +196,14 @@ export async function createAndroidAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
-  // Clone the policy to avoid mutating the original
-  const policyBody = { ...policy };
+  // Recursively clean the policy to remove all OData metadata
+  const policyBody = cleanAppProtectionPolicyRecursively(policy, true) as AppProtectionPolicy;
+
+  // Remove root-level id
+  delete policyBody.id;
 
   // Ensure the hydration marker is in the description
-  if (!policyBody.description?.includes(HYDRATION_MARKER)) {
-    const existingDesc = policyBody.description || "";
-    policyBody.description = existingDesc
-      ? `${existingDesc} - ${HYDRATION_MARKER}`
-      : HYDRATION_MARKER;
-  }
+  policyBody.description = addHydrationMarker(policyBody.description);
 
   // Remove read-only properties (per PowerShell script logic)
   delete policyBody.apps;
@@ -160,6 +214,8 @@ export async function createAndroidAppProtectionPolicy(
   if (policyBody.allowedAndroidDeviceManufacturers === "") {
     delete policyBody.allowedAndroidDeviceManufacturers;
   }
+
+  console.log(`[App Protection] Creating Android policy: "${policyBody.displayName}" with description: "${policyBody.description}"`);
 
   return client.post<AppProtectionPolicy>(
     "/deviceAppManagement/androidManagedAppProtections",
@@ -207,7 +263,7 @@ export async function deleteiOSAppProtectionPolicy(
 ): Promise<void> {
   const policy = await getAppProtectionPolicyById(client, policyId, "iOS");
 
-  if (!policy.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(policy.description)) {
     throw new Error(
       `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
     );
@@ -226,7 +282,7 @@ export async function deleteAndroidAppProtectionPolicy(
 ): Promise<void> {
   const policy = await getAppProtectionPolicyById(client, policyId, "android");
 
-  if (!policy.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(policy.description)) {
     throw new Error(
       `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
     );

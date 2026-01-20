@@ -575,28 +575,29 @@ export function TargetSelection() {
                           ({targets.includes(target.id) ? `${selectedCount} of ${totalCount}` : totalCount} items)
                         </span>
                       </Label>
-                      {targets.includes(target.id) && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          onClick={e => {
-                            e.preventDefault();
-                            toggleCategoryExpanded(target.id);
-                          }}
-                        >
-                          {isLoading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </Button>
-                      )}
                     </div>
                     <p className="text-sm text-muted-foreground">{target.description}</p>
                   </div>
+                  <button
+                    type="button"
+                    className="text-muted-foreground hover:text-foreground transition-colors p-1"
+                    onClick={e => {
+                      e.preventDefault();
+                      if (!targets.includes(target.id)) {
+                        handleToggle(target.id);
+                      } else {
+                        toggleCategoryExpanded(target.id);
+                      }
+                    }}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : targets.includes(target.id) && isExpanded ? (
+                      <ChevronDown className="h-5 w-5" />
+                    ) : (
+                      <ChevronRight className="h-5 w-5" />
+                    )}
+                  </button>
                 </div>
 
                 {/* CIS Sub-categories (by category folder) */}

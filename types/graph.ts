@@ -77,5 +77,7 @@ export interface AppProtectionPolicy {
   id?: string;
   displayName: string;
   description: string;
+  /** Platform tag added during fetch (iOS or android) for delete operations */
+  _platform?: "iOS" | "android";
   [key: string]: unknown;
 }

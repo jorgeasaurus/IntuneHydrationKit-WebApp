@@ -4,8 +4,7 @@
 
 import { GraphClient } from "./client";
 import { DeviceFilter } from "@/types/graph";
-
-const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
+import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
  * Get all device filters in the tenant
@@ -19,7 +18,7 @@ export async function getAllFilters(client: GraphClient): Promise<DeviceFilter[]
  */
 export async function getHydrationKitFilters(client: GraphClient): Promise<DeviceFilter[]> {
   const filters = await getAllFilters(client);
-  return filters.filter((filter) => filter.description?.includes(HYDRATION_MARKER));
+  return filters.filter((filter) => hasHydrationMarker(filter.description));
 }
 
 /**
@@ -76,7 +75,7 @@ export async function createFilter(
   filter: DeviceFilter
 ): Promise<DeviceFilter> {
   // Ensure the hydration marker is in the description
-  if (!filter.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(filter.description)) {
     filter.description = `${filter.description || ""} ${HYDRATION_MARKER}`.trim();
   }
 
@@ -105,7 +104,7 @@ export async function deleteFilter(client: GraphClient, filterId: string): Promi
   // First, verify the filter has the hydration marker
   const filter = await getFilterById(client, filterId);
 
-  if (!filter.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(filter.description)) {
     throw new Error(
       `Cannot delete filter "${filter.displayName}": Not created by Intune Hydration Kit`
     );
@@ -128,7 +127,7 @@ export async function deleteFilterByName(
     throw new Error(`Filter "${displayName}" not found`);
   }
 
-  if (!filter.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(filter.description)) {
     throw new Error(
       `Cannot delete filter "${displayName}": Not created by Intune Hydration Kit`
     );

@@ -29,7 +29,7 @@ export const TEMPLATE_METADATA = {
   baseline: {
     displayName: "OpenIntuneBaseline",
     description: "Security baseline policies (Windows, macOS, iOS, Android)",
-    count: 70,
+    count: 98,
     icon: "ShieldCheck",
   },
   compliance: {

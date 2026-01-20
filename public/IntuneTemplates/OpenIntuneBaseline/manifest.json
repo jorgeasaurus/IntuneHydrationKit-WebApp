@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-01-19T01:26:52.874Z",
+  "generatedAt": "2026-01-19T22:19:00.853Z",
   "totalFiles": 95,
   "platforms": [
     {
@@ -38,19 +38,29 @@
       "count": 70,
       "policyTypes": [
         {
-          "type": "",
-          "description": "",
-          "count": 7
-        },
-        {
           "type": "CompliancePolicies",
           "description": "Device compliance policies",
           "count": 4
         },
         {
+          "type": "DeviceConfiguration",
+          "description": "Device configuration profiles",
+          "count": 1
+        },
+        {
+          "type": "DriverUpdateProfiles",
+          "description": "Windows driver update profiles",
+          "count": 3
+        },
+        {
           "type": "SettingsCatalog",
           "description": "Settings Catalog configuration policies",
           "count": 59
+        },
+        {
+          "type": "UpdatePolicies",
+          "description": "Windows Update for Business rings",
+          "count": 3
         }
       ]
     },
@@ -206,48 +216,6 @@
       "displayName": "MacOS - OIB - Updates - D - Update Configuration - v1.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/DeviceConfiguration/Win - OIB - TP - Health Monitoring - D - Endpoint Analytics - v3.4.json",
-      "platform": "WINDOWS",
-      "policyType": "",
-      "displayName": "Win - OIB - TP - Health Monitoring - D - Endpoint Analytics - v3.4"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/UpdatePolicies/Win - OIB - WUfB - Ring 1 - Pilot - v3.0.json",
-      "platform": "WINDOWS",
-      "policyType": "",
-      "displayName": "Win - OIB - WUfB - Ring 1 - Pilot - v3.0"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/UpdatePolicies/Win - OIB - WUfB - Ring 2 - UAT - v3.0.json",
-      "platform": "WINDOWS",
-      "policyType": "",
-      "displayName": "Win - OIB - WUfB - Ring 2 - UAT - v3.0"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/UpdatePolicies/Win - OIB - WUfB - Ring 3 - Production - v3.0.json",
-      "platform": "WINDOWS",
-      "policyType": "",
-      "displayName": "Win - OIB - WUfB - Ring 3 - Production - v3.0"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/DriverUpdateProfiles/Win - OIB - WUfB Drivers - Ring 1 - Pilot - v3.0.json",
-      "platform": "WINDOWS",
-      "policyType": "",
-      "displayName": "Win - OIB - WUfB Drivers - Ring 1 - Pilot - v3.0"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/DriverUpdateProfiles/Win - OIB - WUfB Drivers - Ring 2 - UAT - v3.0.json",
-      "platform": "WINDOWS",
-      "policyType": "",
-      "displayName": "Win - OIB - WUfB Drivers - Ring 2 - UAT - v3.0"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/DriverUpdateProfiles/Win - OIB - WUfB Drivers - Ring 3 - Production - v3.0.json",
-      "platform": "WINDOWS",
-      "policyType": "",
-      "displayName": "Win - OIB - WUfB Drivers - Ring 3 - Production - v3.0"
-    },
-    {
       "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - Compliance - U - Defender for Endpoint - v3.1.json",
       "platform": "WINDOWS",
       "policyType": "CompliancePolicies",
@@ -270,6 +238,30 @@
       "platform": "WINDOWS",
       "policyType": "CompliancePolicies",
       "displayName": "Win - OIB - Compliance - U - Password - v3.1"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/DeviceConfiguration/Win - OIB - TP - Health Monitoring - D - Endpoint Analytics - v3.4.json",
+      "platform": "WINDOWS",
+      "policyType": "DeviceConfiguration",
+      "displayName": "Win - OIB - TP - Health Monitoring - D - Endpoint Analytics - v3.4"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/DriverUpdateProfiles/Win - OIB - WUfB Drivers - Ring 1 - Pilot - v3.0.json",
+      "platform": "WINDOWS",
+      "policyType": "DriverUpdateProfiles",
+      "displayName": "Win - OIB - WUfB Drivers - Ring 1 - Pilot - v3.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/DriverUpdateProfiles/Win - OIB - WUfB Drivers - Ring 2 - UAT - v3.0.json",
+      "platform": "WINDOWS",
+      "policyType": "DriverUpdateProfiles",
+      "displayName": "Win - OIB - WUfB Drivers - Ring 2 - UAT - v3.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/DriverUpdateProfiles/Win - OIB - WUfB Drivers - Ring 3 - Production - v3.0.json",
+      "platform": "WINDOWS",
+      "policyType": "DriverUpdateProfiles",
+      "displayName": "Win - OIB - WUfB Drivers - Ring 3 - Production - v3.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Attack Surface Reduction - D - ASR Rules (Audit Mode) - v3.1.json",
@@ -624,6 +616,24 @@
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
       "displayName": "Win - OIB - SC - Windows User Experience - U - Copilot - v3.6"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/UpdatePolicies/Win - OIB - WUfB - Ring 1 - Pilot - v3.0.json",
+      "platform": "WINDOWS",
+      "policyType": "UpdatePolicies",
+      "displayName": "Win - OIB - WUfB - Ring 1 - Pilot - v3.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/UpdatePolicies/Win - OIB - WUfB - Ring 2 - UAT - v3.0.json",
+      "platform": "WINDOWS",
+      "policyType": "UpdatePolicies",
+      "displayName": "Win - OIB - WUfB - Ring 2 - UAT - v3.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/UpdatePolicies/Win - OIB - WUfB - Ring 3 - Production - v3.0.json",
+      "platform": "WINDOWS",
+      "policyType": "UpdatePolicies",
+      "displayName": "Win - OIB - WUfB - Ring 3 - Production - v3.0"
     },
     {
       "path": "WINDOWS365/IntuneManagement/CompliancePolicies/Win365 - OIB - Compliance - U - Device Health - v1.0.json",

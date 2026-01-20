@@ -3,8 +3,9 @@
  * Loads templates from local IntuneTemplates directory
  */
 
+import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
+
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
-const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 // Cache version - increment this when templates change to invalidate old caches
 const CACHE_VERSION = 3; // Updated to fix CIS displayName
@@ -831,5 +832,18 @@ export function getCachedTemplates(category: string): unknown[] | null {
   } catch (error) {
     console.error(`Error reading cached ${category} templates:`, error);
     return null;
+  }
+}
+
+/**
+ * Clear cached templates for a specific category
+ * Used when fresh templates need to be fetched (e.g., when selections change)
+ */
+export function clearCategoryCache(category: string): void {
+  try {
+    sessionStorage.removeItem(`intune-hydration-templates-${category}`);
+    console.log(`[Cache] Cleared cache for ${category}`);
+  } catch (error) {
+    console.error(`Error clearing ${category} cache:`, error);
   }
 }

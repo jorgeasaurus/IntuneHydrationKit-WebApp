@@ -29,14 +29,31 @@ export class GraphClient {
 
   /**
    * Handle Graph API errors
+   * Handles both standard Graph API error format and Intune-specific error format
    */
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       let errorMessage = `Graph API error: ${response.status} ${response.statusText}`;
 
       try {
-        const errorData: GraphError = await response.json();
-        errorMessage = errorData.error.message || errorMessage;
+        const responseText = await response.text();
+        if (responseText) {
+          const errorData = JSON.parse(responseText);
+          // Standard Graph API error format: { error: { message: "..." } }
+          if (errorData.error?.message) {
+            errorMessage = errorData.error.message;
+          }
+          // Intune-specific error format: { Message: "..." }
+          else if (errorData.Message) {
+            errorMessage = errorData.Message;
+          }
+          // Intune error format with nested details: { error: { code: "...", details: [...] } }
+          else if (errorData.error?.code) {
+            errorMessage = `${errorData.error.code}: ${errorData.error.details?.[0]?.message || errorData.error.message || "Unknown error"}`;
+          }
+          // Log full error for debugging
+          console.error("[GraphClient] Full error response:", responseText);
+        }
       } catch {
         // Failed to parse error response
       }
@@ -141,6 +158,7 @@ export class GraphClient {
 
   /**
    * DELETE request to Graph API
+   * Treats 404 as success (idempotent delete - if resource is gone, mission accomplished)
    */
   async delete(endpoint: string, version: "v1.0" | "beta" = "beta"): Promise<void> {
     const url = `${this.baseUrl}/${version}${endpoint}`;
@@ -151,6 +169,13 @@ export class GraphClient {
         method: "DELETE",
         headers,
       });
+
+      // Treat 404 as success for DELETE (idempotent - resource already gone)
+      if (response.status === 404) {
+        console.log(`[GraphClient] DELETE returned 404 - resource already deleted, treating as success`);
+        return;
+      }
+
       return this.handleResponse<void>(response);
     });
   }

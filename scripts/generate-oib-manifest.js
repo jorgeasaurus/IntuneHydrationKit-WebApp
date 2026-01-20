@@ -52,9 +52,10 @@ function parseFilePath(filePath) {
     platform = parts[0]; // WINDOWS, MACOS, BYOD, WINDOWS365
   }
 
-  // Find the policy type (SettingsCatalog, CompliancePolicies, AppProtection)
+  // Find the policy type from folder structure
+  // Includes: SettingsCatalog, CompliancePolicies, AppProtection, DeviceConfiguration, UpdatePolicies, DriverUpdateProfiles
   for (let i = 1; i < parts.length - 1; i++) {
-    if (['SettingsCatalog', 'CompliancePolicies', 'AppProtection'].includes(parts[i])) {
+    if (['SettingsCatalog', 'CompliancePolicies', 'AppProtection', 'DeviceConfiguration', 'UpdatePolicies', 'DriverUpdateProfiles'].includes(parts[i])) {
       policyType = parts[i];
       break;
     }
@@ -79,6 +80,9 @@ const POLICY_TYPE_DESCRIPTIONS = {
   'SettingsCatalog': 'Settings Catalog configuration policies',
   'CompliancePolicies': 'Device compliance policies',
   'AppProtection': 'App protection policies (MAM)',
+  'DeviceConfiguration': 'Device configuration profiles',
+  'UpdatePolicies': 'Windows Update for Business rings',
+  'DriverUpdateProfiles': 'Windows driver update profiles',
 };
 
 function generateManifest() {

@@ -5,8 +5,7 @@
 
 import { GraphClient } from "./client";
 import { ConditionalAccessPolicy } from "@/types/graph";
-
-const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
+import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
  * Get all conditional access policies in the tenant
@@ -24,7 +23,7 @@ export async function getHydrationKitConditionalAccessPolicies(
   client: GraphClient
 ): Promise<ConditionalAccessPolicy[]> {
   const policies = await getAllConditionalAccessPolicies(client);
-  return policies.filter((policy) => policy.displayName?.includes(HYDRATION_MARKER));
+  return policies.filter((policy) => hasHydrationMarker(policy.displayName));
 }
 
 /**
@@ -87,7 +86,7 @@ export async function createConditionalAccessPolicy(
   policy.state = "disabled";
 
   // Add hydration marker to display name
-  if (!policy.displayName?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(policy.displayName)) {
     policy.displayName = `${policy.displayName || ""} [${HYDRATION_MARKER}]`.trim();
   }
 
@@ -121,7 +120,7 @@ export async function enableConditionalAccessPolicy(
 ): Promise<ConditionalAccessPolicy> {
   const policy = await getConditionalAccessPolicyById(client, policyId);
 
-  if (!policy.displayName?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(policy.displayName)) {
     throw new Error(
       `Cannot enable policy "${policy.displayName}": Not created by Intune Hydration Kit`
     );
@@ -153,7 +152,7 @@ export async function deleteConditionalAccessPolicy(
   // First, verify the policy has the hydration marker and is disabled
   const policy = await getConditionalAccessPolicyById(client, policyId);
 
-  if (!policy.displayName?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(policy.displayName)) {
     throw new Error(
       `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
     );
@@ -182,7 +181,7 @@ export async function deleteConditionalAccessPolicyByName(
     throw new Error(`Conditional access policy "${displayName}" not found`);
   }
 
-  if (!policy.displayName?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(policy.displayName)) {
     throw new Error(
       `Cannot delete policy "${displayName}": Not created by Intune Hydration Kit`
     );

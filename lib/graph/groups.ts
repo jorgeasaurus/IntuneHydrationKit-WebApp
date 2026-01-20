@@ -4,8 +4,7 @@
 
 import { GraphClient } from "./client";
 import { DeviceGroup } from "@/types/graph";
-
-const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
+import { HYDRATION_MARKER, HYDRATION_MARKER_LEGACY, hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
  * Get all groups in the tenant
@@ -16,10 +15,29 @@ export async function getAllGroups(client: GraphClient): Promise<DeviceGroup[]> 
 
 /**
  * Get groups created by Intune Hydration Kit
+ * Supports both current and legacy markers
  */
 export async function getHydrationKitGroups(client: GraphClient): Promise<DeviceGroup[]> {
-  const filter = `startsWith(description,'${HYDRATION_MARKER}')`;
-  return client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter)}`);
+  // Use contains filter to match both marker variations
+  // Note: Graph API doesn't support OR in filters well, so we do two queries
+  const filter1 = `contains(description,'${HYDRATION_MARKER}')`;
+  const filter2 = `contains(description,'${HYDRATION_MARKER_LEGACY}')`;
+
+  const [groups1, groups2] = await Promise.all([
+    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter1)}`).catch(() => []),
+    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter2)}`).catch(() => [])
+  ]);
+
+  // Combine and deduplicate by id
+  const seen = new Set<string>();
+  const combined: DeviceGroup[] = [];
+  for (const group of [...groups1, ...groups2]) {
+    if (group.id && !seen.has(group.id)) {
+      seen.add(group.id);
+      combined.push(group);
+    }
+  }
+  return combined;
 }
 
 /**
@@ -74,7 +92,7 @@ export async function createGroup(
   group: DeviceGroup
 ): Promise<DeviceGroup> {
   // Ensure the hydration marker is in the description
-  if (!group.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(group.description)) {
     group.description = `${group.description || ""} ${HYDRATION_MARKER}`.trim();
   }
 
@@ -100,7 +118,7 @@ export async function deleteGroup(client: GraphClient, groupId: string): Promise
   // First, verify the group has the hydration marker
   const group = await getGroupById(client, groupId);
 
-  if (!group.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(group.description)) {
     throw new Error(
       `Cannot delete group "${group.displayName}": Not created by Intune Hydration Kit`
     );
@@ -123,7 +141,7 @@ export async function deleteGroupByName(
     throw new Error(`Group "${displayName}" not found`);
   }
 
-  if (!group.description?.includes(HYDRATION_MARKER)) {
+  if (!hasHydrationMarker(group.description)) {
     throw new Error(
       `Cannot delete group "${displayName}": Not created by Intune Hydration Kit`
     );

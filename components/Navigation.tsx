@@ -10,10 +10,12 @@ import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { CloudEnvironment } from "@/types/hydration";
+import { useWizardState } from "@/hooks/useWizardState";
 
 export function Navigation() {
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
+  const { resetWizard } = useWizardState();
   const [showCloudSelector, setShowCloudSelector] = useState(false);
 
   const handleSignInClick = () => {
@@ -25,6 +27,7 @@ export function Navigation() {
     try {
       await signIn(environment);
       toast.success("Successfully signed in!");
+      resetWizard();
       router.push("/wizard");
     } catch (error) {
       toast.error("Failed to sign in. Please try again.");
@@ -38,6 +41,7 @@ export function Navigation() {
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
+      resetWizard();
       router.push("/wizard");
     } else {
       handleSignInClick();

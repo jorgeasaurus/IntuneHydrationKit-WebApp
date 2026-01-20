@@ -58,6 +58,16 @@ export default function ResultsPage() {
     sessionStorage.removeItem("hydration-summary");
     sessionStorage.removeItem("hydration-tasks");
 
+    // Clear all template caches (intune-hydration-templates-*)
+    const keysToRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith("intune-hydration-templates-")) {
+        keysToRemove.push(key);
+      }
+    }
+    keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+
     // Reset wizard state to step 1
     resetWizard();
 

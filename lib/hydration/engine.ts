@@ -4,6 +4,7 @@
  */
 
 import { GraphClient } from "@/lib/graph/client";
+import { HYDRATION_MARKER, hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { HydrationTask, OperationMode, TaskCategory, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
 import {
   DeviceGroup,
@@ -53,6 +54,7 @@ import {
   fetchBaselinePolicies,
   getCachedTemplates,
   cacheTemplates,
+  clearCategoryCache,
   GroupTemplate,
   FilterTemplate,
   ComplianceTemplate,
@@ -78,6 +80,10 @@ export interface ExecutionContext {
   cachedAppProtectionPolicies?: AppProtectionPolicy[];
   cachedIntuneGroups?: DeviceGroup[];
   cachedFilters?: DeviceFilter[];
+  // Cached Settings Catalog policies for delete operations (fetched once, reused for all deletes)
+  cachedSettingsCatalogPolicies?: Array<{ id: string; name: string; description?: string }>;
+  // Cached Driver Update Profiles for delete operations
+  cachedDriverUpdateProfiles?: Array<{ id: string; displayName: string; description?: string }>;
   // License flags for conditional skipping
   hasPremiumP2License?: boolean;
   hasWindowsDriverUpdateLicense?: boolean;
@@ -336,7 +342,6 @@ async function executeFilterTask(
   context: ExecutionContext
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode } = context;
-  const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
   if (mode === "preview") {
     return { task, success: true, skipped: false };
@@ -439,7 +444,7 @@ async function executeFilterTask(
     }
 
     // Check if it was created by the hydration kit
-    if (!existingFilter.description?.includes(HYDRATION_MARKER)) {
+    if (!hasHydrationMarker(existingFilter.description)) {
       console.log(`[Filter Task] Filter not created by Hydration Kit, skipping: "${template.displayName}"`);
       return { task, success: true, skipped: true, error: "Filter not created by Intune Hydration Kit" };
     }
@@ -743,58 +748,49 @@ async function executeAppProtectionTask(
  * Removes metadata fields that shouldn't be sent when creating
  */
 function cleanSettingsCatalogPolicy(policy: Record<string, unknown>): Record<string, unknown> {
-  const cleaned: Record<string, unknown> = {};
+  // Ensure hydration marker in description
+  const description = addHydrationMarker(policy.description as string | undefined);
 
-  // Fields to exclude when creating
-  const excludeFields = [
-    "@odata.context",
-    "@odata.id",
-    "@odata.editLink",
-    "id",
-    "createdDateTime",
-    "lastModifiedDateTime",
-    "createdDateTime@odata.type",
-    "lastModifiedDateTime@odata.type",
-    "#microsoft.graph.assign",
-    "#microsoft.graph.clearEnrollmentTimeDeviceMembershipTarget",
-    "#microsoft.graph.createCopy",
-    "#microsoft.graph.reorder",
-    "#microsoft.graph.retrieveEnrollmentTimeDeviceMembershipTarget",
-    "#microsoft.graph.setEnrollmentTimeDeviceMembershipTarget",
-    "#microsoft.graph.retrieveLatestUpgradeDefaultBaselinePolicy",
-    "assignments@odata.context",
-    "assignments@odata.associationLink",
-    "assignments@odata.navigationLink",
-    "settings@odata.context",
-    "settings@odata.associationLink",
-    "settings@odata.navigationLink",
-    // Our internal metadata fields
-    "_oibPlatform",
-    "_oibPolicyType",
-    "_oibFilePath",
-    "_cisCategory",
-    "_cisSubcategory",
-    "_cisFilePath",
-  ];
+  // Build a clean body with only required properties (matches PowerShell approach)
+  const cleaned: Record<string, unknown> = {
+    name: policy.name || policy.displayName,
+    description,
+    platforms: policy.platforms,
+    technologies: policy.technologies,
+    settings: [],
+  };
 
-  for (const [key, value] of Object.entries(policy)) {
-    if (!excludeFields.includes(key)) {
-      // Clean nested settings array
-      if (key === "settings" && Array.isArray(value)) {
-        cleaned[key] = value.map((setting: Record<string, unknown>) => {
-          const cleanedSetting: Record<string, unknown> = {};
-          for (const [sk, sv] of Object.entries(setting)) {
-            // Exclude metadata from settings too
-            if (!sk.startsWith("@odata.") && !sk.includes("@odata.")) {
-              cleanedSetting[sk] = sv;
-            }
-          }
-          return cleanedSetting;
-        });
-      } else {
-        cleaned[key] = value;
+  // Add optional roleScopeTagIds if present
+  if (policy.roleScopeTagIds && Array.isArray(policy.roleScopeTagIds)) {
+    cleaned.roleScopeTagIds = policy.roleScopeTagIds;
+  }
+
+  // Add templateReference if present with a templateId (matches PowerShell)
+  const templateRef = policy.templateReference as Record<string, unknown> | undefined;
+  if (templateRef && templateRef.templateId) {
+    cleaned.templateReference = {
+      templateId: templateRef.templateId,
+    };
+  }
+
+  // Clean settings array - remove id, @odata.* properties, and settingDefinitions
+  const settings = policy.settings as Array<Record<string, unknown>> | undefined;
+  if (settings && Array.isArray(settings)) {
+    cleaned.settings = settings.map((setting: Record<string, unknown>) => {
+      const cleanedSetting: Record<string, unknown> = {};
+      for (const [sk, sv] of Object.entries(setting)) {
+        // Exclude: id, @odata.* properties, and settingDefinitions (matches PowerShell)
+        if (
+          sk !== "id" &&
+          !sk.startsWith("@odata.") &&
+          !sk.includes("@odata.") &&
+          sk !== "settingDefinitions"
+        ) {
+          cleanedSetting[sk] = sv;
+        }
       }
-    }
+      return cleanedSetting;
+    });
   }
 
   return cleaned;
@@ -847,6 +843,60 @@ async function createSettingsCatalogPolicy(
 }
 
 /**
+ * Create a Device Configuration policy (includes UpdatePolicies/WUfB rings)
+ */
+async function createDeviceConfigurationPolicy(
+  client: GraphClient,
+  policy: Record<string, unknown>
+): Promise<{ id: string }> {
+  // Clean the policy before sending
+  const cleanedPolicy = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+
+  // Remove root-level id
+  delete cleanedPolicy.id;
+
+  // Ensure hydration marker in description
+  cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
+
+  console.log(`[Device Configuration] Creating policy: "${cleanedPolicy.displayName}"`);
+
+  const result = await client.post<{ id: string }>(
+    "/deviceManagement/deviceConfigurations",
+    cleanedPolicy
+  );
+
+  console.log(`[Device Configuration] ✓ Policy created with ID: ${result.id}`);
+  return result;
+}
+
+/**
+ * Create a Driver Update Profile (WUfB Drivers)
+ */
+async function createDriverUpdateProfile(
+  client: GraphClient,
+  policy: Record<string, unknown>
+): Promise<{ id: string }> {
+  // Clean the policy before sending
+  const cleanedPolicy = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+
+  // Remove root-level id
+  delete cleanedPolicy.id;
+
+  // Ensure hydration marker in description
+  cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
+
+  console.log(`[Driver Update Profile] Creating policy: "${cleanedPolicy.displayName}"`);
+
+  const result = await client.post<{ id: string }>(
+    "/deviceManagement/windowsDriverUpdateProfiles",
+    cleanedPolicy
+  );
+
+  console.log(`[Driver Update Profile] ✓ Policy created with ID: ${result.id}`);
+  return result;
+}
+
+/**
  * Check if a compliance policy exists by name
  */
 async function compliancePolicyExistsByName(
@@ -865,25 +915,85 @@ async function compliancePolicyExistsByName(
 }
 
 /**
+ * Recursively clean an object by removing OData metadata and other fields that Graph API rejects
+ * Keeps @odata.type but removes all other @odata.* properties, ids, timestamps, etc.
+ */
+function cleanPolicyRecursively(obj: unknown, isRoot: boolean = true): unknown {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.map((item) => cleanPolicyRecursively(item, false));
+  }
+
+  if (typeof obj === "object") {
+    const cleaned: Record<string, unknown> = {};
+    const excludeFields = [
+      // OData metadata
+      "@odata.context", "@odata.id", "@odata.editLink",
+      // Timestamps and version
+      "createdDateTime", "lastModifiedDateTime", "version",
+      // Internal metadata
+      "_oibPlatform", "_oibPolicyType", "_oibFilePath",
+      // OData actions
+      "#microsoft.graph.assign", "#microsoft.graph.scheduleActionsForRules",
+      // Read-only properties (matches PowerShell Remove-ReadOnlyGraphProperties)
+      "supportsScopeTags",
+      "deviceManagementApplicabilityRuleOsEdition",
+      "deviceManagementApplicabilityRuleOsVersion",
+      "deviceManagementApplicabilityRuleDeviceMode",
+      "creationSource",
+      "settingCount",
+      "priorityMetaData",
+      "isAssigned",
+      // Assignment-related (handled separately if needed)
+      "assignments",
+    ];
+
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+      // Skip excluded fields
+      if (excludeFields.includes(key)) {
+        continue;
+      }
+
+      // Skip any property containing @odata. (except @odata.type)
+      if (key.includes("@odata.") && key !== "@odata.type") {
+        continue;
+      }
+
+      // Skip id fields in nested objects (but keep at root level if needed)
+      if (key === "id" && !isRoot) {
+        continue;
+      }
+
+      // Skip properties starting with # (OData actions)
+      if (key.startsWith("#")) {
+        continue;
+      }
+
+      // Recursively clean nested objects and arrays
+      cleaned[key] = cleanPolicyRecursively(value, false);
+    }
+
+    return cleaned;
+  }
+
+  return obj;
+}
+
+/**
  * Create a baseline compliance policy
  */
 async function createBaselineCompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy - remove metadata but keep @odata.type
-  const cleaned: Record<string, unknown> = {};
-  const excludeFields = [
-    "@odata.context", "@odata.id", "@odata.editLink", "id",
-    "createdDateTime", "lastModifiedDateTime", "version",
-    "_oibPlatform", "_oibPolicyType", "_oibFilePath",
-  ];
+  // Recursively clean the policy to remove all OData metadata
+  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
 
-  for (const [key, value] of Object.entries(policy)) {
-    if (!excludeFields.includes(key) && !key.includes("@odata.") || key === "@odata.type") {
-      cleaned[key] = value;
-    }
-  }
+  // Remove root-level id as well (we don't want to keep it for creation)
+  delete cleaned.id;
 
   console.log(`[Baseline Compliance] Creating policy: "${cleaned.displayName}"`);
 
@@ -904,35 +1014,15 @@ async function createCISCompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy - remove metadata but keep @odata.type and essential fields
-  const cleaned: Record<string, unknown> = {};
-  const excludePatterns = [
-    "@odata.context", "@odata.id", "@odata.editLink", "id",
-    "createdDateTime", "lastModifiedDateTime", "version",
-    "_cisCategory", "_cisSubcategory", "_cisFilePath",
-    "assignments", "scheduledActionsForRule@odata",
-    "deviceSettingStateSummaries@odata", "deviceStatuses@odata",
-    "deviceStatusOverview@odata", "userStatuses@odata", "userStatusOverview@odata",
-    "#microsoft.graph.scheduleActionsForRules",
-  ];
+  // Recursively clean the policy to remove all OData metadata
+  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
 
-  for (const [key, value] of Object.entries(policy)) {
-    // Skip fields that match exclusion patterns
-    const shouldExclude = excludePatterns.some(pattern => key.includes(pattern));
-    if (shouldExclude) continue;
-
-    // Keep @odata.type
-    if (key === "@odata.type") {
-      cleaned[key] = value;
-      continue;
-    }
-
-    // Skip any other @odata fields except @odata.type
-    if (key.includes("@odata.")) continue;
-
-    // Include the field
-    cleaned[key] = value;
-  }
+  // Remove root-level id and CIS-specific metadata
+  delete cleaned.id;
+  delete cleaned._cisCategory;
+  delete cleaned._cisSubcategory;
+  delete cleaned._cisFilePath;
+  delete cleaned.assignments;
 
   // Ensure displayName is set
   if (!cleaned.displayName && cleaned.name) {
@@ -960,7 +1050,6 @@ async function executeBaselineTask(
   context: ExecutionContext
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode } = context;
-  const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
   if (mode === "preview") {
     return { task, success: true, skipped: false };
@@ -1012,8 +1101,35 @@ async function executeBaselineTask(
         const created = await createAppProtectionPolicy(client, template as AppProtectionTemplate);
         return { task, success: true, skipped: false, createdId: created.id };
 
+      } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
+        // DeviceConfiguration and UpdatePolicies use deviceConfigurations endpoint
+        const existsResponse = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
+          `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(policyName)}'&$select=id,displayName`
+        );
+        if (existsResponse.value && existsResponse.value.length > 0) {
+          console.log(`[Baseline Task] Device Configuration policy already exists, skipping: "${policyName}"`);
+          return { task, success: false, skipped: true, error: "Policy already exists" };
+        }
+        const created = await createDeviceConfigurationPolicy(client, template as Record<string, unknown>);
+        return { task, success: true, skipped: false, createdId: created.id };
+
+      } else if (policyType === "DriverUpdateProfiles") {
+        // DriverUpdateProfiles endpoint doesn't support $filter, fetch all and filter client-side
+        const existsResponse = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
+          `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName`
+        );
+        const existingProfile = existsResponse.value?.find(
+          (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
+        );
+        if (existingProfile) {
+          console.log(`[Baseline Task] Driver Update Profile already exists, skipping: "${policyName}"`);
+          return { task, success: false, skipped: true, error: "Policy already exists" };
+        }
+        const created = await createDriverUpdateProfile(client, template as Record<string, unknown>);
+        return { task, success: true, skipped: false, createdId: created.id };
+
       } else {
-        // SettingsCatalog or unknown - use configurationPolicies endpoint
+        // SettingsCatalog (default) - use configurationPolicies endpoint
         const exists = await settingsCatalogPolicyExists(client, policyName);
         if (exists) {
           console.log(`[Baseline Task] Settings Catalog policy already exists, skipping: "${policyName}"`);
@@ -1031,51 +1147,212 @@ async function executeBaselineTask(
   } else if (mode === "delete") {
     try {
       if (policyType === "CompliancePolicies") {
-        // Find and delete compliance policy
-        const response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-          `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(policyName)}'`
+        // Find compliance policy by name first (to get ID)
+        const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
+          `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(policyName)}'&$select=id,displayName`
         );
         if (!response.value || response.value.length === 0) {
           return { task, success: true, skipped: true, error: "Policy not found in tenant" };
         }
-        const policy = response.value[0];
-        if (!policy.description?.includes(HYDRATION_MARKER)) {
+        const policyId = response.value[0].id;
+
+        // Fetch full policy by ID to get description
+        const fullPolicy = await client.get<{ id: string; displayName: string; description?: string }>(
+          `/deviceManagement/deviceCompliancePolicies/${policyId}?$select=id,displayName,description`
+        );
+        if (!hasHydrationMarker(fullPolicy.description)) {
           return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
         }
-        await client.delete(`/deviceManagement/deviceCompliancePolicies/${policy.id}`);
+
+        await client.delete(`/deviceManagement/deviceCompliancePolicies/${policyId}`);
+        console.log(`[Baseline Task] ✓ Deleted compliance policy: "${policyName}"`);
         return { task, success: true, skipped: false };
 
       } else if (policyType === "AppProtection") {
-        // Find and delete app protection policy
-        const policy = context.cachedAppProtectionPolicies?.find(
+        // Find app protection policy in cache (includes platform info)
+        const cachedPolicy = context.cachedAppProtectionPolicies?.find(
           (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
         );
-        if (!policy || !policy.id) {
+        if (!cachedPolicy || !cachedPolicy.id) {
           return { task, success: true, skipped: true, error: "Policy not found in tenant" };
         }
-        const odataType = policy["@odata.type"];
-        const platform = odataType === "#microsoft.graph.iosManagedAppProtection" ? "iOS" : "android";
-        await deleteAppProtectionPolicy(client, policy.id, platform);
-        return { task, success: true, skipped: false };
 
-      } else {
-        // Settings Catalog - delete from configurationPolicies
-        const response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
-          `/deviceManagement/configurationPolicies?$filter=name eq '${encodeURIComponent(policyName)}'`
+        // Determine platform from the cached policy's _platform property or by checking which endpoint it came from
+        // The cache should have been populated with platform info
+        const platform = cachedPolicy._platform as "iOS" | "android" || "android";
+
+        // Fetch full policy to check the marker (deleteAppProtectionPolicy does this internally)
+        try {
+          await deleteAppProtectionPolicy(client, cachedPolicy.id, platform);
+          console.log(`[Baseline Task] ✓ Deleted app protection policy: "${policyName}"`);
+          return { task, success: true, skipped: false };
+        } catch (deleteError) {
+          const errMsg = deleteError instanceof Error ? deleteError.message : String(deleteError);
+          if (errMsg.includes("Not created by Intune Hydration Kit")) {
+            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+          }
+          throw deleteError;
+        }
+
+      } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
+        // DeviceConfiguration and UpdatePolicies use /deviceManagement/deviceConfigurations endpoint
+        const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
+          `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(policyName)}'&$select=id,displayName`
         );
         if (!response.value || response.value.length === 0) {
           return { task, success: true, skipped: true, error: "Policy not found in tenant" };
         }
-        const policy = response.value[0];
-        if (!policy.description?.includes(HYDRATION_MARKER)) {
+        const policyId = response.value[0].id;
+
+        // Fetch full policy by ID to get description
+        const fullPolicy = await client.get<{ id: string; displayName: string; description?: string }>(
+          `/deviceManagement/deviceConfigurations/${policyId}?$select=id,displayName,description`
+        );
+        if (!hasHydrationMarker(fullPolicy.description)) {
           return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
         }
-        await client.delete(`/deviceManagement/configurationPolicies/${policy.id}`);
+
+        await client.delete(`/deviceManagement/deviceConfigurations/${policyId}`);
+        console.log(`[Baseline Task] ✓ Deleted device configuration policy: "${policyName}"`);
         return { task, success: true, skipped: false };
+
+      } else if (policyType === "DriverUpdateProfiles") {
+        // Use pre-fetched cache for Driver Update Profiles
+        let profiles = context.cachedDriverUpdateProfiles;
+
+        if (!profiles || profiles.length === 0) {
+          console.log(`[Baseline Task] No cached Driver Update Profiles - fetching now...`);
+          const response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
+            `/deviceManagement/windowsDriverUpdateProfiles`
+          );
+          profiles = response.value || [];
+          context.cachedDriverUpdateProfiles = profiles;
+        }
+
+        const matchingProfile = profiles.find(
+          (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
+        );
+        if (!matchingProfile) {
+          return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+        }
+
+        console.log(`[Baseline Task] Found Driver Update Profile: "${matchingProfile.displayName}" (ID: ${matchingProfile.id})`);
+        console.log(`[Baseline Task] Description: "${matchingProfile.description || "(none)"}"`);
+
+        // Check hydration marker
+        if (!hasHydrationMarker(matchingProfile.description)) {
+          console.log(`[Baseline Task] Marker check failed - description does not contain marker`);
+          return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+        }
+
+        await client.delete(`/deviceManagement/windowsDriverUpdateProfiles/${matchingProfile.id}`);
+        console.log(`[Baseline Task] ✓ Deleted driver update profile: "${policyName}"`);
+        return { task, success: true, skipped: false };
+
+      } else {
+        // Settings Catalog (default) - use pre-fetched cache to avoid repeated API calls
+        // The cache was populated at the start of executeTasks for delete operations
+        const allPolicies = context.cachedSettingsCatalogPolicies || [];
+
+        if (allPolicies.length === 0) {
+          console.log(`[Baseline Task] No cached Settings Catalog policies - fetching now...`);
+          // Fallback: fetch if cache is empty (shouldn't happen in normal flow)
+          const fetched = await client.getCollection<{ id: string; name: string; description?: string }>(
+            `/deviceManagement/configurationPolicies?$select=id,name,description`
+          );
+          context.cachedSettingsCatalogPolicies = fetched;
+        }
+
+        // Find matching policy by name (case-insensitive)
+        const matchingPolicy = (context.cachedSettingsCatalogPolicies || []).find(
+          (p) => p.name?.toLowerCase() === policyName.toLowerCase()
+        );
+        if (!matchingPolicy) {
+          return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+        }
+
+        console.log(`[Baseline Task] Found Settings Catalog policy: "${matchingPolicy.name}" (ID: ${matchingPolicy.id})`);
+        console.log(`[Baseline Task] Description: "${matchingPolicy.description || "(none)"}"`);
+
+        // Check hydration marker
+        if (!hasHydrationMarker(matchingPolicy.description)) {
+          return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+        }
+
+        // First check if the policy has any assignments
+        let hasAssignments = false;
+        try {
+          const assignmentsResponse = await client.get<{ value: Array<{ id: string }> }>(
+            `/deviceManagement/configurationPolicies/${matchingPolicy.id}/assignments`
+          );
+          hasAssignments = (assignmentsResponse.value?.length ?? 0) > 0;
+          if (hasAssignments) {
+            console.log(`[Baseline Task] Policy "${policyName}" has ${assignmentsResponse.value.length} assignment(s), removing...`);
+          }
+        } catch (getAssignError) {
+          console.log(`[Baseline Task] Could not check assignments for "${policyName}", will try delete directly`);
+        }
+
+        // Remove assignments if present (policies with assignments cannot be deleted)
+        if (hasAssignments) {
+          try {
+            await client.post(`/deviceManagement/configurationPolicies/${matchingPolicy.id}/assign`, {
+              assignments: []
+            });
+            console.log(`[Baseline Task] Cleared assignments for policy: "${policyName}"`);
+            // Wait a moment for the assignment removal to propagate
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (assignError) {
+            const assignErrorMsg = assignError instanceof Error ? assignError.message : String(assignError);
+            console.log(`[Baseline Task] Warning: Could not clear assignments for "${policyName}": ${assignErrorMsg}`);
+            // Continue anyway - the delete might still work
+          }
+        }
+
+        try {
+          await client.delete(`/deviceManagement/configurationPolicies/${matchingPolicy.id}`);
+          console.log(`[Baseline Task] ✓ Deleted settings catalog policy: "${policyName}"`);
+          // Remove from cache after successful delete
+          if (context.cachedSettingsCatalogPolicies) {
+            context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
+              (p) => p.id !== matchingPolicy.id
+            );
+          }
+          return { task, success: true, skipped: false };
+        } catch (deleteError) {
+          // Delete returned an error, but policy might still be deleted (Intune backend quirk)
+          // Verify by checking if policy still exists
+          const errorMsg = deleteError instanceof Error ? deleteError.message : String(deleteError);
+          console.log(`[Baseline Task] Delete returned error for "${policyName}", verifying if policy was actually deleted...`);
+
+          try {
+            // Try to fetch the policy by ID - if it fails with 404, it was deleted
+            await client.get(`/deviceManagement/configurationPolicies/${matchingPolicy.id}?$select=id`);
+            // If we get here, the policy still exists - the delete truly failed
+            console.error(`[Baseline Task] Policy "${policyName}" still exists - delete truly failed`);
+            throw deleteError;
+          } catch (verifyError) {
+            const verifyErrorMsg = verifyError instanceof Error ? verifyError.message : String(verifyError);
+            // Check if it's a 404 (policy not found = successfully deleted)
+            if (verifyErrorMsg.includes("404") || verifyErrorMsg.toLowerCase().includes("not found")) {
+              console.log(`[Baseline Task] ✓ Policy "${policyName}" confirmed deleted (verified via 404)`);
+              // Remove from cache
+              if (context.cachedSettingsCatalogPolicies) {
+                context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
+                  (p) => p.id !== matchingPolicy.id
+                );
+              }
+              return { task, success: true, skipped: false };
+            }
+            // Not a 404, rethrow the original delete error
+            throw deleteError;
+          }
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, error: errorMessage };
+      console.error(`[Baseline Task] Delete failed for "${policyName}":`, errorMessage);
+      return { task, success: false, skipped: false, error: errorMessage };
     }
   }
 
@@ -1091,7 +1368,6 @@ async function executeCISBaselineTask(
   context: ExecutionContext
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode } = context;
-  const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
   if (mode === "preview") {
     return { task, success: true, skipped: false };
@@ -1162,29 +1438,106 @@ async function executeCISBaselineTask(
           return { task, success: true, skipped: true, error: "Policy not found in tenant" };
         }
         const policy = response.value[0];
-        if (!policy.description?.includes(HYDRATION_MARKER)) {
+        if (!hasHydrationMarker(policy.description)) {
           return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
         }
         await client.delete(`/deviceManagement/deviceCompliancePolicies/${policy.id}`);
         return { task, success: true, skipped: false };
       } else {
-        // Find and delete Settings Catalog policy
-        const response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
-          `/deviceManagement/configurationPolicies?$filter=name eq '${encodeURIComponent(policyName)}'`
+        // Use pre-fetched cache for Settings Catalog policies
+        let allPolicies = context.cachedSettingsCatalogPolicies || [];
+
+        if (allPolicies.length === 0) {
+          console.log(`[CIS Baseline Task] No cached Settings Catalog policies - fetching now...`);
+          allPolicies = await client.getCollection<{ id: string; name: string; description?: string }>(
+            `/deviceManagement/configurationPolicies?$select=id,name,description`
+          );
+          context.cachedSettingsCatalogPolicies = allPolicies;
+        }
+
+        // Find matching policy by name (case-insensitive)
+        const policy = allPolicies.find(
+          (p) => p.name?.toLowerCase() === policyName.toLowerCase()
         );
-        if (!response.value || response.value.length === 0) {
+        if (!policy) {
           return { task, success: true, skipped: true, error: "Policy not found in tenant" };
         }
-        const policy = response.value[0];
-        if (!policy.description?.includes(HYDRATION_MARKER)) {
+
+        console.log(`[CIS Baseline Task] Found Settings Catalog policy: "${policy.name}" (ID: ${policy.id})`);
+        console.log(`[CIS Baseline Task] Description: "${policy.description || "(none)"}"`);
+
+        if (!hasHydrationMarker(policy.description)) {
           return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
         }
-        await client.delete(`/deviceManagement/configurationPolicies/${policy.id}`);
-        return { task, success: true, skipped: false };
+
+        // First check if the policy has any assignments
+        let hasAssignments = false;
+        try {
+          const assignmentsResponse = await client.get<{ value: Array<{ id: string }> }>(
+            `/deviceManagement/configurationPolicies/${policy.id}/assignments`
+          );
+          hasAssignments = (assignmentsResponse.value?.length ?? 0) > 0;
+          if (hasAssignments) {
+            console.log(`[CIS Baseline Task] Policy "${policyName}" has ${assignmentsResponse.value.length} assignment(s), removing...`);
+          }
+        } catch (getAssignError) {
+          console.log(`[CIS Baseline Task] Could not check assignments for "${policyName}", will try delete directly`);
+        }
+
+        // Remove assignments if present (policies with assignments cannot be deleted)
+        if (hasAssignments) {
+          try {
+            await client.post(`/deviceManagement/configurationPolicies/${policy.id}/assign`, {
+              assignments: []
+            });
+            console.log(`[CIS Baseline Task] Cleared assignments for policy: "${policyName}"`);
+            // Wait a moment for the assignment removal to propagate
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          } catch (assignError) {
+            const assignErrorMsg = assignError instanceof Error ? assignError.message : String(assignError);
+            console.log(`[CIS Baseline Task] Warning: Could not clear assignments for "${policyName}": ${assignErrorMsg}`);
+            // Continue anyway - the delete might still work
+          }
+        }
+
+        try {
+          await client.delete(`/deviceManagement/configurationPolicies/${policy.id}`);
+          console.log(`[CIS Baseline Task] ✓ Deleted settings catalog policy: "${policyName}"`);
+          // Remove from cache after successful delete
+          if (context.cachedSettingsCatalogPolicies) {
+            context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
+              (p) => p.id !== policy.id
+            );
+          }
+          return { task, success: true, skipped: false };
+        } catch (deleteError) {
+          // Delete returned an error, but policy might still be deleted (Intune backend quirk)
+          // Verify by checking if policy still exists
+          console.log(`[CIS Baseline Task] Delete returned error for "${policyName}", verifying if policy was actually deleted...`);
+
+          try {
+            await client.get(`/deviceManagement/configurationPolicies/${policy.id}?$select=id`);
+            // If we get here, the policy still exists - the delete truly failed
+            console.error(`[CIS Baseline Task] Policy "${policyName}" still exists - delete truly failed`);
+            throw deleteError;
+          } catch (verifyError) {
+            const verifyErrorMsg = verifyError instanceof Error ? verifyError.message : String(verifyError);
+            if (verifyErrorMsg.includes("404") || verifyErrorMsg.toLowerCase().includes("not found")) {
+              console.log(`[CIS Baseline Task] ✓ Policy "${policyName}" confirmed deleted (verified via 404)`);
+              if (context.cachedSettingsCatalogPolicies) {
+                context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
+                  (p) => p.id !== policy.id
+                );
+              }
+              return { task, success: true, skipped: false };
+            }
+            throw deleteError;
+          }
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, error: errorMessage };
+      return { task, success: false, skipped: false, error: errorMessage };
     }
   }
 
@@ -1229,9 +1582,11 @@ export async function executeTasks(
     }
   }
 
-  // Pre-fetch App Protection policies if any appProtection tasks exist
+  // Pre-fetch App Protection policies if any appProtection or baseline tasks exist
+  // Baseline tasks can include AppProtection policies (e.g., Android/iOS BYOD)
   const hasAppProtectionTasks = tasks.some((task) => task.category === "appProtection");
-  if (hasAppProtectionTasks && !context.cachedAppProtectionPolicies) {
+  const hasBaselineTasks = tasks.some((task) => task.category === "baseline");
+  if ((hasAppProtectionTasks || hasBaselineTasks) && !context.cachedAppProtectionPolicies) {
     console.log("[Execute Tasks] Pre-fetching all App Protection policies...");
     try {
       context.cachedAppProtectionPolicies = await getAllAppProtectionPolicies(context.client);
@@ -1240,6 +1595,37 @@ export async function executeTasks(
       console.error("[Execute Tasks] Failed to pre-fetch App Protection policies:", error);
       // Continue execution - individual tasks will handle errors
       context.cachedAppProtectionPolicies = [];
+    }
+  }
+
+  // Pre-fetch Settings Catalog policies for DELETE mode (baseline and CIS tasks)
+  // This avoids calling getCollection for every single delete operation
+  const hasCISTasks = tasks.some((task) => task.category === "cisBaseline");
+  if (context.operationMode === "delete" && (hasBaselineTasks || hasCISTasks) && !context.cachedSettingsCatalogPolicies) {
+    console.log("[Execute Tasks] Pre-fetching all Settings Catalog policies for delete operations...");
+    try {
+      context.cachedSettingsCatalogPolicies = await context.client.getCollection<{ id: string; name: string; description?: string }>(
+        `/deviceManagement/configurationPolicies?$select=id,name,description`
+      );
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedSettingsCatalogPolicies.length} Settings Catalog policies`);
+    } catch (error) {
+      console.error("[Execute Tasks] Failed to pre-fetch Settings Catalog policies:", error);
+      context.cachedSettingsCatalogPolicies = [];
+    }
+  }
+
+  // Pre-fetch Driver Update Profiles for DELETE mode
+  if (context.operationMode === "delete" && hasBaselineTasks && !context.cachedDriverUpdateProfiles) {
+    console.log("[Execute Tasks] Pre-fetching all Driver Update Profiles for delete operations...");
+    try {
+      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
+        `/deviceManagement/windowsDriverUpdateProfiles`
+      );
+      context.cachedDriverUpdateProfiles = response.value || [];
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedDriverUpdateProfiles.length} Driver Update Profiles`);
+    } catch (error) {
+      console.error("[Execute Tasks] Failed to pre-fetch Driver Update Profiles:", error);
+      context.cachedDriverUpdateProfiles = [];
     }
   }
 
@@ -1389,6 +1775,16 @@ export async function buildTaskQueueAsync(
     const cacheKey = category === "cisBaseline" && options?.selectedCISCategories
       ? `${category}-${options.selectedCISCategories.sort().join(",")}`
       : category;
+
+    // Clear cache if categorySelections has selections for this category
+    // This ensures we fetch fresh templates and don't use stale filtered cache
+    const categorySelections = options?.categorySelections;
+    const selectionKey = category as keyof CategorySelections;
+    const selection = categorySelections?.[selectionKey];
+    if (selection && 'selectedItems' in selection && selection.selectedItems && selection.selectedItems.length > 0) {
+      console.log(`[Task Queue] Clearing cache for ${cacheKey} - specific items selected`);
+      clearCategoryCache(cacheKey);
+    }
 
     // Try to get from cache first
     const cached = getCachedTemplates(cacheKey);
@@ -1550,22 +1946,60 @@ export async function buildTaskQueueAsync(
       }
     }
 
-    console.log(`[Task Queue] Creating ${items.length} tasks for ${category}:`,
-      items.slice(0, 5).map(i => i.displayName || (i as Record<string, unknown>).name || 'Unknown').concat(items.length > 5 ? ['...'] : [])
-    );
+    // For delete/preview mode with specific selections, use selectedItems directly
+    // This ensures all selected items appear in the task queue, even if they don't exist in templates
+    // During execution, items that don't exist in the tenant will be marked as "skipped"
 
-    for (const item of items) {
-      // Get displayName with fallbacks for CIS policies that might have 'name' instead
-      const itemRecord = item as Record<string, unknown>;
-      const itemName = item.displayName || (itemRecord.name as string) || (itemRecord._cisFilePath as string) || 'Unknown Policy';
+    // Check if we have direct selections for this category
+    const hasDirectSelections = selection && 'selectedItems' in selection && selection.selectedItems && selection.selectedItems.length > 0;
 
-      tasks.push({
-        id: `task-${taskId++}`,
-        category,
-        operation: operationMode,
-        itemName,
-        status: "pending",
-      });
+    // Special handling for baseline which uses baselineSelection instead of categorySelections
+    const hasBaselineSelections = category === "baseline" && options?.baselineSelection?.selectedPolicies && options.baselineSelection.selectedPolicies.length > 0;
+
+    if ((operationMode === "delete" || operationMode === "preview") && hasDirectSelections) {
+      console.log(`[Task Queue] Using ${selection!.selectedItems!.length} selected items directly for ${category} (${operationMode} mode)`);
+      for (const itemName of selection!.selectedItems!) {
+        tasks.push({
+          id: `task-${taskId++}`,
+          category,
+          operation: operationMode,
+          itemName,
+          status: "pending",
+        });
+      }
+    } else if ((operationMode === "delete" || operationMode === "preview") && hasBaselineSelections) {
+      // For baseline in delete/preview mode, create tasks from the filtered items array
+      // The items array was already filtered by selectedPolicies paths in the switch case above
+      console.log(`[Task Queue] Using ${items.length} baseline items for ${category} (${operationMode} mode)`);
+      for (const item of items) {
+        const itemRecord = item as Record<string, unknown>;
+        const itemName = item.displayName || (itemRecord.name as string) || 'Unknown Policy';
+        tasks.push({
+          id: `task-${taskId++}`,
+          category,
+          operation: operationMode,
+          itemName,
+          status: "pending",
+        });
+      }
+    } else {
+      console.log(`[Task Queue] Creating ${items.length} tasks for ${category}:`,
+        items.slice(0, 5).map(i => i.displayName || (i as Record<string, unknown>).name || 'Unknown').concat(items.length > 5 ? ['...'] : [])
+      );
+
+      for (const item of items) {
+        // Get displayName with fallbacks for CIS policies that might have 'name' instead
+        const itemRecord = item as Record<string, unknown>;
+        const itemName = item.displayName || (itemRecord.name as string) || (itemRecord._cisFilePath as string) || 'Unknown Policy';
+
+        tasks.push({
+          id: `task-${taskId++}`,
+          category,
+          operation: operationMode,
+          itemName,
+          status: "pending",
+        });
+      }
     }
   }
 
