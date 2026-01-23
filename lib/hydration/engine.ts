@@ -40,6 +40,13 @@ import {
   deleteAppProtectionPolicy,
   getAllAppProtectionPolicies,
 } from "@/lib/graph/appProtection";
+import {
+  createEnrollmentProfile,
+  enrollmentProfileExists,
+  deleteEnrollmentProfileByName,
+  getEnrollmentProfileType,
+  EnrollmentProfile,
+} from "@/lib/graph/enrollment";
 import * as Templates from "@/templates";
 import {
   fetchDynamicGroups,
@@ -170,6 +177,9 @@ async function executeTask(
       case "cisBaseline":
         result = await executeCISBaselineTask(task, context);
         break;
+      case "enrollment":
+        result = await executeEnrollmentTask(task, context);
+        break;
       default:
         result = {
           task,
@@ -283,20 +293,43 @@ async function executeGroupTask(
     if (!("@odata.type" in template)) {
       console.log(`[Group Task] Converting simple template to full DeviceGroup format`);
       const simpleTemplate = template as GroupTemplate;
-      fullGroupTemplate = {
-        "@odata.type": "#microsoft.graph.group",
-        displayName: simpleTemplate.displayName,
-        description: simpleTemplate.description,
-        groupTypes: ["DynamicMembership"],
-        mailEnabled: false,
-        mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
-        securityEnabled: true,
-        membershipRule: simpleTemplate.membershipRule,
-        membershipRuleProcessingState: "On",
-      };
+
+      // Check if this is a static group (assigned membership) or dynamic group
+      const isStaticGroup = simpleTemplate.isStaticGroup === true || !simpleTemplate.membershipRule;
+
+      if (isStaticGroup) {
+        // Static group: no membershipRule, empty groupTypes
+        console.log(`[Group Task] Creating static/assigned membership group`);
+        fullGroupTemplate = {
+          "@odata.type": "#microsoft.graph.group",
+          displayName: simpleTemplate.displayName,
+          description: simpleTemplate.description,
+          groupTypes: [], // Empty for assigned membership groups
+          mailEnabled: false,
+          mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
+          securityEnabled: true,
+          // No membershipRule or membershipRuleProcessingState for static groups
+        };
+      } else {
+        // Dynamic group: has membershipRule
+        console.log(`[Group Task] Creating dynamic membership group`);
+        fullGroupTemplate = {
+          "@odata.type": "#microsoft.graph.group",
+          displayName: simpleTemplate.displayName,
+          description: simpleTemplate.description,
+          groupTypes: ["DynamicMembership"],
+          mailEnabled: false,
+          mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
+          securityEnabled: true,
+          membershipRule: simpleTemplate.membershipRule,
+          membershipRuleProcessingState: "On",
+        };
+      }
+
       console.log(`[Group Task] Template converted:`, {
         displayName: fullGroupTemplate.displayName,
         mailNickname: fullGroupTemplate.mailNickname,
+        isStaticGroup,
         hasMembershipRule: !!fullGroupTemplate.membershipRule,
       });
     } else {
@@ -738,6 +771,84 @@ async function executeAppProtectionTask(
     }
 
     return { task, success: true, skipped: false };
+  }
+
+  return { task, success: false, skipped: false, error: "Invalid operation mode" };
+}
+
+/**
+ * Execute an enrollment task (create or delete)
+ * Handles Autopilot Deployment Profiles and Enrollment Status Page configurations
+ */
+async function executeEnrollmentTask(
+  task: HydrationTask,
+  context: ExecutionContext
+): Promise<ExecutionResult> {
+  const { client, operationMode: mode } = context;
+
+  if (mode === "preview") {
+    return { task, success: true, skipped: false };
+  }
+
+  // Get template from cache
+  console.log(`[Enrollment Task] Looking up template for: "${task.itemName}"`);
+  let template: EnrollmentProfile | undefined;
+  const cachedEnrollment = getCachedTemplates("enrollment");
+
+  if (cachedEnrollment && Array.isArray(cachedEnrollment)) {
+    console.log(`[Enrollment Task] Found ${cachedEnrollment.length} cached enrollment templates`);
+    template = (cachedEnrollment as EnrollmentProfile[]).find(
+      (e) => e.displayName === task.itemName
+    );
+    if (template) {
+      console.log(`[Enrollment Task] Found template in cache: "${template.displayName}"`);
+    }
+  }
+
+  if (!template) {
+    console.error(`[Enrollment Task] Template not found for: "${task.itemName}"`);
+    return { task, success: false, skipped: false, error: "Template not found" };
+  }
+
+  const profileType = getEnrollmentProfileType(template);
+  console.log(`[Enrollment Task] Profile type: ${profileType}`);
+
+  if (mode === "create") {
+    // Check if profile already exists
+    const exists = await enrollmentProfileExists(client, template);
+    if (exists) {
+      console.log(`[Enrollment Task] Profile already exists, skipping: "${template.displayName}"`);
+      return {
+        task,
+        success: false,
+        skipped: true,
+        error: "Profile already exists",
+      };
+    }
+
+    // Create the profile
+    console.log(`[Enrollment Task] Creating profile: "${template.displayName}"`);
+    const created = await createEnrollmentProfile(client, template);
+    console.log(`[Enrollment Task] Profile created with ID: ${created.id}`);
+    return {
+      task,
+      success: true,
+      skipped: false,
+      createdId: created.id,
+    };
+  } else if (mode === "delete") {
+    // Delete the profile
+    try {
+      console.log(`[Enrollment Task] Deleting profile: "${template.displayName}" (type: ${profileType})`);
+      await deleteEnrollmentProfileByName(client, template.displayName, profileType);
+      console.log(`[Enrollment Task] Profile deleted successfully`);
+      return { task, success: true, skipped: false };
+    } catch (error) {
+      // Profile not found or not created by hydration kit - skip
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.log(`[Enrollment Task] Delete skipped: ${errorMessage}`);
+      return { task, success: true, skipped: true, error: errorMessage };
+    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

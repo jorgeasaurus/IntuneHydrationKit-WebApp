@@ -8,12 +8,13 @@ import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 3; // Updated to fix CIS displayName
+const CACHE_VERSION = 15; // Aligned Autopilot profile template with PowerShell reference (added roleScopeTagIds, hybridAzureADJoinSkipConnectivityCheck)
 
 export interface GroupTemplate {
   displayName: string;
   description: string;
-  membershipRule: string;
+  membershipRule?: string; // Optional for static/assigned groups
+  isStaticGroup?: boolean; // Flag to indicate this is a static group
 }
 
 export interface FilterTemplate {
@@ -107,6 +108,7 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
         description: group.description
           ? `${group.description} ${HYDRATION_MARKER}`
           : HYDRATION_MARKER,
+        isStaticGroup: true, // Mark as static group (assigned membership, not dynamic)
       }));
     }
 
@@ -162,11 +164,12 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
  * Fetch compliance policies from local templates
  */
 export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
+  // Note: Linux compliance templates removed - they use Settings Catalog format (platforms/technologies)
+  // and cannot be created through the /deviceManagement/deviceCompliancePolicies endpoint.
+  // Linux compliance policies must be created through the Settings Catalog endpoint instead.
   const complianceFiles = [
     "Compliance/Android-Compliance-FullyManaged-Basic.json",
     "Compliance/Android-Compliance-FullyManaged-Strict.json",
-    "Compliance/Linux-Compliance-Basic.json",
-    "Compliance/Linux-Compliance-Strict.json",
     "Compliance/Windows-Compliance-Policy.json",
     "Compliance/Windows-Custom-Compliance.json",
     "Compliance/iOS-Compliance-Basic.json",
@@ -187,8 +190,9 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
 
       const data = await response.json();
 
-      // Compliance files contain single policy objects, not arrays
-      if (data["@odata.type"]) {
+      // Compliance files contain single policy objects
+      // Some use @odata.type (Windows, iOS, macOS, Android), others use platforms/technologies (Linux)
+      if (data["@odata.type"] || data.platforms) {
         const policy: ComplianceTemplate = {
           ...data,
           description: data.description
@@ -221,15 +225,17 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
     "ConditionalAccess/Require MDM-enrolled and compliant device to access cloud apps for all users (Preview).json",
     "ConditionalAccess/Require compliant or hybrid Azure AD joined device for admins.json",
     "ConditionalAccess/Require compliant or hybrid Azure AD joined device or multifactor authentication for all users.json",
-    "ConditionalAccess/Require multifactor authentication for admin portals.json",
+    "ConditionalAccess/Require multifactor authentication for Microsoft admin portals.json",
     "ConditionalAccess/Require multifactor authentication for admins.json",
     "ConditionalAccess/Require multifactor authentication for all users.json",
     "ConditionalAccess/Require multifactor authentication for Azure management.json",
     "ConditionalAccess/Require multifactor authentication for guest access.json",
-    "ConditionalAccess/Require multifactor authentication for risky sign-in (all users).json",
+    "ConditionalAccess/Require multifactor authentication for risky sign-ins.json",
     "ConditionalAccess/Require password change for high-risk users.json",
+    "ConditionalAccess/Require phishing-resistant multifactor authentication for admins.json",
+    "ConditionalAccess/Secure account recovery with identity verification (Preview).json",
     "ConditionalAccess/Securing security info registration.json",
-    "ConditionalAccess/Use application enforced restrictions for unmanaged devices.json",
+    "ConditionalAccess/Use application enforced restrictions for O365 apps.json",
   ];
 
   const allPolicies: ConditionalAccessTemplate[] = [];
@@ -311,29 +317,35 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
  * Fetch enrollment profiles from local templates
  */
 export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
-  try {
-    const response = await fetch(`${TEMPLATES_BASE_PATH}/Enrollment/Autopilot-Profiles.json`);
-    if (!response.ok) {
-      console.error(`Failed to fetch enrollment profiles: ${response.statusText}`);
-      return [];
-    }
+  const enrollmentFiles = [
+    "Windows-Autopilot-Profile.json",
+    "Windows-Self-Deploy-Autopilot-Profile.json",
+    "Windows-ESP-Profile.json",
+  ];
 
-    const data = await response.json();
+  const profiles: unknown[] = [];
 
-    if (data.profiles && Array.isArray(data.profiles)) {
-      return data.profiles.map((profile: { description?: string }) => ({
+  for (const file of enrollmentFiles) {
+    try {
+      const response = await fetch(`${TEMPLATES_BASE_PATH}/Enrollment/${file}`);
+      if (!response.ok) {
+        console.warn(`Failed to fetch enrollment profile ${file}: ${response.statusText}`);
+        continue;
+      }
+
+      const profile = await response.json();
+      profiles.push({
         ...profile,
         description: profile.description
           ? `${profile.description} ${HYDRATION_MARKER}`
           : HYDRATION_MARKER,
-      }));
+      });
+    } catch (error) {
+      console.warn(`Error fetching enrollment profile ${file}:`, error);
     }
-
-    return [];
-  } catch (error) {
-    console.error("Error fetching enrollment profiles:", error);
-    return [];
   }
+
+  return profiles;
 }
 
 /**

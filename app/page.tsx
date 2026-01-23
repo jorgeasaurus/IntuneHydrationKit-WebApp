@@ -75,7 +75,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-muted/20">
+    <div className="min-h-screen relative z-10">
       <Navigation />
       {/* Hero Section */}
       <section className="container mx-auto px-4 pt-32 pb-16">

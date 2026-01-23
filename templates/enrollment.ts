@@ -67,8 +67,8 @@ export interface AppleEnrollmentProfile {
 export const AUTOPILOT_PROFILES: AutopilotProfile[] = [
   {
     "@odata.type": "#microsoft.graph.azureADWindowsAutopilotDeploymentProfile",
-    displayName: "Corporate Autopilot - User-Driven AAD Join",
-    description: `Windows Autopilot user-driven Azure AD join profile for corporate devices. ${HYDRATION_MARKER}`,
+    displayName: "Corporate Autopilot User Driven AAD Join",
+    description: `Windows Autopilot user driven Azure AD join profile for corporate devices. ${HYDRATION_MARKER}`,
     language: "en-US",
     extractHardwareHash: true,
     deviceNameTemplate: "CORP-%SERIAL%",
@@ -86,7 +86,7 @@ export const AUTOPILOT_PROFILES: AutopilotProfile[] = [
   {
     "@odata.type": "#microsoft.graph.azureADWindowsAutopilotDeploymentProfile",
     displayName: "Corporate Autopilot - Self-Deploying",
-    description: `Windows Autopilot self-deploying mode profile for kiosks and shared devices. ${HYDRATION_MARKER}`,
+    description: `Windows Autopilot self deploying mode profile for kiosks and shared devices. ${HYDRATION_MARKER}`,
     language: "en-US",
     extractHardwareHash: true,
     deviceNameTemplate: "KIOSK-%SERIAL%",

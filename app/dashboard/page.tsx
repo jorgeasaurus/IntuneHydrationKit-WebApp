@@ -82,11 +82,11 @@ export default function DashboardPage() {
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
+      <div className="min-h-screen relative z-10">
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">Execution Dashboard</h1>
+              <h1 className="text-2xl font-bold">Hydration Dashboard</h1>
               <p className="text-sm text-muted-foreground">
                 {state.operationMode === "create"
                   ? "Creating configurations"

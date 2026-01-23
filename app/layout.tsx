@@ -6,6 +6,7 @@ import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
+import { AnimatedGridBackground } from "@/components/ui/animated-grid-background";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -36,6 +37,7 @@ export default function RootLayout({
           <MsalProvider>
             <SettingsProvider>
               <WizardProvider>
+                <AnimatedGridBackground />
                 {children}
                 <Toaster />
               </WizardProvider>
