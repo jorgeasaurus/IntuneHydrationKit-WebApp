@@ -1,7 +1,7 @@
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { getGraphEndpoint } from "@/lib/auth/msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
-import { GraphError, GraphResponse } from "@/types/graph";
+import { GraphResponse } from "@/types/graph";
 import { retryWithBackoff } from "@/lib/utils/retry";
 
 /**

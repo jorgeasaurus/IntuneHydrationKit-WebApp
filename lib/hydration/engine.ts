@@ -4,7 +4,7 @@
  */
 
 import { GraphClient } from "@/lib/graph/client";
-import { HYDRATION_MARKER, hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { HydrationTask, OperationMode, TaskCategory, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
 import {
   DeviceGroup,
@@ -35,8 +35,6 @@ import {
 import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import {
   createAppProtectionPolicy,
-  appProtectionPolicyExists,
-  getAppProtectionPolicyByName,
   deleteAppProtectionPolicy,
   getAllAppProtectionPolicies,
 } from "@/lib/graph/appProtection";
@@ -1400,7 +1398,7 @@ async function executeBaselineTask(
           if (hasAssignments) {
             console.log(`[Baseline Task] Policy "${policyName}" has ${assignmentsResponse.value.length} assignment(s), removing...`);
           }
-        } catch (getAssignError) {
+        } catch {
           console.log(`[Baseline Task] Could not check assignments for "${policyName}", will try delete directly`);
         }
 
@@ -1433,7 +1431,6 @@ async function executeBaselineTask(
         } catch (deleteError) {
           // Delete returned an error, but policy might still be deleted (Intune backend quirk)
           // Verify by checking if policy still exists
-          const errorMsg = deleteError instanceof Error ? deleteError.message : String(deleteError);
           console.log(`[Baseline Task] Delete returned error for "${policyName}", verifying if policy was actually deleted...`);
 
           try {
@@ -1591,7 +1588,7 @@ async function executeCISBaselineTask(
           if (hasAssignments) {
             console.log(`[CIS Baseline Task] Policy "${policyName}" has ${assignmentsResponse.value.length} assignment(s), removing...`);
           }
-        } catch (getAssignError) {
+        } catch {
           console.log(`[CIS Baseline Task] Could not check assignments for "${policyName}", will try delete directly`);
         }
 

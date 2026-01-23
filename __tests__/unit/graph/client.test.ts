@@ -32,7 +32,7 @@ describe('GraphClient', () => {
 
   describe('get', () => {
     it('makes GET request with correct headers', async () => {
-      let capturedHeaders: Headers | null = null
+      let capturedHeaders: Headers | undefined
 
       server.use(
         http.get(`${GRAPH_BASE}/beta/test`, ({ request }) => {
@@ -44,8 +44,8 @@ describe('GraphClient', () => {
       const client = new GraphClient()
       await client.get('/test')
 
-      expect(capturedHeaders?.get('Authorization')).toBe('Bearer mock-access-token')
-      expect(capturedHeaders?.get('Content-Type')).toBe('application/json')
+      expect(capturedHeaders!.get('Authorization')).toBe('Bearer mock-access-token')
+      expect(capturedHeaders!.get('Content-Type')).toBe('application/json')
     })
 
     it('returns parsed JSON response', async () => {

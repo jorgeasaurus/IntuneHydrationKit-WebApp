@@ -39,6 +39,7 @@ export interface HydrationTask {
 
 export interface HydrationSummary {
   tenantId: string;
+  tenantName?: string;
   operationMode: OperationMode;
   startTime: Date;
   endTime: Date;

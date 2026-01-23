@@ -111,57 +111,26 @@ export async function autopilotProfileExists(
   client: GraphClient,
   displayName: string
 ): Promise<boolean> {
-  const profiles = await getAllAutopilotProfiles(client);
-  console.log(`[Enrollment] Checking if profile exists: "${displayName}"`);
-  console.log(`[Enrollment] Found ${profiles.length} existing profiles:`);
-  profiles.forEach((p, i) => {
-    console.log(`[Enrollment]   ${i+1}. "${p.displayName}" (matches: ${p.displayName.toLowerCase() === displayName.toLowerCase()})`);
-  });
-  const profile = profiles.find(
-    (p) => p.displayName.toLowerCase() === displayName.toLowerCase()
-  ) || null;
-  console.log(`[Enrollment] Profile exists: ${profile !== null}`);
+  const profile = await getAutopilotProfileByName(client, displayName);
   return profile !== null;
 }
 
 /**
  * Clean and normalize an Autopilot profile for creation
- * Following PowerShell approach: send the full template directly with minimal transformation
- * PowerShell reference sends template as-is, only modifying description
  */
 function cleanAutopilotProfile(profile: AutopilotDeploymentProfile): Record<string, unknown> {
-  // Deep clone the profile to avoid mutating the original
   const cleaned = JSON.parse(JSON.stringify(profile)) as Record<string, unknown>;
 
-  // Remove id if present (can't be set on creation)
   delete cleaned.id;
-
-  // Add hydration marker to description (using period separator for enrollment profiles)
   cleaned.description = addEnrollmentHydrationMarker(profile.description);
 
-  // Keep OOBE settings as-is - the Graph API accepts both:
-  // - outOfBoxExperienceSettings (plural, old format with hidePrivacySettings, hideEULA, etc.)
-  // - outOfBoxExperienceSetting (singular, new format with privacySettingsHidden, eulaHidden, etc.)
-  // The template should use whichever format is appropriate for the API version
-
-  // hybridAzureADJoinSkipConnectivityCheck - keep it in the payload as PowerShell reference includes it
-  // The Graph API accepts this property for Azure AD join profiles as well
-
-  // Handle "os-default" language/locale - Graph API doesn't accept this value
-  // Remove it so the API uses the system default
+  // Graph API doesn't accept "os-default" for language/locale
   if (cleaned.language === "os-default") {
     delete cleaned.language;
   }
   if (cleaned.locale === "os-default") {
     delete cleaned.locale;
   }
-
-  // Note: Following PowerShell reference, we keep these properties:
-  // - deviceType (windowsPc)
-  // - locale (en-US)
-  // - preprovisioningAllowed (true)
-  // - hardwareHashExtractionEnabled (true)
-  // - roleScopeTagIds (empty array is valid)
 
   return cleaned;
 }
@@ -173,20 +142,12 @@ export async function createAutopilotProfile(
   client: GraphClient,
   profile: AutopilotDeploymentProfile
 ): Promise<AutopilotDeploymentProfile> {
-  // Clean and normalize the profile
   const profileBody = cleanAutopilotProfile(profile);
 
-  console.log(`[Enrollment] Creating Autopilot profile: "${profileBody.displayName}"`);
-  console.log(`[Enrollment] Cleaned payload keys:`, Object.keys(profileBody));
-  console.log(`[Enrollment] Full payload:`, JSON.stringify(profileBody, null, 2));
-
-  const created = await client.post<AutopilotDeploymentProfile>(
+  return client.post<AutopilotDeploymentProfile>(
     "/deviceManagement/windowsAutopilotDeploymentProfiles",
     profileBody
   );
-
-  console.log(`[Enrollment] Autopilot profile created with ID: ${created.id}`);
-  return created;
 }
 
 /**
@@ -196,7 +157,6 @@ export async function deleteAutopilotProfile(
   client: GraphClient,
   profileId: string
 ): Promise<void> {
-  // Fetch the profile to verify it has the hydration marker
   const profile = await client.get<AutopilotDeploymentProfile>(
     `/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}`
   );
@@ -208,7 +168,6 @@ export async function deleteAutopilotProfile(
   }
 
   await client.delete(`/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}`);
-  console.log(`[Enrollment] Deleted Autopilot profile: "${profile.displayName}"`);
 }
 
 /**
@@ -273,24 +232,15 @@ export async function createESPConfiguration(
   client: GraphClient,
   config: EnrollmentStatusPageConfiguration
 ): Promise<EnrollmentStatusPageConfiguration> {
-  // Deep clone to avoid mutating original
   const configBody = JSON.parse(JSON.stringify(config)) as EnrollmentStatusPageConfiguration;
 
-  // Remove id if present
   delete configBody.id;
-
-  // Ensure the hydration marker is in the description (using period separator for enrollment profiles)
   configBody.description = addEnrollmentHydrationMarker(configBody.description);
 
-  console.log(`[Enrollment] Creating ESP configuration: "${configBody.displayName}"`);
-
-  const created = await client.post<EnrollmentStatusPageConfiguration>(
+  return client.post<EnrollmentStatusPageConfiguration>(
     "/deviceManagement/deviceEnrollmentConfigurations",
     configBody
   );
-
-  console.log(`[Enrollment] ESP configuration created with ID: ${created.id}`);
-  return created;
 }
 
 /**
@@ -300,7 +250,6 @@ export async function deleteESPConfiguration(
   client: GraphClient,
   configId: string
 ): Promise<void> {
-  // Fetch the configuration to verify it has the hydration marker
   const config = await client.get<EnrollmentStatusPageConfiguration>(
     `/deviceManagement/deviceEnrollmentConfigurations/${configId}`
   );
@@ -312,7 +261,6 @@ export async function deleteESPConfiguration(
   }
 
   await client.delete(`/deviceManagement/deviceEnrollmentConfigurations/${configId}`);
-  console.log(`[Enrollment] Deleted ESP configuration: "${config.displayName}"`);
 }
 
 /**

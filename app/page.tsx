@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -102,7 +101,7 @@ export default function Home() {
                 Sign In with Microsoft
               </Button>
             ) : (
-              <Button onClick={handleContinue} size="lg" className="text-lg px-8">
+              <Button onClick={handleContinue} size="lg" className="text-lg px-8 text-white">
                 Continue to Wizard
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -573,6 +572,38 @@ export default function Home() {
                 &quot;Skipped&quot; in the results. This prevents duplicates and ensures idempotent operations.
               </AccordionContent>
             </AccordionItem>
+
+            <AccordionItem value="item-9">
+              <AccordionTrigger>Where can I inspect what is being imported?</AccordionTrigger>
+              <AccordionContent>
+                <p className="mb-3">
+                  All configurations are based on open-source templates and Microsoft best practices.
+                  You can review the source configurations at:
+                </p>
+                <ul className="list-disc pl-6 space-y-2">
+                  <li>
+                    <a href="https://github.com/jorgeasaurus/OpenIntuneBaseline" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      OpenIntuneBaseline (Windows/macOS policies)
+                    </a>
+                  </li>
+                  <li>
+                    <a href="https://github.com/IntuneAdmin/IntuneBaselines" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      CIS Intune Baselines
+                    </a>
+                  </li>
+                  <li>
+                    <a href="https://learn.microsoft.com/en-us/intune/intune-service/apps/app-protection-framework" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      Microsoft App Protection Framework
+                    </a>
+                  </li>
+                  <li>
+                    <a href="https://learn.microsoft.com/en-us/entra/identity/conditional-access/concept-conditional-access-policy-common" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                      Microsoft Common Conditional Access Policies
+                    </a>
+                  </li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
           </Accordion>
         </div>
       </section>
@@ -600,7 +631,7 @@ export default function Home() {
                     Get Started Now
                   </Button>
                 ) : (
-                  <Button onClick={handleContinue} size="lg" className="text-lg px-8">
+                  <Button onClick={handleContinue} size="lg" className="text-lg px-8 text-white">
                     Continue to Wizard
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>

@@ -4,7 +4,7 @@
 
 import { GraphClient } from "./client";
 import { AppProtectionPolicy } from "@/types/graph";
-import { HYDRATION_MARKER, hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
  * Get all iOS app protection policies

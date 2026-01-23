@@ -20,11 +20,6 @@ import {
   fetchCISBaselineManifest,
   OIBManifest,
   CISBaselineManifest,
-  GroupTemplate,
-  FilterTemplate,
-  ComplianceTemplate,
-  ConditionalAccessTemplate,
-  AppProtectionTemplate,
 } from "@/lib/templates/loader";
 import { ChevronDown, ChevronRight, Loader2, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -416,15 +411,6 @@ export function TargetSelection() {
     return selectedCount > 0 && selectedCount < categoryPolicies.length;
   };
 
-  // Keep legacy handlers for backwards compatibility with existing code
-  const handleCISCategoryToggle = (categoryId: CISCategoryId) => {
-    setCISCategories(prev =>
-      prev.includes(categoryId)
-        ? prev.filter(id => id !== categoryId)
-        : [...prev, categoryId]
-    );
-  };
-
   // Baseline platform handlers
   const togglePlatformExpanded = (platform: OIBPlatformId) => {
     setExpandedPlatforms(prev => {
@@ -734,6 +720,7 @@ export function TargetSelection() {
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
               >
                 <X className="h-4 w-4" />

@@ -4,7 +4,7 @@
 
 import { GraphClient } from "./client";
 import { DeviceGroup } from "@/types/graph";
-import { HYDRATION_MARKER, HYDRATION_MARKER_LEGACY, hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { HYDRATION_MARKER, HYDRATION_MARKER_LEGACY, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
  * Get all groups in the tenant

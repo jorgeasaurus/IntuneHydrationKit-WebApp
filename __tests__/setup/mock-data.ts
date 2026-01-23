@@ -1,4 +1,4 @@
-import type { HydrationTask, HydrationSummary, TenantConfig } from '@/types/hydration'
+import type { HydrationTask, HydrationSummary, TenantConfig, TaskCategory } from '@/types/hydration'
 
 // Organization mock
 export const mockOrganization = {
@@ -95,7 +95,7 @@ export const createMockTask = (overrides: Partial<HydrationTask> = {}): Hydratio
   ...overrides,
 })
 
-export const createMockTaskList = (count: number, category = 'groups'): HydrationTask[] => {
+export const createMockTaskList = (count: number, category: TaskCategory = 'groups'): HydrationTask[] => {
   return Array.from({ length: count }, (_, i) => createMockTask({
     id: `task-${i}`,
     category,
@@ -108,7 +108,7 @@ export const mockCompletedTask: HydrationTask = {
   category: 'groups',
   operation: 'create',
   itemName: 'Completed Group',
-  status: 'completed',
+  status: 'success',
   startTime: new Date('2024-01-01T10:00:00Z'),
   endTime: new Date('2024-01-01T10:00:02Z'),
 }
@@ -150,9 +150,9 @@ export const mockSummary: HydrationSummary = {
     failed: 2,
   },
   categoryBreakdown: {
-    groups: { total: 12, success: 12, failed: 0 },
-    filters: { total: 12, success: 10, failed: 2 },
-    compliance: { total: 76, success: 68, failed: 0, skipped: 8 },
+    groups: { total: 12, success: 12, skipped: 0, failed: 0 },
+    filters: { total: 12, success: 10, skipped: 0, failed: 2 },
+    compliance: { total: 76, success: 68, skipped: 8, failed: 0 },
   },
   errors: [
     {

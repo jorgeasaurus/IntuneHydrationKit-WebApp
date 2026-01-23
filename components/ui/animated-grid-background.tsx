@@ -2,7 +2,13 @@
 
 import { useEffect, useRef } from "react";
 
-export function AnimatedGridBackground() {
+const GRID_COLOR = "59, 130, 246";
+const GRID_SPACING = 40;
+const HORIZON_POSITION = 0.35;
+const HORIZONTAL_LINE_COUNT = 25;
+const VERTICAL_LINE_STEPS = 50;
+
+export function AnimatedGridBackground(): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -15,24 +21,24 @@ export function AnimatedGridBackground() {
     let animationId: number;
     let time = 0;
 
-    const resize = () => {
+    function resize(): void {
+      if (!canvas) return;
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-    };
+    }
 
-    const drawWaterGrid = () => {
+    function drawWaterGrid(): void {
+      if (!canvas || !ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const centerX = canvas.width / 2;
-      const horizonY = canvas.height * 0.35;
-      const gridSpacing = 40;
-      const horizontalLines = 25;
+      const horizonY = canvas.height * HORIZON_POSITION;
 
       ctx.lineWidth = 1;
 
       // Draw horizontal lines with wave distortion
-      for (let i = 0; i <= horizontalLines; i++) {
-        const progress = i / horizontalLines;
+      for (let i = 0; i <= HORIZONTAL_LINE_COUNT; i++) {
+        const progress = i / HORIZONTAL_LINE_COUNT;
         // Perspective: lines get closer together near horizon
         const y = horizonY + (canvas.height - horizonY) * Math.pow(progress, 1.8);
 
@@ -43,7 +49,7 @@ export function AnimatedGridBackground() {
 
         // Alpha fades near horizon
         const alpha = 0.08 + progress * 0.12;
-        ctx.strokeStyle = `rgba(59, 130, 246, ${alpha})`;
+        ctx.strokeStyle = `rgba(${GRID_COLOR}, ${alpha})`;
 
         ctx.beginPath();
 
@@ -65,9 +71,8 @@ export function AnimatedGridBackground() {
       }
 
       // Draw vertical lines with perspective and wave distortion
-      // Need more lines to fill the wider spread at the bottom
       const bottomWidth = canvas.width * 3;
-      const totalLines = Math.ceil(bottomWidth / gridSpacing) + 1;
+      const totalLines = Math.ceil(bottomWidth / GRID_SPACING) + 1;
 
       for (let i = 0; i <= totalLines; i++) {
         // Position lines to span from beyond left edge to beyond right edge at bottom
@@ -79,13 +84,12 @@ export function AnimatedGridBackground() {
         // Alpha based on distance from center
         const distFromCenter = Math.abs(centerX - (baseX + perspectiveX) / 2) / (canvas.width / 2);
         const alpha = Math.max(0.06, 0.15 - distFromCenter * 0.06);
-        ctx.strokeStyle = `rgba(59, 130, 246, ${alpha})`;
+        ctx.strokeStyle = `rgba(${GRID_COLOR}, ${alpha})`;
 
         ctx.beginPath();
 
-        const steps = 50;
-        for (let j = 0; j <= steps; j++) {
-          const progress = j / steps;
+        for (let j = 0; j <= VERTICAL_LINE_STEPS; j++) {
+          const progress = j / VERTICAL_LINE_STEPS;
           const y = horizonY + (canvas.height - horizonY) * Math.pow(progress, 1.8);
 
           // Interpolate x position with perspective (from horizon point to base)
@@ -105,9 +109,9 @@ export function AnimatedGridBackground() {
 
       // Subtle glow/reflection at horizon
       const gradient = ctx.createLinearGradient(0, horizonY - 50, 0, horizonY + 100);
-      gradient.addColorStop(0, "rgba(59, 130, 246, 0)");
-      gradient.addColorStop(0.5, `rgba(59, 130, 246, ${0.03 + Math.sin(time * 0.0003) * 0.015})`);
-      gradient.addColorStop(1, "rgba(59, 130, 246, 0)");
+      gradient.addColorStop(0, `rgba(${GRID_COLOR}, 0)`);
+      gradient.addColorStop(0.5, `rgba(${GRID_COLOR}, ${0.03 + Math.sin(time * 0.0003) * 0.015})`);
+      gradient.addColorStop(1, `rgba(${GRID_COLOR}, 0)`);
 
       ctx.fillStyle = gradient;
       ctx.fillRect(0, horizonY - 50, canvas.width, 150);

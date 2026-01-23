@@ -3,7 +3,7 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HydrationSummary, HydrationTask } from "@/types/hydration";
-import { Download, FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
+import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
 import {
   generateMarkdownReport,
   generateJSONReport,

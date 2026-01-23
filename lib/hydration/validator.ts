@@ -39,8 +39,9 @@ const WINDOWS_E3_E5_SKUS = [
 
 /**
  * Required Graph API permissions (delegated)
+ * Used for documentation and future permission validation
  */
-const REQUIRED_PERMISSIONS = [
+export const REQUIRED_PERMISSIONS = [
   "DeviceManagementConfiguration.ReadWrite.All",
   "DeviceManagementServiceConfig.ReadWrite.All",
   "DeviceManagementManagedDevices.ReadWrite.All",
@@ -188,8 +189,8 @@ async function checkPermissions(client: GraphClient): Promise<{
   missingPermissions?: string[];
 }> {
   try {
-    // Get current user's OAuth2 permissions
-    const me = await client.get<{
+    // Verify basic Graph API access by fetching current user
+    await client.get<{
       id: string;
       userPrincipalName: string;
     }>("/me", "v1.0");
