@@ -33,6 +33,7 @@ export interface HydrationTask {
   itemName: string;
   status: TaskStatus;
   error?: string;
+  warning?: string;
   startTime?: Date;
   endTime?: Date;
 }
@@ -60,6 +61,11 @@ export interface HydrationSummary {
     };
   };
   errors: Array<{
+    task: string;
+    message: string;
+    timestamp: Date;
+  }>;
+  warnings: Array<{
     task: string;
     message: string;
     timestamp: Date;

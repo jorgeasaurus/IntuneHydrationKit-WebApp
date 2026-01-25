@@ -60,6 +60,7 @@ import {
   getCachedTemplates,
   cacheTemplates,
   clearCategoryCache,
+  getAllTemplateCacheKeys,
   GroupTemplate,
   FilterTemplate,
   ComplianceTemplate,
@@ -102,6 +103,7 @@ export interface ExecutionResult {
   success: boolean;
   skipped: boolean;
   error?: string;
+  warning?: string;
   createdId?: string;
 }
 
@@ -119,7 +121,6 @@ async function executeTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  console.log(`[Execute Task] Starting task: ${task.category} - "${task.itemName}" (mode: ${context.operationMode})`);
   const { client, operationMode } = context;
 
   // Update task status to running
@@ -134,12 +135,10 @@ async function executeTask(
     let result: ExecutionResult;
 
     // Check for Windows Driver Update license requirement
-    // Driver update profiles have names like "Win - OIB - WUfB Drivers - ..."
     const isDriverUpdateProfile = task.itemName.toLowerCase().includes("wufb drivers") ||
       task.itemName.toLowerCase().includes("driver update");
 
     if (isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
-      console.log(`[Execute Task] Skipping driver update profile (no Windows E3/E5 license): "${task.itemName}"`);
       task.status = "skipped";
       task.error = "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)";
       task.endTime = new Date();
@@ -151,8 +150,6 @@ async function executeTask(
         error: task.error,
       };
     }
-
-    console.log(`[Execute Task] Routing to handler for category: ${task.category}`);
     switch (task.category) {
       case "groups":
         result = await executeGroupTask(task, context);
@@ -190,15 +187,8 @@ async function executeTask(
     // Update task with result
     task.status = result.skipped ? "skipped" : result.success ? "success" : "failed";
     task.error = result.error;
+    task.warning = result.warning;
     task.endTime = new Date();
-
-    console.log(`[Execute Task] Task completed:`, {
-      itemName: task.itemName,
-      status: task.status,
-      success: result.success,
-      skipped: result.skipped,
-      error: result.error
-    });
 
     if (result.success || result.skipped) {
       context.onTaskComplete?.(task);
@@ -209,8 +199,6 @@ async function executeTask(
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
-    console.error(`[Execute Task] ✗ Exception caught for "${task.itemName}":`, errorMessage);
-    console.error(`[Execute Task] Stack trace:`, error);
     task.status = "failed";
     task.error = errorMessage;
     task.endTime = new Date();
@@ -239,45 +227,29 @@ async function executeGroupTask(
   }
 
   // Try to get template from cache first, fallback to hardcoded templates
-  console.log(`[Group Task] Looking up template for: "${task.itemName}"`);
   let template: GroupTemplate | DeviceGroup | undefined;
   const cachedGroups = getCachedTemplates("groups");
 
   if (cachedGroups && Array.isArray(cachedGroups)) {
-    console.log(`[Group Task] Found ${cachedGroups.length} cached group templates`);
     template = (cachedGroups as GroupTemplate[]).find((g) => g.displayName === task.itemName);
-    if (template) {
-      console.log(`[Group Task] ✓ Found template in cache: "${template.displayName}"`);
-    } else {
-      console.log(`[Group Task] Template "${task.itemName}" not found in cache`);
-    }
-  } else {
-    console.log("[Group Task] No cached templates found");
   }
 
   // Fallback to hardcoded templates if not in cache
   if (!template) {
-    console.log("[Group Task] Trying hardcoded templates...");
     template = Templates.getDynamicGroupByName(task.itemName);
-    if (template) {
-      console.log(`[Group Task] ✓ Found template in hardcoded templates: "${template.displayName}"`);
-    }
   }
 
   if (!template) {
-    console.error(`[Group Task] ✗ Template not found for: "${task.itemName}"`);
     return { task, success: false, skipped: false, error: `Template not found for ${task.itemName}` };
   }
 
   if (mode === "create") {
     // Check if group already exists using pre-fetched cache
-    console.log(`[Group Task] Checking if group exists: "${template.displayName}"`);
     const existingGroup = context.cachedIntuneGroups?.find(
       (g) => g.displayName.toLowerCase() === template!.displayName.toLowerCase()
     );
 
     if (existingGroup) {
-      console.log(`[Group Task] Group already exists, skipping: "${template.displayName}"`);
       return {
         task,
         success: false,
@@ -289,28 +261,20 @@ async function executeGroupTask(
     // Convert template to full DeviceGroup format if it's a simple template
     let fullGroupTemplate: DeviceGroup = template as DeviceGroup;
     if (!("@odata.type" in template)) {
-      console.log(`[Group Task] Converting simple template to full DeviceGroup format`);
       const simpleTemplate = template as GroupTemplate;
-
-      // Check if this is a static group (assigned membership) or dynamic group
       const isStaticGroup = simpleTemplate.isStaticGroup === true || !simpleTemplate.membershipRule;
 
       if (isStaticGroup) {
-        // Static group: no membershipRule, empty groupTypes
-        console.log(`[Group Task] Creating static/assigned membership group`);
         fullGroupTemplate = {
           "@odata.type": "#microsoft.graph.group",
           displayName: simpleTemplate.displayName,
           description: simpleTemplate.description,
-          groupTypes: [], // Empty for assigned membership groups
+          groupTypes: [],
           mailEnabled: false,
           mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
           securityEnabled: true,
-          // No membershipRule or membershipRuleProcessingState for static groups
         };
       } else {
-        // Dynamic group: has membershipRule
-        console.log(`[Group Task] Creating dynamic membership group`);
         fullGroupTemplate = {
           "@odata.type": "#microsoft.graph.group",
           displayName: simpleTemplate.displayName,
@@ -323,21 +287,9 @@ async function executeGroupTask(
           membershipRuleProcessingState: "On",
         };
       }
-
-      console.log(`[Group Task] Template converted:`, {
-        displayName: fullGroupTemplate.displayName,
-        mailNickname: fullGroupTemplate.mailNickname,
-        isStaticGroup,
-        hasMembershipRule: !!fullGroupTemplate.membershipRule,
-      });
-    } else {
-      console.log(`[Group Task] Using full template directly (has @odata.type)`);
     }
 
-    // Create the group
-    console.log(`[Group Task] Creating group: "${fullGroupTemplate.displayName}"`);
     const created = await createGroup(client, fullGroupTemplate);
-    console.log(`[Group Task] ✓ Group created successfully with ID: ${created.id}`);
 
     // Add the newly created group to the cache
     if (context.cachedIntuneGroups) {
@@ -379,45 +331,29 @@ async function executeFilterTask(
   }
 
   // Try to get template from cache first, fallback to hardcoded templates
-  console.log(`[Filter Task] Looking up template for: "${task.itemName}"`);
   let template: FilterTemplate | DeviceFilter | undefined;
   const cachedFilterTemplates = getCachedTemplates("filters");
 
   if (cachedFilterTemplates && Array.isArray(cachedFilterTemplates)) {
-    console.log(`[Filter Task] Found ${cachedFilterTemplates.length} cached filter templates`);
     template = (cachedFilterTemplates as FilterTemplate[]).find((f) => f.displayName === task.itemName);
-    if (template) {
-      console.log(`[Filter Task] ✓ Found template in cache: "${template.displayName}"`);
-    } else {
-      console.log(`[Filter Task] Template "${task.itemName}" not found in cache`);
-    }
-  } else {
-    console.log("[Filter Task] No cached templates found");
   }
 
   // Fallback to hardcoded templates if not in cache
   if (!template) {
-    console.log("[Filter Task] Trying hardcoded templates...");
     template = Templates.getDeviceFilterByName(task.itemName);
-    if (template) {
-      console.log(`[Filter Task] ✓ Found template in hardcoded templates: "${template.displayName}"`);
-    }
   }
 
   if (!template) {
-    console.error(`[Filter Task] ✗ Template not found for: "${task.itemName}"`);
     return { task, success: false, skipped: false, error: `Template not found for ${task.itemName}` };
   }
 
   if (mode === "create") {
     // Check if filter already exists using pre-fetched cache
-    console.log(`[Filter Task] Checking if filter exists: "${template.displayName}"`);
     const existingFilter = context.cachedFilters?.find(
       (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
     );
 
     if (existingFilter) {
-      console.log(`[Filter Task] Filter already exists, skipping: "${template.displayName}"`);
       return {
         task,
         success: false,
@@ -429,7 +365,6 @@ async function executeFilterTask(
     // Convert template to full DeviceFilter format if it's a simple template
     let fullFilterTemplate: DeviceFilter = template as DeviceFilter;
     if (!("@odata.type" in template)) {
-      console.log(`[Filter Task] Converting simple template to full DeviceFilter format`);
       const simpleTemplate = template as FilterTemplate;
       fullFilterTemplate = {
         "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
@@ -438,19 +373,9 @@ async function executeFilterTask(
         platform: simpleTemplate.platform as "android" | "iOS" | "macOS" | "windows10AndLater",
         rule: simpleTemplate.rule,
       };
-      console.log(`[Filter Task] Template converted:`, {
-        displayName: fullFilterTemplate.displayName,
-        platform: fullFilterTemplate.platform,
-        hasRule: !!fullFilterTemplate.rule,
-      });
-    } else {
-      console.log(`[Filter Task] Using full template directly (has @odata.type)`);
     }
 
-    // Create the filter
-    console.log(`[Filter Task] Creating filter: "${fullFilterTemplate.displayName}"`);
     const created = await createFilter(client, fullFilterTemplate);
-    console.log(`[Filter Task] ✓ Filter created successfully with ID: ${created.id}`);
 
     // Add the newly created filter to the cache
     if (context.cachedFilters) {
@@ -470,20 +395,15 @@ async function executeFilterTask(
     );
 
     if (!existingFilter) {
-      console.log(`[Filter Task] Filter not found in tenant, skipping: "${template.displayName}"`);
       return { task, success: true, skipped: true, error: "Filter not found in tenant" };
     }
 
     // Check if it was created by the hydration kit
     if (!hasHydrationMarker(existingFilter.description)) {
-      console.log(`[Filter Task] Filter not created by Hydration Kit, skipping: "${template.displayName}"`);
       return { task, success: true, skipped: true, error: "Filter not created by Intune Hydration Kit" };
     }
 
-    // Delete the filter directly using its ID
-    console.log(`[Filter Task] Deleting filter: "${template.displayName}" (ID: ${existingFilter.id})`);
     await client.delete(`/deviceManagement/assignmentFilters/${existingFilter.id}`);
-    console.log(`[Filter Task] ✓ Filter deleted successfully`);
 
     // Remove from cache
     if (context.cachedFilters) {
@@ -724,14 +644,6 @@ async function executeAppProtectionTask(
       return { task, success: true, skipped: true, error: "Policy not found in tenant" };
     }
 
-    // Log the policy object to debug platform detection
-    console.log(`[App Protection Delete] Policy object for "${template.displayName}":`, {
-      id: policy.id,
-      displayName: policy.displayName,
-      odataType: policy["@odata.type"],
-      allKeys: Object.keys(policy)
-    });
-
     // Determine platform from @odata.type
     const odataType = policy["@odata.type"];
     let platform: "iOS" | "android";
@@ -742,20 +654,15 @@ async function executeAppProtectionTask(
       platform = "android";
     } else {
       // Fallback: check template's @odata.type if policy doesn't have it
-      console.warn(`[App Protection Delete] Policy missing or invalid @odata.type: ${odataType}`);
       const templateOdataType = template["@odata.type"];
-      console.log(`[App Protection Delete] Using template @odata.type: ${templateOdataType}`);
-
       if (templateOdataType === "#microsoft.graph.iosManagedAppProtection") {
         platform = "iOS";
       } else if (templateOdataType === "#microsoft.graph.androidManagedAppProtection") {
         platform = "android";
       } else {
-        throw new Error(`Unable to determine platform for policy "${template.displayName}". @odata.type: ${odataType}, template @odata.type: ${templateOdataType}`);
+        throw new Error(`Unable to determine platform for policy "${template.displayName}"`);
       }
     }
-
-    console.log(`[App Protection Delete] Detected platform: ${platform}`);
 
     // Delete the policy
     await deleteAppProtectionPolicy(client, policy.id, platform);
@@ -789,33 +696,24 @@ async function executeEnrollmentTask(
   }
 
   // Get template from cache
-  console.log(`[Enrollment Task] Looking up template for: "${task.itemName}"`);
   let template: EnrollmentProfile | undefined;
   const cachedEnrollment = getCachedTemplates("enrollment");
 
   if (cachedEnrollment && Array.isArray(cachedEnrollment)) {
-    console.log(`[Enrollment Task] Found ${cachedEnrollment.length} cached enrollment templates`);
     template = (cachedEnrollment as EnrollmentProfile[]).find(
       (e) => e.displayName === task.itemName
     );
-    if (template) {
-      console.log(`[Enrollment Task] Found template in cache: "${template.displayName}"`);
-    }
   }
 
   if (!template) {
-    console.error(`[Enrollment Task] Template not found for: "${task.itemName}"`);
     return { task, success: false, skipped: false, error: "Template not found" };
   }
 
   const profileType = getEnrollmentProfileType(template);
-  console.log(`[Enrollment Task] Profile type: ${profileType}`);
 
   if (mode === "create") {
-    // Check if profile already exists
     const exists = await enrollmentProfileExists(client, template);
     if (exists) {
-      console.log(`[Enrollment Task] Profile already exists, skipping: "${template.displayName}"`);
       return {
         task,
         success: false,
@@ -824,10 +722,7 @@ async function executeEnrollmentTask(
       };
     }
 
-    // Create the profile
-    console.log(`[Enrollment Task] Creating profile: "${template.displayName}"`);
     const created = await createEnrollmentProfile(client, template);
-    console.log(`[Enrollment Task] Profile created with ID: ${created.id}`);
     return {
       task,
       success: true,
@@ -835,21 +730,148 @@ async function executeEnrollmentTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
-    // Delete the profile
     try {
-      console.log(`[Enrollment Task] Deleting profile: "${template.displayName}" (type: ${profileType})`);
       await deleteEnrollmentProfileByName(client, template.displayName, profileType);
-      console.log(`[Enrollment Task] Profile deleted successfully`);
       return { task, success: true, skipped: false };
     } catch (error) {
-      // Profile not found or not created by hydration kit - skip
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.log(`[Enrollment Task] Delete skipped: ${errorMessage}`);
       return { task, success: true, skipped: true, error: errorMessage };
     }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };
+}
+
+/**
+ * Check if a setting or its children contain password/secret placeholders
+ * Returns true if placeholders are found
+ */
+function containsSecretPlaceholders(obj: unknown): boolean {
+  if (obj === null || obj === undefined) return false;
+
+  if (typeof obj === "string") {
+    // Check for common placeholder patterns
+    const placeholders = ["<YOUR", "YOUR_", "PLACEHOLDER", "CHANGE_ME", "TODO"];
+    const upper = obj.toUpperCase();
+    return placeholders.some(p => upper.includes(p));
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.some(item => containsSecretPlaceholders(item));
+  }
+
+  if (typeof obj === "object") {
+    const record = obj as Record<string, unknown>;
+    // Check if this is a password setting
+    const settingDefId = record.settingDefinitionId as string || "";
+    const isPasswordSetting = settingDefId.toLowerCase().includes("password") ||
+      settingDefId.toLowerCase().includes("secret");
+
+    if (isPasswordSetting) {
+      // Check the value for placeholders
+      const value = record.simpleSettingValue || record.value;
+      if (containsSecretPlaceholders(value)) {
+        return true;
+      }
+    }
+
+    // Recursively check all values
+    return Object.values(record).some(v => containsSecretPlaceholders(v));
+  }
+
+  return false;
+}
+
+/**
+ * Check if a settingDefinitionId is for an actual secret/password VALUE field
+ * vs settings that mention "password" but aren't credential fields (e.g., encryption type for password-protected files)
+ */
+function isActualSecretField(settingDefId: string): boolean {
+  const lower = settingDefId.toLowerCase();
+
+  // Patterns that indicate actual credential/secret VALUE fields
+  const secretPatterns = [
+    /_password$/,           // Ends with _password
+    /password$/,            // Ends with password (e.g., networkpassword)
+    /_pskvalue/,            // WiFi PSK
+    /_secretkey/,           // Secret keys
+    /_sharedkey/,           // Shared keys
+    /_preSharedKey/i,       // Pre-shared keys
+    /wifi.*password/i,      // WiFi passwords
+    /network.*key/i,        // Network keys
+    /network.*password/i,   // Network passwords (Cloud Remediation)
+    /vpn.*secret/i,         // VPN secrets
+    /_passphrase/,          // Passphrases
+  ];
+
+  // Patterns that should NOT trigger secret conversion (settings ABOUT passwords, not password values)
+  const excludePatterns = [
+    /passwordprotected/i,   // Settings about password-protected files
+    /passwordrequired/i,    // Whether password is required
+    /passwordexpir/i,       // Password expiration settings
+    /passwordlength/i,      // Password length requirements
+    /passwordquality/i,     // Password quality settings
+    /passwordhistory/i,     // Password history settings
+    /encryptiontype/i,      // Encryption type settings
+  ];
+
+  // If it matches an exclude pattern, it's not a secret field
+  if (excludePatterns.some(p => p.test(lower))) {
+    return false;
+  }
+
+  // If it matches a secret pattern, it is a secret field
+  return secretPatterns.some(p => p.test(lower));
+}
+
+/**
+ * Recursively clean a setting instance for Settings Catalog
+ * Handles nested children and converts password settings to Secret type (only for actual credential fields)
+ */
+function cleanSettingInstance(obj: unknown): unknown {
+  if (obj === null || obj === undefined) return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanSettingInstance(item));
+  }
+
+  if (typeof obj === "object") {
+    const record = obj as Record<string, unknown>;
+    const cleaned: Record<string, unknown> = {};
+
+    for (const [key, value] of Object.entries(record)) {
+      // Skip id and @odata metadata except @odata.type
+      if (key === "id") continue;
+      if (key.includes("@odata.") && key !== "@odata.type") continue;
+      if (key === "settingDefinitions") continue;
+
+      // Check if this is an actual secret/password VALUE field that needs type conversion
+      const settingDefId = record.settingDefinitionId as string || "";
+      const isSecretField = isActualSecretField(settingDefId);
+
+      if (key === "simpleSettingValue" && isSecretField && typeof value === "object" && value !== null) {
+        const simpleValue = value as Record<string, unknown>;
+        const odataType = simpleValue["@odata.type"] as string || "";
+
+        // Convert StringSettingValue to SecretSettingValue for actual credential fields
+        if (odataType.includes("StringSettingValue")) {
+          cleaned[key] = {
+            "@odata.type": "#microsoft.graph.deviceManagementConfigurationSecretSettingValue",
+            value: simpleValue.value,
+            valueState: "notEncrypted"
+          };
+          continue;
+        }
+      }
+
+      // Recursively clean nested objects and arrays
+      cleaned[key] = cleanSettingInstance(value);
+    }
+
+    return cleaned;
+  }
+
+  return obj;
 }
 
 /**
@@ -882,23 +904,11 @@ function cleanSettingsCatalogPolicy(policy: Record<string, unknown>): Record<str
     };
   }
 
-  // Clean settings array - remove id, @odata.* properties, and settingDefinitions
+  // Clean settings array recursively - handles nested children and password type conversion
   const settings = policy.settings as Array<Record<string, unknown>> | undefined;
   if (settings && Array.isArray(settings)) {
     cleaned.settings = settings.map((setting: Record<string, unknown>) => {
-      const cleanedSetting: Record<string, unknown> = {};
-      for (const [sk, sv] of Object.entries(setting)) {
-        // Exclude: id, @odata.* properties, and settingDefinitions (matches PowerShell)
-        if (
-          sk !== "id" &&
-          !sk.startsWith("@odata.") &&
-          !sk.includes("@odata.") &&
-          sk !== "settingDefinitions"
-        ) {
-          cleanedSetting[sk] = sv;
-        }
-      }
-      return cleanedSetting;
+      return cleanSettingInstance(setting);
     });
   }
 
@@ -925,11 +935,21 @@ async function settingsCatalogPolicyExists(
 
 /**
  * Create a Settings Catalog policy
+ * Returns warning if policy contains placeholder secrets that need manual configuration
  */
 async function createSettingsCatalogPolicy(
   client: GraphClient,
   policy: Record<string, unknown>
-): Promise<{ id: string }> {
+): Promise<{ id: string; warning?: string }> {
+  // Check for placeholder secrets - warn but continue
+  const settings = policy.settings;
+  const policyName = (policy.name || policy.displayName) as string;
+  let warning: string | undefined;
+
+  if (settings && containsSecretPlaceholders(settings)) {
+    warning = `Policy "${policyName}" contains placeholder values that require manual configuration with actual secrets.`;
+  }
+
   // Clean the policy before sending
   const cleanedPolicy = cleanSettingsCatalogPolicy(policy);
 
@@ -939,16 +959,12 @@ async function createSettingsCatalogPolicy(
     delete cleanedPolicy.displayName;
   }
 
-  console.log(`[Settings Catalog] Creating policy: "${cleanedPolicy.name}"`);
-  console.log(`[Settings Catalog] Policy payload keys:`, Object.keys(cleanedPolicy));
-
   const result = await client.post<{ id: string }>(
     "/deviceManagement/configurationPolicies",
     cleanedPolicy
   );
 
-  console.log(`[Settings Catalog] ✓ Policy created with ID: ${result.id}`);
-  return result;
+  return { ...result, warning };
 }
 
 /**
@@ -967,15 +983,10 @@ async function createDeviceConfigurationPolicy(
   // Ensure hydration marker in description
   cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
 
-  console.log(`[Device Configuration] Creating policy: "${cleanedPolicy.displayName}"`);
-
-  const result = await client.post<{ id: string }>(
+  return client.post<{ id: string }>(
     "/deviceManagement/deviceConfigurations",
     cleanedPolicy
   );
-
-  console.log(`[Device Configuration] ✓ Policy created with ID: ${result.id}`);
-  return result;
 }
 
 /**
@@ -985,24 +996,14 @@ async function createDriverUpdateProfile(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy before sending
   const cleanedPolicy = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
-
-  // Remove root-level id
   delete cleanedPolicy.id;
-
-  // Ensure hydration marker in description
   cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
 
-  console.log(`[Driver Update Profile] Creating policy: "${cleanedPolicy.displayName}"`);
-
-  const result = await client.post<{ id: string }>(
+  return client.post<{ id: string }>(
     "/deviceManagement/windowsDriverUpdateProfiles",
     cleanedPolicy
   );
-
-  console.log(`[Driver Update Profile] ✓ Policy created with ID: ${result.id}`);
-  return result;
 }
 
 /**
@@ -1098,21 +1099,13 @@ async function createBaselineCompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Recursively clean the policy to remove all OData metadata
   const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
-
-  // Remove root-level id as well (we don't want to keep it for creation)
   delete cleaned.id;
 
-  console.log(`[Baseline Compliance] Creating policy: "${cleaned.displayName}"`);
-
-  const result = await client.post<{ id: string }>(
+  return client.post<{ id: string }>(
     "/deviceManagement/deviceCompliancePolicies",
     cleaned
   );
-
-  console.log(`[Baseline Compliance] ✓ Policy created with ID: ${result.id}`);
-  return result;
 }
 
 /**
@@ -1123,31 +1116,23 @@ async function createCISCompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Recursively clean the policy to remove all OData metadata
   const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
 
-  // Remove root-level id and CIS-specific metadata
+  // Remove id and CIS-specific metadata
   delete cleaned.id;
   delete cleaned._cisCategory;
   delete cleaned._cisSubcategory;
   delete cleaned._cisFilePath;
   delete cleaned.assignments;
 
-  // Ensure displayName is set
   if (!cleaned.displayName && cleaned.name) {
     cleaned.displayName = cleaned.name;
   }
 
-  console.log(`[CIS Compliance] Creating policy: "${cleaned.displayName}"`);
-  console.log(`[CIS Compliance] Policy payload keys:`, Object.keys(cleaned));
-
-  const result = await client.post<{ id: string }>(
+  return client.post<{ id: string }>(
     "/deviceManagement/deviceCompliancePolicies",
     cleaned
   );
-
-  console.log(`[CIS Compliance] ✓ Policy created with ID: ${result.id}`);
-  return result;
 }
 
 /**
@@ -1245,7 +1230,7 @@ async function executeBaselineTask(
           return { task, success: false, skipped: true, error: "Policy already exists" };
         }
         const created = await createSettingsCatalogPolicy(client, template as Record<string, unknown>);
-        return { task, success: true, skipped: false, createdId: created.id };
+        return { task, success: true, skipped: false, createdId: created.id, warning: created.warning };
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1468,8 +1453,194 @@ async function executeBaselineTask(
 }
 
 /**
+ * CIS policy type enum for routing
+ */
+type CISPolicyType =
+  | "SettingsCatalog"           // configurationPolicies - Settings Catalog (default)
+  | "V2Compliance"              // compliancePolicies - Settings Catalog compliance
+  | "V1Compliance"              // deviceCompliancePolicies - Legacy compliance
+  | "DeviceConfiguration"       // deviceConfigurations - OMA-URI custom policies
+  | "SecurityIntent"            // intents - Security baseline intents (deprecated)
+  | "Unsupported";              // Policy type not supported for creation
+
+/**
+ * Detect the CIS policy type from the template's @odata.type and properties
+ */
+function detectCISPolicyType(template: Record<string, unknown>): CISPolicyType {
+  const odataType = (template["@odata.type"] as string || "").toLowerCase();
+
+  // Security Intents (deprecated security baselines) - NOT supported for creation
+  // These require using the template createInstance endpoint which is complex
+  if (odataType.includes("devicemanagementintent")) {
+    return "Unsupported";
+  }
+
+  // Group Policy Configuration (ADMX-based templates like VS Code, Outlook profile) - NOT supported
+  // These require a complex 2-step creation: create policy, then add definitionValues with bindings
+  // Examples: groupPolicyConfiguration for VS Code settings, OneDrive KFM, Outlook profile
+  if (odataType.includes("grouppolicyconfiguration")) {
+    return "Unsupported";
+  }
+
+  // Device Configurations - various subtypes that all use /deviceConfigurations endpoint
+  const deviceConfigPatterns = [
+    "windows10customconfiguration",
+    "windows10generalconfiguration",
+    "windowshealthmonitoringconfiguration",
+    "sharedpcconfiguration",
+    "windows10endpointprotectionconfiguration",
+    "windowsidentityprotectionconfiguration",
+    "windowsdefenderadvancedthreatprotectionconfiguration",
+    "deviceconfiguration",
+  ];
+
+  const isDeviceConfig = deviceConfigPatterns.some(pattern => odataType.includes(pattern));
+  const hasOmaSettings = template.omaSettings && Array.isArray(template.omaSettings);
+
+  if (isDeviceConfig || hasOmaSettings) {
+    return "DeviceConfiguration";
+  }
+
+  // V2 Compliance (Settings Catalog compliance) - has platforms/technologies
+  if (odataType.includes("devicemanagementcompliancepolicy")) {
+    return "V2Compliance";
+  }
+
+  // V1 Compliance (legacy compliance) - has @odata.type like windows10CompliancePolicy
+  if (
+    odataType.includes("compliancepolicy") &&
+    !odataType.includes("devicemanagement")
+  ) {
+    return "V1Compliance";
+  }
+
+  // Default: Settings Catalog (most CIS baselines are this type)
+  return "SettingsCatalog";
+}
+
+/**
+ * Create a V2 Compliance policy (Settings Catalog compliance)
+ * Endpoint: /deviceManagement/compliancePolicies
+ */
+async function createV2CompliancePolicy(
+  client: GraphClient,
+  policy: Record<string, unknown>
+): Promise<{ id: string }> {
+  // Clean the policy recursively
+  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+
+  // Remove root-level id and CIS metadata
+  delete cleaned.id;
+  delete cleaned._cisCategory;
+  delete cleaned._cisSubcategory;
+  delete cleaned._cisFilePath;
+
+  // Ensure hydration marker in description
+  cleaned.description = addHydrationMarker(cleaned.description as string | undefined);
+
+  // Use 'name' for Settings Catalog compliance (not displayName)
+  if (cleaned.displayName && !cleaned.name) {
+    cleaned.name = cleaned.displayName;
+  }
+
+  // Clean settings array - must have settingInstance structure
+  const settings = cleaned.settings as Array<Record<string, unknown>> | undefined;
+  if (settings && Array.isArray(settings)) {
+    cleaned.settings = settings.map((setting: Record<string, unknown>) => {
+      const cleanedSetting: Record<string, unknown> = {};
+      for (const [key, value] of Object.entries(setting)) {
+        // Skip id and @odata metadata except @odata.type
+        if (key === "id") continue;
+        if (key.includes("@odata.") && key !== "@odata.type") continue;
+        if (key === "settingDefinitions") continue;
+        cleanedSetting[key] = value;
+      }
+      return cleanedSetting;
+    });
+  }
+
+  console.log(`[V2 Compliance] Creating policy: "${cleaned.name}"`);
+  console.log(`[V2 Compliance] Policy payload keys:`, Object.keys(cleaned));
+
+  const result = await client.post<{ id: string }>(
+    "/deviceManagement/compliancePolicies",
+    cleaned
+  );
+
+  console.log(`[V2 Compliance] Policy created with ID: ${result.id}`);
+  return result;
+}
+
+/**
+ * Check if a V2 Compliance policy exists by name
+ */
+async function v2CompliancePolicyExists(
+  client: GraphClient,
+  displayName: string
+): Promise<boolean> {
+  try {
+    const response = await client.get<{ value: Array<{ name: string }> }>(
+      `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(displayName)}'`
+    );
+    return response.value && response.value.length > 0;
+  } catch (error) {
+    console.error(`[V2 Compliance] Error checking if policy exists: ${displayName}`, error);
+    return false;
+  }
+}
+
+/**
+ * Create a CIS Device Configuration policy (OMA-URI)
+ * Endpoint: /deviceManagement/deviceConfigurations
+ */
+async function createCISDeviceConfiguration(
+  client: GraphClient,
+  policy: Record<string, unknown>
+): Promise<{ id: string }> {
+  // Clean the policy recursively
+  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+
+  // Remove root-level id and CIS metadata
+  delete cleaned.id;
+  delete cleaned._cisCategory;
+  delete cleaned._cisSubcategory;
+  delete cleaned._cisFilePath;
+
+  // Ensure hydration marker in description
+  cleaned.description = addHydrationMarker(cleaned.description as string | undefined);
+
+  console.log(`[CIS Device Config] Creating policy: "${cleaned.displayName}"`);
+
+  const result = await client.post<{ id: string }>(
+    "/deviceManagement/deviceConfigurations",
+    cleaned
+  );
+
+  console.log(`[CIS Device Config] Policy created with ID: ${result.id}`);
+  return result;
+}
+
+/**
+ * Check if a device configuration exists by name
+ */
+async function deviceConfigurationExists(
+  client: GraphClient,
+  displayName: string
+): Promise<boolean> {
+  try {
+    const response = await client.get<{ value: Array<{ displayName: string }> }>(
+      `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(displayName)}'`
+    );
+    return response.value && response.value.length > 0;
+  } catch (error) {
+    console.error(`[Device Config] Error checking if policy exists: ${displayName}`, error);
+    return false;
+  }
+}
+
+/**
  * Execute a CIS Baseline task (create or delete)
- * CIS Baselines are also Settings Catalog policies
+ * Routes to correct endpoint based on policy type
  */
 async function executeCISBaselineTask(
   task: HydrationTask,
@@ -1484,14 +1655,17 @@ async function executeCISBaselineTask(
   // Get template from cache - need to find the right cache key
   let template: CISBaselinePolicy | undefined;
 
-  // Try to find in any CIS baseline cache
-  const cacheKeys = Object.keys(sessionStorage).filter(k => k.startsWith("intune-hydration-templates-cisBaseline"));
+  // Try to find in any CIS baseline cache (includes both sessionStorage and in-memory fallback)
+  // Task itemName can be displayName, name, or _cisFilePath (file path), so check all three
+  const cacheKeys = getAllTemplateCacheKeys().filter(k => k.startsWith("intune-hydration-templates-cisBaseline"));
   for (const key of cacheKeys) {
     const cacheKey = key.replace("intune-hydration-templates-", "");
     const cached = getCachedTemplates(cacheKey);
     if (cached && Array.isArray(cached)) {
       template = (cached as CISBaselinePolicy[]).find(
-        (b) => b.displayName === task.itemName || (b as Record<string, unknown>).name === task.itemName
+        (b) => b.displayName === task.itemName ||
+               (b as Record<string, unknown>).name === task.itemName ||
+               b._cisFilePath === task.itemName
       );
       if (template) break;
     }
@@ -1502,33 +1676,73 @@ async function executeCISBaselineTask(
     return { task, success: false, skipped: false, error: "Template not found" };
   }
 
-  // Determine policy type from @odata.type
+  // Detect the policy type for proper routing
+  const policyType = detectCISPolicyType(template as Record<string, unknown>);
   const odataType = template["@odata.type"] as string || "";
-  const isCompliancePolicy = odataType.toLowerCase().includes("compliancepolicy");
   const policyName = template.displayName || (template as Record<string, unknown>).name as string || task.itemName;
 
-  console.log(`[CIS Baseline Task] Processing "${policyName}" (@odata.type: ${odataType}, isCompliance: ${isCompliancePolicy})`);
+  console.log(`[CIS Baseline Task] Processing "${policyName}" (type: ${policyType}, @odata.type: ${odataType})`);
 
   if (mode === "create") {
     try {
-      if (isCompliancePolicy) {
-        // Compliance policies go to deviceCompliancePolicies endpoint
-        const exists = await compliancePolicyExistsByName(client, policyName);
-        if (exists) {
-          console.log(`[CIS Baseline Task] Compliance policy already exists, skipping: "${policyName}"`);
-          return { task, success: false, skipped: true, error: "Policy already exists" };
-        }
-        const created = await createCISCompliancePolicy(client, template as Record<string, unknown>);
-        return { task, success: true, skipped: false, createdId: created.id };
-      } else {
-        // Settings Catalog policies
-        const exists = await settingsCatalogPolicyExists(client, policyName);
-        if (exists) {
-          console.log(`[CIS Baseline Task] Settings Catalog policy already exists, skipping: "${policyName}"`);
-          return { task, success: false, skipped: true, error: "Policy already exists" };
-        }
-        const created = await createSettingsCatalogPolicy(client, template as Record<string, unknown>);
-        return { task, success: true, skipped: false, createdId: created.id };
+      switch (policyType) {
+        case "Unsupported":
+          // Security Intents, ADMX policies, and other unsupported types
+          console.log(`[CIS Baseline Task] Skipping unsupported policy type: "${policyName}" (@odata.type: ${odataType})`);
+          // Provide specific error message based on policy type
+          let unsupportedReason = "This policy type is not supported for automated creation.";
+          if (odataType.includes("grouppolicyconfiguration")) {
+            unsupportedReason = "ADMX-based policies require complex 2-step creation with definition bindings. Please create manually in Intune.";
+          } else if (odataType.includes("devicemanagementintent")) {
+            unsupportedReason = "Security Intents require template instance creation. Please create manually in Intune.";
+          }
+          return {
+            task,
+            success: false,
+            skipped: true,
+            error: `Unsupported policy type: ${odataType}. ${unsupportedReason}`
+          };
+
+        case "V2Compliance":
+          // Settings Catalog compliance -> /compliancePolicies
+          const v2Exists = await v2CompliancePolicyExists(client, policyName);
+          if (v2Exists) {
+            console.log(`[CIS Baseline Task] V2 Compliance policy already exists, skipping: "${policyName}"`);
+            return { task, success: false, skipped: true, error: "Policy already exists" };
+          }
+          const v2Created = await createV2CompliancePolicy(client, template as Record<string, unknown>);
+          return { task, success: true, skipped: false, createdId: v2Created.id };
+
+        case "V1Compliance":
+          // Legacy compliance -> /deviceCompliancePolicies
+          const v1Exists = await compliancePolicyExistsByName(client, policyName);
+          if (v1Exists) {
+            console.log(`[CIS Baseline Task] V1 Compliance policy already exists, skipping: "${policyName}"`);
+            return { task, success: false, skipped: true, error: "Policy already exists" };
+          }
+          const v1Created = await createCISCompliancePolicy(client, template as Record<string, unknown>);
+          return { task, success: true, skipped: false, createdId: v1Created.id };
+
+        case "DeviceConfiguration":
+          // Device configuration -> /deviceConfigurations
+          const dcExists = await deviceConfigurationExists(client, policyName);
+          if (dcExists) {
+            console.log(`[CIS Baseline Task] Device Configuration already exists, skipping: "${policyName}"`);
+            return { task, success: false, skipped: true, error: "Policy already exists" };
+          }
+          const dcCreated = await createCISDeviceConfiguration(client, template as Record<string, unknown>);
+          return { task, success: true, skipped: false, createdId: dcCreated.id };
+
+        case "SettingsCatalog":
+        default:
+          // Settings Catalog -> /configurationPolicies
+          const scExists = await settingsCatalogPolicyExists(client, policyName);
+          if (scExists) {
+            console.log(`[CIS Baseline Task] Settings Catalog policy already exists, skipping: "${policyName}"`);
+            return { task, success: false, skipped: true, error: "Policy already exists" };
+          }
+          const scCreated = await createSettingsCatalogPolicy(client, template as Record<string, unknown>);
+          return { task, success: true, skipped: false, createdId: scCreated.id, warning: scCreated.warning };
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1537,111 +1751,136 @@ async function executeCISBaselineTask(
     }
   } else if (mode === "delete") {
     try {
-      if (isCompliancePolicy) {
-        // Find and delete compliance policy
-        const response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-          `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(policyName)}'`
-        );
-        if (!response.value || response.value.length === 0) {
-          return { task, success: true, skipped: true, error: "Policy not found in tenant" };
-        }
-        const policy = response.value[0];
-        if (!hasHydrationMarker(policy.description)) {
-          return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
-        }
-        await client.delete(`/deviceManagement/deviceCompliancePolicies/${policy.id}`);
-        return { task, success: true, skipped: false };
-      } else {
-        // Use pre-fetched cache for Settings Catalog policies
-        let allPolicies = context.cachedSettingsCatalogPolicies || [];
+      switch (policyType) {
+        case "Unsupported":
+          // Can't delete what we can't create
+          return { task, success: true, skipped: true, error: "Unsupported policy type" };
 
-        if (allPolicies.length === 0) {
-          console.log(`[CIS Baseline Task] No cached Settings Catalog policies - fetching now...`);
-          allPolicies = await client.getCollection<{ id: string; name: string; description?: string }>(
-            `/deviceManagement/configurationPolicies?$select=id,name,description`
+        case "V2Compliance":
+          // Delete from /compliancePolicies
+          const v2Response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
+            `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(policyName)}'`
           );
-          context.cachedSettingsCatalogPolicies = allPolicies;
-        }
-
-        // Find matching policy by name (case-insensitive)
-        const policy = allPolicies.find(
-          (p) => p.name?.toLowerCase() === policyName.toLowerCase()
-        );
-        if (!policy) {
-          return { task, success: true, skipped: true, error: "Policy not found in tenant" };
-        }
-
-        console.log(`[CIS Baseline Task] Found Settings Catalog policy: "${policy.name}" (ID: ${policy.id})`);
-        console.log(`[CIS Baseline Task] Description: "${policy.description || "(none)"}"`);
-
-        if (!hasHydrationMarker(policy.description)) {
-          return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
-        }
-
-        // First check if the policy has any assignments
-        let hasAssignments = false;
-        try {
-          const assignmentsResponse = await client.get<{ value: Array<{ id: string }> }>(
-            `/deviceManagement/configurationPolicies/${policy.id}/assignments`
-          );
-          hasAssignments = (assignmentsResponse.value?.length ?? 0) > 0;
-          if (hasAssignments) {
-            console.log(`[CIS Baseline Task] Policy "${policyName}" has ${assignmentsResponse.value.length} assignment(s), removing...`);
+          if (!v2Response.value || v2Response.value.length === 0) {
+            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
           }
-        } catch {
-          console.log(`[CIS Baseline Task] Could not check assignments for "${policyName}", will try delete directly`);
-        }
+          const v2Policy = v2Response.value[0];
+          if (!hasHydrationMarker(v2Policy.description)) {
+            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+          }
+          await client.delete(`/deviceManagement/compliancePolicies/${v2Policy.id}`);
+          return { task, success: true, skipped: false };
 
-        // Remove assignments if present (policies with assignments cannot be deleted)
-        if (hasAssignments) {
+        case "V1Compliance":
+          // Delete from /deviceCompliancePolicies
+          const v1Response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
+            `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(policyName)}'`
+          );
+          if (!v1Response.value || v1Response.value.length === 0) {
+            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+          }
+          const v1Policy = v1Response.value[0];
+          if (!hasHydrationMarker(v1Policy.description)) {
+            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+          }
+          await client.delete(`/deviceManagement/deviceCompliancePolicies/${v1Policy.id}`);
+          return { task, success: true, skipped: false };
+
+        case "DeviceConfiguration":
+          // Delete from /deviceConfigurations
+          const dcResponse = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
+            `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(policyName)}'`
+          );
+          if (!dcResponse.value || dcResponse.value.length === 0) {
+            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+          }
+          const dcPolicy = dcResponse.value[0];
+          if (!hasHydrationMarker(dcPolicy.description)) {
+            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+          }
+          await client.delete(`/deviceManagement/deviceConfigurations/${dcPolicy.id}`);
+          return { task, success: true, skipped: false };
+
+        case "SettingsCatalog":
+        default:
+          // Use pre-fetched cache for Settings Catalog policies
+          let allPolicies = context.cachedSettingsCatalogPolicies || [];
+
+          if (allPolicies.length === 0) {
+            console.log(`[CIS Baseline Task] No cached Settings Catalog policies - fetching now...`);
+            allPolicies = await client.getCollection<{ id: string; name: string; description?: string }>(
+              `/deviceManagement/configurationPolicies?$select=id,name,description`
+            );
+            context.cachedSettingsCatalogPolicies = allPolicies;
+          }
+
+          // Find matching policy by name (case-insensitive)
+          const policy = allPolicies.find(
+            (p) => p.name?.toLowerCase() === policyName.toLowerCase()
+          );
+          if (!policy) {
+            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+          }
+
+          console.log(`[CIS Baseline Task] Found Settings Catalog policy: "${policy.name}" (ID: ${policy.id})`);
+
+          if (!hasHydrationMarker(policy.description)) {
+            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+          }
+
+          // Check and clear assignments if present
           try {
-            await client.post(`/deviceManagement/configurationPolicies/${policy.id}/assign`, {
-              assignments: []
-            });
-            console.log(`[CIS Baseline Task] Cleared assignments for policy: "${policyName}"`);
-            // Wait a moment for the assignment removal to propagate
-            await new Promise(resolve => setTimeout(resolve, 1000));
-          } catch (assignError) {
-            const assignErrorMsg = assignError instanceof Error ? assignError.message : String(assignError);
-            console.log(`[CIS Baseline Task] Warning: Could not clear assignments for "${policyName}": ${assignErrorMsg}`);
-            // Continue anyway - the delete might still work
+            const assignmentsResponse = await client.get<{ value: Array<{ id: string }> }>(
+              `/deviceManagement/configurationPolicies/${policy.id}/assignments`
+            );
+            if (assignmentsResponse.value?.length > 0) {
+              console.log(`[CIS Baseline Task] Clearing ${assignmentsResponse.value.length} assignment(s)...`);
+              await client.post(`/deviceManagement/configurationPolicies/${policy.id}/assign`, { assignments: [] });
+              await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+          } catch {
+            // Continue if assignments can't be checked/cleared
           }
-        }
 
-        try {
-          await client.delete(`/deviceManagement/configurationPolicies/${policy.id}`);
-          console.log(`[CIS Baseline Task] ✓ Deleted settings catalog policy: "${policyName}"`);
-          // Remove from cache after successful delete
+          // Retry delete up to 5 times with delay (Intune backend can be flaky)
+          let deleteAttempts = 0;
+          const maxDeleteAttempts = 5;
+          let lastDeleteError: Error | null = null;
+
+          while (deleteAttempts < maxDeleteAttempts) {
+            try {
+              await client.delete(`/deviceManagement/configurationPolicies/${policy.id}`);
+              console.log(`[CIS Baseline Task] Deleted settings catalog policy: "${policyName}"`);
+              lastDeleteError = null;
+              break;
+            } catch (deleteError) {
+              deleteAttempts++;
+              lastDeleteError = deleteError instanceof Error ? deleteError : new Error(String(deleteError));
+              console.warn(`[CIS Baseline Task] Delete attempt ${deleteAttempts}/${maxDeleteAttempts} failed for "${policyName}": ${lastDeleteError.message}`);
+
+              if (deleteAttempts < maxDeleteAttempts) {
+                // Wait longer between retries (2s, 4s)
+                await new Promise(resolve => setTimeout(resolve, 2000 * deleteAttempts));
+              }
+            }
+          }
+
+          if (lastDeleteError) {
+            // Provide more helpful error message for generic Intune errors
+            let errorMsg = lastDeleteError.message;
+            if (errorMsg.includes("An error has occurred")) {
+              errorMsg = `Intune service error after ${maxDeleteAttempts} attempts. The policy may be in use or there's a temporary service issue. Try again later or delete manually in Intune.`;
+            }
+            return { task, success: false, skipped: false, error: errorMsg };
+          }
+
+          // Remove from cache
           if (context.cachedSettingsCatalogPolicies) {
             context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
               (p) => p.id !== policy.id
             );
           }
           return { task, success: true, skipped: false };
-        } catch (deleteError) {
-          // Delete returned an error, but policy might still be deleted (Intune backend quirk)
-          // Verify by checking if policy still exists
-          console.log(`[CIS Baseline Task] Delete returned error for "${policyName}", verifying if policy was actually deleted...`);
-
-          try {
-            await client.get(`/deviceManagement/configurationPolicies/${policy.id}?$select=id`);
-            // If we get here, the policy still exists - the delete truly failed
-            console.error(`[CIS Baseline Task] Policy "${policyName}" still exists - delete truly failed`);
-            throw deleteError;
-          } catch (verifyError) {
-            const verifyErrorMsg = verifyError instanceof Error ? verifyError.message : String(verifyError);
-            if (verifyErrorMsg.includes("404") || verifyErrorMsg.toLowerCase().includes("not found")) {
-              console.log(`[CIS Baseline Task] ✓ Policy "${policyName}" confirmed deleted (verified via 404)`);
-              if (context.cachedSettingsCatalogPolicies) {
-                context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
-                  (p) => p.id !== policy.id
-                );
-              }
-              return { task, success: true, skipped: false };
-            }
-            throw deleteError;
-          }
-        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -1803,7 +2042,7 @@ export function buildTaskQueue(
       case "cisBaseline":
         // CIS Intune Baselines - placeholder for sync version
         // Real data will be fetched in async version
-        items = Array.from({ length: 728 }, (_, i) => ({
+        items = Array.from({ length: 720 }, (_, i) => ({
           displayName: `CIS Baseline Policy ${i + 1}`,
         }));
         break;

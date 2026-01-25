@@ -151,7 +151,20 @@ export async function createAutopilotProfile(
 }
 
 /**
+ * Get assignments for an Autopilot deployment profile
+ */
+export async function getAutopilotProfileAssignments(
+  client: GraphClient,
+  profileId: string
+): Promise<unknown[]> {
+  return client.getCollection(
+    `/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}/assignments`
+  );
+}
+
+/**
  * Delete an Autopilot deployment profile
+ * Only deletes if the profile was created by Intune Hydration Kit and has no assignments
  */
 export async function deleteAutopilotProfile(
   client: GraphClient,
@@ -164,6 +177,13 @@ export async function deleteAutopilotProfile(
   if (!hasHydrationMarker(profile.description)) {
     throw new Error(
       `Cannot delete profile "${profile.displayName}": Not created by Intune Hydration Kit`
+    );
+  }
+
+  const assignments = await getAutopilotProfileAssignments(client, profileId);
+  if (assignments.length > 0) {
+    throw new Error(
+      `Cannot delete profile "${profile.displayName}": Profile has ${assignments.length} assignment(s). Remove all assignments before deleting.`
     );
   }
 
@@ -244,7 +264,20 @@ export async function createESPConfiguration(
 }
 
 /**
+ * Get assignments for an ESP configuration
+ */
+export async function getESPConfigurationAssignments(
+  client: GraphClient,
+  configId: string
+): Promise<unknown[]> {
+  return client.getCollection(
+    `/deviceManagement/deviceEnrollmentConfigurations/${configId}/assignments`
+  );
+}
+
+/**
  * Delete an ESP configuration
+ * Only deletes if the configuration was created by Intune Hydration Kit and has no assignments
  */
 export async function deleteESPConfiguration(
   client: GraphClient,
@@ -257,6 +290,13 @@ export async function deleteESPConfiguration(
   if (!hasHydrationMarker(config.description)) {
     throw new Error(
       `Cannot delete ESP configuration "${config.displayName}": Not created by Intune Hydration Kit`
+    );
+  }
+
+  const assignments = await getESPConfigurationAssignments(client, configId);
+  if (assignments.length > 0) {
+    throw new Error(
+      `Cannot delete ESP configuration "${config.displayName}": Configuration has ${assignments.length} assignment(s). Remove all assignments before deleting.`
     );
   }
 

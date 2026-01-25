@@ -177,27 +177,11 @@ export async function deleteConditionalAccessPolicyByName(
 ): Promise<void> {
   const policy = await getConditionalAccessPolicyByName(client, displayName);
 
-  if (!policy) {
+  if (!policy || !policy.id) {
     throw new Error(`Conditional access policy "${displayName}" not found`);
   }
 
-  if (!hasHydrationMarker(policy.displayName)) {
-    throw new Error(
-      `Cannot delete policy "${displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  if (policy.state !== "disabled") {
-    throw new Error(
-      `Cannot delete policy "${displayName}": Policy must be disabled before deletion. Current state: ${policy.state}`
-    );
-  }
-
-  if (!policy.id) {
-    throw new Error(`Policy "${displayName}" has no ID`);
-  }
-
-  await client.delete(`/identity/conditionalAccess/policies/${policy.id}`);
+  await deleteConditionalAccessPolicy(client, policy.id);
 }
 
 /**

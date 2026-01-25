@@ -123,21 +123,11 @@ export async function deleteFilterByName(
 ): Promise<void> {
   const filter = await getFilterByName(client, displayName);
 
-  if (!filter) {
+  if (!filter || !filter.id) {
     throw new Error(`Filter "${displayName}" not found`);
   }
 
-  if (!hasHydrationMarker(filter.description)) {
-    throw new Error(
-      `Cannot delete filter "${displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  if (!filter.id) {
-    throw new Error(`Filter "${displayName}" has no ID`);
-  }
-
-  await client.delete(`/deviceManagement/assignmentFilters/${filter.id}`);
+  await deleteFilter(client, filter.id);
 }
 
 /**

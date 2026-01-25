@@ -1,9 +1,9 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { HydrationTask, HydrationSummary, OperationMode } from "@/types/hydration";
+import { HydrationTask, HydrationSummary } from "@/types/hydration";
 import { createGraphClient } from "@/lib/graph/client";
-import { buildTaskQueue, buildTaskQueueAsync, executeTasks, ExecutionContext } from "@/lib/hydration/engine";
+import { buildTaskQueueAsync, executeTasks, ExecutionContext } from "@/lib/hydration/engine";
 import { createSummary } from "@/lib/hydration/reporter";
 import { useWizardState } from "./useWizardState";
 
@@ -80,37 +80,30 @@ export function useHydrationExecution() {
       // Create Graph client
       const client = createGraphClient(state.tenantConfig.cloudEnvironment);
 
+      // Task update callback for all task events
+      const updateTask = (task: HydrationTask) => {
+        setExecutionState((prev) => ({
+          ...prev,
+          tasks: prev.tasks.map((t) => (t.id === task.id ? task : t)),
+        }));
+      };
+
       // Create execution context
       const context: ExecutionContext = {
         client,
         operationMode: state.operationMode,
-        stopOnFirstError: false, // Could come from settings
-        hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true, // Default to true if not checked
-        hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true, // Default to true if not checked
-        onTaskStart: (task) => {
-          setExecutionState((prev) => ({
-            ...prev,
-            tasks: prev.tasks.map((t) => (t.id === task.id ? task : t)),
-          }));
-        },
-        onTaskComplete: (task) => {
-          setExecutionState((prev) => ({
-            ...prev,
-            tasks: prev.tasks.map((t) => (t.id === task.id ? task : t)),
-          }));
-        },
-        onTaskError: (task) => {
-          setExecutionState((prev) => ({
-            ...prev,
-            tasks: prev.tasks.map((t) => (t.id === task.id ? task : t)),
-          }));
-        },
+        stopOnFirstError: false,
+        hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,
+        hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true,
+        onTaskStart: updateTask,
+        onTaskComplete: updateTask,
+        onTaskError: updateTask,
         shouldCancel: () => cancelRef.current,
         shouldPause: () => pauseRef.current,
       };
 
       // Execute tasks with pause/cancel support
-      await executeTasksWithControls(tasks, context);
+      await executeTasks(tasks, context);
 
       // Create summary
       const endTime = new Date();
@@ -143,20 +136,6 @@ export function useHydrationExecution() {
       executionLockRef.current = false;
     }
   }, [state]);
-
-  /**
-   * Execute tasks with pause/cancel controls
-   * Now uses the real execution engine from lib/hydration/engine.ts
-   */
-  const executeTasksWithControls = async (
-    tasks: HydrationTask[],
-    context: ExecutionContext
-  ): Promise<void> => {
-    console.log("[Execution Hook] Starting execution with controls for", tasks.length, "tasks");
-
-    // Simply call the execution engine which has all the logic
-    await executeTasks(tasks, context);
-  };
 
   /**
    * Pause execution

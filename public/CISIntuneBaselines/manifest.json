@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-01-12T02:52:31.400Z",
-  "totalFiles": 728,
+  "generatedAt": "2026-01-25T04:32:37.657Z",
+  "totalFiles": 720,
   "categories": [
     {
       "id": "cis-android",
@@ -67,7 +67,7 @@
       "folder": "4.0 - CIS Benchmarks",
       "name": "CIS Windows 11 Benchmarks",
       "description": "CIS security benchmarks for Windows 11 and macOS",
-      "count": 507,
+      "count": 501,
       "subcategories": [
         {
           "name": "CIS -  Intune for Windows 11 Benchmarks",
@@ -76,10 +76,6 @@
         {
           "name": "CIS - Microsoft Edge Level 1 and Level 2 Benchmarks",
           "count": 121
-        },
-        {
-          "name": "CIS - Visual Studio Code",
-          "count": 6
         }
       ]
     },
@@ -159,11 +155,11 @@
       "folder": "8.0 - Windows 11 Benchmarks",
       "name": "Windows 11 Benchmarks",
       "description": "Windows 11 BitLocker, Edge, and M365 Apps settings",
-      "count": 58,
+      "count": 56,
       "subcategories": [
         {
           "name": "Intune Modern Workplace Windows 11",
-          "count": 34
+          "count": 32
         },
         {
           "name": "Microsoft Teams",
@@ -3649,42 +3645,6 @@
       "displayName": "CISv3 - EDGE - L2 - Text prediction enabled by default"
     },
     {
-      "path": "4.0 - CIS Benchmarks/CIS - Visual Studio Code/CISv1 - VS Code - L1 - Ensure ChatToolsAutoApprove' is set to Disabled.json",
-      "category": "4.0 - CIS Benchmarks",
-      "subcategory": "CIS - Visual Studio Code",
-      "displayName": "CISv1 - VS Code - L1 - Ensure ChatToolsAutoApprove' is set to Disabled"
-    },
-    {
-      "path": "4.0 - CIS Benchmarks/CIS - Visual Studio Code/CISv1 - VS Code - L1 - Ensure TelemetryLevel is set to Enabled.json",
-      "category": "4.0 - CIS Benchmarks",
-      "subcategory": "CIS - Visual Studio Code",
-      "displayName": "CISv1 - VS Code - L1 - Ensure TelemetryLevel is set to Enabled"
-    },
-    {
-      "path": "4.0 - CIS Benchmarks/CIS - Visual Studio Code/CISv1 - VS Code - L1 - Ensure UpdateMode is set to Enabled.json",
-      "category": "4.0 - CIS Benchmarks",
-      "subcategory": "CIS - Visual Studio Code",
-      "displayName": "CISv1 - VS Code - L1 - Ensure UpdateMode is set to Enabled"
-    },
-    {
-      "path": "4.0 - CIS Benchmarks/CIS - Visual Studio Code/CISv1 - VS Code - L2 -  Ensure AllowedExtensions is configured.json",
-      "category": "4.0 - CIS Benchmarks",
-      "subcategory": "CIS - Visual Studio Code",
-      "displayName": "CISv1 - VS Code - L2 -  Ensure AllowedExtensions is configured"
-    },
-    {
-      "path": "4.0 - CIS Benchmarks/CIS - Visual Studio Code/CISv1 - VS Code - L2 - Ensure ChatMCP is set to Disabled.json",
-      "category": "4.0 - CIS Benchmarks",
-      "subcategory": "CIS - Visual Studio Code",
-      "displayName": "CISv1 - VS Code - L2 - Ensure ChatMCP is set to Disabled"
-    },
-    {
-      "path": "4.0 - CIS Benchmarks/CIS - Visual Studio Code/CISv1 - VS Code - L2 - Ensure EnableFeedback is set to Disabled.json",
-      "category": "4.0 - CIS Benchmarks",
-      "subcategory": "CIS - Visual Studio Code",
-      "displayName": "CISv1 - VS Code - L2 - Ensure EnableFeedback is set to Disabled"
-    },
-    {
       "path": "5.0 - Linux Benchmarks/Linux Compliance/Baseline - Linux - Device Encryption.json",
       "category": "5.0 - Linux Benchmarks",
       "subcategory": "Linux Compliance",
@@ -4117,12 +4077,6 @@
       "displayName": "Baseline - Cloud Remediation  quick machine recovery"
     },
     {
-      "path": "8.0 - Windows 11 Benchmarks/Intune Modern Workplace Windows 11/Baseline - Configure Outlook profile .json",
-      "category": "8.0 - Windows 11 Benchmarks",
-      "subcategory": "Intune Modern Workplace Windows 11",
-      "displayName": "Baseline - Configure Outlook profile "
-    },
-    {
       "path": "8.0 - Windows 11 Benchmarks/Intune Modern Workplace Windows 11/Baseline - Configure Searchbar on taskbar.json",
       "category": "8.0 - Windows 11 Benchmarks",
       "subcategory": "Intune Modern Workplace Windows 11",
@@ -4277,12 +4231,6 @@
       "category": "8.0 - Windows 11 Benchmarks",
       "subcategory": "Intune Modern Workplace Windows 11",
       "displayName": "Baseline - Windows health monitoring"
-    },
-    {
-      "path": "8.0 - Windows 11 Benchmarks/Intune Modern Workplace Windows 11/Baseline - Windows OneDrive automatically.json",
-      "category": "8.0 - Windows 11 Benchmarks",
-      "subcategory": "Intune Modern Workplace Windows 11",
-      "displayName": "Baseline - Windows OneDrive automatically"
     },
     {
       "path": "8.0 - Windows 11 Benchmarks/Intune Modern Workplace Windows 11/Baseline - Windows Power Settings.json",

@@ -69,34 +69,26 @@ export async function checkLicenses(
   console.log(`[Prerequisites] Found ${skus.length} SKUs`);
 
   // Extract all service plan names from all SKUs
-  const allServicePlanNames = new Set<string>();
-  for (const sku of skus) {
-    if (sku.servicePlans && Array.isArray(sku.servicePlans)) {
-      for (const plan of sku.servicePlans) {
-        allServicePlanNames.add(plan.servicePlanName);
-      }
-    }
-  }
-
-  // Check for Intune licenses
-  const intuneServicePlans = Array.from(allServicePlanNames).filter((planName) =>
-    INTUNE_SERVICE_PLANS.includes(planName as never)
+  const allServicePlanNames = new Set(
+    skus.flatMap((sku) => sku.servicePlans?.map((plan) => plan.servicePlanName) ?? [])
   );
 
+  // Check for Intune licenses
+  const intuneServicePlans = [...allServicePlanNames].filter((name) =>
+    INTUNE_SERVICE_PLANS.includes(name as never)
+  );
   const hasIntuneLicense = intuneServicePlans.length > 0;
 
   // Check for Premium P2 licenses
-  const premiumP2ServicePlans = Array.from(allServicePlanNames).filter(
-    (planName) => PREMIUM_P2_SERVICE_PLANS.includes(planName as never)
+  const premiumP2ServicePlans = [...allServicePlanNames].filter((name) =>
+    PREMIUM_P2_SERVICE_PLANS.includes(name as never)
   );
-
   const hasPremiumP2License = premiumP2ServicePlans.length > 0;
 
   // Check for Windows Driver Update licenses
-  const windowsDriverUpdateServicePlans = Array.from(allServicePlanNames).filter(
-    (planName) => WINDOWS_DRIVER_UPDATE_SERVICE_PLANS.includes(planName as never)
+  const windowsDriverUpdateServicePlans = [...allServicePlanNames].filter((name) =>
+    WINDOWS_DRIVER_UPDATE_SERVICE_PLANS.includes(name as never)
   );
-
   const hasWindowsDriverUpdateLicense = windowsDriverUpdateServicePlans.length > 0;
 
   console.log(

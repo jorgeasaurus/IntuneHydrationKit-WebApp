@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { GeistSans } from "geist/font/sans";
+import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
@@ -7,8 +8,6 @@ import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
 import { AnimatedGridBackground } from "@/components/ui/animated-grid-background";
-
-const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Intune Hydration Kit",
@@ -27,7 +26,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={inter.className}>
+      <body className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

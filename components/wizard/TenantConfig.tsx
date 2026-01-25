@@ -23,6 +23,12 @@ const CLOUD_ENVIRONMENT_LABELS: Record<CloudEnvironment, string> = {
   china: "China (21Vianet)",
 };
 
+function getStatusFromResult(result: PrerequisiteCheckResult): PrerequisiteCheckStatus {
+  if (result.errors.length > 0) return "error";
+  if (result.warnings.length > 0) return "warning";
+  return "success";
+}
+
 export function TenantConfig() {
   const { state, setTenantConfig, setPrerequisiteResult: setWizardPrerequisiteResult, nextStep } = useWizardState();
   const { accounts } = useMsal();
@@ -49,16 +55,8 @@ export function TenantConfig() {
           // Validate prerequisites (includes organization info, licenses, permissions)
           const result = await validatePrerequisites(graphClient);
           setPrerequisiteResult(result);
-          setWizardPrerequisiteResult(result); // Store in wizard state for execution
-
-          // Set status based on validation result
-          if (result.errors.length > 0) {
-            setPrerequisiteStatus("error");
-          } else if (result.warnings.length > 0) {
-            setPrerequisiteStatus("warning");
-          } else {
-            setPrerequisiteStatus("success");
-          }
+          setWizardPrerequisiteResult(result);
+          setPrerequisiteStatus(getStatusFromResult(result));
         } catch (error) {
           console.error("Failed to validate prerequisites:", error);
           setPrerequisiteStatus("error");
@@ -90,16 +88,8 @@ export function TenantConfig() {
       const graphClient = createGraphClient(cloudEnv);
       const result = await validatePrerequisites(graphClient);
       setPrerequisiteResult(result);
-      setWizardPrerequisiteResult(result); // Store in wizard state for execution
-
-      // Set status based on validation result
-      if (result.errors.length > 0) {
-        setPrerequisiteStatus("error");
-      } else if (result.warnings.length > 0) {
-        setPrerequisiteStatus("warning");
-      } else {
-        setPrerequisiteStatus("success");
-      }
+      setWizardPrerequisiteResult(result);
+      setPrerequisiteStatus(getStatusFromResult(result));
     } catch (error) {
       console.error("Failed to recheck prerequisites:", error);
       setPrerequisiteStatus("error");

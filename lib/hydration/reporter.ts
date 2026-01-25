@@ -58,12 +58,26 @@ export function generateMarkdownReport(
       if (task.error) {
         markdown += `   - Error: ${task.error}\n`;
       }
+      if (task.warning) {
+        markdown += `   - Warning: ${task.warning}\n`;
+      }
       if (task.startTime && task.endTime) {
         const taskDuration = task.endTime.getTime() - task.startTime.getTime();
         markdown += `   - Duration: ${formatDuration(taskDuration)}\n`;
       }
     }
 
+    markdown += `\n`;
+  }
+
+  // Add warnings section if there are any
+  if (summary.warnings.length > 0) {
+    markdown += `## Warnings\n\n`;
+    markdown += `The following policies were created but require manual configuration:\n\n`;
+    for (const warning of summary.warnings) {
+      const warningTime = format(warning.timestamp, "HH:mm:ss");
+      markdown += `- **[${warningTime}]** ${warning.task}: ${warning.message}\n`;
+    }
     markdown += `\n`;
   }
 
@@ -100,6 +114,7 @@ export function generateJSONReport(
       itemName: task.itemName,
       status: task.status,
       error: task.error,
+      warning: task.warning,
       startTime: task.startTime?.toISOString(),
       endTime: task.endTime?.toISOString(),
       duration: task.startTime && task.endTime
@@ -125,6 +140,7 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
     "Operation",
     "Status",
     "Error",
+    "Warning",
     "Start Time",
     "End Time",
     "Duration (ms)",
@@ -142,6 +158,7 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
       task.operation,
       task.status,
       task.error ? `"${task.error.replace(/"/g, '""')}"` : "",
+      task.warning ? `"${task.warning.replace(/"/g, '""')}"` : "",
       task.startTime ? format(task.startTime, "yyyy-MM-dd HH:mm:ss") : "",
       task.endTime ? format(task.endTime, "yyyy-MM-dd HH:mm:ss") : "",
       duration,
@@ -204,6 +221,15 @@ export function createSummary(
       timestamp: t.endTime || new Date(),
     }));
 
+  // Collect warnings (tasks that succeeded but have warnings)
+  const warnings = tasks
+    .filter((t) => t.status === "success" && t.warning)
+    .map((t) => ({
+      task: t.itemName,
+      message: t.warning || "",
+      timestamp: t.endTime || new Date(),
+    }));
+
   return {
     tenantId,
     operationMode,
@@ -213,6 +239,7 @@ export function createSummary(
     stats,
     categoryBreakdown,
     errors,
+    warnings,
   };
 }
 
@@ -292,16 +319,10 @@ function formatCategoryName(category: string): string {
 function groupTasksByCategory(
   tasks: HydrationTask[]
 ): Record<string, HydrationTask[]> {
-  const grouped: Record<string, HydrationTask[]> = {};
-
-  for (const task of tasks) {
-    if (!grouped[task.category]) {
-      grouped[task.category] = [];
-    }
-    grouped[task.category].push(task);
-  }
-
-  return grouped;
+  return tasks.reduce<Record<string, HydrationTask[]>>((grouped, task) => {
+    (grouped[task.category] ??= []).push(task);
+    return grouped;
+  }, {});
 }
 
 /**

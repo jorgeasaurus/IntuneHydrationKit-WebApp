@@ -59,7 +59,7 @@ export const TEMPLATE_METADATA = {
   cisBaseline: {
     displayName: "CIS Intune Baselines",
     description: "CIS security benchmarks for Windows, macOS, iOS, Android, and browsers",
-    count: 728,
+    count: 720,
     icon: "ShieldAlert",
     hasSubcategories: true,
   },

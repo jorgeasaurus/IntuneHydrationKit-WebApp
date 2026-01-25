@@ -137,21 +137,11 @@ export async function deleteGroupByName(
 ): Promise<void> {
   const group = await getGroupByName(client, displayName);
 
-  if (!group) {
+  if (!group || !group.id) {
     throw new Error(`Group "${displayName}" not found`);
   }
 
-  if (!hasHydrationMarker(group.description)) {
-    throw new Error(
-      `Cannot delete group "${displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  if (!group.id) {
-    throw new Error(`Group "${displayName}" has no ID`);
-  }
-
-  await client.delete(`/groups/${group.id}`);
+  await deleteGroup(client, group.id);
 }
 
 /**

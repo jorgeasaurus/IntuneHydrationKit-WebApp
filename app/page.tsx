@@ -17,6 +17,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import {
@@ -28,7 +29,6 @@ import {
   FileCheck,
   Users,
   Filter,
-  Lock,
   ArrowRight,
   UserCircle,
   Settings,
@@ -38,6 +38,8 @@ import {
 } from "lucide-react";
 import { Navigation } from "@/components/Navigation";
 import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
+import { GradientBackground } from "@/components/GradientBackground";
+import { WizardDemo } from "@/components/WizardDemo";
 import { CloudEnvironment } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
 
@@ -74,24 +76,26 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen relative z-10">
-      <Navigation />
+    <div className="min-h-screen relative">
+      <GradientBackground />
+      <div className="relative z-10">
+        <Navigation />
       {/* Hero Section */}
       <section className="container mx-auto px-4 pt-32 pb-16">
         <div className="max-w-5xl mx-auto text-center space-y-6">
           <h1 className="text-5xl sm:text-6xl lg:text-7xl xl:text-8xl font-black tracking-tight leading-tight">
             Bootstrap Your Tenant.{" "}
-            <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="gradient-text-animated">
               In Minutes.
             </span>
           </h1>
           <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto">
-            Deploy up to 900+ Microsoft Intune best-practice policies, groups, filters, and more.
+            Deploy up to 930 Microsoft Intune best-practice policies, groups, filters, and more.
             Select only what you need. Zero hassle.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
             {!isAuthenticated ? (
-              <Button onClick={handleSignInClick} size="lg" className="text-lg px-8 text-white">
+              <Button onClick={handleSignInClick} size="lg" className="text-lg px-8 text-white btn-shine">
                 <svg className="mr-2 h-5 w-5" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                   <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
@@ -101,7 +105,7 @@ export default function Home() {
                 Sign In with Microsoft
               </Button>
             ) : (
-              <Button onClick={handleContinue} size="lg" className="text-lg px-8 text-white">
+              <Button onClick={handleContinue} size="lg" className="text-lg px-8 text-white btn-shine">
                 Continue to Wizard
                 <ArrowRight className="ml-2 h-5 w-5" />
               </Button>
@@ -126,6 +130,11 @@ export default function Home() {
             </a>
           </p>
         </div>
+
+        {/* Live Demo Animation */}
+        <div className="mt-16 hidden lg:block">
+          <WizardDemo />
+        </div>
       </section>
 
       {/* Features Section */}
@@ -139,29 +148,29 @@ export default function Home() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            <Card className="border-2 hover:border-primary/50 transition-colors">
+            <Card className="group card-interactive">
               <CardHeader>
-                <Shield className="h-10 w-10 mb-3 text-primary" />
+                <Shield className="h-10 w-10 mb-3 text-primary icon-hover" />
                 <CardTitle>Safety First</CardTitle>
                 <CardDescription>
-                  Built-in safeguards with safety markers prevent accidental deletions. Only objects created by this tool can be removed.
+                  All objects are marked for tracking. Delete operations verify markers and check for active assignments before removal.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="border-2 hover:border-primary/50 transition-colors">
+            <Card className="group card-interactive">
               <CardHeader>
-                <Zap className="h-10 w-10 mb-3 text-primary" />
-                <CardTitle>Quick Deployment</CardTitle>
+                <Zap className="h-10 w-10 mb-3 text-primary icon-hover" />
+                <CardTitle>Smart Deployment</CardTitle>
                 <CardDescription>
-                  Deploy 900+ policies, groups, filters, and conditional access policies in under 10 minutes.
+                  Existing objects are automatically skipped. License requirements are checked and unsupported features are bypassed.
                 </CardDescription>
               </CardHeader>
             </Card>
 
-            <Card className="border-2 hover:border-primary/50 transition-colors">
+            <Card className="group card-interactive">
               <CardHeader>
-                <Cloud className="h-10 w-10 mb-3 text-primary" />
+                <Cloud className="h-10 w-10 mb-3 text-primary icon-hover" />
                 <CardTitle>Multi-Cloud Support</CardTitle>
                 <CardDescription>
                   Works with Global, US Government (GCC High & DoD), Germany, and China (21Vianet) clouds.
@@ -169,9 +178,9 @@ export default function Home() {
               </CardHeader>
             </Card>
 
-            <Card className="border-2 hover:border-primary/50 transition-colors">
+            <Card className="group card-interactive">
               <CardHeader>
-                <GitBranch className="h-10 w-10 mb-3 text-primary" />
+                <GitBranch className="h-10 w-10 mb-3 text-primary icon-hover" />
                 <CardTitle>Three Operation Modes</CardTitle>
                 <CardDescription>
                   Create new configurations, preview changes without applying them, or delete previously created objects.
@@ -179,9 +188,9 @@ export default function Home() {
               </CardHeader>
             </Card>
 
-            <Card className="border-2 hover:border-primary/50 transition-colors">
+            <Card className="group card-interactive">
               <CardHeader>
-                <FileCheck className="h-10 w-10 mb-3 text-primary" />
+                <FileCheck className="h-10 w-10 mb-3 text-primary icon-hover" />
                 <CardTitle>OpenIntuneBaseline</CardTitle>
                 <CardDescription>
                   Integrates with OpenIntuneBaseline for 70+ security and configuration policies maintained by the community.
@@ -189,12 +198,12 @@ export default function Home() {
               </CardHeader>
             </Card>
 
-            <Card className="border-2 hover:border-primary/50 transition-colors">
+            <Card className="group card-interactive">
               <CardHeader>
-                <CheckCircle2 className="h-10 w-10 mb-3 text-primary" />
+                <CheckCircle2 className="h-10 w-10 mb-3 text-primary icon-hover" />
                 <CardTitle>Pre-flight Validation</CardTitle>
                 <CardDescription>
-                  Validates licenses, permissions, and tenant health before making any changes to your environment.
+                  Validates Intune license, Premium P2 for risk policies, and Windows E3/E5 for driver updates before deployment.
                 </CardDescription>
               </CardHeader>
             </Card>
@@ -213,65 +222,73 @@ export default function Home() {
           </div>
 
           <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-4">
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <UserCircle className="h-8 w-8 text-primary" />
+            <Card className="group card-interactive p-6">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <UserCircle className="h-8 w-8 text-primary icon-hover" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                    1
+                  </div>
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                  1
-                </div>
+                <h3 className="text-xl font-semibold">Sign In</h3>
+                <p className="text-sm text-muted-foreground">
+                  Authenticate with your Microsoft account and connect to your Intune tenant
+                </p>
               </div>
-              <h3 className="text-xl font-semibold">Sign In</h3>
-              <p className="text-sm text-muted-foreground">
-                Authenticate with your Microsoft account and connect to your Intune tenant
-              </p>
-            </div>
+            </Card>
 
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Settings className="h-8 w-8 text-primary" />
+            <Card className="group card-interactive p-6">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Settings className="h-8 w-8 text-primary icon-hover" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                    2
+                  </div>
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                  2
-                </div>
+                <h3 className="text-xl font-semibold">Configure</h3>
+                <p className="text-sm text-muted-foreground">
+                  Select what you want to deploy: policies, groups, filters, or conditional access
+                </p>
               </div>
-              <h3 className="text-xl font-semibold">Configure</h3>
-              <p className="text-sm text-muted-foreground">
-                Select what you want to deploy: policies, groups, filters, or conditional access
-              </p>
-            </div>
+            </Card>
 
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Play className="h-8 w-8 text-primary" />
+            <Card className="group card-interactive p-6">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Play className="h-8 w-8 text-primary icon-hover" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                    3
+                  </div>
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                  3
-                </div>
+                <h3 className="text-xl font-semibold">Deploy</h3>
+                <p className="text-sm text-muted-foreground">
+                  Review your selections and deploy configurations to your tenant with one click
+                </p>
               </div>
-              <h3 className="text-xl font-semibold">Deploy</h3>
-              <p className="text-sm text-muted-foreground">
-                Review your selections and deploy configurations to your tenant with one click
-              </p>
-            </div>
+            </Card>
 
-            <div className="flex flex-col items-center text-center space-y-4">
-              <div className="relative">
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Download className="h-8 w-8 text-primary" />
+            <Card className="group card-interactive p-6">
+              <div className="flex flex-col items-center text-center space-y-4">
+                <div className="relative">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Download className="h-8 w-8 text-primary icon-hover" />
+                  </div>
+                  <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
+                    4
+                  </div>
                 </div>
-                <div className="absolute -top-2 -right-2 w-8 h-8 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">
-                  4
-                </div>
+                <h3 className="text-xl font-semibold">Export</h3>
+                <p className="text-sm text-muted-foreground">
+                  Download detailed reports and review what was deployed to your environment
+                </p>
               </div>
-              <h3 className="text-xl font-semibold">Export</h3>
-              <p className="text-sm text-muted-foreground">
-                Download detailed reports and review what was deployed to your environment
-              </p>
-            </div>
+            </Card>
           </div>
         </div>
       </section>
@@ -281,38 +298,69 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-              What Gets Deployed
+              Available Configurations
             </h2>
             <p className="text-lg text-muted-foreground">
-              Comprehensive coverage of Intune configuration objects
+              Pick and choose what you need. Deploy everything or just specific items.
             </p>
           </div>
 
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card>
+          <div className="grid gap-4 md:grid-cols-3 md:grid-rows-2">
+            {/* Configuration Profiles - Featured large card */}
+            <Card className="group card-interactive md:row-span-2">
+              <CardHeader className="h-full">
+                <div className="flex flex-col h-full">
+                  <div className="p-3 rounded-lg bg-primary/10 w-fit mb-4">
+                    <FileCheck className="h-8 w-8 text-primary icon-hover" />
+                  </div>
+                  <CardTitle className="text-xl mb-4">Configuration Profiles</CardTitle>
+                  <ul className="space-y-3 text-sm text-muted-foreground flex-1">
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                      <AnimatedCounter value={806} className="font-medium" /> Settings Catalog policies
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                      <AnimatedCounter value={3} className="font-medium" /> Driver Update profiles
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                      <AnimatedCounter value={3} className="font-medium" /> Update Rings (WUfB)
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                      CIS and OpenIntuneBaseline Sourced
+                    </li>
+                  </ul>
+                  <div className="mt-4 pt-4 border-t border-border/50">
+                    <AnimatedCounter value={812} className="text-2xl font-bold text-primary" />
+                    <span className="text-sm text-muted-foreground ml-2">total profiles</span>
+                  </div>
+                </div>
+              </CardHeader>
+            </Card>
+
+            {/* Security Policies */}
+            <Card className="group card-interactive">
               <CardHeader>
                 <div className="flex items-start gap-4">
                   <div className="p-2 rounded-lg bg-primary/10">
-                    <FileCheck className="h-6 w-6 text-primary" />
+                    <Shield className="h-6 w-6 text-primary icon-hover" />
                   </div>
                   <div>
-                    <CardTitle className="mb-2">Policies & Baselines</CardTitle>
+                    <CardTitle className="mb-2">Security Policies</CardTitle>
                     <ul className="space-y-2 text-sm text-muted-foreground">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        98 OpenIntuneBaseline policies
+                        <AnimatedCounter value={21} className="font-medium" /> Conditional Access
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        728 CIS security benchmarks
+                        <AnimatedCounter value={18} className="font-medium" /> Compliance policies
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        10 Compliance policies
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        10 App protection policies
+                        <AnimatedCounter value={12} className="font-medium" /> App Protection
                       </li>
                     </ul>
                   </div>
@@ -320,30 +368,27 @@ export default function Home() {
               </CardHeader>
             </Card>
 
-            <Card>
+            {/* Groups & Targeting */}
+            <Card className="group card-interactive">
               <CardHeader>
                 <div className="flex items-start gap-4">
                   <div className="p-2 rounded-lg bg-primary/10">
-                    <Users className="h-6 w-6 text-primary" />
+                    <Users className="h-6 w-6 text-primary icon-hover" />
                   </div>
                   <div>
                     <CardTitle className="mb-2">Groups & Targeting</CardTitle>
                     <ul className="space-y-2 text-sm text-muted-foreground">
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        47 Device groups
+                        <AnimatedCounter value={47} className="font-medium" /> Device groups
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        24 Assignment filters
+                        <AnimatedCounter value={24} className="font-medium" /> Assignment filters
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        3 Enrollment profiles
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Platform-specific targeting
+                        <AnimatedCounter value={3} className="font-medium" /> Enrollment profiles
                       </li>
                     </ul>
                   </div>
@@ -351,63 +396,33 @@ export default function Home() {
               </CardHeader>
             </Card>
 
-            <Card>
+            {/* Customization - Wide card */}
+            <Card className="group card-interactive md:col-span-2">
               <CardHeader>
                 <div className="flex items-start gap-4">
                   <div className="p-2 rounded-lg bg-primary/10">
-                    <Lock className="h-6 w-6 text-primary" />
+                    <Filter className="h-6 w-6 text-primary icon-hover" />
                   </div>
-                  <div>
-                    <CardTitle className="mb-2">Zero Trust</CardTitle>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        21 Conditional Access policies
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Created in disabled state
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Manual review required
-                      </li>
-                      <li className="flex items-center gap-2">
-                        <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        Production-ready templates
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </CardHeader>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-lg bg-primary/10">
-                    <Filter className="h-6 w-6 text-primary" />
-                  </div>
-                  <div>
-                    <CardTitle className="mb-2">Customization</CardTitle>
-                    <ul className="space-y-2 text-sm text-muted-foreground">
-                      <li className="flex items-center gap-2">
+                  <div className="flex-1">
+                    <CardTitle className="mb-2">Customization Options</CardTitle>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                         Select specific categories
-                      </li>
-                      <li className="flex items-center gap-2">
+                      </div>
+                      <div className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                         Custom baseline repository
-                      </li>
-                      <li className="flex items-center gap-2">
+                      </div>
+                      <div className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                         Preview before deployment
-                      </li>
-                      <li className="flex items-center gap-2">
+                      </div>
+                      <div className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
                         Detailed execution reports
-                      </li>
-                    </ul>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </CardHeader>
@@ -497,16 +512,26 @@ export default function Home() {
 
           <Accordion type="single" collapsible className="w-full">
             <AccordionItem value="item-1">
-              <AccordionTrigger>Is this tool safe to use in production?</AccordionTrigger>
+              <AccordionTrigger>Is this tool free to use?</AccordionTrigger>
               <AccordionContent>
-                Yes. The tool includes multiple safety features: all created objects are marked with
-                &quot;Imported by Intune Hydration Kit&quot; in their description, delete operations only remove
-                objects with this marker, and Conditional Access policies are created in a disabled state
-                so you can review them before enabling. We recommend testing in a dev/test tenant first.
+                Yes, the Intune Hydration Kit is completely free and open-source. There are no licensing fees,
+                subscriptions, or hidden costs. You only need valid Microsoft licenses for the Intune features
+                you want to deploy (e.g., Intune license, Entra ID P2 for risk-based policies, Windows E3/E5
+                for driver updates).
               </AccordionContent>
             </AccordionItem>
 
             <AccordionItem value="item-2">
+              <AccordionTrigger>Is this tool safe to use in production?</AccordionTrigger>
+              <AccordionContent>
+                Yes. Safety features include: hydration markers on all created objects, assignment checks
+                before deletion (objects with assignments are skipped), Conditional Access policies created
+                disabled, and duplicate detection to prevent overwrites. We recommend testing in a dev/test
+                tenant first.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-3">
               <AccordionTrigger>What permissions do I need?</AccordionTrigger>
               <AccordionContent>
                 You need to be a Global Administrator or Intune Administrator with the ability to consent
@@ -516,27 +541,27 @@ export default function Home() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-3">
+            <AccordionItem value="item-4">
               <AccordionTrigger>What licenses are required?</AccordionTrigger>
               <AccordionContent>
-                At minimum, you need an Intune license (included in Microsoft 365 E3/E5, Business Premium,
-                or standalone Intune). For risk-based Conditional Access policies, Azure AD Premium P2 is
-                required. For Windows Driver Update profiles, Windows E3/E5 or equivalent is needed. The
-                tool will automatically skip features that require licenses you don&apos;t have.
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-4">
-              <AccordionTrigger>Can I undo or rollback changes?</AccordionTrigger>
-              <AccordionContent>
-                Yes. Use the Delete operation mode to remove all objects created by this tool. The delete
-                operation only removes objects that have the hydration kit marker in their description,
-                so your existing configurations are safe. Note that Conditional Access policies must be
-                in a disabled state to be deleted.
+                At minimum, you need an Intune license (Microsoft 365 E3/E5, Business Premium, or standalone).
+                Risk-based Conditional Access policies require Premium P2. Driver Update profiles require
+                Windows E3/E5. License checks run during pre-flight validation and unsupported policies are
+                automatically skipped with a clear reason in the results.
               </AccordionContent>
             </AccordionItem>
 
             <AccordionItem value="item-5">
+              <AccordionTrigger>Can I undo or rollback changes?</AccordionTrigger>
+              <AccordionContent>
+                Yes. Use the Delete operation mode to remove all objects created by this tool. The delete
+                operation verifies hydration markers, checks for active assignments, and ensures Conditional
+                Access policies are disabled before removal. Objects with assignments are skipped to prevent
+                disruption.
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-6">
               <AccordionTrigger>What is OpenIntuneBaseline?</AccordionTrigger>
               <AccordionContent>
                 OpenIntuneBaseline is an open-source community project that provides 70+ security and
@@ -546,7 +571,7 @@ export default function Home() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-6">
+            <AccordionItem value="item-7">
               <AccordionTrigger>Does this work with government cloud environments?</AccordionTrigger>
               <AccordionContent>
                 Yes. The tool supports multiple cloud environments including Global (Commercial),
@@ -555,7 +580,7 @@ export default function Home() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-7">
+            <AccordionItem value="item-8">
               <AccordionTrigger>How long does the hydration process take?</AccordionTrigger>
               <AccordionContent>
                 A full deployment of all 900+ objects typically takes 10-30 minutes. The tool processes
@@ -564,16 +589,16 @@ export default function Home() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-8">
+            <AccordionItem value="item-9">
               <AccordionTrigger>What happens if an object already exists?</AccordionTrigger>
               <AccordionContent>
-                In Create mode, the tool checks for existing objects by name before creating new ones.
-                If an object with the same name already exists, it will be skipped and marked as
-                &quot;Skipped&quot; in the results. This prevents duplicates and ensures idempotent operations.
+                In Create mode, objects are checked against a pre-fetched cache of existing tenant objects.
+                If a match is found by display name (case-insensitive), the object is skipped. This makes
+                deployments idempotent and safe to re-run without creating duplicates.
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-9">
+            <AccordionItem value="item-10">
               <AccordionTrigger>Where can I inspect what is being imported?</AccordionTrigger>
               <AccordionContent>
                 <p className="mb-3">
@@ -621,7 +646,7 @@ export default function Home() {
               </CardDescription>
               <div className="pt-4">
                 {!isAuthenticated ? (
-                  <Button onClick={handleSignInClick} size="lg" className="text-lg px-8 text-white">
+                  <Button onClick={handleSignInClick} size="lg" className="text-lg px-8 text-white btn-shine">
                     <svg className="mr-2 h-5 w-5" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                       <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
                       <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
@@ -631,7 +656,7 @@ export default function Home() {
                     Get Started Now
                   </Button>
                 ) : (
-                  <Button onClick={handleContinue} size="lg" className="text-lg px-8 text-white">
+                  <Button onClick={handleContinue} size="lg" className="text-lg px-8 text-white btn-shine">
                     Continue to Wizard
                     <ArrowRight className="ml-2 h-5 w-5" />
                   </Button>
@@ -678,6 +703,7 @@ export default function Home() {
           </div>
         </div>
       </footer>
+      </div>
     </div>
   );
 }

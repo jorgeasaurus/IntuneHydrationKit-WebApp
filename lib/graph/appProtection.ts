@@ -44,11 +44,6 @@ export async function getAllAppProtectionPolicies(
   const taggedIosPolicies = iosPolicies.map(p => ({ ...p, _platform: "iOS" as const }));
   const taggedAndroidPolicies = androidPolicies.map(p => ({ ...p, _platform: "android" as const }));
 
-  // Log each policy for debugging
-  console.log(`[getAllAppProtectionPolicies] Retrieved ${iosPolicies.length} iOS policies, ${androidPolicies.length} Android policies`);
-  taggedIosPolicies.forEach(p => console.log(`  iOS: ${p.displayName} - _platform: ${p._platform}`));
-  taggedAndroidPolicies.forEach(p => console.log(`  Android: ${p.displayName} - _platform: ${p._platform}`));
-
   return [...taggedIosPolicies, ...taggedAndroidPolicies];
 }
 
@@ -181,8 +176,6 @@ export async function createiOSAppProtectionPolicy(
     delete policyBody.allowedIosDeviceModels;
   }
 
-  console.log(`[App Protection] Creating iOS policy: "${policyBody.displayName}" with description: "${policyBody.description}"`);
-
   return client.post<AppProtectionPolicy>(
     "/deviceAppManagement/iosManagedAppProtections",
     policyBody
@@ -214,8 +207,6 @@ export async function createAndroidAppProtectionPolicy(
   if (policyBody.allowedAndroidDeviceManufacturers === "") {
     delete policyBody.allowedAndroidDeviceManufacturers;
   }
-
-  console.log(`[App Protection] Creating Android policy: "${policyBody.displayName}" with description: "${policyBody.description}"`);
 
   return client.post<AppProtectionPolicy>(
     "/deviceAppManagement/androidManagedAppProtections",
@@ -255,7 +246,7 @@ export async function updateAppProtectionPolicy(
 
 /**
  * Delete an iOS app protection policy by ID
- * Only deletes if the policy was created by Intune Hydration Kit
+ * Only deletes if the policy was created by Intune Hydration Kit and has no assignments
  */
 export async function deleteiOSAppProtectionPolicy(
   client: GraphClient,
@@ -269,12 +260,19 @@ export async function deleteiOSAppProtectionPolicy(
     );
   }
 
+  const assignments = await getAppProtectionPolicyAssignments(client, policyId, "iOS");
+  if (assignments.length > 0) {
+    throw new Error(
+      `Cannot delete policy "${policy.displayName}": Policy has ${assignments.length} assignment(s). Remove all assignments before deleting.`
+    );
+  }
+
   await client.delete(`/deviceAppManagement/iosManagedAppProtections/${policyId}`);
 }
 
 /**
  * Delete an Android app protection policy by ID
- * Only deletes if the policy was created by Intune Hydration Kit
+ * Only deletes if the policy was created by Intune Hydration Kit and has no assignments
  */
 export async function deleteAndroidAppProtectionPolicy(
   client: GraphClient,
@@ -285,6 +283,13 @@ export async function deleteAndroidAppProtectionPolicy(
   if (!hasHydrationMarker(policy.description)) {
     throw new Error(
       `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
+    );
+  }
+
+  const assignments = await getAppProtectionPolicyAssignments(client, policyId, "android");
+  if (assignments.length > 0) {
+    throw new Error(
+      `Cannot delete policy "${policy.displayName}": Policy has ${assignments.length} assignment(s). Remove all assignments before deleting.`
     );
   }
 

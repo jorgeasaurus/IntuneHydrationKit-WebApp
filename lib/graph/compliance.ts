@@ -182,7 +182,6 @@ export async function createCompliancePolicy(
 
       if (existingScript) {
         scriptId = existingScript.id;
-        console.log(`[Compliance] Using existing script: "${scriptDisplayName}" (${scriptId})`);
       } else if (scriptDefinition.detectionScriptContentBase64) {
         // Create the compliance script
         const newScript = await createDeviceComplianceScript(
@@ -191,7 +190,6 @@ export async function createCompliancePolicy(
           policyBody.displayName
         );
         scriptId = newScript.id;
-        console.log(`[Compliance] Created script: "${scriptDisplayName}" (${scriptId})`);
       } else {
         throw new Error(
           `Custom Compliance policy "${policyBody.displayName}" missing detectionScriptContentBase64 in deviceCompliancePolicyScriptDefinition`
@@ -216,8 +214,6 @@ export async function createCompliancePolicy(
 
       // Remove the script definition (internal helper, not part of API)
       delete policyBody.deviceCompliancePolicyScriptDefinition;
-
-      console.log(`[Compliance] Creating Custom Compliance policy: "${policyBody.displayName}"`);
     } else {
       // Case 2: Script reference exists but no definition - clean invalid properties
       // Only keep valid properties: deviceComplianceScriptId, rulesContent
@@ -253,13 +249,12 @@ export async function updateCompliancePolicy(
 
 /**
  * Delete a compliance policy by ID
- * Only deletes if the policy was created by Intune Hydration Kit
+ * Only deletes if the policy was created by Intune Hydration Kit and has no assignments
  */
 export async function deleteCompliancePolicy(
   client: GraphClient,
   policyId: string
 ): Promise<void> {
-  // First, verify the policy has the hydration marker
   const policy = await getCompliancePolicyById(client, policyId);
 
   if (!hasHydrationMarker(policy.description)) {
@@ -268,12 +263,19 @@ export async function deleteCompliancePolicy(
     );
   }
 
+  const assignments = await getCompliancePolicyAssignments(client, policyId);
+  if (assignments.length > 0) {
+    throw new Error(
+      `Cannot delete policy "${policy.displayName}": Policy has ${assignments.length} assignment(s). Remove all assignments before deleting.`
+    );
+  }
+
   await client.delete(`/deviceManagement/deviceCompliancePolicies/${policyId}`);
 }
 
 /**
  * Delete a compliance policy by display name
- * Only deletes if the policy was created by Intune Hydration Kit
+ * Only deletes if the policy was created by Intune Hydration Kit and has no assignments
  */
 export async function deleteCompliancePolicyByName(
   client: GraphClient,
@@ -281,21 +283,11 @@ export async function deleteCompliancePolicyByName(
 ): Promise<void> {
   const policy = await getCompliancePolicyByName(client, displayName);
 
-  if (!policy) {
+  if (!policy || !policy.id) {
     throw new Error(`Compliance policy "${displayName}" not found`);
   }
 
-  if (!hasHydrationMarker(policy.description)) {
-    throw new Error(
-      `Cannot delete policy "${displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  if (!policy.id) {
-    throw new Error(`Policy "${displayName}" has no ID`);
-  }
-
-  await client.delete(`/deviceManagement/deviceCompliancePolicies/${policy.id}`);
+  await deleteCompliancePolicy(client, policy.id);
 }
 
 /**
