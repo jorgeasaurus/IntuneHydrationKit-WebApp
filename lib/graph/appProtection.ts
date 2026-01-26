@@ -102,21 +102,29 @@ export async function appProtectionPolicyExists(
  * Recursively clean a policy object to remove OData metadata
  * Keeps @odata.type but removes all other @odata.* properties, ids, timestamps, etc.
  */
-function cleanAppProtectionPolicyRecursively(obj: unknown, isRoot: boolean = true): unknown {
+function cleanAppProtectionPolicyRecursively(obj: unknown): unknown {
   if (obj === null || obj === undefined) {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => cleanAppProtectionPolicyRecursively(item, false));
+    return obj.map((item) => cleanAppProtectionPolicyRecursively(item));
   }
 
   if (typeof obj === "object") {
     const cleaned: Record<string, unknown> = {};
     const excludeFields = [
+      // OData metadata
       "@odata.context", "@odata.id", "@odata.editLink",
+      // Timestamps and version
       "createdDateTime", "lastModifiedDateTime", "version",
+      // OData actions
       "#microsoft.graph.assign",
+      // Read-only properties that cause "The request is invalid" errors
+      "isAssigned",
+      "deployedAppCount",
+      // ID should always be removed (new policies get their own ID)
+      "id",
     ];
 
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
@@ -130,18 +138,13 @@ function cleanAppProtectionPolicyRecursively(obj: unknown, isRoot: boolean = tru
         continue;
       }
 
-      // Skip id fields in nested objects (but keep at root level if needed)
-      if (key === "id" && !isRoot) {
-        continue;
-      }
-
       // Skip properties starting with # (OData actions)
       if (key.startsWith("#")) {
         continue;
       }
 
       // Recursively clean nested objects and arrays
-      cleaned[key] = cleanAppProtectionPolicyRecursively(value, false);
+      cleaned[key] = cleanAppProtectionPolicyRecursively(value);
     }
 
     return cleaned;
@@ -158,10 +161,7 @@ export async function createiOSAppProtectionPolicy(
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
   // Recursively clean the policy to remove all OData metadata
-  const policyBody = cleanAppProtectionPolicyRecursively(policy, true) as AppProtectionPolicy;
-
-  // Remove root-level id
-  delete policyBody.id;
+  const policyBody = cleanAppProtectionPolicyRecursively(policy) as AppProtectionPolicy;
 
   // Ensure the hydration marker is in the description
   policyBody.description = addHydrationMarker(policyBody.description);
@@ -170,6 +170,9 @@ export async function createiOSAppProtectionPolicy(
   delete policyBody.apps;
   delete policyBody.assignments;
   delete policyBody.targetedAppManagementLevels;
+
+  // Remove internal platform tag (used for delete operations only)
+  delete (policyBody as Record<string, unknown>)._platform;
 
   // Remove empty iOS device model allowlist (per PowerShell script logic)
   if (policyBody.allowedIosDeviceModels === "") {
@@ -190,10 +193,7 @@ export async function createAndroidAppProtectionPolicy(
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
   // Recursively clean the policy to remove all OData metadata
-  const policyBody = cleanAppProtectionPolicyRecursively(policy, true) as AppProtectionPolicy;
-
-  // Remove root-level id
-  delete policyBody.id;
+  const policyBody = cleanAppProtectionPolicyRecursively(policy) as AppProtectionPolicy;
 
   // Ensure the hydration marker is in the description
   policyBody.description = addHydrationMarker(policyBody.description);
@@ -202,6 +202,9 @@ export async function createAndroidAppProtectionPolicy(
   delete policyBody.apps;
   delete policyBody.assignments;
   delete policyBody.targetedAppManagementLevels;
+
+  // Remove internal platform tag (used for delete operations only)
+  delete (policyBody as Record<string, unknown>)._platform;
 
   // Remove empty Android device manufacturer allowlist (per PowerShell script logic)
   if (policyBody.allowedAndroidDeviceManufacturers === "") {

@@ -74,6 +74,7 @@ describe('reporter', () => {
         timestamp: new Date('2024-01-15T10:00:07Z'),
       },
     ],
+    warnings: [],
   }
 
   describe('generateMarkdownReport', () => {
@@ -241,7 +242,7 @@ describe('reporter', () => {
       const lines = csv.split('\n')
 
       expect(lines[0]).toBe(
-        'Category,Item Name,Operation,Status,Error,Start Time,End Time,Duration (ms)'
+        'Category,Item Name,Operation,Status,Error,Warning,Start Time,End Time,Duration (ms)'
       )
     })
 

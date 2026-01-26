@@ -15,7 +15,7 @@ export * from "./enrollment";
  */
 export const TEMPLATE_METADATA = {
   groups: {
-    displayName: "Dynamic Groups",
+    displayName: "Entra Groups",
     description: "Azure AD dynamic groups for device categorization (43 dynamic + 4 static)",
     count: 47,
     icon: "Users",

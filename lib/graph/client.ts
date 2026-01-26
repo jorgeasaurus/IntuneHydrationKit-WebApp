@@ -3,6 +3,7 @@ import { getGraphEndpoint } from "@/lib/auth/msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
 import { GraphResponse } from "@/types/graph";
 import { retryWithBackoff } from "@/lib/utils/retry";
+import { BatchRequest, BatchResult } from "./batch";
 
 /**
  * Microsoft Graph API client with retry logic
@@ -58,7 +59,8 @@ export class GraphClient {
         // Failed to parse error response
       }
 
-      const error = new Error(errorMessage) as Error & { status: number };
+      // Always include status code in error message for proper error handling
+      const error = new Error(`[${response.status}] ${errorMessage}`) as Error & { status: number };
       error.status = response.status;
       throw error;
     }
@@ -136,6 +138,25 @@ export class GraphClient {
   }
 
   /**
+   * POST request WITHOUT retry - use for operations where retry could create duplicates
+   * (e.g., compliance policies that timeout but actually succeed)
+   */
+  async postNoRetry<T>(
+    endpoint: string,
+    data: unknown,
+    version: "v1.0" | "beta" = "beta"
+  ): Promise<T> {
+    const url = `${this.baseUrl}/${version}${endpoint}`;
+    const headers = await this.getHeaders();
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(data),
+    });
+    return this.handleResponse<T>(response);
+  }
+
+  /**
    * PATCH request to Graph API
    */
   async patch<T>(
@@ -177,6 +198,42 @@ export class GraphClient {
       }
 
       return this.handleResponse<void>(response);
+    });
+  }
+
+  /**
+   * Execute a batch request against the Graph API $batch endpoint
+   * All requests in a batch must use the same API version
+   * Microsoft Graph supports up to 20 requests per batch
+   *
+   * @param requests - Array of batch requests (max 20)
+   * @param version - API version (v1.0 or beta) - all requests must use same version
+   * @returns BatchResult with responses for each request
+   */
+  async batch(
+    requests: BatchRequest[],
+    version: "v1.0" | "beta" = "beta"
+  ): Promise<BatchResult> {
+    if (requests.length === 0) {
+      return { responses: [] };
+    }
+
+    if (requests.length > 20) {
+      throw new Error(`Batch size exceeds maximum of 20 requests (got ${requests.length})`);
+    }
+
+    const url = `${this.baseUrl}/${version}/$batch`;
+
+    console.log(`[GraphClient] Executing batch with ${requests.length} requests (${version})`);
+
+    return retryWithBackoff(async () => {
+      const headers = await this.getHeaders();
+      const response = await fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ requests }),
+      });
+      return this.handleResponse<BatchResult>(response);
     });
   }
 }

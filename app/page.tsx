@@ -90,7 +90,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto">
-            Deploy up to 930 Microsoft Intune best-practice policies, groups, filters, and more.
+            Deploy up to 921 Microsoft Intune best-practice policies, groups, filters, and more.
             Select only what you need. Zero hassle.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
@@ -317,7 +317,7 @@ export default function Home() {
                   <ul className="space-y-3 text-sm text-muted-foreground flex-1">
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
-                      <AnimatedCounter value={806} className="font-medium" /> Settings Catalog policies
+                      <AnimatedCounter value={798} className="font-medium" /> Settings Catalog policies
                     </li>
                     <li className="flex items-center gap-2">
                       <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
@@ -333,7 +333,7 @@ export default function Home() {
                     </li>
                   </ul>
                   <div className="mt-4 pt-4 border-t border-border/50">
-                    <AnimatedCounter value={812} className="text-2xl font-bold text-primary" />
+                    <AnimatedCounter value={805} className="text-2xl font-bold text-primary" />
                     <span className="text-sm text-muted-foreground ml-2">total profiles</span>
                   </div>
                 </div>
@@ -360,7 +360,7 @@ export default function Home() {
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <AnimatedCounter value={12} className="font-medium" /> App Protection
+                        <AnimatedCounter value={10} className="font-medium" /> App Protection
                       </li>
                     </ul>
                   </div>

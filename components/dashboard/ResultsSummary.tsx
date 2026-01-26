@@ -165,7 +165,7 @@ export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
                     {categoryTasks.map((task) => (
                       <div
                         key={task.id}
-                        className={`flex items-center gap-2 p-2 rounded text-sm ${
+                        className={`flex items-start gap-2 p-2 rounded text-sm ${
                           task.status === "success"
                             ? "text-green-700 dark:text-green-300"
                             : task.status === "skipped"
@@ -176,13 +176,18 @@ export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
                         }`}
                       >
                         {task.status === "success" ? (
-                          <CheckCircle2 className="h-3 w-3 flex-shrink-0" />
+                          <CheckCircle2 className="h-3 w-3 flex-shrink-0 mt-0.5" />
                         ) : task.status === "skipped" ? (
-                          <MinusCircle className="h-3 w-3 flex-shrink-0" />
+                          <MinusCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
                         ) : task.status === "failed" ? (
-                          <XCircle className="h-3 w-3 flex-shrink-0" />
+                          <XCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
                         ) : null}
-                        <span className="truncate">{task.itemName}</span>
+                        <div className="flex-1 min-w-0">
+                          <span className="truncate block">{task.itemName}</span>
+                          {task.error && (task.status === "skipped" || task.status === "failed") && (
+                            <span className="text-xs opacity-75 block mt-0.5">{task.error}</span>
+                          )}
+                        </div>
                       </div>
                     ))}
                   </div>

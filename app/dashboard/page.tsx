@@ -22,6 +22,7 @@ export default function DashboardPage() {
     startTime,
     endTime,
     summary,
+    batchProgress,
     startExecution,
     pause,
     resume,
@@ -130,6 +131,7 @@ export default function DashboardPage() {
               isPaused={isPaused}
               isCompleted={isCompleted}
               startTime={startTime}
+              batchProgress={batchProgress}
               onPause={isRunning && !isPaused ? pause : undefined}
               onResume={isRunning && isPaused ? resume : undefined}
               onCancel={isRunning ? cancel : undefined}

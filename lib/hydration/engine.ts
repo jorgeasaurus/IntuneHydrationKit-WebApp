@@ -5,7 +5,7 @@
 
 import { GraphClient } from "@/lib/graph/client";
 import { hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
-import { HydrationTask, OperationMode, TaskCategory, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
+import { HydrationTask, OperationMode, TaskCategory, CISCategoryId, BaselineSelection, CategorySelections, BatchProgress } from "@/types/hydration";
 import {
   DeviceGroup,
   DeviceFilter,
@@ -46,6 +46,8 @@ import {
   EnrollmentProfile,
 } from "@/lib/graph/enrollment";
 import * as Templates from "@/templates";
+import { getBatchConfig } from "@/lib/config/batchConfig";
+import { executeTasksInBatches, executeDeleteTasksInBatches, isBatchableCategory } from "@/lib/hydration/batchExecutor";
 import {
   fetchDynamicGroups,
   fetchStaticGroups,
@@ -80,6 +82,7 @@ export interface ExecutionContext {
   onTaskStart?: (task: HydrationTask) => void;
   onTaskComplete?: (task: HydrationTask) => void;
   onTaskError?: (task: HydrationTask, error: Error) => void;
+  onBatchProgress?: (progress: BatchProgress) => void;
   shouldCancel?: () => boolean;
   shouldPause?: () => boolean;
   // Pre-fetched data caches to avoid repeated API calls
@@ -90,6 +93,10 @@ export interface ExecutionContext {
   cachedSettingsCatalogPolicies?: Array<{ id: string; name: string; description?: string }>;
   // Cached Driver Update Profiles for delete operations
   cachedDriverUpdateProfiles?: Array<{ id: string; displayName: string; description?: string }>;
+  // Cached compliance policies for delete operations
+  cachedCompliancePolicies?: Array<{ id: string; displayName?: string; description?: string }>;
+  // Cached conditional access policies for delete operations
+  cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; description?: string }>;
   // License flags for conditional skipping
   hasPremiumP2License?: boolean;
   hasWindowsDriverUpdateLicense?: boolean;
@@ -459,22 +466,80 @@ async function executeComplianceTask(
       };
     }
 
-    // Create the policy
-    const created = await createCompliancePolicy(client, template);
-    return {
-      task,
-      success: true,
-      skipped: false,
-      createdId: created.id,
-    };
+    // Create the policy with 504 verification
+    try {
+      const created = await createCompliancePolicy(client, template);
+      return {
+        task,
+        success: true,
+        skipped: false,
+        createdId: created.id,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Check if it's a 504 timeout error
+      if (errorMessage.includes("504") || errorMessage.includes("Gateway Timeout")) {
+        console.log(`[Engine:Compliance] Got 504 for "${template.displayName}", verifying if policy was created...`);
+
+        // Wait for async creation to complete
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Check if policy was actually created despite 504
+        const wasCreated = await compliancePolicyExists(client, template.displayName);
+        if (wasCreated) {
+          console.log(`[Engine:Compliance] Policy "${template.displayName}" was created despite 504 - marking as success`);
+          // Get the policy ID
+          const policies = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
+            "/deviceManagement/deviceCompliancePolicies"
+          );
+          const createdPolicy = policies?.value?.find(
+            p => p.displayName?.toLowerCase() === template.displayName.toLowerCase()
+          );
+          return {
+            task,
+            success: true,
+            skipped: false,
+            createdId: createdPolicy?.id,
+          };
+        }
+
+        console.log(`[Engine:Compliance] Policy "${template.displayName}" not found after 504 - creation failed`);
+      }
+
+      return {
+        task,
+        success: false,
+        skipped: false,
+        error: errorMessage,
+      };
+    }
   } else if (mode === "delete") {
-    // Delete the policy
+    // Delete the policy with 504 verification
     try {
       await deleteCompliancePolicyByName(client, template.displayName);
       return { task, success: true, skipped: false };
     } catch (error) {
-      // Policy not found or not created by hydration kit - skip
       const errorMessage = error instanceof Error ? error.message : String(error);
+
+      // Check if it's a 504 timeout error
+      if (errorMessage.includes("504") || errorMessage.includes("Gateway Timeout")) {
+        console.log(`[Engine:Compliance] Got 504 for delete of "${template.displayName}", verifying if policy was deleted...`);
+
+        // Wait for async deletion to complete
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Check if policy was actually deleted despite 504
+        const stillExists = await compliancePolicyExists(client, template.displayName);
+        if (!stillExists) {
+          console.log(`[Engine:Compliance] Policy "${template.displayName}" was deleted despite 504 - marking as success`);
+          return { task, success: true, skipped: false };
+        }
+
+        console.log(`[Engine:Compliance] Policy "${template.displayName}" still exists after 504 - deletion failed`);
+      }
+
+      // Policy not found or not created by hydration kit - skip
       return { task, success: true, skipped: true, error: errorMessage };
     }
   }
@@ -878,7 +943,7 @@ function cleanSettingInstance(obj: unknown): unknown {
  * Clean a Settings Catalog policy for creation
  * Removes metadata fields that shouldn't be sent when creating
  */
-function cleanSettingsCatalogPolicy(policy: Record<string, unknown>): Record<string, unknown> {
+export function cleanSettingsCatalogPolicy(policy: Record<string, unknown>): Record<string, unknown> {
   // Ensure hydration marker in description
   const description = addHydrationMarker(policy.description as string | undefined);
 
@@ -974,11 +1039,8 @@ async function createDeviceConfigurationPolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy before sending
-  const cleanedPolicy = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
-
-  // Remove root-level id
-  delete cleanedPolicy.id;
+  // Clean the policy before sending (removes id, OData metadata, read-only fields)
+  const cleanedPolicy = cleanPolicyRecursively(policy) as Record<string, unknown>;
 
   // Ensure hydration marker in description
   cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
@@ -996,8 +1058,10 @@ async function createDriverUpdateProfile(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  const cleanedPolicy = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
-  delete cleanedPolicy.id;
+  // Clean the policy before sending (removes id, OData metadata, read-only fields)
+  const cleanedPolicy = cleanPolicyRecursively(policy) as Record<string, unknown>;
+
+  // Ensure hydration marker in description
   cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
 
   return client.post<{ id: string }>(
@@ -1028,13 +1092,13 @@ async function compliancePolicyExistsByName(
  * Recursively clean an object by removing OData metadata and other fields that Graph API rejects
  * Keeps @odata.type but removes all other @odata.* properties, ids, timestamps, etc.
  */
-function cleanPolicyRecursively(obj: unknown, isRoot: boolean = true): unknown {
+export function cleanPolicyRecursively(obj: unknown): unknown {
   if (obj === null || obj === undefined) {
     return obj;
   }
 
   if (Array.isArray(obj)) {
-    return obj.map((item) => cleanPolicyRecursively(item, false));
+    return obj.map((item) => cleanPolicyRecursively(item));
   }
 
   if (typeof obj === "object") {
@@ -1059,6 +1123,12 @@ function cleanPolicyRecursively(obj: unknown, isRoot: boolean = true): unknown {
       "isAssigned",
       // Assignment-related (handled separately if needed)
       "assignments",
+      // Driver Update Profile read-only fields
+      "deviceReporting",
+      "newUpdates",
+      "inventorySyncStatus",
+      // ID should always be removed when creating new resources
+      "id",
     ];
 
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
@@ -1072,18 +1142,13 @@ function cleanPolicyRecursively(obj: unknown, isRoot: boolean = true): unknown {
         continue;
       }
 
-      // Skip id fields in nested objects (but keep at root level if needed)
-      if (key === "id" && !isRoot) {
-        continue;
-      }
-
       // Skip properties starting with # (OData actions)
       if (key.startsWith("#")) {
         continue;
       }
 
       // Recursively clean nested objects and arrays
-      cleaned[key] = cleanPolicyRecursively(value, false);
+      cleaned[key] = cleanPolicyRecursively(value);
     }
 
     return cleaned;
@@ -1099,7 +1164,7 @@ async function createBaselineCompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+  const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
   delete cleaned.id;
 
   return client.post<{ id: string }>(
@@ -1116,7 +1181,7 @@ async function createCISCompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+  const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
 
   // Remove id and CIS-specific metadata
   delete cleaned.id;
@@ -1455,7 +1520,7 @@ async function executeBaselineTask(
 /**
  * CIS policy type enum for routing
  */
-type CISPolicyType =
+export type CISPolicyType =
   | "SettingsCatalog"           // configurationPolicies - Settings Catalog (default)
   | "V2Compliance"              // compliancePolicies - Settings Catalog compliance
   | "V1Compliance"              // deviceCompliancePolicies - Legacy compliance
@@ -1466,7 +1531,7 @@ type CISPolicyType =
 /**
  * Detect the CIS policy type from the template's @odata.type and properties
  */
-function detectCISPolicyType(template: Record<string, unknown>): CISPolicyType {
+export function detectCISPolicyType(template: Record<string, unknown>): CISPolicyType {
   const odataType = (template["@odata.type"] as string || "").toLowerCase();
 
   // Security Intents (deprecated security baselines) - NOT supported for creation
@@ -1527,7 +1592,7 @@ async function createV2CompliancePolicy(
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
   // Clean the policy recursively
-  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+  const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
 
   // Remove root-level id and CIS metadata
   delete cleaned.id;
@@ -1598,7 +1663,7 @@ async function createCISDeviceConfiguration(
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
   // Clean the policy recursively
-  const cleaned = cleanPolicyRecursively(policy, true) as Record<string, unknown>;
+  const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
 
   // Remove root-level id and CIS metadata
   delete cleaned.id;
@@ -1762,13 +1827,16 @@ async function executeCISBaselineTask(
             `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(policyName)}'`
           );
           if (!v2Response.value || v2Response.value.length === 0) {
-            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+            console.log(`[CIS Baseline Task] V2 Compliance policy "${policyName}" not found in tenant`);
+            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
           }
           const v2Policy = v2Response.value[0];
           if (!hasHydrationMarker(v2Policy.description)) {
-            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+            console.log(`[CIS Baseline Task] V2 Compliance policy "${v2Policy.name}" exists but was not created by Intune Hydration Kit`);
+            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
           }
           await client.delete(`/deviceManagement/compliancePolicies/${v2Policy.id}`);
+          console.log(`[CIS Baseline Task] Deleted V2 Compliance policy: "${policyName}"`);
           return { task, success: true, skipped: false };
 
         case "V1Compliance":
@@ -1777,13 +1845,16 @@ async function executeCISBaselineTask(
             `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(policyName)}'`
           );
           if (!v1Response.value || v1Response.value.length === 0) {
-            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+            console.log(`[CIS Baseline Task] V1 Compliance policy "${policyName}" not found in tenant`);
+            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
           }
           const v1Policy = v1Response.value[0];
           if (!hasHydrationMarker(v1Policy.description)) {
-            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+            console.log(`[CIS Baseline Task] V1 Compliance policy "${v1Policy.displayName}" exists but was not created by Intune Hydration Kit`);
+            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
           }
           await client.delete(`/deviceManagement/deviceCompliancePolicies/${v1Policy.id}`);
+          console.log(`[CIS Baseline Task] Deleted V1 Compliance policy: "${policyName}"`);
           return { task, success: true, skipped: false };
 
         case "DeviceConfiguration":
@@ -1792,13 +1863,16 @@ async function executeCISBaselineTask(
             `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(policyName)}'`
           );
           if (!dcResponse.value || dcResponse.value.length === 0) {
-            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+            console.log(`[CIS Baseline Task] Device Configuration policy "${policyName}" not found in tenant`);
+            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
           }
           const dcPolicy = dcResponse.value[0];
           if (!hasHydrationMarker(dcPolicy.description)) {
-            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+            console.log(`[CIS Baseline Task] Device Configuration policy "${dcPolicy.displayName}" exists but was not created by Intune Hydration Kit`);
+            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
           }
           await client.delete(`/deviceManagement/deviceConfigurations/${dcPolicy.id}`);
+          console.log(`[CIS Baseline Task] Deleted Device Configuration policy: "${policyName}"`);
           return { task, success: true, skipped: false };
 
         case "SettingsCatalog":
@@ -1815,17 +1889,32 @@ async function executeCISBaselineTask(
           }
 
           // Find matching policy by name (case-insensitive)
-          const policy = allPolicies.find(
+          let policy = allPolicies.find(
             (p) => p.name?.toLowerCase() === policyName.toLowerCase()
           );
+
+          // If not found by exact name match, try partial match as fallback
           if (!policy) {
-            return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+            console.log(`[CIS Baseline Task] Policy "${policyName}" not found by exact match, trying partial match...`);
+            policy = allPolicies.find(
+              (p) => p.name?.toLowerCase().includes(policyName.toLowerCase()) ||
+                     policyName.toLowerCase().includes(p.name?.toLowerCase() || "")
+            );
+            if (policy) {
+              console.log(`[CIS Baseline Task] Found partial match: "${policy.name}" for "${policyName}"`);
+            }
+          }
+
+          if (!policy) {
+            console.log(`[CIS Baseline Task] Policy "${policyName}" not found in ${allPolicies.length} cached policies`);
+            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
           }
 
           console.log(`[CIS Baseline Task] Found Settings Catalog policy: "${policy.name}" (ID: ${policy.id})`);
 
           if (!hasHydrationMarker(policy.description)) {
-            return { task, success: true, skipped: true, error: "Policy not created by Intune Hydration Kit" };
+            console.log(`[CIS Baseline Task] Policy "${policy.name}" exists but was not created by Intune Hydration Kit (no marker in description)`);
+            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
           }
 
           // Check and clear assignments if present
@@ -1945,11 +2034,49 @@ export async function executeTasks(
     }
   }
 
-  // Pre-fetch Settings Catalog policies for DELETE mode (baseline and CIS tasks)
-  // This avoids calling getCollection for every single delete operation
+  // Pre-fetch Conditional Access policies for DELETE mode or CREATE mode with batching
+  const hasConditionalAccessTasks = tasks.some((task) => task.category === "conditionalAccess");
+  if (hasConditionalAccessTasks && !context.cachedConditionalAccessPolicies) {
+    console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
+    try {
+      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string; state: string }> }>(
+        `/identity/conditionalAccess/policies`
+      );
+      context.cachedConditionalAccessPolicies = response.value || [];
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`);
+    } catch (error) {
+      console.error("[Execute Tasks] Failed to pre-fetch Conditional Access policies:", error);
+      context.cachedConditionalAccessPolicies = [];
+    }
+  }
+
+  // Pre-fetch Compliance policies for batch mode (CREATE or DELETE)
+  // This enables duplicate detection and prevents creating duplicates in batch mode
+  const hasComplianceTasks = tasks.some((task) => task.category === "compliance");
   const hasCISTasks = tasks.some((task) => task.category === "cisBaseline");
-  if (context.operationMode === "delete" && (hasBaselineTasks || hasCISTasks) && !context.cachedSettingsCatalogPolicies) {
-    console.log("[Execute Tasks] Pre-fetching all Settings Catalog policies for delete operations...");
+  const batchConfig = getBatchConfig();
+
+  if (hasComplianceTasks && batchConfig.enableBatching && !context.cachedCompliancePolicies) {
+    console.log("[Execute Tasks] Pre-fetching all Compliance policies for duplicate detection...");
+    try {
+      context.cachedCompliancePolicies = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
+        `/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description`
+      );
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedCompliancePolicies.length} Compliance policies`);
+    } catch (error) {
+      console.error("[Execute Tasks] Failed to pre-fetch Compliance policies:", error);
+      context.cachedCompliancePolicies = [];
+    }
+  }
+
+  // Pre-fetch Settings Catalog policies for DELETE mode or CREATE mode with batching (baseline and CIS tasks)
+  // This avoids calling getCollection for every single operation and enables duplicate detection in batch mode
+  const needsSettingsCatalogCache =
+    (context.operationMode === "delete" && (hasBaselineTasks || hasCISTasks)) ||
+    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
+
+  if (needsSettingsCatalogCache && !context.cachedSettingsCatalogPolicies) {
+    console.log("[Execute Tasks] Pre-fetching all Settings Catalog policies for duplicate detection...");
     try {
       context.cachedSettingsCatalogPolicies = await context.client.getCollection<{ id: string; name: string; description?: string }>(
         `/deviceManagement/configurationPolicies?$select=id,name,description`
@@ -1976,6 +2103,139 @@ export async function executeTasks(
     }
   }
 
+  // Check if batch execution is enabled and applicable
+  const useCreateBatching = batchConfig.enableBatching && context.operationMode === "create";
+  const useDeleteBatching = batchConfig.enableBatching && context.operationMode === "delete";
+
+  if (useCreateBatching) {
+    console.log(`[Execute Tasks] Batch CREATE execution enabled (batch size: ${batchConfig.defaultBatchSize})`);
+
+    // Separate batchable from non-batchable tasks
+    const batchableTasks = tasks.filter((t) => isBatchableCategory(t.category));
+    const nonBatchableTasks = tasks.filter((t) => !isBatchableCategory(t.category));
+
+    console.log(`[Execute Tasks] ${batchableTasks.length} batchable tasks, ${nonBatchableTasks.length} require sequential execution`);
+
+    // Execute batchable tasks first
+    if (batchableTasks.length > 0) {
+      const batchResults = await executeTasksInBatches(batchableTasks, context);
+
+      // Process batch results - some may need sequential fallback
+      for (const result of batchResults) {
+        if (result.error === "NEEDS_SEQUENTIAL_EXECUTION") {
+          // This task couldn't be batched, add to sequential queue
+          nonBatchableTasks.push(result.task);
+        } else {
+          results.push(result);
+
+          // Stop on first error if configured
+          if (context.stopOnFirstError && !result.success && !result.skipped) {
+            console.log("[Execute Tasks] Stopping on first error");
+            return results;
+          }
+        }
+      }
+    }
+
+    // Execute non-batchable tasks sequentially
+    for (const task of nonBatchableTasks) {
+      // Check for cancellation before starting task
+      if (context.shouldCancel?.()) {
+        console.log("[Execute Tasks] Execution cancelled by user");
+        task.status = "skipped";
+        task.error = "Cancelled by user";
+        results.push({ task, success: false, skipped: true, error: "Cancelled by user" });
+        continue;
+      }
+
+      // Handle pause
+      while (context.shouldPause?.()) {
+        console.log("[Execute Tasks] Execution paused, waiting...");
+        await sleep(500);
+      }
+
+      const result = await executeTask(task, context);
+      results.push(result);
+
+      // Stop on first error if configured
+      if (context.stopOnFirstError && !result.success && !result.skipped) {
+        break;
+      }
+
+      // Add delay between tasks to avoid API throttling
+      if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
+        await sleep(TASK_DELAY_MS);
+      }
+    }
+
+    return results;
+  }
+
+  if (useDeleteBatching) {
+    console.log(`[Execute Tasks] Batch DELETE execution enabled (batch size: ${batchConfig.defaultBatchSize})`);
+
+    // Separate batchable from non-batchable tasks
+    const batchableTasks = tasks.filter((t) => isBatchableCategory(t.category));
+    const nonBatchableTasks = tasks.filter((t) => !isBatchableCategory(t.category));
+
+    console.log(`[Execute Tasks] ${batchableTasks.length} batchable tasks, ${nonBatchableTasks.length} require sequential execution`);
+
+    // Execute batchable DELETE tasks first
+    if (batchableTasks.length > 0) {
+      const batchResults = await executeDeleteTasksInBatches(batchableTasks, context);
+
+      // Process batch results - some may need sequential fallback
+      for (const result of batchResults) {
+        if (result.error === "NEEDS_SEQUENTIAL_EXECUTION") {
+          // This task couldn't be batched, add to sequential queue
+          nonBatchableTasks.push(result.task);
+        } else {
+          results.push(result);
+
+          // Stop on first error if configured
+          if (context.stopOnFirstError && !result.success && !result.skipped) {
+            console.log("[Execute Tasks] Stopping on first error");
+            return results;
+          }
+        }
+      }
+    }
+
+    // Execute non-batchable tasks sequentially
+    for (const task of nonBatchableTasks) {
+      // Check for cancellation before starting task
+      if (context.shouldCancel?.()) {
+        console.log("[Execute Tasks] Execution cancelled by user");
+        task.status = "skipped";
+        task.error = "Cancelled by user";
+        results.push({ task, success: false, skipped: true, error: "Cancelled by user" });
+        continue;
+      }
+
+      // Handle pause
+      while (context.shouldPause?.()) {
+        console.log("[Execute Tasks] Execution paused, waiting...");
+        await sleep(500);
+      }
+
+      const result = await executeTask(task, context);
+      results.push(result);
+
+      // Stop on first error if configured
+      if (context.stopOnFirstError && !result.success && !result.skipped) {
+        break;
+      }
+
+      // Add delay between tasks to avoid API throttling
+      if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
+        await sleep(TASK_DELAY_MS);
+      }
+    }
+
+    return results;
+  }
+
+  // Sequential execution (PREVIEW mode or batching disabled)
   for (const task of tasks) {
     // Check for cancellation before starting task
     if (context.shouldCancel?.()) {
@@ -2350,8 +2610,31 @@ export async function buildTaskQueueAsync(
     }
   }
 
-  console.log(`[Task Queue] ✓ Task queue built successfully with ${tasks.length} total tasks`);
-  return tasks;
+  // Deduplicate tasks by itemName within each category to prevent multiple creations/deletions
+  // This handles cases where templates might have duplicate displayNames or where the same
+  // policy appears in multiple template sources
+  const seenItems = new Map<string, Set<string>>(); // category -> set of itemNames
+  const deduplicatedTasks = tasks.filter((task) => {
+    if (!seenItems.has(task.category)) {
+      seenItems.set(task.category, new Set());
+    }
+    const categoryItems = seenItems.get(task.category)!;
+    const lowerName = task.itemName.toLowerCase();
+    if (categoryItems.has(lowerName)) {
+      console.log(`[Task Queue] Removed duplicate: "${task.itemName}" (${task.category})`);
+      return false;
+    }
+    categoryItems.add(lowerName);
+    return true;
+  });
+
+  const duplicateCount = tasks.length - deduplicatedTasks.length;
+  if (duplicateCount > 0) {
+    console.log(`[Task Queue] Removed ${duplicateCount} duplicate task(s)`);
+  }
+
+  console.log(`[Task Queue] ✓ Task queue built successfully with ${deduplicatedTasks.length} total tasks`);
+  return deduplicatedTasks;
 }
 
 /**

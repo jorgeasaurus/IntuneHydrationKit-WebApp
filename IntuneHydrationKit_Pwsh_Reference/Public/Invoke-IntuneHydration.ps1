@@ -61,6 +61,11 @@ function Invoke-IntuneHydration {
         Process mobile app templates
     .PARAMETER All
         Enable all targets
+    .PARAMETER Platform
+        Filter imports by platform. Valid values: Windows, macOS, iOS, Android, Linux, All.
+        Defaults to 'All' which imports resources for all platforms.
+        This affects: ComplianceTemplates, DeviceFilters, AppProtection, MobileApps, EnrollmentProfiles, OpenIntuneBaseline.
+        Cross-platform resources (DynamicGroups, StaticGroups, ConditionalAccess, NotificationTemplates) are not filtered.
     .PARAMETER BaselineRepoUrl
         GitHub repository URL for OpenIntuneBaseline
     .PARAMETER BaselineBranch
@@ -190,10 +195,17 @@ function Invoke-IntuneHydration {
         [Parameter(ParameterSetName = 'ServicePrincipal')]
         [switch]$All,
 
+        # Platform filter - available for all parameter sets
+        [Parameter(ParameterSetName = 'SettingsFile')]
+        [Parameter(ParameterSetName = 'Interactive')]
+        [Parameter(ParameterSetName = 'ServicePrincipal')]
+        [ValidateSet('Windows', 'macOS', 'iOS', 'Android', 'Linux', 'All')]
+        [string[]]$Platform = @('All'),
+
         # OpenIntuneBaseline parameters - available for parameter-based modes only
         [Parameter(ParameterSetName = 'Interactive')]
         [Parameter(ParameterSetName = 'ServicePrincipal')]
-        [string]$BaselineRepoUrl = "https://github.com/SkipToTheEndpoint/OpenIntuneBaseline",
+        [string]$BaselineRepoUrl = "https://github.com/jorgeasaurus/OpenIntuneBaseline",
 
         [Parameter(ParameterSetName = 'Interactive')]
         [Parameter(ParameterSetName = 'ServicePrincipal')]
@@ -239,6 +251,13 @@ function Invoke-IntuneHydration {
             }
             # Set force option from parameter, preserving any existing force setting from settings file
             $settings.options.force = $Force.IsPresent -or ($settings.options.ContainsKey('force') -and $settings.options.force)
+
+            # Set platforms - command-line parameter takes precedence over settings file
+            if ($Platform -and $Platform -notcontains 'All') {
+                $settings['platforms'] = $Platform
+            } elseif (-not $settings.platforms) {
+                $settings['platforms'] = @('All')
+            }
         } else {
             # Parameter-based mode - build settings from parameters
             Write-Host "Using parameter-based configuration" -InformationAction Continue
@@ -291,6 +310,7 @@ function Invoke-IntuneHydration {
                     outputPath = if ($ReportOutputPath) { $ReportOutputPath } else { $null }
                     formats    = if ($ReportFormats) { $ReportFormats } else { @('markdown') }
                 }
+                platforms          = if ($Platform) { $Platform } else { @('All') }
             }
         }
 
@@ -304,6 +324,57 @@ function Invoke-IntuneHydration {
         Write-Host ($settings.options | Out-String) -InformationAction Continue
         Write-Host "Imports Enabled:" -InformationAction Continue
         Write-Host ($settings.imports | Out-String) -InformationAction Continue
+        Write-Host "Platform Filter: $($settings.platforms -join ', ')" -InformationAction Continue
+
+        # Build filtered platform lists for each import function based on what they support
+        # Helper function to filter platforms by valid set
+        function Get-ValidPlatforms {
+            param([string[]]$ValidSet)
+            if ($settings.platforms -contains 'All') { return @('All') }
+            $valid = $settings.platforms | Where-Object { $_ -in $ValidSet }
+            if ($valid.Count -eq 0) { return @('All') }
+            return $valid
+        }
+
+        # Helper function to load group definitions from template directory
+        function Get-GroupDefinitionsFromTemplates {
+            param(
+                [string]$TemplatePath,
+                [string[]]$Platforms
+            )
+            if (-not (Test-Path -Path $TemplatePath)) {
+                return $null
+            }
+
+            $allGroupDefs = @()
+            $templateFiles = Get-ChildItem -Path $TemplatePath -Filter "*.json" -File
+            foreach ($templateFile in $templateFiles) {
+                $content = Get-Content -Path $templateFile.FullName -Raw | ConvertFrom-Json
+                $groups = if ($content.groups) { $content.groups } else { @($content) }
+                $allGroupDefs += $groups
+            }
+
+            # Filter by platform
+            $filtered = $allGroupDefs | Where-Object {
+                $platform = if ($_.platform) { $_.platform } else { 'All' }
+                ($Platforms -contains 'All') -or ($platform -eq 'All') -or ($platform -in $Platforms)
+            }
+
+            return @{
+                All      = $allGroupDefs
+                Filtered = @($filtered)
+            }
+        }
+
+        $platformFilters = @{
+            Compliance         = Get-ValidPlatforms -ValidSet @('Windows', 'macOS', 'iOS', 'Android', 'Linux')
+            DeviceFilters      = Get-ValidPlatforms -ValidSet @('Windows', 'macOS', 'iOS', 'Android')
+            AppProtection      = Get-ValidPlatforms -ValidSet @('iOS', 'Android')
+            MobileApps         = Get-ValidPlatforms -ValidSet @('Windows', 'macOS')
+            EnrollmentProfiles = Get-ValidPlatforms -ValidSet @('Windows', 'macOS')
+            Baseline           = Get-ValidPlatforms -ValidSet @('Windows', 'macOS', 'iOS', 'Android')
+            Groups             = Get-ValidPlatforms -ValidSet @('Windows', 'macOS', 'iOS', 'Android')
+        }
 
         # Apply options from settings
         $createEnabled = $settings.options.create -eq $true
@@ -392,67 +463,32 @@ function Invoke-IntuneHydration {
             $stepAction = if ($RemoveExisting) { "Deleting" } else { "Creating" }
             Write-HydrationLog -Message "Step 3: $stepAction Dynamic Groups" -Level Info
 
-            # Delete existing dynamic groups if RemoveExisting is set
-            # SAFETY: Only delete groups that have "Imported by Intune Hydration Kit" in description
             if ($RemoveExisting) {
-
-                try {
-                    # Get all dynamic groups with descriptions
-                    $listUri = "beta/groups?`$filter=groupTypes/any(c:c eq 'DynamicMembership')&`$select=id,displayName,description"
-                    do {
-                        $existingGroups = Invoke-MgGraphRequest -Method GET -Uri $listUri -ErrorAction Stop
-                        foreach ($group in $existingGroups.value) {
-                            # Safety check: Only delete if created by this kit (has hydration marker in description)
-                            if (-not (Test-HydrationKitObject -Description $group.description -ObjectName $group.displayName)) {
-                                Write-Verbose "Skipping '$($group.displayName)' - not created by Intune-Hydration-Kit"
-                                continue
-                            }
-
-                            if ($PSCmdlet.ShouldProcess($group.displayName, "Delete dynamic group")) {
-                                try {
-                                    Invoke-MgGraphRequest -Method DELETE -Uri "beta/groups/$($group.id)" -ErrorAction Stop
-                                    Write-HydrationLog -Message "  Deleted: $($group.displayName)" -Level Info
-                                    $allResults += New-HydrationResult -Type 'DynamicGroup' -Name $group.displayName -Action 'Deleted' -Status 'Success'
-                                } catch {
-                                    Write-HydrationLog -Message "Failed to delete group '$($group.displayName)': $_" -Level Warning
-                                    $allResults += New-HydrationResult -Type 'DynamicGroup' -Name $group.displayName -Action 'Failed' -Status $_.Exception.Message
-                                }
-                            } else {
-                                $allResults += New-HydrationResult -Type 'DynamicGroup' -Name $group.displayName -Action 'WouldDelete' -Status 'DryRun'
-                            }
-                        }
-                        $listUri = $existingGroups.'@odata.nextLink'
-                    } while ($listUri)
-                } catch {
-                    Write-HydrationLog -Message "Failed to list dynamic groups: $_" -Level Warning
+                $deleteResults = Invoke-GroupBatchImport -GroupType 'Dynamic' -Delete -WhatIf:$WhatIfPreference
+                $allResults += $deleteResults
+                foreach ($result in $deleteResults) {
+                    if ($result.Name) {
+                        Write-HydrationLog -Message "  $($result.Action): $($result.Name)" -Level Info
+                    }
                 }
             } else {
-                # Normal create mode
-                $groupsTemplatePath = Join-Path -Path $moduleRoot -ChildPath 'Templates/DynamicGroups'
+                $templatePath = Join-Path -Path $moduleRoot -ChildPath 'Templates/DynamicGroups'
+                $groupData = Get-GroupDefinitionsFromTemplates -TemplatePath $templatePath -Platforms $platformFilters.Groups
 
-                if (Test-Path -Path $groupsTemplatePath) {
-                    $groupTemplates = Get-ChildItem -Path $groupsTemplatePath -Filter "*.json" -File
-
-                    # Collect all groups from templates
-                    $allGroupDefs = @()
-                    foreach ($templateFile in $groupTemplates) {
-                        $templateContent = Get-Content -Path $templateFile.FullName -Raw | ConvertFrom-Json
-
-                        # Handle templates with multiple groups
-                        $groups = if ($templateContent.groups) { $templateContent.groups } else { @($templateContent) }
-                        $allGroupDefs += $groups
+                if ($null -eq $groupData) {
+                    Write-HydrationLog -Message "Dynamic Groups template directory not found" -Level Warning
+                } else {
+                    if ($groupData.Filtered.Count -lt $groupData.All.Count) {
+                        Write-HydrationLog -Message "  Filtered to $($groupData.Filtered.Count) of $($groupData.All.Count) groups based on platform selection: $($platformFilters.Groups -join ', ')" -Level Info
                     }
 
-                    foreach ($groupDef in $allGroupDefs) {
-                        if ($PSCmdlet.ShouldProcess($groupDef.displayName, "Create dynamic group")) {
-                            $groupResult = New-IntuneDynamicGroup -DisplayName $groupDef.displayName -Description $groupDef.description -MembershipRule $groupDef.membershipRule
-
-                            $allResults += New-HydrationResult -Type 'DynamicGroup' -Name $groupDef.displayName -Action $groupResult.Action -Id $groupResult.Id -Details $groupResult.Reason
-                            Write-HydrationLog -Message "  $($groupResult.Action): $($groupDef.displayName)" -Level Info
+                    $groupResults = Invoke-GroupBatchImport -GroupDefinitions $groupData.Filtered -GroupType 'Dynamic' -WhatIf:$WhatIfPreference
+                    $allResults += $groupResults
+                    foreach ($result in $groupResults) {
+                        if ($result.Name) {
+                            Write-HydrationLog -Message "  $($result.Action): $($result.Name)" -Level Info
                         }
                     }
-                } else {
-                    Write-HydrationLog -Message "Dynamic Groups template directory not found" -Level Warning
                 }
             }
         }
@@ -462,68 +498,32 @@ function Invoke-IntuneHydration {
             $stepAction = if ($RemoveExisting) { "Deleting" } else { "Creating" }
             Write-HydrationLog -Message "Step 3b: $stepAction Static Groups" -Level Info
 
-            # Delete existing static groups if RemoveExisting is set
-            # SAFETY: Only delete groups that have "Imported by Intune Hydration Kit" in description
             if ($RemoveExisting) {
-                try {
-                    # Get all security groups (non-dynamic) with hydration kit marker in description
-                    # Note: Using ConsistencyLevel header and $count for advanced query with NOT operator
-                    $listUri = "beta/groups?`$filter=securityEnabled eq true and NOT groupTypes/any(c:c eq 'DynamicMembership')&`$select=id,displayName,description&`$count=true"
-                    $headers = @{ 'ConsistencyLevel' = 'eventual' }
-                    do {
-                        $existingGroups = Invoke-MgGraphRequest -Method GET -Uri $listUri -Headers $headers -ErrorAction Stop
-                        foreach ($group in $existingGroups.value) {
-                            # Safety check: Only delete if created by this kit (has hydration marker in description)
-                            if (-not (Test-HydrationKitObject -Description $group.description -ObjectName $group.displayName)) {
-                                Write-Verbose "Skipping '$($group.displayName)' - not created by Intune-Hydration-Kit"
-                                continue
-                            }
-
-                            if ($PSCmdlet.ShouldProcess($group.displayName, "Delete static group")) {
-                                try {
-                                    Invoke-MgGraphRequest -Method DELETE -Uri "beta/groups/$($group.id)" -ErrorAction Stop
-                                    Write-HydrationLog -Message "  Deleted: $($group.displayName)" -Level Info
-                                    $allResults += New-HydrationResult -Type 'StaticGroup' -Name $group.displayName -Action 'Deleted' -Status 'Success'
-                                } catch {
-                                    Write-HydrationLog -Message "Failed to delete group '$($group.displayName)': $_" -Level Warning
-                                    $allResults += New-HydrationResult -Type 'StaticGroup' -Name $group.displayName -Action 'Failed' -Status $_.Exception.Message
-                                }
-                            } else {
-                                $allResults += New-HydrationResult -Type 'StaticGroup' -Name $group.displayName -Action 'WouldDelete' -Status 'DryRun'
-                            }
-                        }
-                        $listUri = $existingGroups.'@odata.nextLink'
-                    } while ($listUri)
-                } catch {
-                    Write-HydrationLog -Message "Failed to list static groups: $_" -Level Warning
+                $deleteResults = Invoke-GroupBatchImport -GroupType 'Static' -Delete -WhatIf:$WhatIfPreference
+                $allResults += $deleteResults
+                foreach ($result in $deleteResults) {
+                    if ($result.Name) {
+                        Write-HydrationLog -Message "  $($result.Action): $($result.Name)" -Level Info
+                    }
                 }
             } else {
-                # Normal create mode
-                $staticGroupsTemplatePath = Join-Path -Path $moduleRoot -ChildPath 'Templates/StaticGroups'
+                $templatePath = Join-Path -Path $moduleRoot -ChildPath 'Templates/StaticGroups'
+                $groupData = Get-GroupDefinitionsFromTemplates -TemplatePath $templatePath -Platforms $platformFilters.Groups
 
-                if (Test-Path -Path $staticGroupsTemplatePath) {
-                    $groupTemplates = Get-ChildItem -Path $staticGroupsTemplatePath -Filter "*.json" -File
-
-                    # Collect all groups from templates
-                    $allGroupDefs = @()
-                    foreach ($templateFile in $groupTemplates) {
-                        $templateContent = Get-Content -Path $templateFile.FullName -Raw | ConvertFrom-Json
-
-                        # Handle templates with multiple groups
-                        $groups = if ($templateContent.groups) { $templateContent.groups } else { @($templateContent) }
-                        $allGroupDefs += $groups
+                if ($null -eq $groupData) {
+                    Write-HydrationLog -Message "Static Groups template directory not found" -Level Warning
+                } else {
+                    if ($groupData.Filtered.Count -lt $groupData.All.Count) {
+                        Write-HydrationLog -Message "  Filtered to $($groupData.Filtered.Count) of $($groupData.All.Count) groups based on platform selection: $($platformFilters.Groups -join ', ')" -Level Info
                     }
 
-                    foreach ($groupDef in $allGroupDefs) {
-                        if ($PSCmdlet.ShouldProcess($groupDef.displayName, "Create static group")) {
-                            $groupResult = New-IntuneStaticGroup -DisplayName $groupDef.displayName -Description $groupDef.description
-
-                            $allResults += New-HydrationResult -Type 'StaticGroup' -Name $groupDef.displayName -Action $groupResult.Action -Id $groupResult.Id -Details $groupResult.Reason
-                            Write-HydrationLog -Message "  $($groupResult.Action): $($groupDef.displayName)" -Level Info
+                    $groupResults = Invoke-GroupBatchImport -GroupDefinitions $groupData.Filtered -GroupType 'Static' -WhatIf:$WhatIfPreference
+                    $allResults += $groupResults
+                    foreach ($result in $groupResults) {
+                        if ($result.Name) {
+                            Write-HydrationLog -Message "  $($result.Action): $($result.Name)" -Level Info
                         }
                     }
-                } else {
-                    Write-HydrationLog -Message "Static Groups template directory not found" -Level Warning
                 }
             }
         }
@@ -533,7 +533,7 @@ function Invoke-IntuneHydration {
             $stepAction = if ($RemoveExisting) { "Deleting" } else { "Creating" }
             Write-HydrationLog -Message "Step 4: $stepAction Device Filters" -Level Info
 
-            $filterResults = Import-IntuneDeviceFilter -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
+            $filterResults = Import-IntuneDeviceFilter -Platform $platformFilters.DeviceFilters -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
             $allResults += $filterResults
         }
 
@@ -551,6 +551,7 @@ function Invoke-IntuneHydration {
             # Import function handles ShouldProcess internally for each policy
             $baselineParams['RemoveExisting'] = $RemoveExisting
             $baselineParams['WhatIf'] = $WhatIfPreference
+            $baselineParams['Platform'] = $platformFilters.Baseline
             $baselineResults = Import-IntuneBaseline @baselineParams
             $allResults += $baselineResults
         }
@@ -560,7 +561,7 @@ function Invoke-IntuneHydration {
             $stepAction = if ($RemoveExisting) { "Deleting" } else { "Importing" }
             Write-HydrationLog -Message "Step 6: $stepAction Compliance templates" -Level Info
 
-            $complianceResults = Import-IntuneCompliancePolicy -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
+            $complianceResults = Import-IntuneCompliancePolicy -Platform $platformFilters.Compliance -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
             $allResults += $complianceResults
         }
 
@@ -578,7 +579,7 @@ function Invoke-IntuneHydration {
             $stepAction = if ($RemoveExisting) { "Deleting" } else { "Importing" }
             Write-HydrationLog -Message "Step 8: $stepAction App Protection policies" -Level Info
 
-            $mamResults = Import-IntuneAppProtectionPolicy -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
+            $mamResults = Import-IntuneAppProtectionPolicy -Platform $platformFilters.AppProtection -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
             $allResults += $mamResults
         }
 
@@ -587,7 +588,7 @@ function Invoke-IntuneHydration {
             $stepAction = if ($RemoveExisting) { "Deleting" } else { "Importing" }
             Write-HydrationLog -Message "Step 9: $stepAction Enrollment Profiles" -Level Info
 
-            $enrollmentResults = Import-IntuneEnrollmentProfile -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
+            $enrollmentResults = Import-IntuneEnrollmentProfile -Platform $platformFilters.EnrollmentProfiles -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
             $allResults += $enrollmentResults
         }
 
@@ -605,7 +606,7 @@ function Invoke-IntuneHydration {
             $stepAction = if ($RemoveExisting) { "Deleting" } else { "Importing" }
             Write-HydrationLog -Message "Step 11: $stepAction Mobile Apps" -Level Info
 
-            $mobileAppResults = Import-IntuneMobileApp -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
+            $mobileAppResults = Import-IntuneMobileApp -Platform $platformFilters.MobileApps -RemoveExisting:$RemoveExisting -WhatIf:$WhatIfPreference
             $allResults += $mobileAppResults
         }
 
@@ -756,29 +757,22 @@ function Invoke-IntuneHydration {
         }
         Write-Host "----------------------------------------" -InformationAction Continue
 
-        # Return summary object instead of exiting (functions shouldn't call exit)
+        # Log completion status
         if ($summary.Failed -gt 0) {
             Write-HydrationLog -Message "Completed with $($summary.Failed) failures" -Level Warning
-            return @{
-                Success = $false
-                Summary = $summary
-                Results = $allResults
-                ReportPath = $reportPath
-                JsonReportPath = $jsonReportPath
-            }
+        } elseif ($WhatIfPreference) {
+            Write-HydrationLog -Message "Dry-run completed: $($summary.WouldCreate) would create, $($summary.WouldUpdate) would update, $($summary.WouldDelete) would delete, $($summary.Skipped) skipped" -Level Info
         } else {
-            if ($WhatIfPreference) {
-                Write-HydrationLog -Message "Dry-run completed: $($summary.WouldCreate) would create, $($summary.WouldUpdate) would update, $($summary.WouldDelete) would delete, $($summary.Skipped) skipped" -Level Info
-            } else {
-                Write-HydrationLog -Message "Completed successfully: $($summary.Created) created, $($summary.Updated) updated, $($summary.Deleted) deleted, $($summary.Skipped) skipped" -Level Info
-            }
-            return @{
-                Success = $true
-                Summary = $summary
-                Results = $allResults
-                ReportPath = $reportPath
-                JsonReportPath = $jsonReportPath
-            }
+            Write-HydrationLog -Message "Completed successfully: $($summary.Created) created, $($summary.Updated) updated, $($summary.Deleted) deleted, $($summary.Skipped) skipped" -Level Info
+        }
+
+        # Return summary object (functions shouldn't call exit)
+        return @{
+            Success        = $summary.Failed -eq 0
+            Summary        = $summary
+            Results        = $allResults
+            ReportPath     = $reportPath
+            JsonReportPath = $jsonReportPath
         }
     } catch {
         Write-HydrationLog -Message "Fatal error: $_" -Level Error

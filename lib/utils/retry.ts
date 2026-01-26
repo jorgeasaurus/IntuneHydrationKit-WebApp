@@ -10,7 +10,7 @@ export interface RetryOptions {
 }
 
 const DEFAULT_RETRY_OPTIONS: Required<RetryOptions> = {
-  maxRetries: 3,
+  maxRetries: 5,
   initialDelay: 1000, // 1 second
   maxDelay: 30000, // 30 seconds
   backoffMultiplier: 2,

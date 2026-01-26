@@ -166,6 +166,7 @@ export const mockSummary: HydrationSummary = {
       timestamp: new Date('2024-01-01T10:02:30Z'),
     },
   ],
+  warnings: [],
 }
 
 // Template mocks

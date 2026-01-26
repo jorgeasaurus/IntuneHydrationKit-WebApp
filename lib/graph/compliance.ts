@@ -227,7 +227,9 @@ export async function createCompliancePolicy(
     }
   }
 
-  return client.post<CompliancePolicy>(
+  // Use postNoRetry to avoid duplicate creation on 504 timeout
+  // Compliance policy creation often returns 504 but the policy IS created
+  return client.postNoRetry<CompliancePolicy>(
     "/deviceManagement/deviceCompliancePolicies",
     policyBody
   );
