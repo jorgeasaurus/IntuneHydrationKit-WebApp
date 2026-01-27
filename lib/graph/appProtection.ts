@@ -125,6 +125,22 @@ function cleanAppProtectionPolicyRecursively(obj: unknown): unknown {
       "deployedAppCount",
       // ID should always be removed (new policies get their own ID)
       "id",
+      // Deprecated or read-only properties that cause API errors
+      "fingerprintAndBiometricEnabled",
+      "mobileThreatDefensePartnerPriority",
+      "gracePeriodToBlockAppsDuringOffClockHours",
+      "appActionIfDevicePasscodeComplexityLessThanLow",
+      "appActionIfDevicePasscodeComplexityLessThanHigh",
+      // Navigation/computed properties from OIB templates
+      "apps",
+      "assignments",
+      "deploymentSummary",
+      "targetedAppManagementLevels",
+      // Custom display name properties that are computed
+      "customBrowserDisplayName",
+      "customDialerAppDisplayName",
+      // Internal platform tag (used for delete operations only)
+      "_platform",
     ];
 
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
@@ -160,19 +176,8 @@ export async function createiOSAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
-  // Recursively clean the policy to remove all OData metadata
   const policyBody = cleanAppProtectionPolicyRecursively(policy) as AppProtectionPolicy;
-
-  // Ensure the hydration marker is in the description
   policyBody.description = addHydrationMarker(policyBody.description);
-
-  // Remove read-only properties (per PowerShell script logic)
-  delete policyBody.apps;
-  delete policyBody.assignments;
-  delete policyBody.targetedAppManagementLevels;
-
-  // Remove internal platform tag (used for delete operations only)
-  delete (policyBody as Record<string, unknown>)._platform;
 
   // Remove empty iOS device model allowlist (per PowerShell script logic)
   if (policyBody.allowedIosDeviceModels === "") {
@@ -192,19 +197,8 @@ export async function createAndroidAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
-  // Recursively clean the policy to remove all OData metadata
   const policyBody = cleanAppProtectionPolicyRecursively(policy) as AppProtectionPolicy;
-
-  // Ensure the hydration marker is in the description
   policyBody.description = addHydrationMarker(policyBody.description);
-
-  // Remove read-only properties (per PowerShell script logic)
-  delete policyBody.apps;
-  delete policyBody.assignments;
-  delete policyBody.targetedAppManagementLevels;
-
-  // Remove internal platform tag (used for delete operations only)
-  delete (policyBody as Record<string, unknown>)._platform;
 
   // Remove empty Android device manufacturer allowlist (per PowerShell script logic)
   if (policyBody.allowedAndroidDeviceManufacturers === "") {

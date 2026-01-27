@@ -390,11 +390,43 @@ function buildBaselineRequestBody(
   if (!template) return null;
 
   const policyName = (template.name || template.displayName) as string;
-  const policyType = detectCISPolicyType(template as Record<string, unknown>);
 
-  // Only batch SettingsCatalog, DeviceConfiguration, and V2Compliance
+  // Use _oibPolicyType from manifest for OIB baselines, fallback to detection
+  const oibPolicyType = template._oibPolicyType as string | undefined;
+
+  // Map OIB policy types to batch-compatible types
+  let policyType: string;
+  if (oibPolicyType) {
+    // OIB manifest provides explicit policy type
+    switch (oibPolicyType) {
+      case "SettingsCatalog":
+        policyType = "SettingsCatalog";
+        break;
+      case "DeviceConfiguration":
+      case "UpdatePolicies": // WUfB rings use deviceConfigurations endpoint
+        policyType = "DeviceConfiguration";
+        break;
+      case "DriverUpdateProfiles":
+        policyType = "DriverUpdateProfiles";
+        break;
+      case "V2Compliance":
+        policyType = "V2Compliance";
+        break;
+      default:
+        // Fall back to detection for unknown types
+        policyType = detectCISPolicyType(template as Record<string, unknown>);
+    }
+    console.log(`[BatchExecutor] OIB policy "${policyName}" type from manifest: ${oibPolicyType} -> ${policyType}`);
+  } else {
+    // No OIB type set, use detection (shouldn't happen for OIB)
+    policyType = detectCISPolicyType(template as Record<string, unknown>);
+    console.log(`[BatchExecutor] OIB policy "${policyName}" type detected: ${policyType}`);
+  }
+
+  // Only batch SettingsCatalog, DeviceConfiguration, DriverUpdateProfiles, and V2Compliance
   // Other types require special handling
   if (policyType === "Unsupported" || policyType === "SecurityIntent" || policyType === "V1Compliance") {
+    console.log(`[BatchExecutor] Skipping "${policyName}" - unsupported type for batching: ${policyType}`);
     return null;
   }
 
@@ -403,7 +435,32 @@ function buildBaselineRequestBody(
     const existingPolicy = context.cachedSettingsCatalogPolicies?.find(
       (p) => p.name?.toLowerCase() === policyName.toLowerCase()
     );
-    if (existingPolicy) return null; // Skip - already exists
+    if (existingPolicy) {
+      console.log(`[BatchExecutor] SettingsCatalog/V2Compliance already exists, skipping: "${policyName}"`);
+      return null; // Skip - already exists
+    }
+  }
+
+  // Check if DeviceConfiguration already exists
+  if (policyType === "DeviceConfiguration") {
+    const existingConfig = context.cachedDeviceConfigurations?.find(
+      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase()
+    );
+    if (existingConfig) {
+      console.log(`[BatchExecutor] DeviceConfiguration already exists, skipping: "${policyName}"`);
+      return null; // Skip - already exists
+    }
+  }
+
+  // Check if DriverUpdateProfile already exists
+  if (policyType === "DriverUpdateProfiles") {
+    const existingProfile = context.cachedDriverUpdateProfiles?.find(
+      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase()
+    );
+    if (existingProfile) {
+      console.log(`[BatchExecutor] DriverUpdateProfile already exists, skipping: "${policyName}"`);
+      return null; // Skip - already exists
+    }
   }
 
   // Build the appropriate request body
@@ -422,6 +479,12 @@ function buildBaselineRequestBody(
       endpoint = CATEGORY_ENDPOINTS.deviceConfiguration;
       break;
 
+    case "DriverUpdateProfiles":
+      body = cleanPolicyRecursively(template) as Record<string, unknown>;
+      body.description = addHydrationMarker(body.description as string | undefined);
+      endpoint = CATEGORY_ENDPOINTS.driverUpdate;
+      break;
+
     case "V2Compliance":
       body = cleanPolicyRecursively(template) as Record<string, unknown>;
       body.description = addHydrationMarker(body.description as string | undefined);
@@ -429,6 +492,7 @@ function buildBaselineRequestBody(
       break;
 
     default:
+      console.log(`[BatchExecutor] No batch handler for type: ${policyType}`);
       return null;
   }
 
@@ -484,6 +548,17 @@ function buildCISBaselineRequestBody(
       (p) => p.name?.toLowerCase() === policyName.toLowerCase()
     );
     if (existingPolicy) return null; // Skip - already exists
+  }
+
+  // Check if DeviceConfiguration already exists
+  if (policyType === "DeviceConfiguration") {
+    const existingConfig = context.cachedDeviceConfigurations?.find(
+      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase()
+    );
+    if (existingConfig) {
+      console.log(`[BatchExecutor] CIS DeviceConfiguration already exists, skipping: "${policyName}"`);
+      return null; // Skip - already exists
+    }
   }
 
   // Build the appropriate request body
@@ -946,6 +1021,11 @@ type DeletePrepareResult =
   | { type: "sequential" };
 
 /**
+ * Endpoint type for baseline policies (determines delete URL)
+ */
+type BaselineEndpointType = "settingsCatalog" | "v2Compliance" | "v1Compliance" | "deviceConfiguration" | "driverUpdate";
+
+/**
  * Find resource ID for deletion by name
  * For Settings Catalog policies, the task.itemName may be from displayName in the template,
  * but the policy was created with 'name' field. We search by name match.
@@ -953,7 +1033,7 @@ type DeletePrepareResult =
 function findResourceIdForDelete(
   task: HydrationTask,
   context: ExecutionContext
-): { id: string; hasMarker: boolean } | null {
+): { id: string; hasMarker: boolean; endpointType?: BaselineEndpointType } | null {
   const nameToFind = task.itemName.toLowerCase();
 
   switch (task.category) {
@@ -979,37 +1059,97 @@ function findResourceIdForDelete(
 
     case "baseline":
     case "cisBaseline": {
-      // Settings Catalog policies use 'name' field internally, but task.itemName may be
-      // from template's displayName. Search by exact match first, then case-insensitive.
-      // The policy was created with 'name: template.name || template.displayName', so
-      // we need to match against the name field.
+      // First check Settings Catalog policies
       let policy = context.cachedSettingsCatalogPolicies?.find(
         (p) => p.name?.toLowerCase() === nameToFind
       );
 
-      // If not found by exact name match, the policy might have been created with a slightly
-      // different name format. Log available policies for debugging.
       if (!policy) {
-        console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found by exact name match.`);
-        console.log(`[BatchExecutor:DELETE] Searching ${context.cachedSettingsCatalogPolicies?.length || 0} cached Settings Catalog policies...`);
-
-        // Try partial match (contains) as a fallback - some policies may have extra prefixes/suffixes
+        // Try partial match for Settings Catalog
         policy = context.cachedSettingsCatalogPolicies?.find(
           (p) => p.name?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.name?.toLowerCase() || "")
         );
-
-        if (policy) {
-          console.log(`[BatchExecutor:DELETE] Found partial match: "${policy.name}" for "${task.itemName}"`);
-        }
       }
 
       if (policy?.id) {
         const hasMarker = hasHydrationMarker(policy.description);
-        console.log(`[BatchExecutor:DELETE] Found policy "${policy.name}" (ID: ${policy.id}), hasMarker: ${hasMarker}`);
-        return { id: policy.id, hasMarker };
+        console.log(`[BatchExecutor:DELETE] Found Settings Catalog policy "${policy.name}" (ID: ${policy.id}), hasMarker: ${hasMarker}`);
+        return { id: policy.id, hasMarker, endpointType: "settingsCatalog" };
       }
 
-      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in ${context.cachedSettingsCatalogPolicies?.length || 0} cached Settings Catalog policies`);
+      // If not found in Settings Catalog, check V2 Compliance policies (OIB compliance)
+      let v2Policy = context.cachedV2CompliancePolicies?.find(
+        (p) => p.name?.toLowerCase() === nameToFind
+      );
+
+      if (!v2Policy) {
+        // Try partial match for V2 Compliance
+        v2Policy = context.cachedV2CompliancePolicies?.find(
+          (p) => p.name?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.name?.toLowerCase() || "")
+        );
+      }
+
+      if (v2Policy?.id) {
+        const hasMarker = hasHydrationMarker(v2Policy.description);
+        console.log(`[BatchExecutor:DELETE] Found V2 Compliance policy "${v2Policy.name}" (ID: ${v2Policy.id}), hasMarker: ${hasMarker}`);
+        return { id: v2Policy.id, hasMarker, endpointType: "v2Compliance" };
+      }
+
+      // If not found in V2 Compliance, check V1 Compliance policies (OIB compliance uses deviceCompliancePolicies endpoint)
+      let v1Policy = context.cachedCompliancePolicies?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind
+      );
+
+      if (!v1Policy) {
+        // Try partial match for V1 Compliance
+        v1Policy = context.cachedCompliancePolicies?.find(
+          (p) => p.displayName?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.displayName?.toLowerCase() || "")
+        );
+      }
+
+      if (v1Policy?.id) {
+        const hasMarker = hasHydrationMarker(v1Policy.description);
+        console.log(`[BatchExecutor:DELETE] Found V1 Compliance policy "${v1Policy.displayName}" (ID: ${v1Policy.id}), hasMarker: ${hasMarker}`);
+        return { id: v1Policy.id, hasMarker, endpointType: "v1Compliance" };
+      }
+
+      // If not found in V1 Compliance, check Device Configurations (Health Monitoring, etc.)
+      let deviceConfig = context.cachedDeviceConfigurations?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind
+      );
+
+      if (!deviceConfig) {
+        // Try partial match for Device Configurations
+        deviceConfig = context.cachedDeviceConfigurations?.find(
+          (p) => p.displayName?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.displayName?.toLowerCase() || "")
+        );
+      }
+
+      if (deviceConfig?.id) {
+        const hasMarker = hasHydrationMarker(deviceConfig.description);
+        console.log(`[BatchExecutor:DELETE] Found Device Configuration "${deviceConfig.displayName}" (ID: ${deviceConfig.id}), hasMarker: ${hasMarker}`);
+        return { id: deviceConfig.id, hasMarker, endpointType: "deviceConfiguration" };
+      }
+
+      // If not found in Device Configurations, check Driver Update Profiles
+      let driverProfile = context.cachedDriverUpdateProfiles?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind
+      );
+
+      if (!driverProfile) {
+        // Try partial match for Driver Update Profiles
+        driverProfile = context.cachedDriverUpdateProfiles?.find(
+          (p) => p.displayName?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.displayName?.toLowerCase() || "")
+        );
+      }
+
+      if (driverProfile?.id) {
+        const hasMarker = hasHydrationMarker(driverProfile.description);
+        console.log(`[BatchExecutor:DELETE] Found Driver Update Profile "${driverProfile.displayName}" (ID: ${driverProfile.id}), hasMarker: ${hasMarker}`);
+        return { id: driverProfile.id, hasMarker, endpointType: "driverUpdate" };
+      }
+
+      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), or Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0})`);
       return null;
     }
 
@@ -1050,7 +1190,7 @@ function findResourceIdForDelete(
 /**
  * Get the endpoint for a DELETE request
  */
-function getDeleteEndpoint(category: string, resourceId: string): string {
+function getDeleteEndpoint(category: string, resourceId: string, endpointType?: BaselineEndpointType): string {
   switch (category) {
     case "groups":
       return `/groups/${resourceId}`;
@@ -1062,6 +1202,19 @@ function getDeleteEndpoint(category: string, resourceId: string): string {
       return `/identity/conditionalAccess/policies/${resourceId}`;
     case "baseline":
     case "cisBaseline":
+      // Use the endpoint type to determine the correct URL
+      if (endpointType === "v2Compliance") {
+        return `/deviceManagement/compliancePolicies/${resourceId}`;
+      }
+      if (endpointType === "v1Compliance") {
+        return `/deviceManagement/deviceCompliancePolicies/${resourceId}`;
+      }
+      if (endpointType === "deviceConfiguration") {
+        return `/deviceManagement/deviceConfigurations/${resourceId}`;
+      }
+      if (endpointType === "driverUpdate") {
+        return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}`;
+      }
       return `/deviceManagement/configurationPolicies/${resourceId}`;
     default:
       throw new Error(`Unknown category for delete: ${category}`);
@@ -1095,8 +1248,8 @@ function prepareTaskForDeleteBatch(
   // Determine API version
   const apiVersion: ApiVersion = task.category === "groups" ? "v1.0" : "beta";
 
-  // Build DELETE request
-  const endpoint = getDeleteEndpoint(task.category, resource.id);
+  // Build DELETE request (pass endpointType for baseline/cisBaseline to use correct URL)
+  const endpoint = getDeleteEndpoint(task.category, resource.id, resource.endpointType);
 
   console.log(`[BatchExecutor:DELETE] ✓ Will delete: "${task.itemName}" -> ${endpoint}`);
 
@@ -1380,14 +1533,316 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
 
     case "baseline":
     case "cisBaseline":
+      // Try Settings Catalog first
       if (context.cachedSettingsCatalogPolicies) {
         const index = context.cachedSettingsCatalogPolicies.findIndex(
           (p) => p.name.toLowerCase() === nameToRemove
         );
         if (index !== -1) {
           context.cachedSettingsCatalogPolicies.splice(index, 1);
+          break;
+        }
+      }
+      // If not found in Settings Catalog, try V2 Compliance
+      if (context.cachedV2CompliancePolicies) {
+        const index = context.cachedV2CompliancePolicies.findIndex(
+          (p) => p.name.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedV2CompliancePolicies.splice(index, 1);
+          break;
+        }
+      }
+      // If not found in V2 Compliance, try V1 Compliance
+      if (context.cachedCompliancePolicies) {
+        const index = context.cachedCompliancePolicies.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedCompliancePolicies.splice(index, 1);
+          break;
+        }
+      }
+      // If not found in V1 Compliance, try Device Configurations
+      if (context.cachedDeviceConfigurations) {
+        const index = context.cachedDeviceConfigurations.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedDeviceConfigurations.splice(index, 1);
+          break;
+        }
+      }
+      // If not found in Device Configurations, try Driver Update Profiles
+      if (context.cachedDriverUpdateProfiles) {
+        const index = context.cachedDriverUpdateProfiles.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedDriverUpdateProfiles.splice(index, 1);
         }
       }
       break;
+
+    case "compliance":
+      if (context.cachedCompliancePolicies) {
+        const index = context.cachedCompliancePolicies.findIndex(
+          (c) => c.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedCompliancePolicies.splice(index, 1);
+        }
+      }
+      break;
+
+    case "conditionalAccess":
+      if (context.cachedConditionalAccessPolicies) {
+        const index = context.cachedConditionalAccessPolicies.findIndex(
+          (c) => c.displayName?.toLowerCase() === nameToRemove ||
+                 c.displayName?.toLowerCase() === `${nameToRemove} [intune hydration kit]`
+        );
+        if (index !== -1) {
+          context.cachedConditionalAccessPolicies.splice(index, 1);
+        }
+      }
+      break;
+  }
+}
+
+// ============================================================================
+// FAST PARALLEL DELETE OPERATIONS (NukeTune-style)
+// ============================================================================
+
+/**
+ * Configuration for fast parallel deletion
+ * Based on NukeTune's proven fast deletion pattern
+ * Using conservative settings to avoid 400 errors from overwhelmed backend
+ */
+const FAST_DELETE_CONFIG = {
+  /** Number of concurrent delete requests (NukeTune uses 3) */
+  parallelRequests: 3,
+  /** Delay between batches of parallel requests (ms) (NukeTune uses 300) */
+  delayBetweenBatches: 300,
+};
+
+/**
+ * Execute DELETE tasks in parallel for maximum speed
+ * Uses Promise.all() to send multiple requests concurrently
+ * Based on NukeTune's proven fast deletion pattern
+ */
+export async function executeDeletesInParallel(
+  tasks: HydrationTask[],
+  context: ExecutionContext
+): Promise<ExecutionResult[]> {
+  const results: ExecutionResult[] = [];
+  const { parallelRequests, delayBetweenBatches } = FAST_DELETE_CONFIG;
+
+  console.log(`[FastDelete] Starting parallel deletion of ${tasks.length} tasks (${parallelRequests} concurrent)`);
+
+  // Prepare all tasks first
+  const preparedTasks: Array<{
+    task: HydrationTask;
+    deleteUrl: string | null;
+    apiVersion: "v1.0" | "beta";
+    skipReason?: string;
+  }> = [];
+
+  for (const task of tasks) {
+    const resourceInfo = findResourceIdForDelete(task, context);
+
+    if (!resourceInfo) {
+      preparedTasks.push({
+        task,
+        deleteUrl: null,
+        apiVersion: "beta",
+        skipReason: "Resource not found in tenant",
+      });
+      continue;
+    }
+
+    if (!resourceInfo.hasMarker) {
+      preparedTasks.push({
+        task,
+        deleteUrl: null,
+        apiVersion: "beta",
+        skipReason: "Missing hydration marker - not created by this tool",
+      });
+      continue;
+    }
+
+    // Build delete URL based on category and endpoint type
+    const deleteUrl = buildDeleteUrl(task, resourceInfo);
+    // Groups use v1.0 API, everything else uses beta
+    const apiVersion: "v1.0" | "beta" = task.category === "groups" ? "v1.0" : "beta";
+    preparedTasks.push({ task, deleteUrl, apiVersion });
+  }
+
+  // Count by type
+  const toDelete = preparedTasks.filter((p) => p.deleteUrl);
+  const toSkip = preparedTasks.filter((p) => !p.deleteUrl);
+
+  console.log(`[FastDelete] ${toDelete.length} to delete, ${toSkip.length} to skip`);
+
+  // Process skipped tasks immediately
+  const skipTime = new Date();
+  for (const { task, skipReason } of toSkip) {
+    task.status = "skipped";
+    task.error = skipReason;
+    task.startTime = skipTime;
+    task.endTime = skipTime;
+    results.push({ task, success: false, skipped: true, error: skipReason });
+    context.onTaskComplete?.(task);
+  }
+
+  // Process deletions in parallel batches
+  for (let i = 0; i < toDelete.length; i += parallelRequests) {
+    // Check for cancellation
+    if (context.shouldCancel?.()) {
+      console.log(`[FastDelete] Execution cancelled`);
+      for (let j = i; j < toDelete.length; j++) {
+        const { task } = toDelete[j];
+        task.status = "skipped";
+        task.error = "Cancelled";
+        task.endTime = new Date();
+        results.push({ task, success: false, skipped: true, error: "Cancelled" });
+        context.onTaskComplete?.(task);
+      }
+      break;
+    }
+
+    const batch = toDelete.slice(i, i + parallelRequests);
+    const batchNum = Math.floor(i / parallelRequests) + 1;
+    const totalBatches = Math.ceil(toDelete.length / parallelRequests);
+
+    console.log(`[FastDelete] Processing batch ${batchNum}/${totalBatches} (${batch.length} items)`);
+
+    // Execute all deletes in this batch concurrently with retry logic
+    const batchResults = await Promise.all(
+      batch.map(async ({ task, deleteUrl, apiVersion }) => {
+        task.status = "running";
+        task.startTime = new Date();
+        context.onTaskStart?.(task);
+
+        // Retry logic for transient 400 errors
+        const maxRetries = 3;
+        let lastError: string | undefined;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+          try {
+            await context.client.delete(deleteUrl!, apiVersion);
+
+            task.status = "success";
+            task.endTime = new Date();
+            updateCacheAfterDelete(task, context);
+            context.onTaskComplete?.(task);
+
+            return { task, success: true, skipped: false };
+          } catch (error) {
+            lastError = error instanceof Error ? error.message : String(error);
+
+            // Check if it's a 400 error (transient backend issue)
+            const is400Error = lastError.includes("[400]") || lastError.includes("400");
+            const isRetryable = is400Error && attempt < maxRetries - 1;
+
+            if (isRetryable) {
+              const retryDelay = (attempt + 1) * 500; // 500ms, 1000ms, 1500ms
+              console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms`);
+              await sleep(retryDelay);
+              continue;
+            }
+
+            // Final failure
+            task.status = "failed";
+            task.error = lastError;
+            task.endTime = new Date();
+            context.onTaskError?.(task, error instanceof Error ? error : new Error(lastError));
+
+            return { task, success: false, skipped: false, error: lastError };
+          }
+        }
+
+        // Shouldn't reach here, but handle just in case
+        task.status = "failed";
+        task.error = lastError || "Unknown error after retries";
+        task.endTime = new Date();
+        return { task, success: false, skipped: false, error: task.error };
+      })
+    );
+
+    results.push(...batchResults);
+
+    // Update progress
+    context.onBatchProgress?.({
+      isActive: true,
+      currentBatch: batchNum,
+      totalBatches: totalBatches,
+      itemsInBatch: batch.length,
+      apiVersion: "beta",
+    });
+
+    // Short delay between batches (except for last batch)
+    if (i + parallelRequests < toDelete.length) {
+      await sleep(delayBetweenBatches);
+    }
+  }
+
+  const successCount = results.filter((r) => r.success).length;
+  const failCount = results.filter((r) => !r.success && !r.skipped).length;
+  const skipCount = results.filter((r) => r.skipped).length;
+
+  console.log(`[FastDelete] Complete: ${successCount} deleted, ${failCount} failed, ${skipCount} skipped`);
+
+  return results;
+}
+
+/**
+ * Build the delete URL for a task
+ */
+function buildDeleteUrl(
+  task: HydrationTask,
+  resourceInfo: { id: string; endpointType?: string }
+): string {
+  switch (task.category) {
+    case "groups":
+      return `/groups/${resourceInfo.id}`;
+
+    case "filters":
+      return `/deviceManagement/assignmentFilters/${resourceInfo.id}`;
+
+    case "compliance":
+      return `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
+
+    case "conditionalAccess":
+      return `/identity/conditionalAccess/policies/${resourceInfo.id}`;
+
+    case "appProtection":
+      // App protection policies have different endpoints based on platform
+      // This is handled separately in sequential execution
+      return `/deviceAppManagement/managedAppPolicies/${resourceInfo.id}`;
+
+    case "enrollment":
+      return `/deviceManagement/windowsAutopilotDeploymentProfiles/${resourceInfo.id}`;
+
+    case "baseline":
+    case "cisBaseline":
+      // Use the endpoint type to determine the correct URL
+      switch (resourceInfo.endpointType) {
+        case "settingsCatalog":
+          return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;
+        case "v2Compliance":
+          return `/deviceManagement/compliancePolicies/${resourceInfo.id}`;
+        case "v1Compliance":
+          return `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
+        case "deviceConfiguration":
+          return `/deviceManagement/deviceConfigurations/${resourceInfo.id}`;
+        case "driverUpdate":
+          return `/deviceManagement/windowsDriverUpdateProfiles/${resourceInfo.id}`;
+        default:
+          // Default to Settings Catalog
+          return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;
+      }
+
+    default:
+      return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;
   }
 }

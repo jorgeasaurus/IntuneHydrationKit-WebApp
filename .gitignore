@@ -44,3 +44,7 @@ next-env.d.ts
 .github/instructions/codacy.instructions.md
 ralph.txt
 settings.json
+errors.txt
+ralph*.md
+.playwright-mcp/
+
