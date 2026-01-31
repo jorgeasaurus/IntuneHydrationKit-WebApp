@@ -80,12 +80,30 @@ export class GraphClient {
       throw error;
     }
 
-    // Handle 204 No Content
+    // Handle 204 No Content or 201 Created with empty body
     if (response.status === 204) {
       return {} as T;
     }
 
-    return response.json();
+    // Check Content-Length header or try to parse body safely
+    const contentLength = response.headers.get("Content-Length");
+    if (contentLength === "0") {
+      return {} as T;
+    }
+
+    // Try to read the response text first to handle empty bodies
+    const responseText = await response.text();
+    if (!responseText || responseText.trim() === "") {
+      return {} as T;
+    }
+
+    // Parse the JSON
+    try {
+      return JSON.parse(responseText) as T;
+    } catch {
+      console.warn("[GraphClient] Failed to parse response as JSON, returning empty object");
+      return {} as T;
+    }
   }
 
   /**

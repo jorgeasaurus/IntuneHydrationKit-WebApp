@@ -82,6 +82,8 @@ export async function createDeviceConfigurationPolicy(
 
 /**
  * Create a Driver Update Profile (WUfB Drivers)
+ * Note: The Graph API may return an empty body on success (201 Created)
+ * In that case, we query for the created profile by name to get the ID
  */
 export async function createDriverUpdateProfile(
   client: GraphClient,
@@ -89,14 +91,38 @@ export async function createDriverUpdateProfile(
 ): Promise<{ id: string }> {
   // Clean the policy before sending (removes id, OData metadata, read-only fields)
   const cleanedPolicy = cleanPolicyRecursively(policy) as Record<string, unknown>;
+  const displayName = cleanedPolicy.displayName as string;
 
   // Ensure hydration marker in description
   cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
 
-  return client.post<{ id: string }>(
+  const result = await client.post<{ id?: string }>(
     "/deviceManagement/windowsDriverUpdateProfiles",
     cleanedPolicy
   );
+
+  // If the API returned an ID, use it
+  if (result.id) {
+    return { id: result.id };
+  }
+
+  // Otherwise, query for the created profile by name
+  console.log(`[PolicyCreators] Driver Update Profile created but no ID returned, querying by name: "${displayName}"`);
+  const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
+    `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName`
+  );
+
+  const createdProfile = response.value?.find(
+    (p) => p.displayName.toLowerCase() === displayName.toLowerCase()
+  );
+
+  if (createdProfile) {
+    return { id: createdProfile.id };
+  }
+
+  // If we still can't find it, return empty ID (profile was likely created)
+  console.warn(`[PolicyCreators] Created Driver Update Profile "${displayName}" but could not find ID`);
+  return { id: "" };
 }
 
 /**

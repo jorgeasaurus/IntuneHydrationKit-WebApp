@@ -1236,6 +1236,84 @@ function findResourceIdForDelete(
 }
 
 /**
+ * Get the assignment endpoint for a resource to check if it has active assignments
+ * Returns null for resource types that don't have assignments (groups, filters)
+ */
+function getAssignmentEndpoint(
+  category: string,
+  resourceId: string,
+  endpointType?: BaselineEndpointType
+): string | null {
+  switch (category) {
+    case "groups":
+    case "filters":
+      // Groups and filters don't have assignments - they ARE the assignment targets
+      return null;
+
+    case "conditionalAccess":
+      // CA policies don't have assignments in the traditional sense
+      return null;
+
+    case "compliance":
+      return `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
+
+    case "baseline":
+    case "cisBaseline":
+      switch (endpointType) {
+        case "settingsCatalog":
+          return `/deviceManagement/configurationPolicies/${resourceId}/assignments`;
+        case "v2Compliance":
+          return `/deviceManagement/compliancePolicies/${resourceId}/assignments`;
+        case "v1Compliance":
+          return `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
+        case "deviceConfiguration":
+          return `/deviceManagement/deviceConfigurations/${resourceId}/assignments`;
+        case "driverUpdate":
+          return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}/assignments`;
+        default:
+          return `/deviceManagement/configurationPolicies/${resourceId}/assignments`;
+      }
+
+    case "appProtection":
+      // App protection policies have a different assignment structure
+      return null;
+
+    case "enrollment":
+      return `/deviceManagement/windowsAutopilotDeploymentProfiles/${resourceId}/assignments`;
+
+    default:
+      return null;
+  }
+}
+
+/**
+ * Check if a resource has active assignments
+ * Returns the assignment count, or 0 if assignments can't be checked
+ */
+async function checkResourceAssignments(
+  context: ExecutionContext,
+  category: string,
+  resourceId: string,
+  endpointType?: BaselineEndpointType
+): Promise<number> {
+  const assignmentEndpoint = getAssignmentEndpoint(category, resourceId, endpointType);
+
+  if (!assignmentEndpoint) {
+    // Resource type doesn't have assignments
+    return 0;
+  }
+
+  try {
+    const response = await context.client.get<{ value: Array<{ id: string }> }>(assignmentEndpoint);
+    return response.value?.length ?? 0;
+  } catch (error) {
+    // If we can't check assignments, log and continue (don't block deletion)
+    console.log(`[BatchExecutor:DELETE] Could not check assignments: ${error instanceof Error ? error.message : String(error)}`);
+    return 0;
+  }
+}
+
+/**
  * Get the endpoint for a DELETE request
  */
 function getDeleteEndpoint(category: string, resourceId: string, endpointType?: BaselineEndpointType): string {
@@ -1271,12 +1349,13 @@ function getDeleteEndpoint(category: string, resourceId: string, endpointType?: 
 
 /**
  * Prepare a task for batch DELETE execution
+ * Now async to support assignment checking
  */
-function prepareTaskForDeleteBatch(
+async function prepareTaskForDeleteBatch(
   task: HydrationTask,
   context: ExecutionContext,
   requestId: string
-): DeletePrepareResult {
+): Promise<DeletePrepareResult> {
   console.log(`[BatchExecutor:DELETE] Preparing "${task.itemName}" (${task.category})`);
 
   // Find the resource ID
@@ -1291,6 +1370,18 @@ function prepareTaskForDeleteBatch(
   if (!resource.hasMarker) {
     console.log(`[BatchExecutor:DELETE] ○ No hydration marker: "${task.itemName}"`);
     return { type: "skip", reason: `Not created by Intune Hydration Kit (missing marker in description)` };
+  }
+
+  // Check for active assignments - skip deletion if policy is assigned
+  const assignmentCount = await checkResourceAssignments(
+    context,
+    task.category,
+    resource.id,
+    resource.endpointType
+  );
+  if (assignmentCount > 0) {
+    console.log(`[BatchExecutor:DELETE] ○ Has assignments: "${task.itemName}" (${assignmentCount} assignment(s))`);
+    return { type: "skip", reason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting` };
   }
 
   // Determine API version
@@ -1332,9 +1423,10 @@ export async function executeDeleteTasksInBatches(
   console.log(`[BatchExecutor:DELETE] Preparing ${tasks.length} tasks for batch deletion (batch size: ${config.defaultBatchSize})`);
 
   // Separate tasks into: batchable, skipped, or needs sequential
+  // Assignment checks are async, so we await each prepare
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
-    const prepared = prepareTaskForDeleteBatch(task, context, `del-${i}`);
+    const prepared = await prepareTaskForDeleteBatch(task, context, `del-${i}`);
 
     switch (prepared.type) {
       case "batch":
@@ -1714,6 +1806,23 @@ export async function executeDeletesInParallel(
         deleteUrl: null,
         apiVersion: "beta",
         skipReason: "Missing hydration marker - not created by this tool",
+      });
+      continue;
+    }
+
+    // Check for active assignments - skip deletion if policy is assigned
+    const assignmentCount = await checkResourceAssignments(
+      context,
+      task.category,
+      resourceInfo.id,
+      resourceInfo.endpointType
+    );
+    if (assignmentCount > 0) {
+      preparedTasks.push({
+        task,
+        deleteUrl: null,
+        apiVersion: "beta",
+        skipReason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting`,
       });
       continue;
     }

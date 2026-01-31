@@ -11,7 +11,9 @@ import { useMsal } from "@azure/msal-react";
 import { Button } from "@/components/ui/button";
 import { signOut } from "@/lib/auth/authUtils";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
+import { Home } from "lucide-react";
 
 const STEP_TITLES = [
   "Tenant Configuration",
@@ -66,9 +68,17 @@ function WizardContent() {
               </p>
             </div>
           </div>
-          <Button variant="outline" onClick={handleSignOut}>
-            Sign Out
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/">
+                <Home className="h-4 w-4 mr-2" />
+                Home
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={handleSignOut}>
+              Sign Out
+            </Button>
+          </div>
         </div>
       </header>
 
