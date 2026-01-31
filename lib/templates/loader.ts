@@ -749,7 +749,7 @@ export async function fetchCISBaselinePoliciesByCategories(
 
 /**
  * In-memory fallback cache for when sessionStorage quota is exceeded
- * This happens when selecting all 720+ CIS baseline items
+ * This happens when selecting all 717+ CIS baseline items
  */
 const memoryCache = new Map<string, { templates: unknown[]; timestamp: number; version: number }>();
 

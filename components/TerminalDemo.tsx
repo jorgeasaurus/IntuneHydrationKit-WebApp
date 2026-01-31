@@ -16,7 +16,7 @@ const COMMANDS = [
   { type: "info" as const, message: "Connecting to Microsoft Graph..." },
   { type: "success" as const, message: "Authentication successful" },
   { type: "info" as const, message: "Fetching existing tenant objects..." },
-  { type: "info" as const, message: "Building task queue (930 objects)..." },
+  { type: "info" as const, message: "Building task queue (927 objects)..." },
   { type: "success" as const, message: "Created: Dynamic Group - All Windows Devices" },
   { type: "success" as const, message: "Created: Dynamic Group - All macOS Devices" },
   { type: "success" as const, message: "Created: Device Filter - Corporate Windows" },
@@ -31,8 +31,8 @@ const COMMANDS = [
 ];
 
 const FINAL_STATS = {
-  total: 930,
-  created: 891,
+  total: 927,
+  created: 888,
   skipped: 39,
   failed: 0,
   duration: "8m 42s",

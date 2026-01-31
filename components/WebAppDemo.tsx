@@ -20,7 +20,7 @@ const CATEGORIES = [
   { id: "groups", label: "Dynamic Groups", icon: Users, count: 47 },
   { id: "filters", label: "Device Filters", icon: Filter, count: 24 },
   { id: "compliance", label: "Compliance Policies", icon: Shield, count: 16 },
-  { id: "baseline", label: "Security Baselines", icon: FileCheck, count: 798 },
+  { id: "baseline", label: "Security Baselines", icon: FileCheck, count: 795 },
 ];
 
 const DEPLOYMENT_TASKS = [
@@ -32,8 +32,8 @@ const DEPLOYMENT_TASKS = [
 ];
 
 const FINAL_STATS = {
-  total: 930,
-  created: 891,
+  total: 927,
+  created: 888,
   skipped: 39,
   failed: 0,
 };

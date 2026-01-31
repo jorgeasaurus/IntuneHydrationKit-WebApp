@@ -208,7 +208,7 @@ export function WizardDemo() {
                 <div>
                   <p className="font-semibold">Deployment Complete</p>
                   <p className="text-sm text-muted-foreground">
-                    930 objects created successfully
+                    927 objects created successfully
                   </p>
                 </div>
               </motion.div>

@@ -64,7 +64,7 @@ export function buildTaskQueue(
       case "cisBaseline":
         // CIS Intune Baselines - placeholder for sync version
         // Real data will be fetched in async version
-        items = Array.from({ length: 720 }, (_, i) => ({
+        items = Array.from({ length: 717 }, (_, i) => ({
           displayName: `CIS Baseline Policy ${i + 1}`,
         }));
         break;

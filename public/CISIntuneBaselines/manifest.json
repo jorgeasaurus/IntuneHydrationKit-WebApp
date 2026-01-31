@@ -3897,22 +3897,10 @@
       "displayName": "Baseline -  WHFB Exclude Security Devices TPM 1.2 "
     },
     {
-      "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Endpoint Protection/Baseline - Account Protection.json",
-      "category": "6.0 - Microsoft Endpoint Security Benchmarks",
-      "subcategory": "Microsoft Endpoint Security Benchmarks",
-      "displayName": "Baseline - Account Protection"
-    },
-    {
       "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Endpoint Protection/Baseline - App and Browser Isolation.json",
       "category": "6.0 - Microsoft Endpoint Security Benchmarks",
       "subcategory": "Microsoft Endpoint Security Benchmarks",
       "displayName": "Baseline - App and Browser Isolation"
-    },
-    {
-      "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Bitlocker en Personal Data Encryption/Baseline - Bitlocker Policy.json",
-      "category": "6.0 - Microsoft Endpoint Security Benchmarks",
-      "subcategory": "Microsoft Endpoint Security Benchmarks",
-      "displayName": "Baseline - Bitlocker Policy"
     },
     {
       "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Browser Protection/Baseline - Chrome Microsoft Defender Browser Protection.json",
@@ -3955,12 +3943,6 @@
       "category": "6.0 - Microsoft Endpoint Security Benchmarks",
       "subcategory": "Microsoft Endpoint Security Benchmarks",
       "displayName": "Baseline - Intune Security Baseline -Windows 11"
-    },
-    {
-      "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Firewall/Baseline - MacOS - Firewall.json",
-      "category": "6.0 - Microsoft Endpoint Security Benchmarks",
-      "subcategory": "Microsoft Endpoint Security Benchmarks",
-      "displayName": "Baseline - MacOS - Firewall"
     },
     {
       "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Bitlocker en Personal Data Encryption/Baseline - Personal Data Encryption.json",
