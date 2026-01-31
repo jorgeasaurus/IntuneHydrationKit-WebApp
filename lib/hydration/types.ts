@@ -10,6 +10,7 @@ import {
   DeviceFilter,
   AppProtectionPolicy,
 } from "@/types/graph";
+import { BaselinePolicy } from "@/lib/templates/loader";
 
 /**
  * Task execution context
@@ -40,6 +41,8 @@ export interface ExecutionContext {
   cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached device configurations for delete operations (Health Monitoring, etc.)
   cachedDeviceConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
+  // Cached baseline templates for batch creation (passed directly to avoid cache issues)
+  cachedBaselineTemplates?: BaselinePolicy[];
   // License flags for conditional skipping
   hasPremiumP2License?: boolean;
   hasWindowsDriverUpdateLicense?: boolean;

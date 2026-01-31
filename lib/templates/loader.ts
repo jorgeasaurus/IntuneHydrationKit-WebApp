@@ -271,10 +271,10 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
  */
 export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplate[]> {
   const appProtectionFiles = [
-    "AppProtection/Android - Baseline - BYOD - App Protection.json",
     "AppProtection/Android-App-Protection.json",
-    "AppProtection/iOS - Baseline - BYOD - App Protection.json",
     "AppProtection/iOS-App-Protection.json",
+    "AppProtection/Android - Baseline - BYOD - App Protection.json",
+    "AppProtection/iOS - Baseline - BYOD - App Protection.json",
     "AppProtection/level-1-enterprise-basic-data-protection-Android.json",
     "AppProtection/level-1-enterprise-basic-data-protection-iOS.json",
     "AppProtection/level-2-enterprise-enhanced-data-protection-Android.json",
@@ -415,38 +415,33 @@ const OIB_PATH = "/IntuneTemplates/OpenIntuneBaseline";
 
 /**
  * Parse JSON that may be UTF-16 LE or UTF-8 encoded
+ * Handles BOM markers and tries multiple encodings
  */
 function parseJsonWithEncoding(buffer: ArrayBuffer): unknown {
   const bytes = new Uint8Array(buffer);
 
   // Check for UTF-16 LE BOM (0xFF 0xFE)
   if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
-    // UTF-16 LE with BOM
     const decoder = new TextDecoder("utf-16le");
     const text = decoder.decode(buffer.slice(2));
-    const cleanText = text.replace(/\0/g, "");
-    return JSON.parse(cleanText);
+    return JSON.parse(text.replace(/\0/g, ""));
   }
 
   // Check for UTF-8 BOM (0xEF 0xBB 0xBF)
   if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
-    // UTF-8 with BOM
     const decoder = new TextDecoder("utf-8");
-    const text = decoder.decode(buffer.slice(3));
-    return JSON.parse(text);
+    return JSON.parse(decoder.decode(buffer.slice(3)));
   }
 
   // Try UTF-8 first (most common)
   try {
     const decoder = new TextDecoder("utf-8");
-    const text = decoder.decode(buffer);
-    return JSON.parse(text);
+    return JSON.parse(decoder.decode(buffer));
   } catch {
     // Fallback to UTF-16 LE without BOM
     const decoder = new TextDecoder("utf-16le");
     const text = decoder.decode(buffer);
-    const cleanText = text.replace(/\0/g, "");
-    return JSON.parse(cleanText);
+    return JSON.parse(text.replace(/\0/g, ""));
   }
 }
 
@@ -455,17 +450,15 @@ function parseJsonWithEncoding(buffer: ArrayBuffer): unknown {
  */
 async function fetchOIBFile(filePath: string): Promise<unknown | null> {
   try {
-    const response = await fetch(`${OIB_PATH}/${filePath}`);
+    const encodedPath = filePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
+    const response = await fetch(`${OIB_PATH}/${encodedPath}`);
     if (!response.ok) {
       console.error(`Failed to fetch ${filePath}: ${response.statusText}`);
       return null;
     }
 
-    // Get the raw buffer to handle different encodings
     const buffer = await response.arrayBuffer();
-    const data = parseJsonWithEncoding(buffer);
-
-    return data;
+    return parseJsonWithEncoding(buffer);
   } catch (error) {
     console.error(`Error fetching OIB policy ${filePath}:`, error);
     return null;
@@ -593,47 +586,10 @@ export const CIS_BASELINE_CATEGORIES: CISBaselineCategory[] = [
 const CIS_BASELINES_PATH = "/CISIntuneBaselines";
 
 /**
- * Parse JSON with automatic encoding detection (UTF-16 LE or UTF-8)
- * Handles BOM markers and tries multiple encodings
- */
-function parseJsonWithEncodingForCIS(buffer: ArrayBuffer): unknown {
-  const bytes = new Uint8Array(buffer);
-
-  // Check for UTF-16 LE BOM (0xFF 0xFE)
-  if (bytes[0] === 0xFF && bytes[1] === 0xFE) {
-    const decoder = new TextDecoder("utf-16le");
-    const text = decoder.decode(buffer.slice(2));
-    const cleanText = text.replace(/\0/g, "");
-    return JSON.parse(cleanText);
-  }
-
-  // Check for UTF-8 BOM (0xEF 0xBB 0xBF)
-  if (bytes[0] === 0xEF && bytes[1] === 0xBB && bytes[2] === 0xBF) {
-    const decoder = new TextDecoder("utf-8");
-    const text = decoder.decode(buffer.slice(3));
-    return JSON.parse(text);
-  }
-
-  // Try UTF-8 first (most common)
-  try {
-    const decoder = new TextDecoder("utf-8");
-    const text = decoder.decode(buffer);
-    return JSON.parse(text);
-  } catch {
-    // Fallback to UTF-16 LE without BOM
-    const decoder = new TextDecoder("utf-16le");
-    const text = decoder.decode(buffer);
-    const cleanText = text.replace(/\0/g, "");
-    return JSON.parse(cleanText);
-  }
-}
-
-/**
  * Fetch a single CIS baseline policy from local templates
  */
 async function fetchCISBaselineFile(filePath: string): Promise<unknown | null> {
   try {
-    // URL-encode the file path to handle special characters
     const encodedPath = filePath.split('/').map(segment => encodeURIComponent(segment)).join('/');
     const response = await fetch(`${CIS_BASELINES_PATH}/${encodedPath}`);
     if (!response.ok) {
@@ -641,11 +597,8 @@ async function fetchCISBaselineFile(filePath: string): Promise<unknown | null> {
       return null;
     }
 
-    // Get the raw buffer to handle UTF-16/UTF-8 encoding
     const buffer = await response.arrayBuffer();
-    const data = parseJsonWithEncodingForCIS(buffer);
-
-    return data;
+    return parseJsonWithEncoding(buffer);
   } catch (error) {
     console.error(`Error fetching CIS baseline ${filePath}:`, error);
     return null;
@@ -678,8 +631,8 @@ export async function fetchCISBaselinePolicies(): Promise<CISBaselinePolicy[]> {
         const policyObj = policy as Record<string, unknown>;
         allPolicies.push({
           ...policyObj,
-          // Use displayName from manifest, fallback to policy's name or displayName property
-          displayName: file.displayName || (policyObj.name as string) || (policyObj.displayName as string),
+          // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
+          displayName: (policyObj.name as string) || (policyObj.displayName as string) || file.displayName,
           _cisCategory: file.category,
           _cisSubcategory: file.subcategory,
           _cisFilePath: file.path,
@@ -776,8 +729,8 @@ export async function fetchCISBaselinePoliciesByCategories(
         const policyObj = policy as Record<string, unknown>;
         allPolicies.push({
           ...policyObj,
-          // Use displayName from manifest, fallback to policy's name or displayName property
-          displayName: file.displayName || (policyObj.name as string) || (policyObj.displayName as string),
+          // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
+          displayName: (policyObj.name as string) || (policyObj.displayName as string) || file.displayName,
           _cisCategory: file.category,
           _cisSubcategory: file.subcategory,
           _cisFilePath: file.path,

@@ -16,21 +16,16 @@ import {
 import type { ApiVersion } from "@/lib/graph/batch";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
-import {
-  ExecutionContext,
-  ExecutionResult,
-  detectCISPolicyType,
-  cleanSettingsCatalogPolicy,
-  cleanPolicyRecursively,
-  CISPolicyType,
-} from "./engine";
+import { ExecutionContext, ExecutionResult, CISPolicyType } from "./types";
+import { detectCISPolicyType } from "./policyDetection";
+import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
+import { sleep } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   getCachedTemplates,
   getAllTemplateCacheKeys,
   GroupTemplate,
   FilterTemplate,
-  ComplianceTemplate,
   ConditionalAccessTemplate,
   CISBaselinePolicy,
   BaselinePolicy,
@@ -73,12 +68,6 @@ const CATEGORY_ENDPOINTS: Record<string, string> = {
   v2Compliance: "/deviceManagement/compliancePolicies",
 };
 
-/**
- * Sleep utility
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 /**
  * Verify if a compliance policy was created after a 504 timeout
@@ -295,39 +284,6 @@ function buildFilterRequestBody(task: HydrationTask, context: ExecutionContext):
   };
 }
 
-/**
- * Build request body for a compliance task
- */
-function buildComplianceRequestBody(task: HydrationTask, context: ExecutionContext): BuildBodyResult {
-  const cachedPolicies = getCachedTemplates("compliance");
-  let template: ComplianceTemplate | undefined;
-
-  if (cachedPolicies && Array.isArray(cachedPolicies)) {
-    template = (cachedPolicies as ComplianceTemplate[]).find((p) => p.displayName === task.itemName);
-  }
-
-  if (!template) {
-    template = Templates.getCompliancePolicyByName(task.itemName);
-  }
-
-  if (!template) return { type: "error", reason: "Template not found" };
-
-  // Check if already exists in cache (prevent duplicates)
-  const existingPolicy = context.cachedCompliancePolicies?.find(
-    (p) => p.displayName?.toLowerCase() === template!.displayName.toLowerCase()
-  );
-  if (existingPolicy) {
-    return { type: "skip", reason: "Compliance policy already exists" };
-  }
-
-  return {
-    type: "body",
-    body: {
-      ...template,
-      description: addHydrationMarker(template.description),
-    },
-  };
-}
 
 /**
  * Build request body for a conditional access task
@@ -378,16 +334,28 @@ function buildBaselineRequestBody(
   task: HydrationTask,
   context: ExecutionContext
 ): BaselineRequestResult | null {
-  const cachedPolicies = getCachedTemplates("baseline");
+  // Use templates from context (passed directly from engine) or fallback to global cache
+  const cachedPolicies = context.cachedBaselineTemplates || getCachedTemplates("baseline");
   let template: BaselinePolicy | undefined;
 
+  console.log(`[BatchExecutor:baseline] Looking for "${task.itemName}" in ${cachedPolicies?.length || 0} cached policies (source: ${context.cachedBaselineTemplates ? 'context' : 'global cache'})`);
+
   if (cachedPolicies && Array.isArray(cachedPolicies)) {
+    // Log first few policy names to help debug
+    if (cachedPolicies.length > 0) {
+      const sampleNames = (cachedPolicies as BaselinePolicy[]).slice(0, 3).map(p => p.name || p.displayName);
+      console.log(`[BatchExecutor:baseline] Sample cached names: ${sampleNames.join(', ')}`);
+    }
+
     template = (cachedPolicies as BaselinePolicy[]).find(
       (p) => (p.name || p.displayName) === task.itemName
     );
   }
 
-  if (!template) return null;
+  if (!template) {
+    console.log(`[BatchExecutor:baseline] ✗ No template found for "${task.itemName}"`);
+    return null;
+  }
 
   const policyName = (template.name || template.displayName) as string;
 
@@ -430,32 +398,38 @@ function buildBaselineRequestBody(
     return null;
   }
 
-  // Check if already exists in cache
+  // Check if already exists in cache - use normalizeName to handle punctuation differences
   if (policyType === "SettingsCatalog" || policyType === "V2Compliance") {
+    const normalizedPolicyName = normalizeName(policyName);
     const existingPolicy = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase()
+      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
+             normalizeName(p.name) === normalizedPolicyName
     );
     if (existingPolicy) {
-      console.log(`[BatchExecutor] SettingsCatalog/V2Compliance already exists, skipping: "${policyName}"`);
+      console.log(`[BatchExecutor] SettingsCatalog/V2Compliance already exists, skipping: "${policyName}" (matched: "${existingPolicy.name}")`);
       return null; // Skip - already exists
     }
   }
 
-  // Check if DeviceConfiguration already exists
+  // Check if DeviceConfiguration already exists - use normalizeName to handle punctuation differences
   if (policyType === "DeviceConfiguration") {
+    const normalizedPolicyName = normalizeName(policyName);
     const existingConfig = context.cachedDeviceConfigurations?.find(
-      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase()
+      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase() ||
+             normalizeName(p.displayName) === normalizedPolicyName
     );
     if (existingConfig) {
-      console.log(`[BatchExecutor] DeviceConfiguration already exists, skipping: "${policyName}"`);
+      console.log(`[BatchExecutor] DeviceConfiguration already exists, skipping: "${policyName}" (matched: "${existingConfig.displayName}")`);
       return null; // Skip - already exists
     }
   }
 
-  // Check if DriverUpdateProfile already exists
+  // Check if DriverUpdateProfile already exists - use normalizeName to handle punctuation differences
   if (policyType === "DriverUpdateProfiles") {
+    const normalizedPolicyName = normalizeName(policyName);
     const existingProfile = context.cachedDriverUpdateProfiles?.find(
-      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase()
+      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase() ||
+             normalizeName(p.displayName) === normalizedPolicyName
     );
     if (existingProfile) {
       console.log(`[BatchExecutor] DriverUpdateProfile already exists, skipping: "${policyName}"`);
@@ -542,21 +516,28 @@ function buildCISBaselineRequestBody(
     return null;
   }
 
-  // Check if already exists in cache
+  // Check if already exists in cache - use normalizeName to handle punctuation differences
   if (policyType === "SettingsCatalog" || policyType === "V2Compliance") {
+    const normalizedPolicyName = normalizeName(policyName);
     const existingPolicy = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase()
+      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
+             normalizeName(p.name) === normalizedPolicyName
     );
-    if (existingPolicy) return null; // Skip - already exists
+    if (existingPolicy) {
+      console.log(`[BatchExecutor] CIS SettingsCatalog/V2Compliance already exists, skipping: "${policyName}" (matched: "${existingPolicy.name}")`);
+      return null; // Skip - already exists
+    }
   }
 
-  // Check if DeviceConfiguration already exists
+  // Check if DeviceConfiguration already exists - use normalizeName to handle punctuation differences
   if (policyType === "DeviceConfiguration") {
+    const normalizedPolicyName = normalizeName(policyName);
     const existingConfig = context.cachedDeviceConfigurations?.find(
-      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase()
+      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase() ||
+             normalizeName(p.displayName) === normalizedPolicyName
     );
     if (existingConfig) {
-      console.log(`[BatchExecutor] CIS DeviceConfiguration already exists, skipping: "${policyName}"`);
+      console.log(`[BatchExecutor] CIS DeviceConfiguration already exists, skipping: "${policyName}" (matched: "${existingConfig.displayName}")`);
       return null; // Skip - already exists
     }
   }
@@ -704,6 +685,7 @@ export async function executeTasksInBatches(
     acc[cat] = (acc[cat] || 0) + 1;
     return acc;
   }, {} as Record<string, number>));
+  console.log(`[BatchExecutor] Context cache: baselineTemplates=${context.cachedBaselineTemplates?.length ?? 'not set'}`);
 
   // Separate tasks into: batchable, skipped, or needs sequential
   for (let i = 0; i < tasks.length; i++) {
@@ -1026,6 +1008,30 @@ type DeletePrepareResult =
 type BaselineEndpointType = "settingsCatalog" | "v2Compliance" | "v1Compliance" | "deviceConfiguration" | "driverUpdate";
 
 /**
+ * Normalize a name for comparison by:
+ * - Converting to lowercase
+ * - Removing special characters (colons, quotes, smart quotes, etc.)
+ * - Collapsing multiple spaces to single space
+ * - Trimming whitespace
+ * This helps match policy names that differ only in punctuation
+ * (e.g., filename "Network security LAN Manager" vs policy name "Network security: LAN Manager")
+ */
+function normalizeName(name: string | undefined | null): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    // Replace colons, all types of quotes (straight, curly/smart) with spaces
+    .replace(/[:'""`''""]/g, " ")
+    // Remove ellipsis and trailing dots
+    .replace(/\.{2,}/g, " ")
+    // Remove parentheses content for partial matching (optional)
+    // .replace(/\([^)]*\)/g, " ")
+    // Collapse multiple spaces to single space
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
  * Find resource ID for deletion by name
  * For Settings Catalog policies, the task.itemName may be from displayName in the template,
  * but the policy was created with 'name' field. We search by name match.
@@ -1035,6 +1041,7 @@ function findResourceIdForDelete(
   context: ExecutionContext
 ): { id: string; hasMarker: boolean; endpointType?: BaselineEndpointType } | null {
   const nameToFind = task.itemName.toLowerCase();
+  const normalizedNameToFind = normalizeName(task.itemName);
 
   switch (task.category) {
     case "groups": {
@@ -1059,15 +1066,26 @@ function findResourceIdForDelete(
 
     case "baseline":
     case "cisBaseline": {
-      // First check Settings Catalog policies
+      // First check Settings Catalog policies with exact match
       let policy = context.cachedSettingsCatalogPolicies?.find(
         (p) => p.name?.toLowerCase() === nameToFind
       );
 
       if (!policy) {
-        // Try partial match for Settings Catalog
+        // Try normalized match (handles punctuation differences like colons)
         policy = context.cachedSettingsCatalogPolicies?.find(
-          (p) => p.name?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.name?.toLowerCase() || "")
+          (p) => normalizeName(p.name) === normalizedNameToFind
+        );
+      }
+
+      if (!policy) {
+        // Try partial match for Settings Catalog (normalized)
+        policy = context.cachedSettingsCatalogPolicies?.find(
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.name);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
         );
       }
 
@@ -1079,13 +1097,17 @@ function findResourceIdForDelete(
 
       // If not found in Settings Catalog, check V2 Compliance policies (OIB compliance)
       let v2Policy = context.cachedV2CompliancePolicies?.find(
-        (p) => p.name?.toLowerCase() === nameToFind
+        (p) => p.name?.toLowerCase() === nameToFind || normalizeName(p.name) === normalizedNameToFind
       );
 
       if (!v2Policy) {
-        // Try partial match for V2 Compliance
+        // Try partial match for V2 Compliance (normalized)
         v2Policy = context.cachedV2CompliancePolicies?.find(
-          (p) => p.name?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.name?.toLowerCase() || "")
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.name);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
         );
       }
 
@@ -1097,13 +1119,17 @@ function findResourceIdForDelete(
 
       // If not found in V2 Compliance, check V1 Compliance policies (OIB compliance uses deviceCompliancePolicies endpoint)
       let v1Policy = context.cachedCompliancePolicies?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
       );
 
       if (!v1Policy) {
-        // Try partial match for V1 Compliance
+        // Try partial match for V1 Compliance (normalized)
         v1Policy = context.cachedCompliancePolicies?.find(
-          (p) => p.displayName?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.displayName?.toLowerCase() || "")
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
         );
       }
 
@@ -1115,13 +1141,17 @@ function findResourceIdForDelete(
 
       // If not found in V1 Compliance, check Device Configurations (Health Monitoring, etc.)
       let deviceConfig = context.cachedDeviceConfigurations?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
       );
 
       if (!deviceConfig) {
-        // Try partial match for Device Configurations
+        // Try partial match for Device Configurations (normalized)
         deviceConfig = context.cachedDeviceConfigurations?.find(
-          (p) => p.displayName?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.displayName?.toLowerCase() || "")
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
         );
       }
 
@@ -1133,13 +1163,17 @@ function findResourceIdForDelete(
 
       // If not found in Device Configurations, check Driver Update Profiles
       let driverProfile = context.cachedDriverUpdateProfiles?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
       );
 
       if (!driverProfile) {
-        // Try partial match for Driver Update Profiles
+        // Try partial match for Driver Update Profiles (normalized)
         driverProfile = context.cachedDriverUpdateProfiles?.find(
-          (p) => p.displayName?.toLowerCase().includes(nameToFind) || nameToFind.includes(p.displayName?.toLowerCase() || "")
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
         );
       }
 
@@ -1154,9 +1188,19 @@ function findResourceIdForDelete(
     }
 
     case "compliance": {
-      const compliance = context.cachedCompliancePolicies?.find(
-        (c) => c.displayName?.toLowerCase() === nameToFind
+      let compliance = context.cachedCompliancePolicies?.find(
+        (c) => c.displayName?.toLowerCase() === nameToFind || normalizeName(c.displayName) === normalizedNameToFind
       );
+      if (!compliance) {
+        // Try partial match for compliance (normalized)
+        compliance = context.cachedCompliancePolicies?.find(
+          (c) => {
+            const normalizedPolicyName = normalizeName(c.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
+        );
+      }
       if (compliance?.id) {
         return { id: compliance.id, hasMarker: hasHydrationMarker(compliance.description) };
       }
@@ -1165,19 +1209,23 @@ function findResourceIdForDelete(
 
     case "conditionalAccess": {
       // CA policies have the marker in displayName (not description) since CA policies don't support descriptions
-      // The marker format is "[Intune Hydration Kit]" appended to displayName (matches CREATE path)
-      // Search for policy with the marker suffix in displayName
-      const markerSuffix = "[Intune Hydration Kit]";
-      const searchNameWithMarker = `${nameToFind} ${markerSuffix}`.toLowerCase();
+      // Support BOTH marker formats:
+      //   - Old: "[Intune Hydration Kit]"
+      //   - New: "[Imported by Intune Hydration Kit]"
+      // IMPORTANT: Only search for policies WITH the marker - do NOT fall back to exact name match
+      // because there may be existing policies with the same base name that weren't created by this tool
+      const markerShort = "[Intune Hydration Kit]";
+      const markerFull = "[Imported by Intune Hydration Kit]";
+      const searchNameWithShortMarker = `${nameToFind} ${markerShort}`.toLowerCase();
+      const searchNameWithFullMarker = `${nameToFind} ${markerFull}`.toLowerCase();
 
       const ca = context.cachedConditionalAccessPolicies?.find(
-        (c) => c.displayName?.toLowerCase() === searchNameWithMarker || c.displayName?.toLowerCase() === nameToFind
+        (c) => c.displayName?.toLowerCase() === searchNameWithShortMarker ||
+               c.displayName?.toLowerCase() === searchNameWithFullMarker
       );
       if (ca?.id) {
-        // For CA policies, marker is in displayName, check for either marker format
-        const hasMarker = ca.displayName?.includes("[Intune Hydration Kit]") ||
-                          ca.displayName?.includes("[Imported by Intune Hydration Kit]");
-        return { id: ca.id, hasMarker: hasMarker ?? false };
+        // Policy found with marker in displayName - it was created by this tool
+        return { id: ca.id, hasMarker: true };
       }
       return null;
     }
@@ -1740,7 +1788,18 @@ export async function executeDeletesInParallel(
           } catch (error) {
             lastError = error instanceof Error ? error.message : String(error);
 
-            // Check if it's a 400 error (transient backend issue)
+            // Check if it's a ResourceNotFound error - this means success (resource is gone)
+            const isResourceNotFound = lastError.toLowerCase().includes("resourcenotfound");
+            if (isResourceNotFound) {
+              console.log(`[FastDelete] "${task.itemName}" - ResourceNotFound, treating as success`);
+              task.status = "success";
+              task.endTime = new Date();
+              updateCacheAfterDelete(task, context);
+              context.onTaskComplete?.(task);
+              return { task, success: true, skipped: false };
+            }
+
+            // Check if it's a 400 error (transient backend issue) but NOT ResourceNotFound
             const is400Error = lastError.includes("[400]") || lastError.includes("400");
             const isRetryable = is400Error && attempt < maxRetries - 1;
 

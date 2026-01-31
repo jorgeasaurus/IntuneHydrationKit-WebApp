@@ -90,7 +90,7 @@ export default function Home() {
             </span>
           </h1>
           <p className="text-xl sm:text-2xl text-muted-foreground max-w-3xl mx-auto">
-            Deploy up to 921 Microsoft Intune best-practice policies, groups, filters, and more.
+            Deploy over 900+ Microsoft Intune best-practice policies, groups, filters, and more.
             Select only what you need. Zero hassle.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4">
@@ -356,7 +356,7 @@ export default function Home() {
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />
-                        <AnimatedCounter value={18} className="font-medium" /> Compliance policies
+                        <AnimatedCounter value={16} className="font-medium" /> Compliance policies
                       </li>
                       <li className="flex items-center gap-2">
                         <CheckCircle2 className="h-4 w-4 text-green-500" />

@@ -1680,7 +1680,7 @@
       "path": "4.0 - CIS Benchmarks/CIS -  Intune for Windows 11 Benchmarks/CISv4 - WIN - L1 - Enable Public Network Firewall Log File Path'  is set to '%SystemRoot%System32logfilesfirewallpublicfw.log.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "CIS -  Intune for Windows 11 Benchmarks",
-      "displayName": "CISv4 - WIN - L1 - Enable Public Network Firewall Log File Path'  is set to '%SystemRoot%System32logfilesfirewallpublicfw.log"
+      "displayName": "CISv4 - WIN - L1 - Enable Public Network Firewall: Log File Path'  is set to '%SystemRoot%\\System32\\logfiles\\firewall\\publicfw.log"
     },
     {
       "path": "4.0 - CIS Benchmarks/CIS -  Intune for Windows 11 Benchmarks/CISv4 - WIN - L1 - Enable Public Network Firewall Log Max File  Size.json",
@@ -2892,7 +2892,7 @@
       "path": "4.0 - CIS Benchmarks/CIS -  Intune for Windows 11 Benchmarks/CISv4 - WIN - L2 - Turn on Mapper IO (LLTDIO) driver.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "CIS -  Intune for Windows 11 Benchmarks",
-      "displayName": "CISv4 - WIN - L2 - Turn on Mapper IO (LLTDIO) driver"
+      "displayName": "CISv4 - WIN - L2 - Turn on Mapper I/O (LLTDIO) driver"
     },
     {
       "path": "4.0 - CIS Benchmarks/CIS -  Intune for Windows 11 Benchmarks/CISv4 - WIN - L2 - Turn on PowerShell Script Block Logging.json",
@@ -3942,7 +3942,7 @@
       "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Intune Default Security Baselines/Baseline - Intune Security Baseline - Windows 365.json",
       "category": "6.0 - Microsoft Endpoint Security Benchmarks",
       "subcategory": "Microsoft Endpoint Security Benchmarks",
-      "displayName": "Baseline - Intune Security Baseline - Windows 365"
+      "displayName": "Windows 365 Baseline"
     },
     {
       "path": "6.0 - Microsoft Endpoint Security Benchmarks/Microsoft Endpoint Security Benchmarks/Intune Default Security Baselines/Baseline - Intune Security Baseline - Windows Defender  Security Experience.json",

@@ -3,7 +3,7 @@
  */
 
 import { GraphClient } from "./client";
-import { CompliancePolicy } from "@/types/graph";
+import { CompliancePolicy, DeletionResult } from "@/types/graph";
 import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
@@ -251,12 +251,12 @@ export async function updateCompliancePolicy(
 
 /**
  * Delete a compliance policy by ID
- * Only deletes if the policy was created by Intune Hydration Kit and has no assignments
+ * Only deletes if created by Intune Hydration Kit and has no active assignments
  */
 export async function deleteCompliancePolicy(
   client: GraphClient,
   policyId: string
-): Promise<void> {
+): Promise<DeletionResult> {
   const policy = await getCompliancePolicyById(client, policyId);
 
   if (!hasHydrationMarker(policy.description)) {
@@ -265,31 +265,36 @@ export async function deleteCompliancePolicy(
     );
   }
 
+  // Check for active assignments - skip deletion if assigned
   const assignments = await getCompliancePolicyAssignments(client, policyId);
   if (assignments.length > 0) {
-    throw new Error(
-      `Cannot delete policy "${policy.displayName}": Policy has ${assignments.length} assignment(s). Remove all assignments before deleting.`
-    );
+    console.log(`[Compliance] Skipping deletion of "${policy.displayName}" - has ${assignments.length} active assignment(s)`);
+    return {
+      deleted: false,
+      skipped: true,
+      reason: `Policy has ${assignments.length} active assignment(s)`
+    };
   }
 
   await client.delete(`/deviceManagement/deviceCompliancePolicies/${policyId}`);
+  return { deleted: true, skipped: false };
 }
 
 /**
  * Delete a compliance policy by display name
- * Only deletes if the policy was created by Intune Hydration Kit and has no assignments
+ * Only deletes if created by Intune Hydration Kit and has no active assignments
  */
 export async function deleteCompliancePolicyByName(
   client: GraphClient,
   displayName: string
-): Promise<void> {
+): Promise<DeletionResult> {
   const policy = await getCompliancePolicyByName(client, displayName);
 
   if (!policy || !policy.id) {
     throw new Error(`Compliance policy "${displayName}" not found`);
   }
 
-  await deleteCompliancePolicy(client, policy.id);
+  return deleteCompliancePolicy(client, policy.id);
 }
 
 /**

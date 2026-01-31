@@ -41,16 +41,50 @@ function calculateDelay(
 
 /**
  * Check if an error has a status code that should be retried
- * Retryable: 429 (Too Many Requests), 5xx (Server Errors)
- * Non-retryable: 4xx (Client Errors) except 429
+ * Retryable: 429 (Too Many Requests), 5xx (Server Errors),
+ *            and transient 400 errors from Microsoft backend (except ResourceNotFound)
+ * Non-retryable: 4xx (Client Errors) except 429 and transient 400s
  */
 function isRetryableError(error: unknown): boolean {
   // Check for status property on error (added by GraphClient)
-  const errorWithStatus = error as { status?: number };
+  const errorWithStatus = error as { status?: number; message?: string };
   if (typeof errorWithStatus.status === "number") {
     const status = errorWithStatus.status;
-    // Only retry 429 and 5xx errors
-    return status === 429 || (status >= 500 && status < 600);
+
+    // Always retry 429 and 5xx errors
+    if (status === 429 || (status >= 500 && status < 600)) {
+      return true;
+    }
+
+    // Check for transient 400 errors from Microsoft backend
+    // These have generic "An error has occurred" messages and should be retried
+    // EXCEPTION: ResourceNotFound errors should NOT be retried - the resource is gone
+    if (status === 400 && errorWithStatus.message) {
+      const message = errorWithStatus.message.toLowerCase();
+
+      // ResourceNotFound means the resource doesn't exist - don't retry
+      // This commonly happens during DELETE when the resource was already deleted
+      if (message.includes("resourcenotfound")) {
+        console.log(`[Retry] 400 ResourceNotFound - resource does not exist, not retrying`);
+        return false;
+      }
+
+      // Transient backend errors contain these patterns
+      const transientPatterns = [
+        "an error has occurred",
+        "operation id (for customer support): 00000000-0000-0000-0000-000000000000",
+        "transient",
+        "temporary",
+      ];
+      const isTransient = transientPatterns.some(pattern => message.includes(pattern));
+      if (isTransient) {
+        console.log(`[Retry] Detected transient 400 error, will retry: ${errorWithStatus.message.substring(0, 100)}...`);
+        return true;
+      }
+    }
+
+    // Other 4xx errors are not retryable
+    return false;
   }
 
   // Check if it's a Response object

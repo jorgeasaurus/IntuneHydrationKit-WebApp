@@ -1,3 +1,4 @@
+import { Client } from "@microsoft/microsoft-graph-client";
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { getGraphEndpoint } from "@/lib/auth/msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
@@ -7,6 +8,7 @@ import { BatchRequest, BatchResult } from "./batch";
 
 /**
  * Microsoft Graph API client with retry logic
+ * Uses Microsoft Graph Client SDK for reliable pagination through Intune proxies
  */
 export class GraphClient {
   private baseUrl: string;
@@ -15,6 +17,19 @@ export class GraphClient {
   constructor(environment: CloudEnvironment = "global") {
     this.environment = environment;
     this.baseUrl = getGraphEndpoint(environment);
+  }
+
+  /**
+   * Get a Microsoft Graph Client SDK instance
+   * Used for operations that need reliable pagination through Intune proxies
+   */
+  private async getSdkClient(): Promise<Client> {
+    const accessToken = await getAccessToken();
+    return Client.init({
+      authProvider: (done) => {
+        done(null, accessToken);
+      },
+    });
   }
 
   /**
@@ -91,25 +106,32 @@ export class GraphClient {
 
   /**
    * GET request that returns a collection with automatic pagination
+   * Uses Microsoft Graph Client SDK for reliable pagination through Intune proxies
+   * (like NukeTune does - fixes 401 errors on Settings Catalog pagination)
    */
   async getCollection<T>(
     endpoint: string,
     version: "v1.0" | "beta" = "beta"
   ): Promise<T[]> {
     const results: T[] = [];
-    let nextLink: string | undefined = `${this.baseUrl}/${version}${endpoint}`;
+    const client = await this.getSdkClient();
+    const url = `${this.baseUrl}/${version}${endpoint}`;
 
-    while (nextLink) {
-      const response = await retryWithBackoff(async () => {
-        const headers = await this.getHeaders();
-        const res = await fetch(nextLink!, {
-          method: "GET",
-          headers,
-        });
-        return this.handleResponse<GraphResponse<T>>(res);
-      });
-
+    // First request
+    let response = await client.api(url).get() as GraphResponse<T>;
+    if (response.value && Array.isArray(response.value)) {
       results.push(...response.value);
+    }
+
+    // Follow pagination using @odata.nextLink
+    let nextLink = response["@odata.nextLink"];
+    while (nextLink) {
+      // Get fresh token for each page (in case of long pagination)
+      const freshClient = await this.getSdkClient();
+      response = await freshClient.api(nextLink).get() as GraphResponse<T>;
+      if (response.value && Array.isArray(response.value)) {
+        results.push(...response.value);
+      }
       nextLink = response["@odata.nextLink"];
     }
 
@@ -179,7 +201,7 @@ export class GraphClient {
 
   /**
    * DELETE request to Graph API
-   * Treats 404 as success (idempotent delete - if resource is gone, mission accomplished)
+   * Treats 404 and 400/ResourceNotFound as success (idempotent delete - if resource is gone, mission accomplished)
    */
   async delete(endpoint: string, version: "v1.0" | "beta" = "beta"): Promise<void> {
     const url = `${this.baseUrl}/${version}${endpoint}`;
@@ -195,6 +217,16 @@ export class GraphClient {
       if (response.status === 404) {
         console.log(`[GraphClient] DELETE returned 404 - resource already deleted, treating as success`);
         return;
+      }
+
+      // Treat 400 with ResourceNotFound as success for DELETE
+      // Microsoft Graph sometimes returns 400 instead of 404 when resource doesn't exist
+      if (response.status === 400) {
+        const responseText = await response.clone().text();
+        if (responseText.toLowerCase().includes("resourcenotfound")) {
+          console.log(`[GraphClient] DELETE returned 400/ResourceNotFound - resource already deleted, treating as success`);
+          return;
+        }
       }
 
       return this.handleResponse<void>(response);

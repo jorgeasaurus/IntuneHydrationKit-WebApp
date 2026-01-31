@@ -23,6 +23,15 @@ export interface GraphResponse<T> {
   value: T[];
 }
 
+/**
+ * Result of a deletion operation that may be skipped due to active assignments
+ */
+export interface DeletionResult {
+  deleted: boolean;
+  skipped: boolean;
+  reason?: string;
+}
+
 export interface DeviceFilter {
   "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter";
   id?: string;

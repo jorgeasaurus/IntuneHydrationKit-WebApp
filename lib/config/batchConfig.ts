@@ -19,7 +19,7 @@ export interface BatchConfiguration {
  * Modify defaultBatchSize to change batch sizes across the application
  */
 export const BATCH_CONFIG: BatchConfiguration = {
-  defaultBatchSize: 10,
+  defaultBatchSize: 20,
   maxBatchSize: 20,
   delayBetweenBatches: 2000,
   enableBatching: true,

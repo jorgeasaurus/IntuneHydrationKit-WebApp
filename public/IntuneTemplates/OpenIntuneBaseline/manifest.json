@@ -1,20 +1,8 @@
 {
   "version": "1.0.0",
   "generatedAt": "2026-01-25T04:32:42.802Z",
-  "totalFiles": 95,
+  "totalFiles": 93,
   "platforms": [
-    {
-      "id": "BYOD",
-      "name": "BYOD (Bring Your Own Device)",
-      "count": 2,
-      "policyTypes": [
-        {
-          "type": "AppProtection",
-          "description": "App protection policies (MAM)",
-          "count": 2
-        }
-      ]
-    },
     {
       "id": "MACOS",
       "name": "macOS",
@@ -83,18 +71,6 @@
     }
   ],
   "files": [
-    {
-      "path": "BYOD/AppProtection/Android - Baseline - BYOD - App Protection.json",
-      "platform": "BYOD",
-      "policyType": "AppProtection",
-      "displayName": "Android - Baseline - BYOD - App Protection"
-    },
-    {
-      "path": "BYOD/AppProtection/iOS - Baseline - BYOD - App Protection.json",
-      "platform": "BYOD",
-      "policyType": "AppProtection",
-      "displayName": "iOS - Baseline - BYOD - App Protection"
-    },
     {
       "path": "MACOS/IntuneManagement/CompliancePolicies/MacOS - OIB - Compliance - U - Device Health - v1.0.json",
       "platform": "MACOS",
