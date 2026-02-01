@@ -13,6 +13,18 @@ import {
 import { BaselinePolicy } from "@/lib/templates/loader";
 
 /**
+ * Activity message for status updates
+ */
+export interface ActivityMessage {
+  id: string;
+  timestamp: Date;
+  message: string;
+  type: "info" | "progress" | "success" | "warning" | "error";
+  /** Optional category for grouping (e.g., "prefetch", "delete", "create") */
+  category?: string;
+}
+
+/**
  * Task execution context
  */
 export interface ExecutionContext {
@@ -23,6 +35,8 @@ export interface ExecutionContext {
   onTaskComplete?: (task: HydrationTask) => void;
   onTaskError?: (task: HydrationTask, error: Error) => void;
   onBatchProgress?: (progress: BatchProgress) => void;
+  /** Callback for activity/status updates shown in UI */
+  onStatusUpdate?: (message: ActivityMessage) => void;
   shouldCancel?: () => boolean;
   shouldPause?: () => boolean;
   // Pre-fetched data caches to avoid repeated API calls

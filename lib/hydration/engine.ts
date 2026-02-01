@@ -26,7 +26,25 @@ import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
 import { sleep } from "./utils";
-import { ExecutionContext, ExecutionResult } from "./types";
+import { ExecutionContext, ExecutionResult, ActivityMessage } from "./types";
+
+/**
+ * Helper to emit status updates to UI
+ */
+function emitStatus(
+  context: ExecutionContext,
+  message: string,
+  type: ActivityMessage["type"] = "info",
+  category?: string
+) {
+  context.onStatusUpdate?.({
+    id: `status-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: new Date(),
+    message,
+    type,
+    category,
+  });
+}
 import {
   executeGroupTask,
   executeFilterTask,
@@ -39,7 +57,7 @@ import {
 } from "./taskExecutors";
 
 // Re-export types for backwards compatibility
-export type { ExecutionContext, ExecutionResult, CISPolicyType, BuildTaskQueueOptions } from "./types";
+export type { ExecutionContext, ExecutionResult, CISPolicyType, BuildTaskQueueOptions, ActivityMessage } from "./types";
 export { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 export { detectCISPolicyType } from "./policyDetection";
 export {
@@ -159,11 +177,14 @@ export async function executeTasks(
   // Pre-fetch "Intune - " groups if any group tasks exist
   const hasGroupTasks = tasks.some((task) => task.category === "groups");
   if (hasGroupTasks && !context.cachedIntuneGroups) {
+    emitStatus(context, "Querying existing groups from tenant...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all 'Intune - ' groups...");
     try {
       context.cachedIntuneGroups = await getIntuneGroups(context.client);
+      emitStatus(context, `Found ${context.cachedIntuneGroups.length} existing groups`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedIntuneGroups.length} 'Intune - ' groups`);
     } catch (error) {
+      emitStatus(context, "Failed to query groups - will check individually", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch groups:", error);
       // Continue execution - individual tasks will handle errors
       context.cachedIntuneGroups = [];
@@ -173,11 +194,14 @@ export async function executeTasks(
   // Pre-fetch all filters if any filter tasks exist
   const hasFilterTasks = tasks.some((task) => task.category === "filters");
   if (hasFilterTasks && !context.cachedFilters) {
+    emitStatus(context, "Querying existing device filters...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all device filters...");
     try {
       context.cachedFilters = await getAllFilters(context.client);
+      emitStatus(context, `Found ${context.cachedFilters.length} existing device filters`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedFilters.length} device filters`);
     } catch (error) {
+      emitStatus(context, "Failed to query filters - will check individually", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch filters:", error);
       // Continue execution - individual tasks will handle errors
       context.cachedFilters = [];
@@ -189,11 +213,14 @@ export async function executeTasks(
   const hasAppProtectionTasks = tasks.some((task) => task.category === "appProtection");
   const hasBaselineTasks = tasks.some((task) => task.category === "baseline");
   if ((hasAppProtectionTasks || hasBaselineTasks) && !context.cachedAppProtectionPolicies) {
+    emitStatus(context, "Querying existing App Protection policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all App Protection policies...");
     try {
       context.cachedAppProtectionPolicies = await getAllAppProtectionPolicies(context.client);
+      emitStatus(context, `Found ${context.cachedAppProtectionPolicies.length} App Protection policies`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedAppProtectionPolicies.length} App Protection policies`);
     } catch (error) {
+      emitStatus(context, "Failed to query App Protection policies", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch App Protection policies:", error);
       // Continue execution - individual tasks will handle errors
       context.cachedAppProtectionPolicies = [];
@@ -203,14 +230,17 @@ export async function executeTasks(
   // Pre-fetch Conditional Access policies for DELETE mode or CREATE mode with batching
   const hasConditionalAccessTasks = tasks.some((task) => task.category === "conditionalAccess");
   if (hasConditionalAccessTasks && !context.cachedConditionalAccessPolicies) {
+    emitStatus(context, "Querying existing Conditional Access policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
     try {
       const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string; state: string }> }>(
         `/identity/conditionalAccess/policies`
       );
       context.cachedConditionalAccessPolicies = response.value || [];
+      emitStatus(context, `Found ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`);
     } catch (error) {
+      emitStatus(context, "Failed to query Conditional Access policies", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch Conditional Access policies:", error);
       context.cachedConditionalAccessPolicies = [];
     }
@@ -228,13 +258,16 @@ export async function executeTasks(
     (hasBaselineTasks && (context.operationMode === "delete" || context.operationMode === "preview"));
 
   if (needsV1ComplianceCache && !context.cachedCompliancePolicies) {
+    emitStatus(context, "Querying existing Compliance policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all V1 Compliance policies (deviceCompliancePolicies)...");
     try {
       context.cachedCompliancePolicies = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
         `/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description`
       );
+      emitStatus(context, `Found ${context.cachedCompliancePolicies.length} Compliance policies`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedCompliancePolicies.length} V1 Compliance policies`);
     } catch (error) {
+      emitStatus(context, "Failed to query Compliance policies", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch V1 Compliance policies:", error);
       context.cachedCompliancePolicies = [];
     }
@@ -247,13 +280,16 @@ export async function executeTasks(
     (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
 
   if (needsSettingsCatalogCache && !context.cachedSettingsCatalogPolicies) {
+    emitStatus(context, "Querying existing Settings Catalog policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Settings Catalog policies for duplicate detection...");
     try {
       context.cachedSettingsCatalogPolicies = await context.client.getCollection<{ id: string; name: string; description?: string }>(
         `/deviceManagement/configurationPolicies?$select=id,name,description`
       );
+      emitStatus(context, `Found ${context.cachedSettingsCatalogPolicies.length} Settings Catalog policies`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedSettingsCatalogPolicies.length} Settings Catalog policies`);
     } catch (error) {
+      emitStatus(context, "Failed to query Settings Catalog policies", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch Settings Catalog policies:", error);
       context.cachedSettingsCatalogPolicies = [];
     }
@@ -261,13 +297,16 @@ export async function executeTasks(
 
   // Pre-fetch V2 Compliance policies for DELETE mode (used by OIB compliance policies)
   if (needsSettingsCatalogCache && !context.cachedV2CompliancePolicies) {
+    emitStatus(context, "Querying V2 Compliance policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all V2 Compliance policies for delete operations...");
     try {
       context.cachedV2CompliancePolicies = await context.client.getCollection<{ id: string; name: string; description?: string }>(
         `/deviceManagement/compliancePolicies?$select=id,name,description`
       );
+      emitStatus(context, `Found ${context.cachedV2CompliancePolicies.length} V2 Compliance policies`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedV2CompliancePolicies.length} V2 Compliance policies`);
     } catch (error) {
+      emitStatus(context, "Failed to query V2 Compliance policies", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch V2 Compliance policies:", error);
       context.cachedV2CompliancePolicies = [];
     }
@@ -279,14 +318,17 @@ export async function executeTasks(
     (context.operationMode === "create" && batchConfig.enableBatching && hasBaselineTasks);
 
   if (needsDriverUpdateCache && !context.cachedDriverUpdateProfiles) {
+    emitStatus(context, "Querying Driver Update profiles...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Driver Update Profiles...");
     try {
       const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
         `/deviceManagement/windowsDriverUpdateProfiles`
       );
       context.cachedDriverUpdateProfiles = response.value || [];
+      emitStatus(context, `Found ${context.cachedDriverUpdateProfiles.length} Driver Update profiles`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedDriverUpdateProfiles.length} Driver Update Profiles`);
     } catch (error) {
+      emitStatus(context, "Failed to query Driver Update profiles", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch Driver Update Profiles:", error);
       context.cachedDriverUpdateProfiles = [];
     }
@@ -299,13 +341,16 @@ export async function executeTasks(
     (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
 
   if (needsDeviceConfigCache && !context.cachedDeviceConfigurations) {
+    emitStatus(context, "Querying Device Configurations...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Device Configurations...");
     try {
       context.cachedDeviceConfigurations = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
         `/deviceManagement/deviceConfigurations?$select=id,displayName,description`
       );
+      emitStatus(context, `Found ${context.cachedDeviceConfigurations.length} Device Configurations`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedDeviceConfigurations.length} Device Configurations`);
     } catch (error) {
+      emitStatus(context, "Failed to query Device Configurations", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch Device Configurations:", error);
       context.cachedDeviceConfigurations = [];
     }
@@ -331,6 +376,7 @@ export async function executeTasks(
   const usePreviewBatching = batchConfig.enableBatching && context.operationMode === "preview";
 
   if (useCreateBatching) {
+    emitStatus(context, `Starting batch creation (${batchConfig.defaultBatchSize} items per batch)...`, "info", "execute");
     console.log(`[Execute Tasks] Batch CREATE execution enabled (batch size: ${batchConfig.defaultBatchSize})`);
 
     // Separate batchable from non-batchable tasks
@@ -395,6 +441,7 @@ export async function executeTasks(
   }
 
   if (useDeleteBatching) {
+    emitStatus(context, "Starting parallel deletion - checking assignments...", "info", "execute");
     console.log(`[Execute Tasks] Fast parallel DELETE execution enabled (NukeTune-style)`);
 
     // Separate batchable from non-batchable tasks
@@ -454,6 +501,7 @@ export async function executeTasks(
   }
 
   if (usePreviewBatching) {
+    emitStatus(context, "Running preview simulation...", "info", "execute");
     console.log(`[Execute Tasks] Batch PREVIEW execution enabled - fast parallel simulation`);
 
     // Preview mode doesn't make API calls, so we can process all tasks rapidly

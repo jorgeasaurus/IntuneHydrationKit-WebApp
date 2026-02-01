@@ -148,6 +148,7 @@
     linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
     linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
   background-size: 40px 40px;
+  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 70%);
   mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 70%);
 }
 
@@ -349,8 +350,8 @@
 
 .nav-industrial {
   background: hsl(var(--background) / 0.85);
-  backdrop-filter: blur(20px) saturate(150%);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
+  backdrop-filter: blur(20px) saturate(150%);
   border: 1px solid hsl(var(--border) / 0.5);
   box-shadow: 0 4px 30px hsl(var(--foreground) / 0.05);
 }
@@ -694,8 +695,8 @@
 /* Glassmorphism panels */
 .glass-panel {
   background: hsl(var(--card) / 0.8);
-  backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
   border: 1px solid hsl(var(--border) / 0.5);
 }
 

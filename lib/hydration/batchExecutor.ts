@@ -16,8 +16,26 @@ import {
 import type { ApiVersion } from "@/lib/graph/batch";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
-import { ExecutionContext, ExecutionResult, CISPolicyType } from "./types";
+import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
+
+/**
+ * Helper to emit status updates to UI
+ */
+function emitStatus(
+  context: ExecutionContext,
+  message: string,
+  type: ActivityMessage["type"] = "info",
+  category?: string
+) {
+  context.onStatusUpdate?.({
+    id: `batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: new Date(),
+    message,
+    type,
+    category,
+  });
+}
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { sleep } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
@@ -680,6 +698,7 @@ export async function executeTasksInBatches(
   const nonBatchableTasks: HydrationTask[] = [];
   const skippedTasks: { task: HydrationTask; reason: string }[] = [];
 
+  emitStatus(context, `Preparing ${tasks.length} items for batch creation...`, "progress", "create");
   console.log(`[BatchExecutor] Preparing ${tasks.length} tasks for batch execution (batch size: ${config.defaultBatchSize})`);
   console.log(`[BatchExecutor] Task categories:`, tasks.map(t => t.category).reduce((acc, cat) => {
     acc[cat] = (acc[cat] || 0) + 1;
@@ -723,6 +742,12 @@ export async function executeTasksInBatches(
   }
 
   console.log(`[BatchExecutor] Summary: ${batchableTasks.length} batched, ${skippedTasks.length} skipped, ${nonBatchableTasks.length} sequential`);
+  emitStatus(
+    context,
+    `Creating ${batchableTasks.length} items (${skippedTasks.length} duplicates skipped)...`,
+    "info",
+    "create"
+  );
 
   // Group batchable tasks by API version
   const v1Tasks = batchableTasks.filter((t) => t.apiVersion === "v1.0");
@@ -1778,6 +1803,7 @@ export async function executeDeletesInParallel(
   const { parallelRequests, delayBetweenBatches } = FAST_DELETE_CONFIG;
 
   console.log(`[FastDelete] Starting parallel deletion of ${tasks.length} tasks (${parallelRequests} concurrent)`);
+  emitStatus(context, `Preparing ${tasks.length} items for deletion...`, "progress", "delete");
 
   // Prepare all tasks first
   const preparedTasks: Array<{
@@ -1787,7 +1813,14 @@ export async function executeDeletesInParallel(
     skipReason?: string;
   }> = [];
 
+  let checkedCount = 0;
   for (const task of tasks) {
+    checkedCount++;
+    // Emit progress every 10 items or on last item
+    if (checkedCount % 10 === 0 || checkedCount === tasks.length) {
+      emitStatus(context, `Checking assignments: ${checkedCount}/${tasks.length} items...`, "progress", "delete");
+    }
+
     const resourceInfo = findResourceIdForDelete(task, context);
 
     if (!resourceInfo) {
@@ -1839,6 +1872,7 @@ export async function executeDeletesInParallel(
   const toSkip = preparedTasks.filter((p) => !p.deleteUrl);
 
   console.log(`[FastDelete] ${toDelete.length} to delete, ${toSkip.length} to skip`);
+  emitStatus(context, `Deleting ${toDelete.length} items (${toSkip.length} skipped)...`, "info", "delete");
 
   // Process skipped tasks immediately
   const skipTime = new Date();
@@ -1959,6 +1993,12 @@ export async function executeDeletesInParallel(
   const skipCount = results.filter((r) => r.skipped).length;
 
   console.log(`[FastDelete] Complete: ${successCount} deleted, ${failCount} failed, ${skipCount} skipped`);
+  emitStatus(
+    context,
+    `Deletion complete: ${successCount} deleted, ${failCount} failed, ${skipCount} skipped`,
+    failCount > 0 ? "warning" : "success",
+    "delete"
+  );
 
   return results;
 }

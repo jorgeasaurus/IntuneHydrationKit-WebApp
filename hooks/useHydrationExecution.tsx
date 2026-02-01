@@ -4,6 +4,7 @@ import { useState, useCallback, useRef } from "react";
 import { HydrationTask, HydrationSummary, BatchExecutionStats, BatchProgress } from "@/types/hydration";
 import { createGraphClient } from "@/lib/graph/client";
 import { buildTaskQueueAsync, executeTasks, ExecutionContext } from "@/lib/hydration/engine";
+import { ActivityMessage } from "@/lib/hydration/types";
 import { createSummary } from "@/lib/hydration/reporter";
 import { useWizardState } from "./useWizardState";
 import { getBatchConfig } from "@/lib/config/batchConfig";
@@ -18,6 +19,8 @@ interface ExecutionState {
   endTime: Date | null;
   summary: HydrationSummary | null;
   batchProgress: BatchProgress | null;
+  /** Activity log showing what's happening behind the scenes */
+  activityLog: ActivityMessage[];
 }
 
 export function useHydrationExecution() {
@@ -31,7 +34,11 @@ export function useHydrationExecution() {
     endTime: null,
     summary: null,
     batchProgress: null,
+    activityLog: [],
   });
+
+  // Counter for generating unique activity message IDs
+  const activityIdCounter = useRef(0);
 
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
@@ -75,6 +82,7 @@ export function useHydrationExecution() {
       endTime: null,
       summary: null,
       batchProgress: null,
+      activityLog: [],
     });
 
     // Reset control refs
@@ -101,6 +109,20 @@ export function useHydrationExecution() {
         }));
       };
 
+      // Status update callback for activity log
+      const updateStatus = (message: ActivityMessage) => {
+        // Generate unique ID if not provided
+        const msgWithId: ActivityMessage = {
+          ...message,
+          id: message.id || `activity-${activityIdCounter.current++}`,
+        };
+        setExecutionState((prev) => ({
+          ...prev,
+          // Keep last 100 messages to prevent memory issues
+          activityLog: [...prev.activityLog.slice(-99), msgWithId],
+        }));
+      };
+
       // Create execution context
       const context: ExecutionContext = {
         client,
@@ -112,6 +134,7 @@ export function useHydrationExecution() {
         onTaskComplete: updateTask,
         onTaskError: updateTask,
         onBatchProgress: updateBatchProgress,
+        onStatusUpdate: updateStatus,
         shouldCancel: () => cancelRef.current,
         shouldPause: () => pauseRef.current,
       };
@@ -221,6 +244,7 @@ export function useHydrationExecution() {
       endTime: null,
       summary: null,
       batchProgress: null,
+      activityLog: [],
     });
     pauseRef.current = false;
     cancelRef.current = false;

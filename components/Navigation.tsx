@@ -76,7 +76,7 @@ export function Navigation() {
                   {/* Glow effect on hover */}
                   <div className="absolute inset-0 bg-hydrate/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <span className="hidden sm:block font-bold text-lg leading-tight tracking-tight">
+                <span className="hidden sm:block font-bold text-xl leading-tight tracking-tight">
                   Intune Hydration Kit
                 </span>
               </Link>
