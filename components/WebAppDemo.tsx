@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckCircle2,
-  Circle,
-  Settings,
   Play,
   FileCheck,
   Users,

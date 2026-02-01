@@ -12,7 +12,7 @@ import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector"
 import { CloudEnvironment } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { Terminal } from "lucide-react";
+import { Terminal, Github } from "lucide-react";
 
 export function Navigation() {
   const isAuthenticated = useIsAuthenticated();
@@ -96,6 +96,15 @@ export function Navigation() {
 
               {/* Right Section */}
               <div className="flex items-center gap-3">
+                <a
+                  href="https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-2 rounded-md hover:bg-muted transition-colors"
+                  aria-label="GitHub Repository"
+                >
+                  <Github className="w-5 h-5" />
+                </a>
                 <ThemeToggle />
 
                 {/* Terminal Status Indicator */}

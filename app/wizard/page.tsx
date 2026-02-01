@@ -107,7 +107,7 @@ function WizardContent() {
           <p>
             IntuneHydrationKit v0.1.0 |{" "}
             <a
-              href="https://github.com/jorgeasaurus/IntuneHydrationKit"
+              href="https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp"
               target="_blank"
               rel="noopener noreferrer"
               className="text-primary hover:underline"
