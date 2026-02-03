@@ -128,6 +128,7 @@ export function useHydrationExecution() {
         client,
         operationMode: state.operationMode,
         stopOnFirstError: false,
+        hasConditionalAccessLicense: state.prerequisiteResult?.licenses?.hasConditionalAccessLicense ?? true,
         hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,
         hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true,
         onTaskStart: updateTask,

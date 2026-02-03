@@ -58,6 +58,7 @@ export interface ExecutionContext {
   // Cached baseline templates for batch creation (passed directly to avoid cache issues)
   cachedBaselineTemplates?: BaselinePolicy[];
   // License flags for conditional skipping
+  hasConditionalAccessLicense?: boolean;
   hasPremiumP2License?: boolean;
   hasWindowsDriverUpdateLicense?: boolean;
 }

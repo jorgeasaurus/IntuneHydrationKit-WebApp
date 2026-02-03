@@ -49,3 +49,4 @@ ralph*.md
 .playwright-mcp/
 
 VERCEL_MIGRATION.md
+*.csv

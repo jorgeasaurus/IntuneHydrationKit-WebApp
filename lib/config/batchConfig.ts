@@ -12,6 +12,8 @@ export interface BatchConfiguration {
   delayBetweenBatches: number;
   /** Feature flag to enable/disable batching (fallback to sequential) */
   enableBatching: boolean;
+  /** Per-category batch size overrides (categories not listed use defaultBatchSize) */
+  categoryBatchSizes?: Record<string, number>;
 }
 
 /**
@@ -23,6 +25,13 @@ export const BATCH_CONFIG: BatchConfiguration = {
   maxBatchSize: 20,
   delayBetweenBatches: 2000,
   enableBatching: true,
+  categoryBatchSizes: {
+    // CIS and OIB baselines all write to /deviceManagement/configurationPolicies (settings catalog),
+    // hitting the per-tenant deviceintent.tenant.app.write throttle bucket.
+    // Smaller batches avoid overwhelming this limit.
+    cisBaseline: 5,
+    baseline: 5,
+  },
 };
 
 // Runtime configuration storage

@@ -7,10 +7,10 @@ import {
   BatchRequest,
   BatchResponse,
   chunkArray,
-  processBatchResponses,
   extractBatchError,
   isBatchResponseSuccess,
   isBatchResponseConflict,
+  isBatchResponseRetryable,
   getRetryAfterFromBatchResponse,
 } from "@/lib/graph/batch";
 import type { ApiVersion } from "@/lib/graph/batch";
@@ -630,6 +630,10 @@ function prepareTaskForBatch(
     }
 
     case "conditionalAccess": {
+      // Skip all CA policies if tenant lacks Entra ID Premium P1 license
+      if (context.hasConditionalAccessLicense === false) {
+        return { type: "skip", reason: "No Entra ID Premium (P1) license" };
+      }
       const result = buildConditionalAccessRequestBody(task);
       if (result.type === "skip") return { type: "skip", reason: result.reason };
       if (result.type === "error") return { type: "sequential" };
@@ -795,10 +799,22 @@ async function executeBatchGroup(
 ): Promise<ExecutionResult[]> {
   const config = getBatchConfig();
   const results: ExecutionResult[] = [];
-  const chunks = chunkArray(preparedTasks, config.defaultBatchSize);
+
+  // Determine batch size: use smaller size if group contains cisBaseline or baseline tasks
+  const hasThrottleSensitiveTasks = preparedTasks.some(
+    (t) => t.task.category === "cisBaseline" || t.task.category === "baseline"
+  );
+  const effectiveBatchSize = hasThrottleSensitiveTasks
+    ? Math.min(config.categoryBatchSizes?.cisBaseline ?? config.defaultBatchSize, config.defaultBatchSize)
+    : config.defaultBatchSize;
+
+  const chunks = chunkArray(preparedTasks, effectiveBatchSize);
   const maxRetries = 3;
 
-  console.log(`[BatchExecutor] Processing ${chunks.length} batch(es) of ${version} requests`);
+  if (hasThrottleSensitiveTasks) {
+    console.log(`[BatchExecutor] Using reduced batch size ${effectiveBatchSize} for throttle-sensitive categories`);
+  }
+  console.log(`[BatchExecutor] Processing ${chunks.length} batch(es) of ${version} requests (batch size: ${effectiveBatchSize})`);
 
   for (let i = 0; i < chunks.length; i++) {
     const chunk = chunks[i];
@@ -841,19 +857,16 @@ async function executeBatchGroup(
 
     console.log(`[BatchExecutor] Executing batch ${i + 1}/${chunks.length} with ${chunk.length} requests`);
 
-    // Retry logic for entire batch
+    // Submit this chunk, with retry support for individual 429/5xx responses
+    let currentItems = chunk;
     let retryCount = 0;
-    let batchSuccess = false;
 
-    while (!batchSuccess && retryCount < maxRetries) {
+    while (currentItems.length > 0 && retryCount <= maxRetries) {
       try {
         const batchResult = await context.client.batch(
-          chunk.map((t) => t.request),
+          currentItems.map((t) => t.request),
           version
         );
-
-        // Process responses
-        const processed = processBatchResponses(batchResult);
 
         // Map responses back to tasks
         const responseMap = new Map<string, BatchResponse>();
@@ -861,7 +874,12 @@ async function executeBatchGroup(
           responseMap.set(response.id, response);
         }
 
-        for (const { task, request } of chunk) {
+        // Collect retryable items for re-submission
+        const pendingRetry: PreparedBatchTask[] = [];
+        let retryAfterMs = 0;
+
+        for (const item of currentItems) {
+          const { task, request } = item;
           const response = responseMap.get(request.id);
 
           if (!response) {
@@ -890,17 +908,14 @@ async function executeBatchGroup(
             context.onTaskComplete?.(task);
           } else if (response.status === 504 && task.category === "compliance") {
             // Special handling for compliance policies with 504 timeout
-            // The Graph API often returns 504 but the policy was actually created
             const verifiedId = await verifyCompliancePolicyCreated(task.itemName, context);
 
             if (verifiedId) {
-              // Policy was actually created despite 504 - mark as success
               task.status = "success";
               task.endTime = new Date();
               results.push({ task, success: true, skipped: false, createdId: verifiedId });
               context.onTaskComplete?.(task);
             } else {
-              // Policy was not created - mark as failed
               const error = extractBatchError(response);
               task.status = "failed";
               task.error = `${error.message} (verified not created)`;
@@ -908,6 +923,12 @@ async function executeBatchGroup(
               results.push({ task, success: false, skipped: false, error: task.error });
               context.onTaskError?.(task, new Error(task.error));
             }
+          } else if (isBatchResponseRetryable(response.status) && retryCount < maxRetries) {
+            // 429 or 5xx -- queue for retry instead of marking failed
+            const headerDelay = getRetryAfterFromBatchResponse(response.headers) || 0;
+            retryAfterMs = Math.max(retryAfterMs, headerDelay);
+            pendingRetry.push(item);
+            console.log(`[BatchExecutor] Response ${response.status} for "${task.itemName}" -- queued for retry`);
           } else {
             const error = extractBatchError(response);
             task.status = "failed";
@@ -918,32 +939,52 @@ async function executeBatchGroup(
           }
         }
 
-        // Handle retryable failures within the batch
-        if (processed.retryable.length > 0) {
-          console.log(`[BatchExecutor] ${processed.retryable.length} requests need retry`);
-          const retryDelay = getRetryAfterFromBatchResponse(processed.retryable[0].headers) || 2000;
-          await sleep(retryDelay);
+        if (pendingRetry.length > 0) {
+          retryCount++;
+          const backoff = Math.pow(2, retryCount) * 1000;
+          const delay = Math.max(retryAfterMs, backoff);
+          console.log(`[BatchExecutor] ${pendingRetry.length} responses need retry (attempt ${retryCount}/${maxRetries}), waiting ${delay}ms`);
+          emitStatus(context, `Retrying ${pendingRetry.length} throttled requests (attempt ${retryCount}/${maxRetries})...`, "warning");
+          await sleep(delay);
+          currentItems = pendingRetry;
+        } else {
+          // All items handled, exit the retry loop
+          currentItems = [];
         }
-
-        batchSuccess = true;
       } catch (error) {
+        // Entire batch HTTP call failed (network error, etc.)
         retryCount++;
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`[BatchExecutor] Batch ${i + 1} failed (attempt ${retryCount}/${maxRetries}):`, errorMessage);
 
-        if (retryCount < maxRetries) {
-          const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff
-          console.log(`[BatchExecutor] Retrying in ${retryDelay}ms...`);
+        if (retryCount <= maxRetries) {
+          const retryDelay = Math.pow(2, retryCount) * 1000;
+          console.log(`[BatchExecutor] Retrying entire batch in ${retryDelay}ms...`);
           await sleep(retryDelay);
+          // currentItems stays the same -- re-submit all
         } else {
-          // Max retries reached, mark all as failed
-          for (const { task } of chunk) {
+          // Max retries exhausted, mark all remaining as failed
+          for (const { task } of currentItems) {
             task.status = "failed";
             task.error = errorMessage;
             task.endTime = new Date();
             results.push({ task, success: false, skipped: false, error: errorMessage });
             context.onTaskError?.(task, error instanceof Error ? error : new Error(errorMessage));
           }
+          currentItems = [];
+        }
+      }
+    }
+
+    // If we exhausted retries but still have items (shouldn't happen, but safety net)
+    if (currentItems.length > 0) {
+      for (const { task } of currentItems) {
+        if (task.status !== "failed" && task.status !== "success" && task.status !== "skipped") {
+          task.status = "failed";
+          task.error = "Max retries exhausted";
+          task.endTime = new Date();
+          results.push({ task, success: false, skipped: false, error: "Max retries exhausted" });
+          context.onTaskError?.(task, new Error("Max retries exhausted"));
         }
       }
     }

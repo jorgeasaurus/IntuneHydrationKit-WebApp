@@ -44,6 +44,19 @@ export async function executeConditionalAccessTask(
     return { task, success: false, skipped: false, error: "Template not found" };
   }
 
+  // Check if tenant has Entra ID Premium P1 license (required for ALL CA policies)
+  if (mode === "create" && context.hasConditionalAccessLicense === false) {
+    console.log(
+      `[Conditional Access] Skipped: ${template.displayName} - no Entra ID Premium (P1) license`
+    );
+    return {
+      task,
+      success: false,
+      skipped: true,
+      error: "No Entra ID Premium (P1) license",
+    };
+  }
+
   // Check if policy requires Premium P2 and tenant doesn't have it (PowerShell parity)
   if (mode === "create" && context.hasPremiumP2License === false) {
     if (policyRequiresPremiumP2(template as ConditionalAccessPolicy)) {
