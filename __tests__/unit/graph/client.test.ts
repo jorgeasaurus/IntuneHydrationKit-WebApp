@@ -315,6 +315,21 @@ describe('GraphClient', () => {
       server.use(
         http.delete(`${GRAPH_BASE}/beta/groups/999`, () => {
           return HttpResponse.json(
+            { error: { code: 'Forbidden', message: 'Insufficient permissions to delete group' } },
+            { status: 403 }
+          )
+        })
+      )
+
+      const client = new GraphClient()
+
+      await expect(client.delete('/groups/999')).rejects.toThrow('Insufficient permissions to delete group')
+    })
+
+    it('treats 404 as success (idempotent delete)', async () => {
+      server.use(
+        http.delete(`${GRAPH_BASE}/beta/groups/already-deleted`, () => {
+          return HttpResponse.json(
             { error: { code: 'NotFound', message: 'Group not found' } },
             { status: 404 }
           )
@@ -322,8 +337,9 @@ describe('GraphClient', () => {
       )
 
       const client = new GraphClient()
-
-      await expect(client.delete('/groups/999')).rejects.toThrow('Group not found')
+      // Should not throw - 404 is treated as success (resource already deleted)
+      const result = await client.delete('/groups/already-deleted')
+      expect(result).toBeUndefined()
     })
   })
 

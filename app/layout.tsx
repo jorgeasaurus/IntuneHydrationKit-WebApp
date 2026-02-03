@@ -1,13 +1,28 @@
 import type { Metadata } from "next";
-import { GeistSans } from "geist/font/sans";
-import { GeistMono } from "geist/font/mono";
+import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
-import { AnimatedGridBackground } from "@/components/ui/animated-grid-background";
+import { IndustrialBackground } from "@/components/IndustrialBackground";
+
+// DM Sans - Geometric, bold display font
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  variable: "--font-dm-sans",
+  display: "swap",
+  weight: ["400", "500", "600", "700", "800", "900"],
+});
+
+// JetBrains Mono - Technical, precise monospace for data displays
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+  weight: ["400", "500", "600", "700"],
+});
 
 export const metadata: Metadata = {
   title: "Intune Hydration Kit",
@@ -26,17 +41,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${GeistSans.variable} ${GeistMono.variable} font-sans antialiased`}>
+      <body
+        className={`${dmSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}
+      >
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           enableSystem
           disableTransitionOnChange
         >
           <MsalProvider>
             <SettingsProvider>
               <WizardProvider>
-                <AnimatedGridBackground />
+                <IndustrialBackground />
                 {children}
                 <Toaster />
               </WizardProvider>

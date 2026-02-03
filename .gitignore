@@ -43,3 +43,10 @@ next-env.d.ts
 # Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
 ralph.txt
+settings.json
+errors.txt
+ralph*.md
+.playwright-mcp/
+
+VERCEL_MIGRATION.md
+*.csv

@@ -339,8 +339,8 @@ describe('retryWithBackoff', () => {
 
       await vi.runAllTimersAsync()
 
-      // Default maxRetries is 3, so 4 total calls
-      expect(mockFn).toHaveBeenCalledTimes(4)
+      // Default maxRetries is 5, so 6 total calls
+      expect(mockFn).toHaveBeenCalledTimes(6)
     })
 
     it('preserves error type on final throw', async () => {

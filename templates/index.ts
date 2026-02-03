@@ -15,7 +15,7 @@ export * from "./enrollment";
  */
 export const TEMPLATE_METADATA = {
   groups: {
-    displayName: "Dynamic Groups",
+    displayName: "Entra Groups",
     description: "Azure AD dynamic groups for device categorization (43 dynamic + 4 static)",
     count: 47,
     icon: "Users",
@@ -28,8 +28,8 @@ export const TEMPLATE_METADATA = {
   },
   baseline: {
     displayName: "OpenIntuneBaseline",
-    description: "Security baseline policies (Windows, macOS, iOS, Android)",
-    count: 98,
+    description: "Security baseline policies (Windows, macOS)",
+    count: 93,
     icon: "ShieldCheck",
   },
   compliance: {
@@ -59,7 +59,7 @@ export const TEMPLATE_METADATA = {
   cisBaseline: {
     displayName: "CIS Intune Baselines",
     description: "CIS security benchmarks for Windows, macOS, iOS, Android, and browsers",
-    count: 720,
+    count: 717,
     icon: "ShieldAlert",
     hasSubcategories: true,
   },

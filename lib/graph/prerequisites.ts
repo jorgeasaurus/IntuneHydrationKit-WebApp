@@ -11,6 +11,7 @@ import {
   PermissionCheckResult,
   PrerequisiteCheckResult,
   INTUNE_SERVICE_PLANS,
+  CONDITIONAL_ACCESS_SERVICE_PLANS,
   PREMIUM_P2_SERVICE_PLANS,
   WINDOWS_DRIVER_UPDATE_SERVICE_PLANS,
   REQUIRED_GRAPH_SCOPES,
@@ -79,6 +80,12 @@ export async function checkLicenses(
   );
   const hasIntuneLicense = intuneServicePlans.length > 0;
 
+  // Check for Conditional Access licenses (Entra ID Premium P1+)
+  const conditionalAccessServicePlans = [...allServicePlanNames].filter((name) =>
+    CONDITIONAL_ACCESS_SERVICE_PLANS.includes(name as never)
+  );
+  const hasConditionalAccessLicense = conditionalAccessServicePlans.length > 0;
+
   // Check for Premium P2 licenses
   const premiumP2ServicePlans = [...allServicePlanNames].filter((name) =>
     PREMIUM_P2_SERVICE_PLANS.includes(name as never)
@@ -95,6 +102,9 @@ export async function checkLicenses(
     `[Prerequisites] Intune license: ${hasIntuneLicense ? "✓" : "✗"} (${intuneServicePlans.length} plans)`
   );
   console.log(
+    `[Prerequisites] Conditional Access (P1) license: ${hasConditionalAccessLicense ? "✓" : "⚠"} (${conditionalAccessServicePlans.length} plans)`
+  );
+  console.log(
     `[Prerequisites] Premium P2 license: ${hasPremiumP2License ? "✓" : "⚠"} (${premiumP2ServicePlans.length} plans)`
   );
   console.log(
@@ -103,9 +113,11 @@ export async function checkLicenses(
 
   return {
     hasIntuneLicense,
+    hasConditionalAccessLicense,
     hasPremiumP2License,
     hasWindowsDriverUpdateLicense,
     intuneServicePlans,
+    conditionalAccessServicePlans,
     premiumP2ServicePlans,
     windowsDriverUpdateServicePlans,
     allSkus: skus,
@@ -229,7 +241,11 @@ export async function validatePrerequisites(
         );
       }
 
-      if (!result.licenses.hasPremiumP2License) {
+      if (!result.licenses.hasConditionalAccessLicense) {
+        result.warnings.push(
+          "No Entra ID Premium (P1) license found. All Conditional Access policies will be skipped during creation."
+        );
+      } else if (!result.licenses.hasPremiumP2License) {
         result.warnings.push(
           "No Azure AD Premium P2 license found. Conditional Access policies that use risk-based conditions (signInRiskLevels, userRiskLevels, insiderRiskLevels) will be skipped during creation."
         );

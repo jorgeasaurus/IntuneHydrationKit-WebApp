@@ -33,9 +33,11 @@ export interface SubscribedSku {
 
 export interface LicenseCheckResult {
   hasIntuneLicense: boolean;
+  hasConditionalAccessLicense: boolean;
   hasPremiumP2License: boolean;
   hasWindowsDriverUpdateLicense: boolean;
   intuneServicePlans: string[];
+  conditionalAccessServicePlans: string[];
   premiumP2ServicePlans: string[];
   windowsDriverUpdateServicePlans: string[];
   allSkus: SubscribedSku[];
@@ -102,6 +104,46 @@ export const PREMIUM_P2_SERVICE_PLANS = [
 
   // Azure Advanced Threat Protection (now part of Defender for Identity)
   "ATA", // Azure ATP
+] as const;
+
+/**
+ * Conditional Access service plan names (requires Entra ID Premium P1 or higher)
+ * CA requires at minimum P1. All P2 plans also include P1.
+ */
+export const CONDITIONAL_ACCESS_SERVICE_PLANS = [
+  // Azure AD Premium P1 standalone
+  "AAD_PREMIUM",
+
+  // Azure AD Premium P2 (P2 implies P1)
+  "AAD_PREMIUM_P2",
+
+  // Enterprise Mobility + Security E3/E5
+  "EMSPREMIUM", // EMS E5
+  "EMS", // EMS E3
+
+  // Microsoft 365 E3/E5 suites
+  "SPE_E3", // Microsoft 365 E3
+  "SPE_E5", // Microsoft 365 E5
+  "SPE_E3_GOV", // Microsoft 365 E3 (Gov)
+  "SPE_E5_GOV", // Microsoft 365 E5 (Gov)
+  "M365_E3", // Microsoft 365 E3 (alternate)
+  "M365_E5", // Microsoft 365 E5 (alternate)
+  "SPE_E3_USGOV_GCCHIGH", // Microsoft 365 E3 GCC High
+  "SPE_E5_USGOV_GCCHIGH", // Microsoft 365 E5 GCC High
+
+  // Microsoft 365 Education A3/A5
+  "M365EDU_A3_FACULTY",
+  "M365EDU_A3_STUDENT",
+  "M365EDU_A5_FACULTY",
+  "M365EDU_A5_STUDENT",
+
+  // Microsoft 365 Business Premium
+  "SPB",
+  "SMB_BUSINESS_PREMIUM",
+  "O365_BUSINESS_PREMIUM",
+
+  // Identity & Threat Protection
+  "IDENTITY_THREAT_PROTECTION",
 ] as const;
 
 /**

@@ -57,6 +57,17 @@
         "kind": "build",
         "isDefault": true
       }
+    },
+    {
+      "label": "commit-push-deploy",
+      "type": "shell",
+      "command": "git add -A && git commit && git push && vercel --prod",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "focus": true
+      },
+      "problemMatcher": []
     }
   ]
 }

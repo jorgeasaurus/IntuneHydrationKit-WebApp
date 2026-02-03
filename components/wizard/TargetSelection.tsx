@@ -57,6 +57,63 @@ const PLATFORM_NAMES: Record<OIBPlatformId, string> = {
   WINDOWS365: "Windows 365 Cloud PC",
 };
 
+// OS Platform filters for quick selection
+const OS_PLATFORM_FILTERS = [
+  { id: "windows", label: "Windows" },
+  { id: "macos", label: "macOS" },
+  { id: "ios", label: "iOS/iPadOS" },
+  { id: "android", label: "Android" },
+  { id: "linux", label: "Linux" },
+] as const;
+
+type OSPlatformFilterId = typeof OS_PLATFORM_FILTERS[number]["id"];
+
+// Platform matching patterns for each category
+const platformMatchesItem = (platform: OSPlatformFilterId, item: CategoryItem, category: TaskCategory): boolean => {
+  const name = item.displayName.toLowerCase();
+  const subtype = item.subtype?.toLowerCase() || "";
+  const desc = item.description?.toLowerCase() || "";
+  const combined = `${name} ${subtype} ${desc}`;
+
+  switch (platform) {
+    case "windows":
+      // Windows matches: Windows, Win10, Win11, Windows365, and PC manufacturers (Dell, HP, Lenovo, Surface)
+      if (category === "baseline") {
+        return subtype.includes("windows") || subtype.includes("windows365");
+      }
+      // Include Windows keywords and PC manufacturers (excluding Apple)
+      return combined.includes("windows") || combined.includes("win10") || combined.includes("win11") ||
+        combined.includes("dell") || combined.includes(" hp ") || name.includes("hp devices") ||
+        combined.includes("lenovo") || combined.includes("surface");
+    case "macos":
+      // macOS matches: macOS, Mac, Apple (but not iOS/iPad)
+      if (category === "baseline") {
+        return subtype.includes("macos");
+      }
+      return combined.includes("macos") || (combined.includes("mac") && !combined.includes("machine"));
+    case "ios":
+      // iOS matches: iOS, iPadOS, iPad, iPhone, Apple (mobile)
+      return combined.includes("ios") || combined.includes("ipad") || combined.includes("iphone");
+    case "android":
+      // Android matches: Android
+      return combined.includes("android");
+    case "linux":
+      // Linux matches: Linux
+      return combined.includes("linux");
+    default:
+      return false;
+  }
+};
+
+// Categories that each platform affects
+const PLATFORM_CATEGORIES: Record<OSPlatformFilterId, TaskCategory[]> = {
+  windows: ["groups", "filters", "baseline", "compliance", "enrollment", "conditionalAccess", "cisBaseline"],
+  macos: ["groups", "filters", "baseline", "compliance", "cisBaseline"],
+  ios: ["groups", "filters", "baseline", "compliance", "appProtection", "cisBaseline"],
+  android: ["groups", "filters", "baseline", "compliance", "appProtection", "cisBaseline"],
+  linux: ["groups", "filters", "compliance", "cisBaseline"],
+};
+
 // Generic item type for category items
 interface CategoryItem {
   displayName: string;
@@ -107,6 +164,9 @@ export function TargetSelection() {
 
   // Search state
   const [searchQuery, setSearchQuery] = useState("");
+
+  // Platform filter state
+  const [selectedPlatformFilters, setSelectedPlatformFilters] = useState<Set<string>>(new Set());
 
   // Load category items when expanded
   const loadCategoryItems = useCallback(async (category: TaskCategory) => {
@@ -187,10 +247,21 @@ export function TargetSelection() {
 
       setCategoryItems(prev => ({ ...prev, [category]: items }));
 
-      // If no items selected yet, select all by default
+      // If no items selected yet, apply platform filters or select all
       if (!selectedItems[category] || selectedItems[category].size === 0) {
-        const allNames = items.map(i => i.displayName);
-        setSelectedItems(prev => ({ ...prev, [category]: new Set(allNames) }));
+        if (selectedPlatformFilters.size > 0) {
+          // Apply platform filters to newly loaded items
+          const matchingItems = items.filter(item =>
+            [...selectedPlatformFilters].some(platform =>
+              platformMatchesItem(platform as OSPlatformFilterId, item, category)
+            )
+          );
+          setSelectedItems(prev => ({ ...prev, [category]: new Set(matchingItems.map(i => i.displayName)) }));
+        } else {
+          // No platform filters - select all by default
+          const allNames = items.map(i => i.displayName);
+          setSelectedItems(prev => ({ ...prev, [category]: new Set(allNames) }));
+        }
       }
     } catch (error) {
       console.error(`Error loading ${category} items:`, error);
@@ -201,7 +272,7 @@ export function TargetSelection() {
         return next;
       });
     }
-  }, [categoryItems, loadingCategories, selectedItems]);
+  }, [categoryItems, loadingCategories, selectedItems, selectedPlatformFilters]);
 
   // Load items when category is enabled
   useEffect(() => {
@@ -219,14 +290,30 @@ export function TargetSelection() {
       fetchCISBaselineManifest().then(manifest => {
         setCISManifest(manifest);
         setCISLoading(false);
-        // If no policies selected yet, select all by default
+        // If no policies selected yet, apply platform filters or select all
         if (manifest && selectedCISPolicies.size === 0) {
-          const allPaths = manifest.files.map(f => f.path);
-          setSelectedCISPolicies(new Set(allPaths));
+          if (selectedPlatformFilters.size > 0) {
+            // Apply platform filters to CIS policies
+            const matchingPolicies = manifest.files.filter(f => {
+              const item: CategoryItem = {
+                displayName: f.displayName,
+                subtype: f.category,
+                description: f.subcategory,
+              };
+              return [...selectedPlatformFilters].some(platform =>
+                platformMatchesItem(platform as OSPlatformFilterId, item, "cisBaseline")
+              );
+            });
+            setSelectedCISPolicies(new Set(matchingPolicies.map(f => f.path)));
+          } else {
+            // No platform filters - select all by default
+            const allPaths = manifest.files.map(f => f.path);
+            setSelectedCISPolicies(new Set(allPaths));
+          }
         }
       });
     }
-  }, [targets, cisManifest, cisLoading, selectedCISPolicies.size]);
+  }, [targets, cisManifest, cisLoading, selectedCISPolicies.size, selectedPlatformFilters]);
 
   const toggleCategoryExpanded = (category: TaskCategory) => {
     setExpandedCategories(prev => {
@@ -441,9 +528,10 @@ export function TargetSelection() {
     });
   };
 
-  // Global select/deselect - respects search filter
-  const handleSelectAll = () => {
+  // Global select/deselect - respects search filter AND platform filters
+  const handleSelectAll = async () => {
     const search = searchQuery.toLowerCase().trim();
+    const hasPlatformFilters = selectedPlatformFilters.size > 0;
 
     if (search) {
       // When searching, only select matching categories and items
@@ -489,8 +577,70 @@ export function TargetSelection() {
         setSelectedCISPolicies(prev => new Set([...prev, ...matchingCIS]));
         setCISCategories(CIS_CATEGORIES.map(c => c.id));
       }
+    } else if (hasPlatformFilters) {
+      // Platform filters active - only select items matching the platforms
+      const platforms = [...selectedPlatformFilters] as OSPlatformFilterId[];
+
+      // Get all categories that might have matching items
+      const allPlatformCategories = new Set<TaskCategory>();
+      platforms.forEach(p => PLATFORM_CATEGORIES[p].forEach(c => allPlatformCategories.add(c)));
+
+      // For each category, find matching items and only enable if there are matches
+      const categoriesToEnable: TaskCategory[] = [];
+      const newSelected: Record<string, Set<string>> = {};
+
+      for (const [cat, items] of Object.entries(categoryItems)) {
+        const category = cat as TaskCategory;
+        if (!allPlatformCategories.has(category)) continue;
+
+        const matchingItems = items.filter(item =>
+          platforms.some(platform => platformMatchesItem(platform, item, category))
+        );
+
+        if (matchingItems.length > 0) {
+          categoriesToEnable.push(category);
+          newSelected[category] = new Set(matchingItems.map(i => i.displayName));
+        }
+      }
+
+      // Handle baseline separately
+      if (baselineManifest && allPlatformCategories.has("baseline")) {
+        const matchingBaseline = baselineManifest.files.filter(f => {
+          const item: CategoryItem = {
+            displayName: f.path,
+            subtype: `${f.platform} - ${f.policyType || "Config"}`.toLowerCase(),
+          };
+          return platforms.some(platform => platformMatchesItem(platform, item, "baseline"));
+        });
+        if (matchingBaseline.length > 0) {
+          categoriesToEnable.push("baseline");
+          newSelected.baseline = new Set(matchingBaseline.map(f => f.path));
+        }
+      }
+
+      // Handle CIS baseline separately
+      if (cisManifest && allPlatformCategories.has("cisBaseline")) {
+        const matchingCIS = cisManifest.files.filter(f => {
+          const item: CategoryItem = {
+            displayName: f.displayName,
+            subtype: f.category,
+            description: f.subcategory,
+          };
+          return platforms.some(platform => platformMatchesItem(platform, item, "cisBaseline"));
+        });
+        if (matchingCIS.length > 0) {
+          categoriesToEnable.push("cisBaseline");
+          setSelectedCISPolicies(new Set(matchingCIS.map(f => f.path)));
+          setCISCategories(CIS_CATEGORIES.map(c => c.id));
+        }
+      }
+
+      // Only enable categories that have matching items
+      setTargets(categoriesToEnable);
+      setExpandedCategories(new Set(categoriesToEnable));
+      setSelectedItems(newSelected);
     } else {
-      // No search - select everything
+      // No search, no platform filters - select everything
       setTargets(TARGETS.map(t => t.id));
       setCISCategories(CIS_CATEGORIES.map(c => c.id));
       setExpandedCategories(new Set(TARGETS.map(t => t.id)));
@@ -499,6 +649,31 @@ export function TargetSelection() {
         newSelected[cat] = new Set(items.map(i => i.displayName));
       }
       setSelectedItems(prev => ({ ...prev, ...newSelected }));
+
+      // Load and select all baseline items
+      let manifest = baselineManifest;
+      if (!manifest) {
+        manifest = await fetchOIBManifest();
+        if (manifest) setBaselineManifest(manifest);
+      }
+      if (manifest) {
+        setSelectedItems(prev => ({
+          ...prev,
+          baseline: new Set(manifest!.files.map(f => f.path))
+        }));
+      }
+
+      // Load and select all CIS baseline items
+      let cis = cisManifest;
+      if (!cis && !cisLoading) {
+        setCISLoading(true);
+        cis = await fetchCISBaselineManifest();
+        setCISManifest(cis);
+        setCISLoading(false);
+      }
+      if (cis) {
+        setSelectedCISPolicies(new Set(cis.files.map(f => f.path)));
+      }
     }
   };
 
@@ -553,6 +728,278 @@ export function TargetSelection() {
       setExpandedCategories(new Set());
       setSelectedItems({});
       setSelectedCISPolicies(new Set());
+    }
+  };
+
+  // Helper to load category items inline (for platform filter)
+  const loadCategoryItemsInline = async (category: TaskCategory): Promise<CategoryItem[]> => {
+    // Return cached items if available
+    if (categoryItems[category]) return categoryItems[category];
+
+    let items: CategoryItem[] = [];
+
+    switch (category) {
+      case "groups": {
+        const [dynamic, static_] = await Promise.all([fetchDynamicGroups(), fetchStaticGroups()]);
+        items = [...dynamic, ...static_].map(g => ({
+          displayName: g.displayName,
+          description: g.description,
+          subtype: g.membershipRule ? "Dynamic" : "Static",
+        }));
+        break;
+      }
+      case "filters": {
+        const filters = await fetchFilters();
+        items = filters.map(f => ({
+          displayName: f.displayName,
+          description: f.description,
+          subtype: f.platform,
+        }));
+        break;
+      }
+      case "compliance": {
+        const policies = await fetchCompliancePolicies();
+        items = policies.map(p => ({
+          displayName: p.displayName,
+          description: p.description,
+          subtype: p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") || "",
+        }));
+        break;
+      }
+      case "conditionalAccess": {
+        const policies = await fetchConditionalAccessPolicies();
+        items = policies.map(p => ({
+          displayName: p.displayName,
+          subtype: "CA Policy",
+        }));
+        break;
+      }
+      case "appProtection": {
+        const policies = await fetchAppProtectionPolicies();
+        items = policies.map(p => ({
+          displayName: p.displayName,
+          description: p.description,
+          subtype: p["@odata.type"]?.includes("ios") ? "iOS" : "Android",
+        }));
+        break;
+      }
+      case "enrollment": {
+        const profiles = await fetchEnrollmentProfiles();
+        items = (profiles as Array<{ displayName?: string; description?: string }>).map(p => ({
+          displayName: p.displayName || "Unknown Profile",
+          description: p.description,
+          subtype: "Autopilot",
+        }));
+        break;
+      }
+    }
+
+    // Cache the items
+    if (items.length > 0) {
+      setCategoryItems(prev => ({ ...prev, [category]: items }));
+    }
+
+    return items;
+  };
+
+  // Platform filter toggle - selects/deselects all items matching the platform
+  const togglePlatformFilter = async (platformId: OSPlatformFilterId) => {
+    const isCurrentlySelected = selectedPlatformFilters.has(platformId);
+
+    // Update the platform filter state
+    setSelectedPlatformFilters(prev => {
+      const next = new Set(prev);
+      if (isCurrentlySelected) {
+        next.delete(platformId);
+      } else {
+        next.add(platformId);
+      }
+      return next;
+    });
+
+    if (!isCurrentlySelected) {
+      // Adding platform - only enable categories that have matching items
+      const platformCategories = PLATFORM_CATEGORIES[platformId];
+      const categoriesToEnable: TaskCategory[] = [];
+      const newSelectedItems: Record<string, Set<string>> = {};
+
+      // Load all category items in parallel for categories that need loading
+      const categoriesToLoad = platformCategories.filter(
+        cat => cat !== "baseline" && cat !== "cisBaseline" && !categoryItems[cat]
+      );
+
+      // Start loading all categories in parallel
+      const loadPromises: Promise<{ category: TaskCategory; items: CategoryItem[] }>[] = [];
+
+      for (const category of categoriesToLoad) {
+        loadPromises.push(
+          loadCategoryItemsInline(category).then(items => ({ category, items }))
+        );
+      }
+
+      // Load baseline manifest if needed
+      let loadedBaselineManifest = baselineManifest;
+      if (!baselineManifest && platformCategories.includes("baseline")) {
+        loadPromises.push(
+          fetchOIBManifest().then(manifest => {
+            loadedBaselineManifest = manifest;
+            if (manifest) {
+              setBaselineManifest(manifest);
+            }
+            return { category: "baseline" as TaskCategory, items: [] };
+          })
+        );
+      }
+
+      // Load CIS manifest if needed
+      let loadedCISManifest = cisManifest;
+      if (!cisManifest && !cisLoading && platformCategories.includes("cisBaseline")) {
+        setCISLoading(true);
+        loadPromises.push(
+          fetchCISBaselineManifest().then(manifest => {
+            loadedCISManifest = manifest;
+            setCISManifest(manifest);
+            setCISLoading(false);
+            return { category: "cisBaseline" as TaskCategory, items: [] };
+          }).catch(() => {
+            setCISLoading(false);
+            return { category: "cisBaseline" as TaskCategory, items: [] };
+          })
+        );
+      }
+
+      // Wait for all loads to complete
+      const loadedResults = await Promise.all(loadPromises);
+
+      // Build a combined map of all loaded items
+      const allCategoryItems: Record<string, CategoryItem[]> = { ...categoryItems };
+      for (const result of loadedResults) {
+        if (result.items.length > 0) {
+          allCategoryItems[result.category] = result.items;
+        }
+      }
+
+      // Now process all categories with fresh data
+      for (const category of platformCategories) {
+        if (category === "baseline" || category === "cisBaseline") continue;
+
+        const items = allCategoryItems[category] || [];
+        if (items.length === 0) continue;
+
+        const matchingItems = items.filter(item => platformMatchesItem(platformId, item, category));
+        if (matchingItems.length > 0) {
+          if (!targets.includes(category)) {
+            categoriesToEnable.push(category);
+          }
+          const current = selectedItems[category] || new Set();
+          newSelectedItems[category] = new Set([...current, ...matchingItems.map(i => i.displayName)]);
+        }
+      }
+
+      // Handle baseline - use freshly loaded manifest if available
+      const effectiveBaselineManifest = loadedBaselineManifest || baselineManifest;
+      if (effectiveBaselineManifest && platformCategories.includes("baseline")) {
+        const matchingBaseline = effectiveBaselineManifest.files.filter(f => {
+          const item: CategoryItem = {
+            displayName: f.path,
+            subtype: `${f.platform} - ${f.policyType || "Config"}`.toLowerCase(),
+          };
+          return platformMatchesItem(platformId, item, "baseline");
+        });
+        if (matchingBaseline.length > 0) {
+          if (!targets.includes("baseline")) {
+            categoriesToEnable.push("baseline");
+          }
+          const current = selectedItems.baseline || new Set();
+          newSelectedItems.baseline = new Set([...current, ...matchingBaseline.map(f => f.path)]);
+        }
+      }
+
+      // Handle CIS baseline - use freshly loaded manifest if available
+      const effectiveCISManifest = loadedCISManifest || cisManifest;
+      if (effectiveCISManifest && platformCategories.includes("cisBaseline")) {
+        const matchingCIS = effectiveCISManifest.files.filter(f => {
+          const item: CategoryItem = {
+            displayName: f.displayName,
+            subtype: f.category,
+            description: f.subcategory,
+          };
+          return platformMatchesItem(platformId, item, "cisBaseline");
+        });
+        if (matchingCIS.length > 0) {
+          if (!targets.includes("cisBaseline")) {
+            categoriesToEnable.push("cisBaseline");
+          }
+          setSelectedCISPolicies(prev => new Set([...prev, ...matchingCIS.map(f => f.path)]));
+          setCISCategories(CIS_CATEGORIES.map(c => c.id));
+        }
+      }
+
+      // Only enable categories that have matching items
+      if (categoriesToEnable.length > 0) {
+        setTargets(prev => [...new Set([...prev, ...categoriesToEnable])]);
+        setExpandedCategories(prev => new Set([...prev, ...categoriesToEnable]));
+      }
+
+      // Update selected items
+      setSelectedItems(prev => ({ ...prev, ...newSelectedItems }));
+    } else {
+      // Removing platform - deselect items that match ONLY this platform (not other selected platforms)
+      const remainingPlatforms = [...selectedPlatformFilters].filter(p => p !== platformId) as OSPlatformFilterId[];
+      const newSelectedItems: Record<string, Set<string>> = {};
+
+      for (const [cat, items] of Object.entries(categoryItems)) {
+        const category = cat as TaskCategory;
+        const current = selectedItems[category];
+        if (!current) continue;
+
+        // Keep items that don't match this platform OR match another selected platform
+        const filtered = new Set([...current].filter(itemName => {
+          const item = items.find(i => i.displayName === itemName);
+          if (!item) return true;
+          const matchesRemovedPlatform = platformMatchesItem(platformId, item, category);
+          if (!matchesRemovedPlatform) return true;
+          // Keep if it matches any remaining selected platform
+          return remainingPlatforms.some(p => platformMatchesItem(p, item, category));
+        }));
+        newSelectedItems[category] = filtered;
+      }
+
+      // Handle baseline
+      if (baselineManifest && selectedItems.baseline) {
+        const filtered = new Set([...selectedItems.baseline].filter(path => {
+          const file = baselineManifest.files.find(f => f.path === path);
+          if (!file) return true;
+          const item: CategoryItem = {
+            displayName: file.path,
+            subtype: `${file.platform} - ${file.policyType || "Config"}`.toLowerCase(),
+          };
+          const matchesRemovedPlatform = platformMatchesItem(platformId, item, "baseline");
+          if (!matchesRemovedPlatform) return true;
+          return remainingPlatforms.some(p => platformMatchesItem(p, item, "baseline"));
+        }));
+        newSelectedItems.baseline = filtered;
+      }
+
+      // Handle CIS
+      if (cisManifest) {
+        setSelectedCISPolicies(prev => {
+          return new Set([...prev].filter(path => {
+            const file = cisManifest.files.find(f => f.path === path);
+            if (!file) return true;
+            const item: CategoryItem = {
+              displayName: file.displayName,
+              subtype: file.category,
+              description: file.subcategory,
+            };
+            const matchesRemovedPlatform = platformMatchesItem(platformId, item, "cisBaseline");
+            if (!matchesRemovedPlatform) return true;
+            return remainingPlatforms.some(p => platformMatchesItem(p, item, "cisBaseline"));
+          }));
+        });
+      }
+
+      setSelectedItems(prev => ({ ...prev, ...newSelectedItems }));
     }
   };
 
@@ -733,6 +1180,26 @@ export function TargetSelection() {
           <Button variant="outline" size="sm" onClick={handleDeselectAll}>
             Deselect All
           </Button>
+        </div>
+
+        {/* Platform filter checkboxes */}
+        <div className="flex flex-wrap gap-4 items-center py-2 px-1 border rounded-md bg-muted/30">
+          <span className="text-sm font-medium text-muted-foreground pl-2">Filter by OS:</span>
+          {OS_PLATFORM_FILTERS.map(platform => (
+            <div key={platform.id} className="flex items-center gap-2">
+              <Checkbox
+                id={`platform-filter-${platform.id}`}
+                checked={selectedPlatformFilters.has(platform.id)}
+                onCheckedChange={() => togglePlatformFilter(platform.id)}
+              />
+              <Label
+                htmlFor={`platform-filter-${platform.id}`}
+                className="text-sm cursor-pointer"
+              >
+                {platform.label}
+              </Label>
+            </div>
+          ))}
         </div>
 
         {/* Search results info */}

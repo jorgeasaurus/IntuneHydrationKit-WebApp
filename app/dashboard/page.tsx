@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft } from "lucide-react";
-import { ProgressBar, TaskList, ExecutionControls } from "@/components/dashboard";
+import { ProgressBar, TaskList, ExecutionControls, ActivityLog } from "@/components/dashboard";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
 import { useWizardState } from "@/hooks/useWizardState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,6 +22,8 @@ export default function DashboardPage() {
     startTime,
     endTime,
     summary,
+    batchProgress,
+    activityLog,
     startExecution,
     pause,
     resume,
@@ -130,12 +132,16 @@ export default function DashboardPage() {
               isPaused={isPaused}
               isCompleted={isCompleted}
               startTime={startTime}
+              batchProgress={batchProgress}
               onPause={isRunning && !isPaused ? pause : undefined}
               onResume={isRunning && isPaused ? resume : undefined}
               onCancel={isRunning ? cancel : undefined}
               onDownloadLog={handleDownloadLog}
             />
           )}
+
+          {/* Activity Log - shows what's happening behind the scenes */}
+          <ActivityLog messages={activityLog} />
 
           {/* Task List */}
           <TaskList tasks={tasks} />

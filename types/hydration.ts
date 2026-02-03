@@ -38,6 +38,40 @@ export interface HydrationTask {
   endTime?: Date;
 }
 
+/**
+ * Batch execution statistics
+ */
+export interface BatchExecutionStats {
+  /** Whether batch execution was used */
+  batchingEnabled: boolean;
+  /** Batch size used */
+  batchSize: number;
+  /** Number of batch requests sent */
+  batchRequestCount: number;
+  /** Number of tasks executed via batch */
+  batchedTaskCount: number;
+  /** Number of tasks executed sequentially */
+  sequentialTaskCount: number;
+}
+
+/**
+ * Real-time batch progress for UI display
+ */
+export interface BatchProgress {
+  /** Whether batch mode is active */
+  isActive: boolean;
+  /** Current batch number being processed (1-indexed) */
+  currentBatch: number;
+  /** Total number of batches */
+  totalBatches: number;
+  /** Number of items in current batch */
+  itemsInBatch: number;
+  /** API version being used (v1.0 or beta) */
+  apiVersion: string;
+  /** Timestamp when current batch started */
+  batchStartTime?: Date;
+}
+
 export interface HydrationSummary {
   tenantId: string;
   tenantName?: string;
@@ -70,6 +104,8 @@ export interface HydrationSummary {
     message: string;
     timestamp: Date;
   }>;
+  /** Batch execution statistics (optional, present when batching was used) */
+  batchStats?: BatchExecutionStats;
 }
 
 export interface LicenseCheck {

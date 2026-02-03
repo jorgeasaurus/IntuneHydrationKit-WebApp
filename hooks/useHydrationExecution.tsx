@@ -1,11 +1,14 @@
 "use client";
 
 import { useState, useCallback, useRef } from "react";
-import { HydrationTask, HydrationSummary } from "@/types/hydration";
+import { HydrationTask, HydrationSummary, BatchExecutionStats, BatchProgress } from "@/types/hydration";
 import { createGraphClient } from "@/lib/graph/client";
 import { buildTaskQueueAsync, executeTasks, ExecutionContext } from "@/lib/hydration/engine";
+import { ActivityMessage } from "@/lib/hydration/types";
 import { createSummary } from "@/lib/hydration/reporter";
 import { useWizardState } from "./useWizardState";
+import { getBatchConfig } from "@/lib/config/batchConfig";
+import { isBatchableCategory } from "@/lib/hydration/batchExecutor";
 
 interface ExecutionState {
   tasks: HydrationTask[];
@@ -15,6 +18,9 @@ interface ExecutionState {
   startTime: Date | null;
   endTime: Date | null;
   summary: HydrationSummary | null;
+  batchProgress: BatchProgress | null;
+  /** Activity log showing what's happening behind the scenes */
+  activityLog: ActivityMessage[];
 }
 
 export function useHydrationExecution() {
@@ -27,7 +33,12 @@ export function useHydrationExecution() {
     startTime: null,
     endTime: null,
     summary: null,
+    batchProgress: null,
+    activityLog: [],
   });
+
+  // Counter for generating unique activity message IDs
+  const activityIdCounter = useRef(0);
 
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
@@ -70,6 +81,8 @@ export function useHydrationExecution() {
       startTime,
       endTime: null,
       summary: null,
+      batchProgress: null,
+      activityLog: [],
     });
 
     // Reset control refs
@@ -88,16 +101,41 @@ export function useHydrationExecution() {
         }));
       };
 
+      // Batch progress callback
+      const updateBatchProgress = (progress: BatchProgress) => {
+        setExecutionState((prev) => ({
+          ...prev,
+          batchProgress: progress,
+        }));
+      };
+
+      // Status update callback for activity log
+      const updateStatus = (message: ActivityMessage) => {
+        // Generate unique ID if not provided
+        const msgWithId: ActivityMessage = {
+          ...message,
+          id: message.id || `activity-${activityIdCounter.current++}`,
+        };
+        setExecutionState((prev) => ({
+          ...prev,
+          // Keep last 100 messages to prevent memory issues
+          activityLog: [...prev.activityLog.slice(-99), msgWithId],
+        }));
+      };
+
       // Create execution context
       const context: ExecutionContext = {
         client,
         operationMode: state.operationMode,
         stopOnFirstError: false,
+        hasConditionalAccessLicense: state.prerequisiteResult?.licenses?.hasConditionalAccessLicense ?? true,
         hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,
         hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true,
         onTaskStart: updateTask,
         onTaskComplete: updateTask,
         onTaskError: updateTask,
+        onBatchProgress: updateBatchProgress,
+        onStatusUpdate: updateStatus,
         shouldCancel: () => cancelRef.current,
         shouldPause: () => pauseRef.current,
       };
@@ -105,14 +143,32 @@ export function useHydrationExecution() {
       // Execute tasks with pause/cancel support
       await executeTasks(tasks, context);
 
-      // Create summary
+      // Create summary with batch stats
       const endTime = new Date();
+      const batchConfig = getBatchConfig();
+      const usedBatching = batchConfig.enableBatching && state.operationMode === "create";
+
+      // Calculate batch stats
+      let batchStats: BatchExecutionStats | undefined;
+      if (usedBatching) {
+        const batchableTasks = tasks.filter((t) => isBatchableCategory(t.category));
+        const sequentialTasks = tasks.filter((t) => !isBatchableCategory(t.category));
+        batchStats = {
+          batchingEnabled: true,
+          batchSize: batchConfig.defaultBatchSize,
+          batchRequestCount: Math.ceil(batchableTasks.length / batchConfig.defaultBatchSize),
+          batchedTaskCount: batchableTasks.length,
+          sequentialTaskCount: sequentialTasks.length,
+        };
+      }
+
       const summary = createSummary(
         state.tenantConfig.tenantId,
         state.operationMode,
         startTime,
         endTime,
-        tasks
+        tasks,
+        batchStats
       );
 
       setExecutionState((prev) => ({
@@ -121,6 +177,7 @@ export function useHydrationExecution() {
         isCompleted: true,
         endTime,
         summary,
+        batchProgress: prev.batchProgress ? { ...prev.batchProgress, isActive: false } : null,
       }));
     } catch (error) {
       console.error("Execution failed:", error);
@@ -129,6 +186,7 @@ export function useHydrationExecution() {
         isRunning: false,
         isCompleted: true,
         endTime: new Date(),
+        batchProgress: prev.batchProgress ? { ...prev.batchProgress, isActive: false } : null,
       }));
       throw error;
     } finally {
@@ -186,6 +244,8 @@ export function useHydrationExecution() {
       startTime: null,
       endTime: null,
       summary: null,
+      batchProgress: null,
+      activityLog: [],
     });
     pauseRef.current = false;
     cancelRef.current = false;
