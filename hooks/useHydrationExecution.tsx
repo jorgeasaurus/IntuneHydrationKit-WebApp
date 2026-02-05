@@ -15,6 +15,7 @@ interface ExecutionState {
   isRunning: boolean;
   isPaused: boolean;
   isCompleted: boolean;
+  isBuildingQueue: boolean;
   startTime: Date | null;
   endTime: Date | null;
   summary: HydrationSummary | null;
@@ -30,6 +31,7 @@ export function useHydrationExecution() {
     isRunning: false,
     isPaused: false,
     isCompleted: false,
+    isBuildingQueue: false,
     startTime: null,
     endTime: null,
     summary: null,
@@ -61,6 +63,29 @@ export function useHydrationExecution() {
     // Acquire execution lock
     executionLockRef.current = true;
 
+    // Signal that we're building the task queue
+    const emitQueueProgress = (message: string, type: ActivityMessage["type"] = "progress") => {
+      const msg: ActivityMessage = {
+        id: `queue-${activityIdCounter.current++}`,
+        timestamp: new Date(),
+        message,
+        type,
+        category: "queue",
+      };
+      setExecutionState((prev) => ({
+        ...prev,
+        activityLog: [...prev.activityLog.slice(-99), msg],
+      }));
+    };
+
+    setExecutionState((prev) => ({
+      ...prev,
+      isBuildingQueue: true,
+      activityLog: [],
+    }));
+
+    emitQueueProgress("Building task queue...");
+
     // Build task queue with real templates from local IntuneTemplates directory
     const tasks = await buildTaskQueueAsync(
       state.selectedTargets,
@@ -69,21 +94,25 @@ export function useHydrationExecution() {
         selectedCISCategories: state.selectedCISCategories,
         baselineSelection: state.baselineSelection,
         categorySelections: state.categorySelections,
+        onProgress: emitQueueProgress,
       }
     );
     const startTime = new Date();
 
-    setExecutionState({
+    emitQueueProgress(`Task queue ready: ${tasks.length} tasks queued`, "success");
+
+    setExecutionState((prev) => ({
+      ...prev,
       tasks,
       isRunning: true,
       isPaused: false,
       isCompleted: false,
+      isBuildingQueue: false,
       startTime,
       endTime: null,
       summary: null,
       batchProgress: null,
-      activityLog: [],
-    });
+    }));
 
     // Reset control refs
     pauseRef.current = false;
@@ -241,6 +270,7 @@ export function useHydrationExecution() {
       isRunning: false,
       isPaused: false,
       isCompleted: false,
+      isBuildingQueue: false,
       startTime: null,
       endTime: null,
       summary: null,

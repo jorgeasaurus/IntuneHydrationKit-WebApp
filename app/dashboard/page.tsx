@@ -4,12 +4,12 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
 import { ProgressBar, TaskList, ExecutionControls, ActivityLog } from "@/components/dashboard";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
 import { useWizardState } from "@/hooks/useWizardState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -19,6 +19,7 @@ export default function DashboardPage() {
     isRunning,
     isPaused,
     isCompleted,
+    isBuildingQueue,
     startTime,
     endTime,
     summary,
@@ -118,12 +119,35 @@ export default function DashboardPage() {
             </Alert>
           )}
 
+          {/* Building Queue Indicator */}
+          {isBuildingQueue && tasks.length === 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                  Preparing Hydration
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground">
+                  Building task queue -- loading and validating templates for the selected categories.
+                  This may take a moment for large selections.
+                </p>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full w-full animate-pulse bg-gradient-to-r from-blue-500/40 via-blue-500 to-blue-500/40 rounded-full" />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Progress Overview */}
-          <ProgressBar
-            tasks={tasks}
-            title="Overall Progress"
-            description={`${tasks.filter((t) => t.status === "success" || t.status === "failed" || t.status === "skipped").length} of ${tasks.length} tasks completed`}
-          />
+          {tasks.length > 0 && (
+            <ProgressBar
+              tasks={tasks}
+              title="Overall Progress"
+              description={`${tasks.filter((t) => t.status === "success" || t.status === "failed" || t.status === "skipped").length} of ${tasks.length} tasks completed`}
+            />
+          )}
 
           {/* Execution Controls */}
           {startTime && (

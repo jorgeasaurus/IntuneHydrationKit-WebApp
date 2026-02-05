@@ -255,7 +255,7 @@ export async function executeTasks(
 
   const needsV1ComplianceCache =
     (hasComplianceTasks && batchConfig.enableBatching) ||
-    (hasBaselineTasks && (context.operationMode === "delete" || context.operationMode === "preview"));
+    ((hasBaselineTasks || hasCISTasks) && (context.operationMode === "delete" || context.operationMode === "preview"));
 
   if (needsV1ComplianceCache && !context.cachedCompliancePolicies) {
     emitStatus(context, "Querying existing Compliance policies...", "progress", "prefetch");
@@ -314,8 +314,8 @@ export async function executeTasks(
 
   // Pre-fetch Driver Update Profiles for DELETE/PREVIEW mode or CREATE mode with batching
   const needsDriverUpdateCache =
-    ((context.operationMode === "delete" || context.operationMode === "preview") && hasBaselineTasks) ||
-    (context.operationMode === "create" && batchConfig.enableBatching && hasBaselineTasks);
+    ((context.operationMode === "delete" || context.operationMode === "preview") && (hasBaselineTasks || hasCISTasks)) ||
+    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
 
   if (needsDriverUpdateCache && !context.cachedDriverUpdateProfiles) {
     emitStatus(context, "Querying Driver Update profiles...", "progress", "prefetch");
@@ -337,7 +337,7 @@ export async function executeTasks(
   // Pre-fetch Device Configurations for DELETE mode or CREATE mode with batching (Health Monitoring, etc.)
   // This enables duplicate detection in batch mode and proper deletion/preview
   const needsDeviceConfigCache =
-    ((context.operationMode === "delete" || context.operationMode === "preview") && hasBaselineTasks) ||
+    ((context.operationMode === "delete" || context.operationMode === "preview") && (hasBaselineTasks || hasCISTasks)) ||
     (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
 
   if (needsDeviceConfigCache && !context.cachedDeviceConfigurations) {

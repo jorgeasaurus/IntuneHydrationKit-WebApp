@@ -110,9 +110,13 @@ export async function buildTaskQueueAsync(
     selectedCISCategories?: CISCategoryId[];
     baselineSelection?: BaselineSelection;
     categorySelections?: CategorySelections;
+    /** Callback for reporting progress during queue construction */
+    onProgress?: (message: string, type?: "info" | "progress" | "success" | "warning" | "error") => void;
   }
 ): Promise<HydrationTask[]> {
+  const emit = options?.onProgress;
   console.log(`[Task Queue] Building task queue for categories:`, selectedCategories);
+  emit?.(`Preparing ${selectedCategories.length} categor${selectedCategories.length === 1 ? "y" : "ies"}: ${selectedCategories.join(", ")}`);
   if (options?.selectedCISCategories) {
     console.log(`[Task Queue] Selected CIS categories:`, options.selectedCISCategories);
   }
@@ -125,8 +129,24 @@ export async function buildTaskQueueAsync(
   const tasks: HydrationTask[] = [];
   let taskId = 1;
 
+  /** Display names for progress messages */
+  const CATEGORY_LABELS: Partial<Record<TaskCategory, string>> = {
+    groups: "Dynamic Groups",
+    filters: "Device Filters",
+    compliance: "Compliance Policies",
+    appProtection: "App Protection Policies",
+    conditionalAccess: "Conditional Access Policies",
+    enrollment: "Enrollment Profiles",
+    baseline: "OpenIntuneBaseline Policies",
+    cisBaseline: "CIS Baseline Policies",
+  };
+
+  let categoryIndex = 0;
   for (const category of selectedCategories) {
+    categoryIndex++;
     console.log(`[Task Queue] Processing category: ${category}`);
+    const label = CATEGORY_LABELS[category] || category;
+    emit?.(`[${categoryIndex}/${selectedCategories.length}] Loading templates for ${label}...`);
     let items: Array<{ displayName: string }> = [];
 
     // CIS baselines use a special cache key that includes selected categories
@@ -148,16 +168,21 @@ export async function buildTaskQueueAsync(
     const cached = getCachedTemplates(cacheKey);
     if (cached && Array.isArray(cached)) {
       console.log(`[Task Queue] Using ${cached.length} cached templates for ${cacheKey}`);
+      emit?.(`Using ${cached.length} cached templates for ${label}`, "info");
       items = cached as Array<{ displayName: string }>;
     } else {
       console.log(`[Task Queue] Cache miss for ${cacheKey}, fetching fresh templates...`);
+      emit?.(`Fetching templates for ${label}...`);
       // Fetch fresh templates
       switch (category) {
         case "groups":
           {
             console.log(`[Task Queue] Fetching dynamic and static groups...`);
+            emit?.("Fetching dynamic groups...");
             const dynamicGroups = await fetchDynamicGroups();
+            emit?.(`Found ${dynamicGroups.length} dynamic groups. Fetching static groups...`);
             const staticGroups = await fetchStaticGroups();
+            emit?.(`Found ${staticGroups.length} static groups`, "info");
             let allGroups = [...dynamicGroups, ...staticGroups];
 
             // Filter by selected items if categorySelections is provided
@@ -166,6 +191,7 @@ export async function buildTaskQueueAsync(
               const selectedSet = new Set(groupSelection.selectedItems);
               allGroups = allGroups.filter(g => selectedSet.has(g.displayName));
               console.log(`[Task Queue] Filtered to ${allGroups.length} selected groups`);
+              emit?.(`Filtered to ${allGroups.length} of ${dynamicGroups.length + staticGroups.length} groups based on selection`, "info");
             }
 
             items = allGroups;
@@ -176,14 +202,17 @@ export async function buildTaskQueueAsync(
         case "filters":
           {
             console.log(`[Task Queue] Fetching device filters...`);
+            emit?.("Fetching device filter templates...");
             let filters = await fetchFilters();
 
             // Filter by selected items if categorySelections is provided
             const filterSelection = options?.categorySelections?.filters;
             if (filterSelection?.selectedItems && filterSelection.selectedItems.length > 0) {
               const selectedSet = new Set(filterSelection.selectedItems);
+              const totalCount = filters.length;
               filters = filters.filter(f => selectedSet.has(f.displayName));
               console.log(`[Task Queue] Filtered to ${filters.length} selected filters`);
+              emit?.(`Filtered to ${filters.length} of ${totalCount} device filters based on selection`, "info");
             }
 
             items = filters;
@@ -193,14 +222,17 @@ export async function buildTaskQueueAsync(
           break;
         case "compliance":
           {
+            emit?.("Fetching compliance policy templates...");
             let policies = await fetchCompliancePolicies();
 
             // Filter by selected items if categorySelections is provided
             const complianceSelection = options?.categorySelections?.compliance;
             if (complianceSelection?.selectedItems && complianceSelection.selectedItems.length > 0) {
               const selectedSet = new Set(complianceSelection.selectedItems);
+              const totalCount = policies.length;
               policies = policies.filter(p => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${policies.length} selected compliance policies`);
+              emit?.(`Filtered to ${policies.length} of ${totalCount} compliance policies based on selection`, "info");
             }
 
             items = policies;
@@ -209,14 +241,17 @@ export async function buildTaskQueueAsync(
           break;
         case "conditionalAccess":
           {
+            emit?.("Fetching conditional access policy templates...");
             let policies = await fetchConditionalAccessPolicies();
 
             // Filter by selected items if categorySelections is provided
             const caSelection = options?.categorySelections?.conditionalAccess;
             if (caSelection?.selectedItems && caSelection.selectedItems.length > 0) {
               const selectedSet = new Set(caSelection.selectedItems);
+              const totalCount = policies.length;
               policies = policies.filter(p => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${policies.length} selected CA policies`);
+              emit?.(`Filtered to ${policies.length} of ${totalCount} conditional access policies based on selection`, "info");
             }
 
             items = policies;
@@ -225,14 +260,17 @@ export async function buildTaskQueueAsync(
           break;
         case "appProtection":
           {
+            emit?.("Fetching app protection policy templates...");
             let policies = await fetchAppProtectionPolicies();
 
             // Filter by selected items if categorySelections is provided
             const appSelection = options?.categorySelections?.appProtection;
             if (appSelection?.selectedItems && appSelection.selectedItems.length > 0) {
               const selectedSet = new Set(appSelection.selectedItems);
+              const totalCount = policies.length;
               policies = policies.filter(p => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${policies.length} selected app protection policies`);
+              emit?.(`Filtered to ${policies.length} of ${totalCount} app protection policies based on selection`, "info");
             }
 
             items = policies;
@@ -241,14 +279,17 @@ export async function buildTaskQueueAsync(
           break;
         case "enrollment":
           {
+            emit?.("Fetching enrollment profile templates...");
             let profiles = await fetchEnrollmentProfiles() as Array<{ displayName?: string }>;
 
             // Filter by selected items if categorySelections is provided
             const enrollmentSelection = options?.categorySelections?.enrollment;
             if (enrollmentSelection?.selectedItems && enrollmentSelection.selectedItems.length > 0) {
               const selectedSet = new Set(enrollmentSelection.selectedItems);
+              const totalCount = profiles.length;
               profiles = profiles.filter(p => selectedSet.has(p.displayName || ""));
               console.log(`[Task Queue] Filtered to ${profiles.length} selected enrollment profiles`);
+              emit?.(`Filtered to ${profiles.length} of ${totalCount} enrollment profiles based on selection`, "info");
             }
 
             items = profiles as Array<{ displayName: string }>;
@@ -258,13 +299,17 @@ export async function buildTaskQueueAsync(
         case "baseline":
           {
             console.log(`[Task Queue] Fetching OpenIntuneBaseline policies...`);
+            emit?.("Fetching OpenIntuneBaseline policies from local templates...");
             let baselinePolicies = await fetchBaselinePolicies();
+            emit?.(`Found ${baselinePolicies.length} baseline policies`, "info");
 
             // Filter by selected policies if baselineSelection is provided
             if (options?.baselineSelection?.selectedPolicies && options.baselineSelection.selectedPolicies.length > 0) {
               const selectedPaths = new Set(options.baselineSelection.selectedPolicies);
+              const totalCount = baselinePolicies.length;
               baselinePolicies = baselinePolicies.filter(p => selectedPaths.has(p._oibFilePath));
               console.log(`[Task Queue] Filtered to ${baselinePolicies.length} selected baseline policies`);
+              emit?.(`Filtered to ${baselinePolicies.length} of ${totalCount} baseline policies based on selection`, "info");
             }
 
             items = baselinePolicies as Array<{ displayName: string }>;
@@ -290,18 +335,24 @@ export async function buildTaskQueueAsync(
             // Use filtered fetch if specific categories are selected (legacy approach)
             if (options?.selectedCISCategories && options.selectedCISCategories.length > 0) {
               console.log(`[Task Queue] Fetching CIS baselines for selected categories:`, options.selectedCISCategories);
+              emit?.(`Fetching CIS baselines for ${options.selectedCISCategories.length} sub-categories...`);
               cisItems = await fetchCISBaselinePoliciesByCategories(options.selectedCISCategories);
+              emit?.(`Found ${cisItems.length} CIS policies across ${options.selectedCISCategories.length} sub-categories`, "info");
             } else {
+              emit?.("Fetching all CIS Intune Baseline policies...");
               // Fetch all if no specific categories selected
               cisItems = await fetchCISBaselinePolicies();
+              emit?.(`Found ${cisItems.length} CIS baseline policies`, "info");
             }
 
             // Filter by selected policy paths if categorySelections is provided (new approach)
             const cisSelection = options?.categorySelections?.cisBaseline;
             if (cisSelection?.selectedItems && cisSelection.selectedItems.length > 0) {
               const selectedPaths = new Set(cisSelection.selectedItems);
+              const totalCount = cisItems.length;
               cisItems = cisItems.filter(p => selectedPaths.has(p._cisFilePath));
               console.log(`[Task Queue] Filtered to ${cisItems.length} selected CIS policies`);
+              emit?.(`Filtered to ${cisItems.length} of ${totalCount} CIS policies based on selection`, "info");
             }
 
             items = cisItems as Array<{ displayName: string }>;
@@ -313,6 +364,9 @@ export async function buildTaskQueueAsync(
           items = [];
       }
     }
+
+    // Report how many tasks are being queued for this category
+    emit?.(`Queuing ${items.length} ${label.toLowerCase()} tasks`, "success");
 
     // For delete/preview mode with specific selections, use selectedItems directly
     // This ensures all selected items appear in the task queue, even if they don't exist in templates
@@ -426,8 +480,10 @@ export async function buildTaskQueueAsync(
   const duplicateCount = tasks.length - deduplicatedTasks.length;
   if (duplicateCount > 0) {
     console.log(`[Task Queue] Removed ${duplicateCount} duplicate task(s)`);
+    emit?.(`Removed ${duplicateCount} duplicate task(s)`, "info");
   }
 
+  emit?.(`Deduplication complete. ${deduplicatedTasks.length} tasks ready for execution`, "success");
   console.log(`[Task Queue] Task queue built successfully with ${deduplicatedTasks.length} total tasks`);
   return deduplicatedTasks;
 }
