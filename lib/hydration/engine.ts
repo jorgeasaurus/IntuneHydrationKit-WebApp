@@ -27,6 +27,16 @@ import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
 import { sleep } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage } from "./types";
+import {
+  executeGroupTask,
+  executeFilterTask,
+  executeComplianceTask,
+  executeConditionalAccessTask,
+  executeAppProtectionTask,
+  executeEnrollmentTask,
+  executeBaselineTask,
+  executeCISBaselineTask,
+} from "./taskExecutors";
 
 /**
  * Helper to emit status updates to UI
@@ -45,16 +55,6 @@ function emitStatus(
     category,
   });
 }
-import {
-  executeGroupTask,
-  executeFilterTask,
-  executeComplianceTask,
-  executeConditionalAccessTask,
-  executeAppProtectionTask,
-  executeEnrollmentTask,
-  executeBaselineTask,
-  executeCISBaselineTask,
-} from "./taskExecutors";
 
 // Re-export types for backwards compatibility
 export type { ExecutionContext, ExecutionResult, CISPolicyType, BuildTaskQueueOptions, ActivityMessage } from "./types";
@@ -312,12 +312,12 @@ export async function executeTasks(
     }
   }
 
-  // Pre-fetch Driver Update Profiles for DELETE/PREVIEW mode or CREATE mode with batching
-  const needsDriverUpdateCache =
+  // Pre-fetch Driver Update Profiles and Device Configurations for baseline/CIS tasks
+  const needsBaselinePolicyCaches =
     ((context.operationMode === "delete" || context.operationMode === "preview") && (hasBaselineTasks || hasCISTasks)) ||
     (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
 
-  if (needsDriverUpdateCache && !context.cachedDriverUpdateProfiles) {
+  if (needsBaselinePolicyCaches && !context.cachedDriverUpdateProfiles) {
     emitStatus(context, "Querying Driver Update profiles...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Driver Update Profiles...");
     try {
@@ -334,13 +334,8 @@ export async function executeTasks(
     }
   }
 
-  // Pre-fetch Device Configurations for DELETE mode or CREATE mode with batching (Health Monitoring, etc.)
-  // This enables duplicate detection in batch mode and proper deletion/preview
-  const needsDeviceConfigCache =
-    ((context.operationMode === "delete" || context.operationMode === "preview") && (hasBaselineTasks || hasCISTasks)) ||
-    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
-
-  if (needsDeviceConfigCache && !context.cachedDeviceConfigurations) {
+  // Pre-fetch Device Configurations (Health Monitoring, etc.) - same condition as Driver Update above
+  if (needsBaselinePolicyCaches && !context.cachedDeviceConfigurations) {
     emitStatus(context, "Querying Device Configurations...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Device Configurations...");
     try {

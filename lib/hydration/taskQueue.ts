@@ -33,6 +33,18 @@ export interface BuildTaskQueueOptions {
   categorySelections?: CategorySelections;
 }
 
+/** Display labels for each category */
+const CATEGORY_LABELS: Partial<Record<TaskCategory, string>> = {
+  groups: "Dynamic Groups",
+  filters: "Device Filters",
+  compliance: "Compliance Policies",
+  appProtection: "App Protection Policies",
+  conditionalAccess: "Conditional Access Policies",
+  enrollment: "Enrollment Profiles",
+  baseline: "OpenIntuneBaseline Policies",
+  cisBaseline: "CIS Baseline Policies",
+};
+
 /**
  * Build task queue from selected categories and templates
  * @deprecated Use buildTaskQueueAsync for real template loading
@@ -129,24 +141,10 @@ export async function buildTaskQueueAsync(
   const tasks: HydrationTask[] = [];
   let taskId = 1;
 
-  /** Display names for progress messages */
-  const CATEGORY_LABELS: Partial<Record<TaskCategory, string>> = {
-    groups: "Dynamic Groups",
-    filters: "Device Filters",
-    compliance: "Compliance Policies",
-    appProtection: "App Protection Policies",
-    conditionalAccess: "Conditional Access Policies",
-    enrollment: "Enrollment Profiles",
-    baseline: "OpenIntuneBaseline Policies",
-    cisBaseline: "CIS Baseline Policies",
-  };
-
-  let categoryIndex = 0;
-  for (const category of selectedCategories) {
-    categoryIndex++;
+  for (const [categoryIndex, category] of selectedCategories.entries()) {
     console.log(`[Task Queue] Processing category: ${category}`);
     const label = CATEGORY_LABELS[category] || category;
-    emit?.(`[${categoryIndex}/${selectedCategories.length}] Loading templates for ${label}...`);
+    emit?.(`[${categoryIndex + 1}/${selectedCategories.length}] Loading templates for ${label}...`);
     let items: Array<{ displayName: string }> = [];
 
     // CIS baselines use a special cache key that includes selected categories

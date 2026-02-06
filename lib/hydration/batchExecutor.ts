@@ -18,24 +18,6 @@ import { getBatchConfig } from "@/lib/config/batchConfig";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
-
-/**
- * Helper to emit status updates to UI
- */
-function emitStatus(
-  context: ExecutionContext,
-  message: string,
-  type: ActivityMessage["type"] = "info",
-  category?: string
-) {
-  context.onStatusUpdate?.({
-    id: `batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    timestamp: new Date(),
-    message,
-    type,
-    category,
-  });
-}
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { sleep } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
@@ -55,6 +37,24 @@ import {
 } from "@/lib/templates/loader";
 import * as Templates from "@/templates";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
+
+/**
+ * Helper to emit status updates to UI
+ */
+function emitStatus(
+  context: ExecutionContext,
+  message: string,
+  type: ActivityMessage["type"] = "info",
+  category?: string
+) {
+  context.onStatusUpdate?.({
+    id: `batch-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    timestamp: new Date(),
+    message,
+    type,
+    category,
+  });
+}
 
 /**
  * Task prepared for batch execution
@@ -349,14 +349,22 @@ interface BaselineRequestResult {
   policyType: CISPolicyType;
 }
 
+/** Returned when a policy already exists and should be skipped (not sent to sequential) */
+interface BaselineSkipResult {
+  skip: true;
+  reason: string;
+}
+
+type BaselineBuildResult = BaselineRequestResult | BaselineSkipResult | null;
+
 /**
  * Build request body for a baseline task (OpenIntuneBaseline)
- * Returns null if template not found, already exists, or requires sequential execution
+ * Returns BaselineRequestResult on success, BaselineSkipResult if policy exists, null if template not found/unsupported
  */
 async function buildBaselineRequestBody(
   task: HydrationTask,
   context: ExecutionContext
-): Promise<BaselineRequestResult | null> {
+): Promise<BaselineBuildResult> {
   // Use templates from context (passed directly from engine) or fallback to global cache
   const cachedPolicies = context.cachedBaselineTemplates || getCachedTemplates("baseline");
   let template: BaselinePolicy | undefined;
@@ -421,84 +429,9 @@ async function buildBaselineRequestBody(
     return null;
   }
 
-  // Check if already exists - first check cache, then fall back to individual API call
-  // Cache-only checks can miss policies due to pagination edge cases or replication delays
-  if (policyType === "SettingsCatalog") {
-    const normalizedPolicyName = normalizeName(policyName);
-    const existingPolicy = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingPolicy) {
-      console.log(`[BatchExecutor] SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existingPolicy.name}")`);
-      return null;
-    }
-    // Cache miss - verify with targeted API call before creating
-    const existsViaApi = await settingsCatalogPolicyExists(context.client, policyName);
-    if (existsViaApi) {
-      console.log(`[BatchExecutor] SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
-      return null;
-    }
-  }
-
-  if (policyType === "V2Compliance") {
-    const normalizedPolicyName = normalizeName(policyName);
-    // Check V2 Compliance cache (correct cache for this policy type)
-    const existingV2 = context.cachedV2CompliancePolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingV2) {
-      console.log(`[BatchExecutor] V2Compliance already exists (V2 cache hit), skipping: "${policyName}" (matched: "${existingV2.name}")`);
-      return null;
-    }
-    // Also check Settings Catalog cache (V2 policies sometimes appear there)
-    const existingSC = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingSC) {
-      console.log(`[BatchExecutor] V2Compliance already exists (SC cache hit), skipping: "${policyName}" (matched: "${existingSC.name}")`);
-      return null;
-    }
-    // Cache miss - verify with targeted API call
-    const existsViaApi = await v2CompliancePolicyExists(context.client, policyName);
-    if (existsViaApi) {
-      console.log(`[BatchExecutor] V2Compliance already exists (API fallback), skipping: "${policyName}"`);
-      return null;
-    }
-  }
-
-  // Check if DeviceConfiguration already exists
-  if (policyType === "DeviceConfiguration") {
-    const normalizedPolicyName = normalizeName(policyName);
-    const existingConfig = context.cachedDeviceConfigurations?.find(
-      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.displayName) === normalizedPolicyName
-    );
-    if (existingConfig) {
-      console.log(`[BatchExecutor] DeviceConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existingConfig.displayName}")`);
-      return null;
-    }
-    // Cache miss - verify with targeted API call
-    const existsViaApi = await deviceConfigurationExists(context.client, policyName);
-    if (existsViaApi) {
-      console.log(`[BatchExecutor] DeviceConfiguration already exists (API fallback), skipping: "${policyName}"`);
-      return null;
-    }
-  }
-
-  // Check if DriverUpdateProfile already exists
-  if (policyType === "DriverUpdateProfiles") {
-    const normalizedPolicyName = normalizeName(policyName);
-    const existingProfile = context.cachedDriverUpdateProfiles?.find(
-      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.displayName) === normalizedPolicyName
-    );
-    if (existingProfile) {
-      console.log(`[BatchExecutor] DriverUpdateProfile already exists (cache hit), skipping: "${policyName}"`);
-      return null;
-    }
+  // Check if policy already exists (cache-first with API fallback)
+  if (await policyExistsInCacheOrApi(policyType, policyName, context)) {
+    return { skip: true, reason: `${policyType} "${policyName}" already exists` };
   }
 
   // Build the appropriate request body
@@ -539,12 +472,12 @@ async function buildBaselineRequestBody(
 
 /**
  * Build request body for a CIS baseline task
- * Returns null if template not found, already exists, or requires sequential execution
+ * Returns BaselineRequestResult on success, BaselineSkipResult if policy exists, null if template not found/unsupported
  */
 async function buildCISBaselineRequestBody(
   task: HydrationTask,
   context: ExecutionContext
-): Promise<BaselineRequestResult | null> {
+): Promise<BaselineBuildResult> {
   // CIS templates are cached with keys like "cisBaseline-cis-windows-11,cis-browser"
   // We need to search all matching cache keys
   let template: CISBaselinePolicy | undefined;
@@ -580,71 +513,9 @@ async function buildCISBaselineRequestBody(
     return null;
   }
 
-  // Check if already exists - first check cache, then fall back to individual API call
-  // Cache-only checks can miss policies due to pagination edge cases or replication delays
-  if (policyType === "SettingsCatalog") {
-    const normalizedPolicyName = normalizeName(policyName);
-    const existingPolicy = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingPolicy) {
-      console.log(`[BatchExecutor] CIS SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existingPolicy.name}")`);
-      return null;
-    }
-    // Cache miss - verify with targeted API call before creating
-    const existsViaApi = await settingsCatalogPolicyExists(context.client, policyName);
-    if (existsViaApi) {
-      console.log(`[BatchExecutor] CIS SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
-      return null;
-    }
-  }
-
-  if (policyType === "V2Compliance") {
-    const normalizedPolicyName = normalizeName(policyName);
-    // Check V2 Compliance cache (correct cache for this policy type)
-    const existingV2 = context.cachedV2CompliancePolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingV2) {
-      console.log(`[BatchExecutor] CIS V2Compliance already exists (V2 cache hit), skipping: "${policyName}" (matched: "${existingV2.name}")`);
-      return null;
-    }
-    // Also check Settings Catalog cache (V2 policies sometimes appear there)
-    const existingSC = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingSC) {
-      console.log(`[BatchExecutor] CIS V2Compliance already exists (SC cache hit), skipping: "${policyName}" (matched: "${existingSC.name}")`);
-      return null;
-    }
-    // Cache miss - verify with targeted API call
-    const existsViaApi = await v2CompliancePolicyExists(context.client, policyName);
-    if (existsViaApi) {
-      console.log(`[BatchExecutor] CIS V2Compliance already exists (API fallback), skipping: "${policyName}"`);
-      return null;
-    }
-  }
-
-  // Check if DeviceConfiguration already exists
-  if (policyType === "DeviceConfiguration") {
-    const normalizedPolicyName = normalizeName(policyName);
-    const existingConfig = context.cachedDeviceConfigurations?.find(
-      (p) => p.displayName?.toLowerCase() === policyName.toLowerCase() ||
-             normalizeName(p.displayName) === normalizedPolicyName
-    );
-    if (existingConfig) {
-      console.log(`[BatchExecutor] CIS DeviceConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existingConfig.displayName}")`);
-      return null;
-    }
-    // Cache miss - verify with targeted API call
-    const existsViaApi = await deviceConfigurationExists(context.client, policyName);
-    if (existsViaApi) {
-      console.log(`[BatchExecutor] CIS DeviceConfiguration already exists (API fallback), skipping: "${policyName}"`);
-      return null;
-    }
+  // Check if policy already exists (cache-first with API fallback)
+  if (await policyExistsInCacheOrApi(policyType, policyName, context, "[BatchExecutor] CIS")) {
+    return { skip: true, reason: `${policyType} "${policyName}" already exists` };
   }
 
   // Build the appropriate request body
@@ -733,6 +604,7 @@ async function prepareTaskForBatch(
     case "baseline": {
       const baselineResult = await buildBaselineRequestBody(task, context);
       if (!baselineResult) return { type: "sequential" };
+      if ("skip" in baselineResult) return { type: "skip", reason: baselineResult.reason };
       body = baselineResult.body;
       endpoint = baselineResult.endpoint;
       break;
@@ -745,6 +617,7 @@ async function prepareTaskForBatch(
         console.log(`[BatchExecutor] CIS task "${task.itemName}" could not be prepared for batch`);
         return { type: "sequential" };
       }
+      if ("skip" in cisResult) return { type: "skip", reason: cisResult.reason };
       console.log(`[BatchExecutor] CIS task "${task.itemName}" prepared with endpoint: ${cisResult.endpoint}`);
       body = cisResult.body;
       endpoint = cisResult.endpoint;
@@ -1182,6 +1055,87 @@ function normalizeName(name: string | undefined | null): string {
     // Collapse multiple spaces to single space
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/**
+ * Check if a policy already exists using cache-first strategy with API fallback.
+ * Consolidates existence checks for SettingsCatalog, V2Compliance,
+ * DeviceConfiguration, and DriverUpdateProfiles.
+ */
+async function policyExistsInCacheOrApi(
+  policyType: string,
+  policyName: string,
+  context: ExecutionContext,
+  logPrefix = "[BatchExecutor]"
+): Promise<boolean> {
+  const normalizedPolicyName = normalizeName(policyName);
+  const lowerName = policyName.toLowerCase();
+
+  if (policyType === "SettingsCatalog") {
+    const existing = context.cachedSettingsCatalogPolicies?.find(
+      (p) => p.name?.toLowerCase() === lowerName || normalizeName(p.name) === normalizedPolicyName
+    );
+    if (existing) {
+      console.log(`${logPrefix} SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name}")`);
+      return true;
+    }
+    if (await settingsCatalogPolicyExists(context.client, policyName)) {
+      console.log(`${logPrefix} SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
+  if (policyType === "V2Compliance") {
+    const existingV2 = context.cachedV2CompliancePolicies?.find(
+      (p) => p.name?.toLowerCase() === lowerName || normalizeName(p.name) === normalizedPolicyName
+    );
+    if (existingV2) {
+      console.log(`${logPrefix} V2Compliance already exists (V2 cache hit), skipping: "${policyName}" (matched: "${existingV2.name}")`);
+      return true;
+    }
+    // V2 policies sometimes appear in Settings Catalog cache
+    const existingSC = context.cachedSettingsCatalogPolicies?.find(
+      (p) => p.name?.toLowerCase() === lowerName || normalizeName(p.name) === normalizedPolicyName
+    );
+    if (existingSC) {
+      console.log(`${logPrefix} V2Compliance already exists (SC cache hit), skipping: "${policyName}" (matched: "${existingSC.name}")`);
+      return true;
+    }
+    if (await v2CompliancePolicyExists(context.client, policyName)) {
+      console.log(`${logPrefix} V2Compliance already exists (API fallback), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
+  if (policyType === "DeviceConfiguration") {
+    const existing = context.cachedDeviceConfigurations?.find(
+      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
+    );
+    if (existing) {
+      console.log(`${logPrefix} DeviceConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    if (await deviceConfigurationExists(context.client, policyName)) {
+      console.log(`${logPrefix} DeviceConfiguration already exists (API fallback), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
+  if (policyType === "DriverUpdateProfiles") {
+    const existing = context.cachedDriverUpdateProfiles?.find(
+      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
+    );
+    if (existing) {
+      console.log(`${logPrefix} DriverUpdateProfile already exists (cache hit), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
+  return false;
 }
 
 /**
