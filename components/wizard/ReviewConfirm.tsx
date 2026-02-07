@@ -22,29 +22,15 @@ export function ReviewConfirm() {
   };
 
   const getModeLabel = () => {
-    switch (state.operationMode) {
-      case "create":
-        return "Create";
-      case "delete":
-        return "Delete";
-      case "preview":
-        return "Preview";
-      default:
-        return "Unknown";
-    }
+    const baseLabel = state.operationMode === "create" ? "Create" : "Delete";
+    return state.isPreview ? `${baseLabel} (Preview)` : baseLabel;
   };
 
   const getActionButtonText = () => {
-    switch (state.operationMode) {
-      case "create":
-        return "Start Hydration";
-      case "delete":
-        return "Start Deletion";
-      case "preview":
-        return "Preview Changes";
-      default:
-        return "Start";
+    if (state.isPreview) {
+      return state.operationMode === "create" ? "Preview Create" : "Preview Delete";
     }
+    return state.operationMode === "create" ? "Start Hydration" : "Start Deletion";
   };
 
   return (
@@ -113,7 +99,7 @@ export function ReviewConfirm() {
           </div>
         </div>
 
-        {state.operationMode !== "preview" && (
+        {!state.isPreview && (
           <div className="flex items-start space-x-3 space-y-0 rounded-md border p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900/50">
             <Checkbox
               id="acknowledge"
@@ -131,13 +117,13 @@ export function ReviewConfirm() {
           </div>
         )}
 
-        {state.operationMode === "preview" && (
+        {state.isPreview && (
           <div className="rounded-md border p-4 bg-blue-50 dark:bg-blue-950/30 border-blue-200 dark:border-blue-900">
             <p className="text-sm text-blue-900 dark:text-blue-100 font-medium">
               Preview Mode
             </p>
             <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-              Preview mode will not make any changes to your tenant. You can proceed without confirmation.
+              Preview mode will check what would {state.operationMode === "create" ? "be created" : "be deleted"} without making any changes to your tenant.
             </p>
           </div>
         )}
@@ -148,7 +134,7 @@ export function ReviewConfirm() {
           </Button>
           <Button
             onClick={handleStart}
-            disabled={!acknowledged && state.operationMode !== "preview"}
+            disabled={!acknowledged && !state.isPreview}
             className="flex-1"
           >
             {getActionButtonText()}

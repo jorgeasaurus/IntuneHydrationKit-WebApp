@@ -21,11 +21,7 @@ export async function executeComplianceTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  const { client, operationMode: mode } = context;
-
-  if (mode === "preview") {
-    return { task, success: true, skipped: false };
-  }
+  const { client, operationMode: mode, isPreview } = context;
 
   // Try to get template from cache first, fallback to hardcoded templates
   let template: ComplianceTemplate | CompliancePolicy | undefined;
@@ -49,10 +45,15 @@ export async function executeComplianceTask(
     if (exists) {
       return {
         task,
-        success: false,
+        success: true,
         skipped: true,
-        error: "Policy already exists",
+        error: "Already exists",
       };
+    }
+
+    // Preview mode - would create
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     // Create the policy with 504 verification
@@ -104,6 +105,17 @@ export async function executeComplianceTask(
       };
     }
   } else if (mode === "delete") {
+    // Check if policy exists first
+    const exists = await compliancePolicyExists(client, template.displayName);
+    if (!exists) {
+      return { task, success: true, skipped: true, error: "Not found in tenant" };
+    }
+
+    // Preview mode - would delete
+    if (isPreview) {
+      return { task, success: true, skipped: false };
+    }
+
     // Delete the policy with 504 verification
     try {
       const result = await deleteCompliancePolicyByName(client, template.displayName);

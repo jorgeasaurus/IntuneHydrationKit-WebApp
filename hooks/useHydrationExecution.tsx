@@ -156,6 +156,7 @@ export function useHydrationExecution() {
       const context: ExecutionContext = {
         client,
         operationMode: state.operationMode,
+        isPreview: state.isPreview,
         stopOnFirstError: false,
         hasConditionalAccessLicense: state.prerequisiteResult?.licenses?.hasConditionalAccessLicense ?? true,
         hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,

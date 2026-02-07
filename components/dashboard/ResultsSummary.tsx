@@ -2,8 +2,9 @@
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { HydrationSummary, HydrationTask } from "@/types/hydration";
-import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle } from "lucide-react";
+import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle, Eye } from "lucide-react";
 import {
   generateMarkdownReport,
   generateJSONReport,
@@ -16,9 +17,10 @@ import { format } from "date-fns";
 interface ResultsSummaryProps {
   summary: HydrationSummary;
   tasks: HydrationTask[];
+  isPreview?: boolean;
 }
 
-export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
+export function ResultsSummary({ summary, tasks, isPreview = false }: ResultsSummaryProps) {
   const handleDownload = (fileFormat: "md" | "json" | "csv") => {
     let content: string;
     let filename: string;
@@ -60,15 +62,43 @@ export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
     }
   };
 
+  // Get appropriate labels based on mode and preview state
+  const getActionLabel = () => {
+    if (isPreview) {
+      return summary.operationMode === "create" ? "Would Create" : "Would Delete";
+    }
+    return summary.operationMode === "create" ? "Created" : "Deleted";
+  };
+
+  const getActionCount = () => {
+    return summary.operationMode === "create"
+      ? summary.stats.created
+      : summary.stats.deleted;
+  };
+
   return (
     <div className="space-y-6">
+      {/* Preview Mode Banner */}
+      {isPreview && (
+        <Alert className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30">
+          <Eye className="h-4 w-4" />
+          <AlertTitle>Preview Mode</AlertTitle>
+          <AlertDescription>
+            This is a preview of what would happen. No changes were made to your tenant.
+            {summary.operationMode === "create"
+              ? " Items marked as 'Would Create' do not exist in your tenant yet."
+              : " Items marked as 'Would Delete' would be removed from your tenant."}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Summary Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Execution Summary</CardTitle>
+          <CardTitle>{isPreview ? "Preview" : "Execution"} Summary</CardTitle>
           <CardDescription>
-            {summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)}{" "}
-            operation completed on {format(summary.endTime, "PPp")}
+            {isPreview ? "Preview of " : ""}{summary.operationMode}{" "}
+            operation {isPreview ? "completed" : "completed"} on {format(summary.endTime, "PPp")}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -79,13 +109,9 @@ export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
               <p className="text-2xl font-bold">{summary.stats.total}</p>
             </div>
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">
-                {summary.operationMode === "create" ? "Created" : "Deleted"}
-              </p>
+              <p className="text-sm text-muted-foreground">{getActionLabel()}</p>
               <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {summary.operationMode === "create"
-                  ? summary.stats.created
-                  : summary.stats.deleted}
+                {getActionCount()}
               </p>
             </div>
             <div className="space-y-1">
@@ -201,14 +227,20 @@ export function ResultsSummary({ summary, tasks }: ResultsSummaryProps) {
       {/* Successfully Imported Items */}
       {(() => {
         const successfulTasks = tasks.filter((task) => task.status === "success");
+        const actionVerb = isPreview
+          ? (summary.operationMode === "create" ? "Would Be Created" : "Would Be Deleted")
+          : (summary.operationMode === "create" ? "Created" : "Deleted");
+        const actionDescription = isPreview
+          ? (summary.operationMode === "create" ? "would be created" : "would be deleted")
+          : (summary.operationMode === "create" ? "were created" : "were deleted");
         return successfulTasks.length > 0 ? (
           <Card className="border-green-200 dark:border-green-900">
             <CardHeader>
               <CardTitle className="text-green-600 dark:text-green-400">
-                Successfully {summary.operationMode === "create" ? "Created" : "Deleted"} Items ({successfulTasks.length})
+                {isPreview ? "Items That " : "Successfully "}{actionVerb} ({successfulTasks.length})
               </CardTitle>
               <CardDescription>
-                Items that were successfully {summary.operationMode === "create" ? "created" : "deleted"} in your tenant
+                Items that {actionDescription} in your tenant
               </CardDescription>
             </CardHeader>
             <CardContent>

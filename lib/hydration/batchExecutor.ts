@@ -592,6 +592,12 @@ async function prepareTaskForBatch(
       if (context.hasConditionalAccessLicense === false) {
         return { type: "skip", reason: "No Entra ID Premium (P1) license" };
       }
+
+      // Check if policy already exists
+      if (await policyExistsInCacheOrApi("ConditionalAccess", task.itemName, context)) {
+        return { type: "skip", reason: "Already exists" };
+      }
+
       const result = buildConditionalAccessRequestBody(task);
       if (result.type === "skip") return { type: "skip", reason: result.reason };
       if (result.type === "error") return { type: "sequential" };
@@ -823,6 +829,18 @@ async function executeBatchGroup(
 
     while (currentItems.length > 0 && retryCount <= maxRetries) {
       try {
+        // Preview mode: simulate successful responses without making API calls
+        if (context.isPreview) {
+          for (const { task } of currentItems) {
+            task.status = "success";
+            task.endTime = new Date();
+            results.push({ task, success: true, skipped: false });
+            context.onTaskComplete?.(task);
+          }
+          currentItems = [];
+          continue;
+        }
+
         const batchResult = await context.client.batch(
           currentItems.map((t) => t.request),
           version
@@ -1135,6 +1153,25 @@ async function policyExistsInCacheOrApi(
     return false;
   }
 
+  if (policyType === "ConditionalAccess") {
+    // CA policies are created with " [Intune Hydration Kit]" suffix
+    // Check for both the original name and the suffixed version
+    const suffixedLowerName = `${lowerName} [intune hydration kit]`;
+    const existing = context.cachedConditionalAccessPolicies?.find(
+      (p) => {
+        const pLower = p.displayName?.toLowerCase();
+        return pLower === lowerName ||
+               pLower === suffixedLowerName ||
+               normalizeName(p.displayName) === normalizedPolicyName;
+      }
+    );
+    if (existing) {
+      console.log(`${logPrefix} ConditionalAccess policy already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    return false;
+  }
+
   return false;
 }
 
@@ -1403,6 +1440,11 @@ async function checkResourceAssignments(
   resourceId: string,
   endpointType?: BaselineEndpointType
 ): Promise<number> {
+  // Skip assignment checks in preview mode - they're read-only but slow
+  if (context.isPreview) {
+    return 0;
+  }
+
   const assignmentEndpoint = getAssignmentEndpoint(category, resourceId, endpointType);
 
   if (!assignmentEndpoint) {
@@ -1654,6 +1696,18 @@ async function executeDeleteBatchGroup(
 
     while (!batchSuccess && retryCount < maxRetries) {
       try {
+        // Preview mode: simulate successful deletions without making API calls
+        if (context.isPreview) {
+          for (const { task } of chunk) {
+            task.status = "success";
+            task.endTime = new Date();
+            results.push({ task, success: true, skipped: false });
+            context.onTaskComplete?.(task);
+          }
+          batchSuccess = true;
+          continue;
+        }
+
         const batchResult = await context.client.batch(
           chunk.map((t) => t.request),
           version
@@ -2002,11 +2056,14 @@ export async function executeDeletesInParallel(
 
         for (let attempt = 0; attempt < maxRetries; attempt++) {
           try {
-            await context.client.delete(deleteUrl!, apiVersion);
+            // Preview mode: skip actual API call and cache updates
+            if (!context.isPreview) {
+              await context.client.delete(deleteUrl!, apiVersion);
+              updateCacheAfterDelete(task, context);
+            }
 
             task.status = "success";
             task.endTime = new Date();
-            updateCacheAfterDelete(task, context);
             context.onTaskComplete?.(task);
 
             return { task, success: true, skipped: false };

@@ -131,10 +131,10 @@ describe('reporter', () => {
       expect(markdown).toContain('**Operation**: Delete')
     })
 
-    it('handles preview operation mode', () => {
-      const previewSummary = { ...mockSummary, operationMode: 'preview' as const }
-      const markdown = generateMarkdownReport(previewSummary, mockTasks)
-      expect(markdown).toContain('**Operation**: Preview')
+    it('handles create operation mode', () => {
+      const createSummary = { ...mockSummary, operationMode: 'create' as const }
+      const markdown = generateMarkdownReport(createSummary, mockTasks)
+      expect(markdown).toContain('**Operation**: Create')
     })
 
     it('handles empty errors array', () => {

@@ -22,11 +22,7 @@ export async function executeConditionalAccessTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  const { client, operationMode: mode } = context;
-
-  if (mode === "preview") {
-    return { task, success: true, skipped: false };
-  }
+  const { client, operationMode: mode, isPreview } = context;
 
   // Try to get template from cache first, fallback to hardcoded templates
   let template: ConditionalAccessTemplate | ConditionalAccessPolicy | undefined;
@@ -51,7 +47,7 @@ export async function executeConditionalAccessTask(
     );
     return {
       task,
-      success: false,
+      success: true,
       skipped: true,
       error: "No Entra ID Premium (P1) license",
     };
@@ -65,7 +61,7 @@ export async function executeConditionalAccessTask(
       );
       return {
         task,
-        success: false,
+        success: true,
         skipped: true,
         error: "Requires Premium P2 license",
       };
@@ -78,10 +74,15 @@ export async function executeConditionalAccessTask(
     if (exists) {
       return {
         task,
-        success: false,
+        success: true,
         skipped: true,
-        error: "Policy already exists",
+        error: "Already exists",
       };
+    }
+
+    // Preview mode - would create
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     // Convert template to full ConditionalAccessPolicy format if needed
@@ -107,6 +108,24 @@ export async function executeConditionalAccessTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
+    // Check if policy exists first using cached policies if available
+    const existingPolicy = context.cachedConditionalAccessPolicies?.find(
+      (p) => p.displayName?.toLowerCase() === template.displayName.toLowerCase()
+    );
+
+    if (!existingPolicy) {
+      // If no cache, check via API
+      const exists = await conditionalAccessPolicyExists(client, template.displayName);
+      if (!exists) {
+        return { task, success: true, skipped: true, error: "Not found in tenant" };
+      }
+    }
+
+    // Preview mode - would delete
+    if (isPreview) {
+      return { task, success: true, skipped: false };
+    }
+
     // Delete the policy (must be disabled first)
     try {
       await deleteConditionalAccessPolicyByName(client, template.displayName);

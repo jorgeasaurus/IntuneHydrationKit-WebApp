@@ -59,7 +59,7 @@ export const TEMPLATE_METADATA = {
   cisBaseline: {
     displayName: "CIS Intune Baselines",
     description: "CIS security benchmarks for Windows, macOS, iOS, Android, and browsers",
-    count: 717,
+    count: 720,
     icon: "ShieldAlert",
     hasSubcategories: true,
   },
@@ -92,7 +92,7 @@ export const CIS_CATEGORY_METADATA = {
     id: "cis-windows-cis",
     name: "CIS Windows 11 Benchmarks",
     description: "CIS security benchmarks for Windows 11 and macOS",
-    count: 507,
+    count: 501,
   },
   "cis-linux": {
     id: "cis-linux",
@@ -116,7 +116,7 @@ export const CIS_CATEGORY_METADATA = {
     id: "cis-windows-11",
     name: "Windows 11 Benchmarks",
     description: "Windows 11 BitLocker, Edge, and M365 Apps settings",
-    count: 58,
+    count: 56,
   },
   "cis-cloud-pc": {
     id: "cis-cloud-pc",

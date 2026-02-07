@@ -9,6 +9,7 @@ interface WizardContextType {
   setCurrentStep: (step: number) => void;
   setTenantConfig: (config: TenantConfig) => void;
   setOperationMode: (mode: OperationMode) => void;
+  setIsPreview: (isPreview: boolean) => void;
   setSelectedTargets: (targets: TaskCategory[]) => void;
   setSelectedCISCategories: (categories: CISCategoryId[]) => void;
   setBaselineSelection: (selection: BaselineSelection) => void;
@@ -24,6 +25,7 @@ const WizardContext = createContext<WizardContextType | undefined>(undefined);
 
 const initialState: WizardState = {
   currentStep: 1,
+  isPreview: false,
   selectedTargets: [],
   selectedCISCategories: [],
   confirmed: false,
@@ -42,6 +44,10 @@ export function WizardProvider({ children }: { children: ReactNode }) {
 
   const setOperationMode = (mode: OperationMode) => {
     setState((prev) => ({ ...prev, operationMode: mode }));
+  };
+
+  const setIsPreview = (isPreview: boolean) => {
+    setState((prev) => ({ ...prev, isPreview }));
   };
 
   const setSelectedTargets = (targets: TaskCategory[]) => {
@@ -87,6 +93,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
         setCurrentStep,
         setTenantConfig,
         setOperationMode,
+        setIsPreview,
         setSelectedTargets,
         setSelectedCISCategories,
         setBaselineSelection,

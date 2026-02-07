@@ -22,11 +22,7 @@ export async function executeEnrollmentTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  const { client, operationMode: mode } = context;
-
-  if (mode === "preview") {
-    return { task, success: true, skipped: false };
-  }
+  const { client, operationMode: mode, isPreview } = context;
 
   // Get template from cache
   let template: EnrollmentProfile | undefined;
@@ -49,10 +45,15 @@ export async function executeEnrollmentTask(
     if (exists) {
       return {
         task,
-        success: false,
+        success: true,
         skipped: true,
-        error: "Profile already exists",
+        error: "Already exists",
       };
+    }
+
+    // Preview mode - would create
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     const created = await createEnrollmentProfile(client, template);
@@ -63,6 +64,17 @@ export async function executeEnrollmentTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
+    // Check if profile exists first
+    const exists = await enrollmentProfileExists(client, template);
+    if (!exists) {
+      return { task, success: true, skipped: true, error: "Not found in tenant" };
+    }
+
+    // Preview mode - would delete
+    if (isPreview) {
+      return { task, success: true, skipped: false };
+    }
+
     try {
       await deleteEnrollmentProfileByName(client, template.displayName, profileType);
       return { task, success: true, skipped: false };

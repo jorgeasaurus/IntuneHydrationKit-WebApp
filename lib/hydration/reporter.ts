@@ -181,7 +181,7 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
  */
 export function createSummary(
   tenantId: string,
-  operationMode: "create" | "delete" | "preview",
+  operationMode: "create" | "delete",
   startTime: Date,
   endTime: Date,
   tasks: HydrationTask[],

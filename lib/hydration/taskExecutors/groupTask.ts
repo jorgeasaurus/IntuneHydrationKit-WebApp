@@ -17,11 +17,7 @@ export async function executeGroupTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  const { client, operationMode: mode } = context;
-
-  if (mode === "preview") {
-    return { task, success: true, skipped: false };
-  }
+  const { client, operationMode: mode, isPreview } = context;
 
   // Try to get template from cache first, fallback to hardcoded templates
   let template: GroupTemplate | DeviceGroup | undefined;
@@ -49,10 +45,15 @@ export async function executeGroupTask(
     if (existingGroup) {
       return {
         task,
-        success: false,
+        success: true,
         skipped: true,
-        error: "Group already exists",
+        error: "Already exists",
       };
+    }
+
+    // Preview mode - would create
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     // Convert template to full DeviceGroup format if it's a simple template
@@ -100,6 +101,20 @@ export async function executeGroupTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
+    // Check if group exists using pre-fetched cache
+    const existingGroup = context.cachedIntuneGroups?.find(
+      (g) => g.displayName.toLowerCase() === template!.displayName.toLowerCase()
+    );
+
+    if (!existingGroup) {
+      return { task, success: true, skipped: true, error: "Not found in tenant" };
+    }
+
+    // Preview mode - would delete
+    if (isPreview) {
+      return { task, success: true, skipped: false };
+    }
+
     // Delete the group
     try {
       await deleteGroupByName(client, template.displayName);

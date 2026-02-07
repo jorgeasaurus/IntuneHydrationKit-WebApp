@@ -255,7 +255,7 @@ export async function executeTasks(
 
   const needsV1ComplianceCache =
     (hasComplianceTasks && batchConfig.enableBatching) ||
-    ((hasBaselineTasks || hasCISTasks) && (context.operationMode === "delete" || context.operationMode === "preview"));
+    ((hasBaselineTasks || hasCISTasks) && (context.operationMode === "delete" || context.isPreview));
 
   if (needsV1ComplianceCache && !context.cachedCompliancePolicies) {
     emitStatus(context, "Querying existing Compliance policies...", "progress", "prefetch");
@@ -273,10 +273,10 @@ export async function executeTasks(
     }
   }
 
-  // Pre-fetch Settings Catalog policies for DELETE mode or CREATE mode with batching (baseline and CIS tasks)
+  // Pre-fetch Settings Catalog policies for DELETE mode, CREATE mode with batching, or PREVIEW mode (baseline and CIS tasks)
   // This avoids calling getCollection for every single operation and enables duplicate detection in batch mode
   const needsSettingsCatalogCache =
-    ((context.operationMode === "delete" || context.operationMode === "preview") && (hasBaselineTasks || hasCISTasks)) ||
+    ((context.operationMode === "delete" || context.isPreview) && (hasBaselineTasks || hasCISTasks)) ||
     (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
 
   if (needsSettingsCatalogCache && !context.cachedSettingsCatalogPolicies) {
@@ -314,7 +314,7 @@ export async function executeTasks(
 
   // Pre-fetch Driver Update Profiles and Device Configurations for baseline/CIS tasks
   const needsBaselinePolicyCaches =
-    ((context.operationMode === "delete" || context.operationMode === "preview") && (hasBaselineTasks || hasCISTasks)) ||
+    ((context.operationMode === "delete" || context.isPreview) && (hasBaselineTasks || hasCISTasks)) ||
     (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
 
   if (needsBaselinePolicyCaches && !context.cachedDriverUpdateProfiles) {
@@ -366,9 +366,9 @@ export async function executeTasks(
   }
 
   // Check if batch execution is enabled and applicable
+  // Preview mode now uses batching with guards in batchExecutor.ts that skip actual API calls
   const useCreateBatching = batchConfig.enableBatching && context.operationMode === "create";
   const useDeleteBatching = batchConfig.enableBatching && context.operationMode === "delete";
-  const usePreviewBatching = batchConfig.enableBatching && context.operationMode === "preview";
 
   if (useCreateBatching) {
     emitStatus(context, `Starting batch creation (${batchConfig.defaultBatchSize} items per batch)...`, "info", "execute");
@@ -437,7 +437,7 @@ export async function executeTasks(
 
   if (useDeleteBatching) {
     emitStatus(context, "Starting parallel deletion - checking assignments...", "info", "execute");
-    console.log(`[Execute Tasks] Fast parallel DELETE execution enabled (NukeTune-style)`);
+    console.log(`[Execute Tasks] Fast parallel DELETE execution enabled`);
 
     // Separate batchable from non-batchable tasks
     const batchableTasks = tasks.filter((t) => isBatchableCategory(t.category));
@@ -495,66 +495,12 @@ export async function executeTasks(
     return results;
   }
 
-  if (usePreviewBatching) {
-    emitStatus(context, "Running preview simulation...", "info", "execute");
-    console.log(`[Execute Tasks] Batch PREVIEW execution enabled - fast parallel simulation`);
-
-    // Preview mode doesn't make API calls, so we can process all tasks rapidly
-    // Process in batches to allow UI updates and cancellation checks
-    const PREVIEW_BATCH_SIZE = 50;
-
-    for (let i = 0; i < tasks.length; i += PREVIEW_BATCH_SIZE) {
-      // Check for cancellation before each batch
-      if (context.shouldCancel?.()) {
-        console.log("[Execute Tasks] Preview cancelled by user");
-        for (let j = i; j < tasks.length; j++) {
-          tasks[j].status = "skipped";
-          tasks[j].error = "Cancelled by user";
-          results.push({ task: tasks[j], success: false, skipped: true, error: "Cancelled by user" });
-        }
-        break;
-      }
-
-      // Handle pause
-      while (context.shouldPause?.()) {
-        console.log("[Execute Tasks] Preview paused, waiting...");
-        await sleep(500);
-      }
-
-      const batch = tasks.slice(i, i + PREVIEW_BATCH_SIZE);
-
-      // Process batch in parallel (preview tasks are instant)
-      const batchResults = await Promise.all(
-        batch.map(async (task) => {
-          task.status = "running";
-          task.startTime = new Date();
-          context.onTaskStart?.(task);
-
-          // Preview mode always succeeds instantly
-          const result = await executeTask(task, context);
-
-          task.status = result.skipped ? "skipped" : result.success ? "success" : "failed";
-          task.error = result.error;
-          task.endTime = new Date();
-
-          if (result.success || result.skipped) {
-            context.onTaskComplete?.(task);
-          }
-
-          return result;
-        })
-      );
-
-      results.push(...batchResults);
-
-      // Brief yield to allow UI updates between batches
-      await sleep(10);
-    }
-
-    return results;
+  // Sequential execution (batching disabled or preview mode)
+  if (context.isPreview) {
+    emitStatus(context, `Running preview (${context.operationMode} mode) - no changes will be made...`, "info", "execute");
+    console.log(`[Execute Tasks] Preview mode - sequential execution, no Graph mutations`);
   }
 
-  // Sequential execution (batching disabled)
   for (const task of tasks) {
     // Check for cancellation before starting task
     if (context.shouldCancel?.()) {

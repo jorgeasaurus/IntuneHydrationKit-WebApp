@@ -18,11 +18,7 @@ export async function executeFilterTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  const { client, operationMode: mode } = context;
-
-  if (mode === "preview") {
-    return { task, success: true, skipped: false };
-  }
+  const { client, operationMode: mode, isPreview } = context;
 
   // Try to get template from cache first, fallback to hardcoded templates
   let template: FilterTemplate | DeviceFilter | undefined;
@@ -50,10 +46,15 @@ export async function executeFilterTask(
     if (existingFilter) {
       return {
         task,
-        success: false,
+        success: true,
         skipped: true,
-        error: "Filter already exists",
+        error: "Already exists",
       };
+    }
+
+    // Preview mode - would create
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     // Convert template to full DeviceFilter format if it's a simple template
@@ -89,12 +90,17 @@ export async function executeFilterTask(
     );
 
     if (!existingFilter) {
-      return { task, success: true, skipped: true, error: "Filter not found in tenant" };
+      return { task, success: true, skipped: true, error: "Not found in tenant" };
     }
 
     // Check if it was created by the hydration kit
     if (!hasHydrationMarker(existingFilter.description)) {
-      return { task, success: true, skipped: true, error: "Filter not created by Intune Hydration Kit" };
+      return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+    }
+
+    // Preview mode - would delete
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     await client.delete(`/deviceManagement/assignmentFilters/${existingFilter.id}`);

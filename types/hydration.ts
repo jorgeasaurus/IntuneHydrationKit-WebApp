@@ -11,7 +11,7 @@ export type CloudEnvironment =
   | "germany"
   | "china";
 
-export type OperationMode = "create" | "delete" | "preview";
+export type OperationMode = "create" | "delete";
 
 export type TaskStatus = "pending" | "running" | "success" | "failed" | "skipped";
 
@@ -186,6 +186,7 @@ export interface WizardState {
   currentStep: number;
   tenantConfig?: TenantConfig;
   operationMode?: OperationMode;
+  isPreview: boolean;
   selectedTargets: TaskCategory[];
   selectedCISCategories: CISCategoryId[];
   categorySelections?: CategorySelections;

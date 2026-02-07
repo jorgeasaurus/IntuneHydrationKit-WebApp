@@ -2,13 +2,13 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { Home, RefreshCcw } from "lucide-react";
+import { Home, RefreshCcw, AlertTriangle } from "lucide-react";
 import { ResultsSummary } from "@/components/dashboard";
 import { HydrationSummary, HydrationTask } from "@/types/hydration";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
 import { useWizardState } from "@/hooks/useWizardState";
 
 export default function ResultsPage() {
@@ -16,6 +16,7 @@ export default function ResultsPage() {
   const { resetWizard } = useWizardState();
   const [summary, setSummary] = useState<HydrationSummary | null>(null);
   const [tasks, setTasks] = useState<HydrationTask[]>([]);
+  const [isPreview, setIsPreview] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -23,6 +24,7 @@ export default function ResultsPage() {
     try {
       const summaryJson = sessionStorage.getItem("hydration-summary");
       const tasksJson = sessionStorage.getItem("hydration-tasks");
+      const isPreviewJson = sessionStorage.getItem("hydration-isPreview");
 
       if (!summaryJson || !tasksJson) {
         setError("No execution results found. Please run a hydration first.");
@@ -31,6 +33,7 @@ export default function ResultsPage() {
 
       const parsedSummary = JSON.parse(summaryJson);
       const parsedTasks = JSON.parse(tasksJson);
+      const parsedIsPreview = isPreviewJson ? JSON.parse(isPreviewJson) : false;
 
       // Convert date strings back to Date objects
       parsedSummary.startTime = new Date(parsedSummary.startTime);
@@ -47,6 +50,7 @@ export default function ResultsPage() {
 
       setSummary(parsedSummary);
       setTasks(parsedTasks);
+      setIsPreview(parsedIsPreview);
     } catch (err) {
       console.error("Failed to load results:", err);
       setError("Failed to load execution results. The data may be corrupted.");
@@ -80,13 +84,22 @@ export default function ResultsPage() {
       <div className="min-h-screen relative z-10">
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Execution Results</h1>
-              <p className="text-sm text-muted-foreground">
-                {summary
-                  ? `${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)} operation completed`
-                  : "Loading results..."}
-              </p>
+            <div className="flex items-center gap-3">
+              <Image
+                src="/IHTLogoClear.png"
+                alt="Intune Hydration Kit"
+                width={40}
+                height={40}
+                className="w-10 h-10"
+              />
+              <div>
+                <h1 className="text-2xl font-bold">Execution Results</h1>
+                <p className="text-sm text-muted-foreground">
+                  {summary
+                    ? `${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)} operation completed`
+                    : "Loading results..."}
+                </p>
+              </div>
             </div>
             <div className="flex gap-2">
               <Button variant="outline" onClick={() => router.push("/")}>
@@ -115,7 +128,7 @@ export default function ResultsPage() {
             </Alert>
           ) : summary ? (
             tasks.length > 0 ? (
-              <ResultsSummary summary={summary} tasks={tasks} />
+              <ResultsSummary summary={summary} tasks={tasks} isPreview={isPreview} />
             ) : (
               <Alert>
                 <AlertTriangle className="h-4 w-4" />

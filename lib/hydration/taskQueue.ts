@@ -366,7 +366,7 @@ export async function buildTaskQueueAsync(
     // Report how many tasks are being queued for this category
     emit?.(`Queuing ${items.length} ${label.toLowerCase()} tasks`, "success");
 
-    // For delete/preview mode with specific selections, use selectedItems directly
+    // For delete mode with specific selections, use selectedItems directly
     // This ensures all selected items appear in the task queue, even if they don't exist in templates
     // During execution, items that don't exist in the tenant will be marked as "skipped"
 
@@ -376,8 +376,8 @@ export async function buildTaskQueueAsync(
     // Special handling for baseline which uses baselineSelection instead of categorySelections
     const hasBaselineSelections = category === "baseline" && options?.baselineSelection?.selectedPolicies && options.baselineSelection.selectedPolicies.length > 0;
 
-    if ((operationMode === "delete" || operationMode === "preview") && hasDirectSelections) {
-      console.log(`[Task Queue] Using ${selection!.selectedItems!.length} selected items directly for ${category} (${operationMode} mode)`);
+    if (operationMode === "delete" && hasDirectSelections) {
+      console.log(`[Task Queue] Using ${selection!.selectedItems!.length} selected items directly for ${category} (delete mode)`);
 
       // For cisBaseline, selectedItems contains file paths - need to look up displayNames
       if (category === "cisBaseline" && items.length > 0) {
@@ -416,8 +416,8 @@ export async function buildTaskQueueAsync(
           });
         }
       }
-    } else if ((operationMode === "delete" || operationMode === "preview") && hasBaselineSelections) {
-      // For baseline in delete/preview mode, create tasks from the filtered items array
+    } else if (operationMode === "delete" && hasBaselineSelections) {
+      // For baseline in delete mode, create tasks from the filtered items array
       // The items array was already filtered by selectedPolicies paths in the switch case above
       console.log(`[Task Queue] Using ${items.length} baseline items for ${category} (${operationMode} mode)`);
       for (const item of items) {

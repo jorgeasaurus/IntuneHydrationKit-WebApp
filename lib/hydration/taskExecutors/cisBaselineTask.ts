@@ -29,11 +29,7 @@ export async function executeCISBaselineTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  const { client, operationMode: mode } = context;
-
-  if (mode === "preview") {
-    return { task, success: true, skipped: false };
-  }
+  const { client, operationMode: mode, isPreview } = context;
 
   // Get template from cache - need to find the right cache key
   let template: CISBaselinePolicy | undefined;
@@ -81,51 +77,67 @@ export async function executeCISBaselineTask(
           }
           return {
             task,
-            success: false,
+            success: true,
             skipped: true,
             error: `Unsupported policy type: ${odataType}. ${unsupportedReason}`
           };
 
-        case "V2Compliance":
+        case "V2Compliance": {
           // Settings Catalog compliance -> /compliancePolicies
           const v2Exists = await v2CompliancePolicyExists(client, policyName);
           if (v2Exists) {
             console.log(`[CIS Baseline Task] V2 Compliance policy already exists, skipping: "${policyName}"`);
-            return { task, success: false, skipped: true, error: "Policy already exists" };
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
           const v2Created = await createV2CompliancePolicy(client, template as Record<string, unknown>);
           return { task, success: true, skipped: false, createdId: v2Created.id };
+        }
 
-        case "V1Compliance":
+        case "V1Compliance": {
           // Legacy compliance -> /deviceCompliancePolicies
           const v1Exists = await compliancePolicyExistsByName(client, policyName);
           if (v1Exists) {
             console.log(`[CIS Baseline Task] V1 Compliance policy already exists, skipping: "${policyName}"`);
-            return { task, success: false, skipped: true, error: "Policy already exists" };
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
           const v1Created = await createCISCompliancePolicy(client, template as Record<string, unknown>);
           return { task, success: true, skipped: false, createdId: v1Created.id };
+        }
 
-        case "DeviceConfiguration":
+        case "DeviceConfiguration": {
           // Device configuration -> /deviceConfigurations
           const dcExists = await deviceConfigurationExists(client, policyName);
           if (dcExists) {
             console.log(`[CIS Baseline Task] Device Configuration already exists, skipping: "${policyName}"`);
-            return { task, success: false, skipped: true, error: "Policy already exists" };
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
           const dcCreated = await createCISDeviceConfiguration(client, template as Record<string, unknown>);
           return { task, success: true, skipped: false, createdId: dcCreated.id };
+        }
 
         case "SettingsCatalog":
-        default:
+        default: {
           // Settings Catalog -> /configurationPolicies
           const scExists = await settingsCatalogPolicyExists(client, policyName);
           if (scExists) {
             console.log(`[CIS Baseline Task] Settings Catalog policy already exists, skipping: "${policyName}"`);
-            return { task, success: false, skipped: true, error: "Policy already exists" };
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
           const scCreated = await createSettingsCatalogPolicy(client, template as Record<string, unknown>);
           return { task, success: true, skipped: false, createdId: scCreated.id, warning: scCreated.warning };
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -139,7 +151,7 @@ export async function executeCISBaselineTask(
           // Can't delete what we can't create
           return { task, success: true, skipped: true, error: "Unsupported policy type" };
 
-        case "V2Compliance":
+        case "V2Compliance": {
           // Delete from /compliancePolicies
           const escapedV2Name = escapeODataString(policyName);
           const v2Response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
@@ -147,18 +159,22 @@ export async function executeCISBaselineTask(
           );
           if (!v2Response.value || v2Response.value.length === 0) {
             console.log(`[CIS Baseline Task] V2 Compliance policy "${policyName}" not found in tenant`);
-            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
+            return { task, success: true, skipped: true, error: "Not found in tenant" };
           }
           const v2Policy = v2Response.value[0];
           if (!hasHydrationMarker(v2Policy.description)) {
             console.log(`[CIS Baseline Task] V2 Compliance policy "${v2Policy.name}" exists but was not created by Intune Hydration Kit`);
-            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
+            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
           await client.delete(`/deviceManagement/compliancePolicies/${v2Policy.id}`);
           console.log(`[CIS Baseline Task] Deleted V2 Compliance policy: "${policyName}"`);
           return { task, success: true, skipped: false };
+        }
 
-        case "V1Compliance":
+        case "V1Compliance": {
           // Delete from /deviceCompliancePolicies
           const escapedV1Name = escapeODataString(policyName);
           const v1Response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
@@ -166,18 +182,22 @@ export async function executeCISBaselineTask(
           );
           if (!v1Response.value || v1Response.value.length === 0) {
             console.log(`[CIS Baseline Task] V1 Compliance policy "${policyName}" not found in tenant`);
-            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
+            return { task, success: true, skipped: true, error: "Not found in tenant" };
           }
           const v1Policy = v1Response.value[0];
           if (!hasHydrationMarker(v1Policy.description)) {
             console.log(`[CIS Baseline Task] V1 Compliance policy "${v1Policy.displayName}" exists but was not created by Intune Hydration Kit`);
-            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
+            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
           await client.delete(`/deviceManagement/deviceCompliancePolicies/${v1Policy.id}`);
           console.log(`[CIS Baseline Task] Deleted V1 Compliance policy: "${policyName}"`);
           return { task, success: true, skipped: false };
+        }
 
-        case "DeviceConfiguration":
+        case "DeviceConfiguration": {
           // Delete from /deviceConfigurations
           const escapedDcName = escapeODataString(policyName);
           const dcResponse = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
@@ -185,19 +205,23 @@ export async function executeCISBaselineTask(
           );
           if (!dcResponse.value || dcResponse.value.length === 0) {
             console.log(`[CIS Baseline Task] Device Configuration policy "${policyName}" not found in tenant`);
-            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
+            return { task, success: true, skipped: true, error: "Not found in tenant" };
           }
           const dcPolicy = dcResponse.value[0];
           if (!hasHydrationMarker(dcPolicy.description)) {
             console.log(`[CIS Baseline Task] Device Configuration policy "${dcPolicy.displayName}" exists but was not created by Intune Hydration Kit`);
-            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
+            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
           await client.delete(`/deviceManagement/deviceConfigurations/${dcPolicy.id}`);
           console.log(`[CIS Baseline Task] Deleted Device Configuration policy: "${policyName}"`);
           return { task, success: true, skipped: false };
+        }
 
         case "SettingsCatalog":
-        default:
+        default: {
           // Use pre-fetched cache for Settings Catalog policies
           let allPolicies = context.cachedSettingsCatalogPolicies || [];
 
@@ -228,14 +252,14 @@ export async function executeCISBaselineTask(
 
           if (!policy) {
             console.log(`[CIS Baseline Task] Policy "${policyName}" not found in ${allPolicies.length} cached policies`);
-            return { task, success: true, skipped: true, error: `Not found in tenant: "${policyName}" does not exist` };
+            return { task, success: true, skipped: true, error: "Not found in tenant" };
           }
 
           console.log(`[CIS Baseline Task] Found Settings Catalog policy: "${policy.name}" (ID: ${policy.id})`);
 
           if (!hasHydrationMarker(policy.description)) {
             console.log(`[CIS Baseline Task] Policy "${policy.name}" exists but was not created by Intune Hydration Kit (no marker in description)`);
-            return { task, success: true, skipped: true, error: `Not created by Intune Hydration Kit (missing marker in description)` };
+            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
           }
 
           // Check for active assignments - skip deletion if assigned
@@ -250,6 +274,10 @@ export async function executeCISBaselineTask(
             }
           } catch {
             // Continue if assignments can't be checked
+          }
+
+          if (isPreview) {
+            return { task, success: true, skipped: false };
           }
 
           // Retry delete up to 5 times with delay (Intune backend can be flaky)
@@ -291,6 +319,7 @@ export async function executeCISBaselineTask(
             );
           }
           return { task, success: true, skipped: false };
+        }
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

@@ -30,6 +30,7 @@ export interface ActivityMessage {
 export interface ExecutionContext {
   client: GraphClient;
   operationMode: OperationMode;
+  isPreview: boolean;
   stopOnFirstError: boolean;
   onTaskStart?: (task: HydrationTask) => void;
   onTaskComplete?: (task: HydrationTask) => void;

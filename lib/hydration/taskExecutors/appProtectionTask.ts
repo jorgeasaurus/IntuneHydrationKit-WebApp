@@ -20,11 +20,7 @@ export async function executeAppProtectionTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
-  const { client, operationMode: mode } = context;
-
-  if (mode === "preview") {
-    return { task, success: true, skipped: false };
-  }
+  const { client, operationMode: mode, isPreview } = context;
 
   // Try to get template from cache first, fallback to hardcoded templates
   let template: AppProtectionTemplate | AppProtectionPolicy | undefined;
@@ -51,10 +47,15 @@ export async function executeAppProtectionTask(
     if (existingPolicy) {
       return {
         task,
-        success: false,
+        success: true,
         skipped: true,
-        error: "Policy already exists",
+        error: "Already exists",
       };
+    }
+
+    // Preview mode - would create
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     // Create the policy
@@ -79,7 +80,12 @@ export async function executeAppProtectionTask(
 
     if (!policy || !policy.id) {
       // Policy doesn't exist, skip deletion
-      return { task, success: true, skipped: true, error: "Policy not found in tenant" };
+      return { task, success: true, skipped: true, error: "Not found in tenant" };
+    }
+
+    // Preview mode - would delete
+    if (isPreview) {
+      return { task, success: true, skipped: false };
     }
 
     // Determine platform from @odata.type

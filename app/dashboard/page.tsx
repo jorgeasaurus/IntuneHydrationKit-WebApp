@@ -2,9 +2,10 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertTriangle, Loader2 } from "lucide-react";
+import { ArrowLeft, AlertTriangle, Loader2, Eye } from "lucide-react";
 import { ProgressBar, TaskList, ExecutionControls, ActivityLog } from "@/components/dashboard";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
@@ -52,13 +53,25 @@ export default function DashboardPage() {
       // Store summary in sessionStorage for results page
       sessionStorage.setItem("hydration-summary", JSON.stringify(summary));
       sessionStorage.setItem("hydration-tasks", JSON.stringify(tasks));
+      sessionStorage.setItem("hydration-isPreview", JSON.stringify(state.isPreview));
 
       // Navigate to results page after a short delay
       setTimeout(() => {
         router.push("/results");
       }, 2000);
     }
-  }, [isCompleted, summary, tasks, router]);
+  }, [isCompleted, summary, tasks, router, state.isPreview]);
+
+  const getOperationText = (): string => {
+    switch (state.operationMode) {
+      case "create":
+        return "Creating configurations";
+      case "delete":
+        return "Deleting configurations";
+      default:
+        return "Previewing changes";
+    }
+  };
 
   const handleDownloadLog = () => {
     // Download current execution log as JSON
@@ -88,16 +101,20 @@ export default function DashboardPage() {
       <div className="min-h-screen relative z-10">
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Hydration Dashboard</h1>
-              <p className="text-sm text-muted-foreground">
-                {state.operationMode === "create"
-                  ? "Creating configurations"
-                  : state.operationMode === "delete"
-                    ? "Deleting configurations"
-                    : "Previewing changes"}{" "}
-                in {state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}
-              </p>
+            <div className="flex items-center gap-3">
+              <Image
+                src="/IHTLogoClear.png"
+                alt="Intune Hydration Kit"
+                width={40}
+                height={40}
+                className="w-10 h-10"
+              />
+              <div>
+                <h1 className="text-2xl font-bold">Hydration Dashboard</h1>
+                <p className="text-sm text-muted-foreground">
+                  {getOperationText()} in {state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}
+                </p>
+              </div>
             </div>
             <Button variant="outline" onClick={() => router.push("/wizard")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -107,8 +124,19 @@ export default function DashboardPage() {
         </header>
 
         <main className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+          {/* Preview mode indicator */}
+          {state.isPreview && !isCompleted && (
+            <Alert className="border-blue-500 bg-blue-500/10">
+              <Eye className="h-4 w-4 text-blue-500" />
+              <AlertTitle className="text-blue-500">Preview Mode</AlertTitle>
+              <AlertDescription>
+                No changes will be made to your tenant. This is a dry run to show what would happen.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Warning for delete mode */}
-          {state.operationMode === "delete" && !isCompleted && (
+          {state.operationMode === "delete" && !state.isPreview && !isCompleted && (
             <Alert variant="destructive">
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle>Delete Mode Active</AlertTitle>
