@@ -7,6 +7,7 @@ import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
 import { IndustrialBackground } from "@/components/IndustrialBackground";
+import { Analytics } from "@vercel/analytics/next";
 
 // DM Sans - Geometric, bold display font
 const dmSans = DM_Sans({
@@ -56,6 +57,7 @@ export default function RootLayout({
                 <IndustrialBackground />
                 {children}
                 <Toaster />
+                <Analytics />
               </WizardProvider>
             </SettingsProvider>
           </MsalProvider>
