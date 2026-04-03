@@ -1,5 +1,4 @@
 {
-  "displayName": "Block all agent identities from accessing resources",
   "grantControls": {
     "termsOfUse": [],
     "authenticationStrength@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/templates('c5bf9137-a43c-48e1-9d13-8258b31b855d')/details/grantControls/authenticationStrength/$entity",

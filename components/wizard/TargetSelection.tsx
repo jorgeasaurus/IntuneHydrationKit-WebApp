@@ -21,6 +21,7 @@ import {
   OIBManifest,
   CISBaselineManifest,
 } from "@/lib/templates/loader";
+import { IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
 import { ChevronDown, ChevronRight, Loader2, Search, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
@@ -224,8 +225,8 @@ export function TargetSelection() {
         }
         case "enrollment": {
           const profiles = await fetchEnrollmentProfiles();
-          items = (profiles as Array<{ displayName?: string; description?: string }>).map(p => ({
-            displayName: p.displayName || "Unknown Profile",
+          items = (profiles as Array<{ displayName?: string; name?: string; description?: string }>).map(p => ({
+            displayName: p.displayName || p.name || "Unknown Profile",
             description: p.description,
             subtype: "Autopilot",
           }));
@@ -785,8 +786,8 @@ export function TargetSelection() {
       }
       case "enrollment": {
         const profiles = await fetchEnrollmentProfiles();
-        items = (profiles as Array<{ displayName?: string; description?: string }>).map(p => ({
-          displayName: p.displayName || "Unknown Profile",
+        items = (profiles as Array<{ displayName?: string; name?: string; description?: string }>).map(p => ({
+          displayName: p.displayName || p.name || "Unknown Profile",
           description: p.description,
           subtype: "Autopilot",
         }));
@@ -1402,8 +1403,8 @@ export function TargetSelection() {
                                             checked={selectedCISPolicies.has(policy.path)}
                                             onCheckedChange={() => toggleCISPolicy(policy.path)}
                                           />
-                                          <Label htmlFor={`cis-policy-${policy.path}`} className="text-sm cursor-pointer flex-1 truncate" title={policy.displayName}>
-                                            {policy.displayName}
+                                          <Label htmlFor={`cis-policy-${policy.path}`} className="text-sm cursor-pointer flex-1 truncate" title={`${IMPORT_PREFIX}${policy.displayName}`}>
+                                            {IMPORT_PREFIX}{policy.displayName}
                                           </Label>
                                           <span className="text-xs text-muted-foreground shrink-0">{policy.subcategory}</span>
                                         </div>

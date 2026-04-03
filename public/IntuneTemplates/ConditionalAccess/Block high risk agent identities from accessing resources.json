@@ -1,5 +1,4 @@
 {
-  "displayName": "Block high risk agent identities from accessing resources",
   "grantControls": {
     "termsOfUse": [],
     "authenticationStrength@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/templates('6bdcbbb7-ebd1-4f8f-a02f-652db0e3665d')/details/grantControls/authenticationStrength/$entity",

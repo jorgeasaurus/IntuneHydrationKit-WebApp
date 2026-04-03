@@ -1,5 +1,4 @@
 {
-  "displayName": "Block access to Office365 apps for users with insider risk",
   "grantControls": {
     "termsOfUse": [],
     "authenticationStrength@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/templates('16aaa400-bfdf-4756-a420-ad2245d4cde8')/details/grantControls/authenticationStrength/$entity",
@@ -38,7 +37,9 @@
     "clients": null,
     "agentIdRiskLevels": null,
     "users": {
-      "excludeUsers": [],
+      "excludeUsers": [
+        
+      ],
       "includeUsers": [
         "All"
       ],

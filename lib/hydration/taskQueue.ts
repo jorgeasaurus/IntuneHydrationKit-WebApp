@@ -278,14 +278,14 @@ export async function buildTaskQueueAsync(
         case "enrollment":
           {
             emit?.("Fetching enrollment profile templates...");
-            let profiles = await fetchEnrollmentProfiles() as Array<{ displayName?: string }>;
+            let profiles = await fetchEnrollmentProfiles() as Array<{ displayName?: string; name?: string }>;
 
             // Filter by selected items if categorySelections is provided
             const enrollmentSelection = options?.categorySelections?.enrollment;
             if (enrollmentSelection?.selectedItems && enrollmentSelection.selectedItems.length > 0) {
               const selectedSet = new Set(enrollmentSelection.selectedItems);
               const totalCount = profiles.length;
-              profiles = profiles.filter(p => selectedSet.has(p.displayName || ""));
+              profiles = profiles.filter(p => selectedSet.has(p.displayName || p.name || ""));
               console.log(`[Task Queue] Filtered to ${profiles.length} selected enrollment profiles`);
               emit?.(`Filtered to ${profiles.length} of ${totalCount} enrollment profiles based on selection`, "info");
             }

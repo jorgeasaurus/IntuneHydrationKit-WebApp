@@ -30,7 +30,8 @@ export async function executeEnrollmentTask(
 
   if (cachedEnrollment && Array.isArray(cachedEnrollment)) {
     template = (cachedEnrollment as EnrollmentProfile[]).find(
-      (e) => e.displayName === task.itemName
+      (e) => ("displayName" in e ? e.displayName : undefined) === task.itemName
+            || ("name" in e ? e.name : undefined) === task.itemName
     );
   }
 
@@ -39,6 +40,11 @@ export async function executeEnrollmentTask(
   }
 
   const profileType = getEnrollmentProfileType(template);
+  const profileName = "displayName" in template && template.displayName
+    ? String(template.displayName)
+    : "name" in template && template.name
+      ? String(template.name)
+      : task.itemName;
 
   if (mode === "create") {
     const exists = await enrollmentProfileExists(client, template);
@@ -76,7 +82,7 @@ export async function executeEnrollmentTask(
     }
 
     try {
-      await deleteEnrollmentProfileByName(client, template.displayName, profileType);
+      await deleteEnrollmentProfileByName(client, profileName, profileType);
       return { task, success: true, skipped: false };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);

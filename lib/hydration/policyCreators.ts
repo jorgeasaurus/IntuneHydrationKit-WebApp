@@ -180,6 +180,7 @@ export async function createCISCompliancePolicy(
   if (!cleaned.displayName && cleaned.name) {
     cleaned.displayName = cleaned.name;
   }
+  delete cleaned.name;
 
   return client.post<{ id: string }>(
     "/deviceManagement/deviceCompliancePolicies",
@@ -276,6 +277,12 @@ export async function createCISDeviceConfiguration(
 
   // Ensure hydration marker in description
   cleaned.description = addHydrationMarker(cleaned.description as string | undefined);
+
+  // V1 device configs use displayName, not name
+  if (!cleaned.displayName && cleaned.name) {
+    cleaned.displayName = cleaned.name;
+  }
+  delete cleaned.name;
 
   console.log(`[CIS Device Config] Creating policy: "${cleaned.displayName}"`);
 

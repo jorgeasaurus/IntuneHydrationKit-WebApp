@@ -3,12 +3,12 @@
  * Loads templates from local IntuneTemplates directory
  */
 
-import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
+import { HYDRATION_MARKER, IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 15; // Aligned Autopilot profile template with PowerShell reference (added roleScopeTagIds, hybridAzureADJoinSkipConnectivityCheck)
+const CACHE_VERSION = 17; // Add [IHD] prefix to CIS Intune Baseline policies
 
 export interface GroupTemplate {
   displayName: string;
@@ -75,6 +75,7 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
       if (data.groups && Array.isArray(data.groups)) {
         const groups = data.groups.map((group: GroupTemplate) => ({
           ...group,
+          displayName: `${IMPORT_PREFIX}${group.displayName}`,
           description: group.description
             ? `${group.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
@@ -105,6 +106,7 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
     if (data.groups && Array.isArray(data.groups)) {
       return data.groups.map((group: GroupTemplate) => ({
         ...group,
+        displayName: `${IMPORT_PREFIX}${group.displayName}`,
         description: group.description
           ? `${group.description} ${HYDRATION_MARKER}`
           : HYDRATION_MARKER,
@@ -146,6 +148,7 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
       if (data.filters && Array.isArray(data.filters)) {
         const filters = data.filters.map((filter: FilterTemplate) => ({
           ...filter,
+          displayName: `${IMPORT_PREFIX}${filter.displayName}`,
           description: filter.description
             ? `${filter.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
@@ -195,6 +198,7 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
       if (data["@odata.type"] || data.platforms) {
         const policy: ComplianceTemplate = {
           ...data,
+          displayName: `${IMPORT_PREFIX}${data.displayName}`,
           description: data.description
             ? `${data.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
@@ -254,6 +258,7 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
       if (data.displayName) {
         const policy: ConditionalAccessTemplate = {
           ...data,
+          displayName: `${IMPORT_PREFIX}${data.displayName}`,
           state: "disabled", // CA policies are always created in disabled state
         };
         allPolicies.push(policy);
@@ -299,6 +304,7 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
       if (data["@odata.type"]) {
         const policy: AppProtectionTemplate = {
           ...data,
+          displayName: `${IMPORT_PREFIX}${data.displayName}`,
           description: data.description
             ? `${data.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
@@ -321,6 +327,7 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
     "Windows-Autopilot-Profile.json",
     "Windows-Self-Deploy-Autopilot-Profile.json",
     "Windows-ESP-Profile.json",
+    "Windows-Autopilot-Device-Preparation-UserDriven.json",
   ];
 
   const profiles: unknown[] = [];
@@ -334,8 +341,11 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
       }
 
       const profile = await response.json();
+      // Device Preparation uses "name" instead of "displayName"
+      const nameField = profile.displayName ? "displayName" : "name";
       profiles.push({
         ...profile,
+        [nameField]: `${IMPORT_PREFIX}${profile[nameField]}`,
         description: profile.description
           ? `${profile.description} ${HYDRATION_MARKER}`
           : HYDRATION_MARKER,
@@ -352,24 +362,34 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
  * Fetch notification templates from local templates
  */
 export async function fetchNotificationTemplates(): Promise<unknown[]> {
-  try {
-    const response = await fetch(`${TEMPLATES_BASE_PATH}/Notifications/Notification-Templates.json`);
-    if (!response.ok) {
-      console.error(`Failed to fetch notification templates: ${response.statusText}`);
-      return [];
+  const notificationFiles = [
+    "Notifications/First-Warning.json",
+  ];
+
+  const allTemplates: unknown[] = [];
+
+  for (const file of notificationFiles) {
+    try {
+      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
+      if (!response.ok) {
+        console.error(`Failed to fetch ${file}: ${response.statusText}`);
+        continue;
+      }
+
+      const data = await response.json();
+
+      if (data.displayName) {
+        allTemplates.push({
+          ...data,
+          displayName: `${IMPORT_PREFIX}${data.displayName}`,
+        });
+      }
+    } catch (error) {
+      console.error(`Error fetching ${file}:`, error);
     }
-
-    const data = await response.json();
-
-    if (data.templates && Array.isArray(data.templates)) {
-      return data.templates;
-    }
-
-    return [];
-  } catch (error) {
-    console.error("Error fetching notification templates:", error);
-    return [];
   }
+
+  return allTemplates;
 }
 
 /**
@@ -629,10 +649,12 @@ export async function fetchCISBaselinePolicies(): Promise<CISBaselinePolicy[]> {
       const policy = await fetchCISBaselineFile(file.path);
       if (policy && typeof policy === "object") {
         const policyObj = policy as Record<string, unknown>;
+        const resolvedName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
         allPolicies.push({
           ...policyObj,
           // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
-          displayName: (policyObj.name as string) || (policyObj.displayName as string) || file.displayName,
+          displayName: `${IMPORT_PREFIX}${resolvedName}`,
+          name: `${IMPORT_PREFIX}${resolvedName}`,
           _cisCategory: file.category,
           _cisSubcategory: file.subcategory,
           _cisFilePath: file.path,
@@ -727,10 +749,12 @@ export async function fetchCISBaselinePoliciesByCategories(
       const policy = await fetchCISBaselineFile(file.path);
       if (policy && typeof policy === "object") {
         const policyObj = policy as Record<string, unknown>;
+        const resolvedName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
         allPolicies.push({
           ...policyObj,
           // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
-          displayName: (policyObj.name as string) || (policyObj.displayName as string) || file.displayName,
+          displayName: `${IMPORT_PREFIX}${resolvedName}`,
+          name: `${IMPORT_PREFIX}${resolvedName}`,
           _cisCategory: file.category,
           _cisSubcategory: file.subcategory,
           _cisFilePath: file.path,

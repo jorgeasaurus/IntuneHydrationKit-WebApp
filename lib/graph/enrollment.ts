@@ -1,10 +1,12 @@
 /**
  * Microsoft Graph API operations for Enrollment Profiles
- * Handles Autopilot Deployment Profiles and Enrollment Status Page (ESP) configurations
+ * Handles Autopilot Deployment Profiles, Enrollment Status Page (ESP),
+ * and Device Preparation profiles (Settings Catalog-based)
  */
 
 import { GraphClient } from "./client";
 import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import type { DevicePreparationProfile } from "@/templates/enrollment";
 
 /**
  * Add hydration marker to enrollment profile description
@@ -78,7 +80,7 @@ export interface EnrollmentStatusPageConfiguration {
 /**
  * Union type for all enrollment profile types
  */
-export type EnrollmentProfile = AutopilotDeploymentProfile | EnrollmentStatusPageConfiguration;
+export type EnrollmentProfile = AutopilotDeploymentProfile | EnrollmentStatusPageConfiguration | DevicePreparationProfile;
 
 /**
  * Get all Autopilot deployment profiles
@@ -324,15 +326,79 @@ export async function deleteESPConfigurationByName(
  */
 export function getEnrollmentProfileType(
   profile: EnrollmentProfile
-): "autopilot" | "esp" {
+): "autopilot" | "esp" | "devicePreparation" {
   const odataType = profile["@odata.type"];
 
   if (odataType === "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration") {
     return "esp";
   }
 
+  // Device Preparation profiles use Settings Catalog (have "name" instead of "displayName", and technologies: "enrollment")
+  if ("technologies" in profile && (profile as DevicePreparationProfile).technologies === "enrollment") {
+    return "devicePreparation";
+  }
+
   // All other types are Autopilot profiles
   return "autopilot";
+}
+
+// ---------------------------------------------------------------------------
+// Device Preparation Profiles (Settings Catalog-based)
+// ---------------------------------------------------------------------------
+
+/**
+ * Check if a Device Preparation policy exists by name
+ */
+export async function devicePreparationExists(
+  client: GraphClient,
+  name: string
+): Promise<boolean> {
+  try {
+    const response = await client.get<{ value: Array<{ name: string }> }>(
+      `/deviceManagement/configurationPolicies?$filter=name eq '${encodeURIComponent(name)}'&$select=id,name`
+    );
+    return response.value && response.value.length > 0;
+  } catch (error) {
+    console.error(`[DevicePreparation] Error checking if policy exists: ${name}`, error);
+    return false;
+  }
+}
+
+/**
+ * Create a Device Preparation policy via Settings Catalog endpoint
+ */
+export async function createDevicePreparationProfile(
+  client: GraphClient,
+  profile: DevicePreparationProfile
+): Promise<DevicePreparationProfile> {
+  const payload = { ...profile };
+  delete payload.id;
+
+  payload.description = addEnrollmentHydrationMarker(payload.description);
+
+  return client.post<DevicePreparationProfile>(
+    "/deviceManagement/configurationPolicies",
+    payload
+  );
+}
+
+/**
+ * Delete a Device Preparation policy by name
+ */
+export async function deleteDevicePreparationByName(
+  client: GraphClient,
+  name: string
+): Promise<void> {
+  const response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
+    `/deviceManagement/configurationPolicies?$filter=name eq '${encodeURIComponent(name)}'&$select=id,name,description`
+  );
+
+  const match = response.value?.find(p => hasHydrationMarker(p.description) || hasHydrationMarker(p.name));
+  if (!match || !match.id) {
+    throw new Error(`Device Preparation policy "${name}" not found`);
+  }
+
+  await client.delete(`/deviceManagement/configurationPolicies('${match.id}')`);
 }
 
 /**
@@ -348,6 +414,10 @@ export async function createEnrollmentProfile(
     return createESPConfiguration(client, profile as EnrollmentStatusPageConfiguration);
   }
 
+  if (profileType === "devicePreparation") {
+    return createDevicePreparationProfile(client, profile as DevicePreparationProfile);
+  }
+
   return createAutopilotProfile(client, profile as AutopilotDeploymentProfile);
 }
 
@@ -361,10 +431,14 @@ export async function enrollmentProfileExists(
   const profileType = getEnrollmentProfileType(profile);
 
   if (profileType === "esp") {
-    return espConfigurationExists(client, profile.displayName);
+    return espConfigurationExists(client, (profile as EnrollmentStatusPageConfiguration).displayName);
   }
 
-  return autopilotProfileExists(client, profile.displayName);
+  if (profileType === "devicePreparation") {
+    return devicePreparationExists(client, (profile as DevicePreparationProfile).name);
+  }
+
+  return autopilotProfileExists(client, (profile as AutopilotDeploymentProfile).displayName);
 }
 
 /**
@@ -373,10 +447,12 @@ export async function enrollmentProfileExists(
 export async function deleteEnrollmentProfileByName(
   client: GraphClient,
   displayName: string,
-  profileType: "autopilot" | "esp"
+  profileType: "autopilot" | "esp" | "devicePreparation"
 ): Promise<void> {
   if (profileType === "esp") {
     await deleteESPConfigurationByName(client, displayName);
+  } else if (profileType === "devicePreparation") {
+    await deleteDevicePreparationByName(client, displayName);
   } else {
     await deleteAutopilotProfileByName(client, displayName);
   }

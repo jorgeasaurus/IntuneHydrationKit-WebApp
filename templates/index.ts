@@ -16,8 +16,8 @@ export * from "./enrollment";
 export const TEMPLATE_METADATA = {
   groups: {
     displayName: "Entra Groups",
-    description: "Azure AD dynamic groups for device categorization (43 dynamic + 4 static)",
-    count: 47,
+    description: "Dynamic and static groups for device/user categorization (50 dynamic + 5 static)",
+    count: 55,
     icon: "Users",
   },
   filters: {
@@ -34,25 +34,25 @@ export const TEMPLATE_METADATA = {
   },
   compliance: {
     displayName: "Compliance Policies",
-    description: "Device compliance policies for all platforms",
-    count: 10,
+    description: "Device compliance policies for all platforms (excl. Linux)",
+    count: 8,
     icon: "Shield",
   },
   appProtection: {
     displayName: "App Protection",
     description: "Mobile application management (MAM) policies",
-    count: 10,
+    count: 8,
     icon: "Smartphone",
   },
   enrollment: {
     displayName: "Enrollment Profiles",
-    description: "Windows Autopilot and Apple DEP enrollment profiles",
-    count: 3,
+    description: "Windows Autopilot, ESP, and Device Preparation profiles",
+    count: 4,
     icon: "Download",
   },
   conditionalAccess: {
     displayName: "Conditional Access",
-    description: "Conditional access policies (created in disabled state)",
+    description: "Microsoft starter pack CA policies (created in disabled state)",
     count: 21,
     icon: "Lock",
   },
