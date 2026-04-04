@@ -1973,8 +1973,8 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
 const FAST_DELETE_CONFIG = {
   /** Number of concurrent delete requests (NukeTune uses 3) */
   parallelRequests: 3,
-  /** Delay between batches of parallel requests (ms) (NukeTune uses 300) */
-  delayBetweenBatches: 300,
+  /** Delay between batches of parallel requests (ms) */
+  delayBetweenBatches: 500,
 };
 
 /**
@@ -2132,13 +2132,16 @@ export async function executeDeletesInParallel(
               return { task, success: true, skipped: false };
             }
 
-            // Check if it's a 400 error (transient backend issue) but NOT ResourceNotFound
+            // Check if it's a 429 (throttled) or 400 error (transient backend issue) but NOT ResourceNotFound
+            const is429Error = lastError.includes("[429]") || lastError.includes("TooManyRequests");
             const is400Error = lastError.includes("[400]") || lastError.includes("400");
-            const isRetryable = is400Error && attempt < maxRetries - 1;
+            const isRetryable = (is429Error || is400Error) && attempt < maxRetries - 1;
 
             if (isRetryable) {
-              const retryDelay = (attempt + 1) * 500; // 500ms, 1000ms, 1500ms
-              console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms`);
+              const retryDelay = is429Error
+                ? (attempt + 1) * 3000  // 3s, 6s, 9s for throttling
+                : (attempt + 1) * 500;  // 500ms, 1000ms, 1500ms for transient
+              console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms (${is429Error ? "throttled" : "transient"})`);
               await sleep(retryDelay);
               continue;
             }
@@ -2163,6 +2166,11 @@ export async function executeDeletesInParallel(
 
     results.push(...batchResults);
 
+    // Check if any results in this batch had throttling errors — add extra cooldown
+    const hadThrottling = batchResults.some(
+      (r) => r.error?.includes("[429]") || r.error?.includes("TooManyRequests")
+    );
+
     // Update progress
     context.onBatchProgress?.({
       isActive: true,
@@ -2172,9 +2180,13 @@ export async function executeDeletesInParallel(
       apiVersion: "beta",
     });
 
-    // Short delay between batches (except for last batch)
+    // Delay between batches (except for last batch); extra cooldown after throttling
     if (i + parallelRequests < toDelete.length) {
-      await sleep(delayBetweenBatches);
+      const batchDelay = hadThrottling ? 5000 : delayBetweenBatches;
+      if (hadThrottling) {
+        console.log(`[FastDelete] Throttling detected — cooling down for ${batchDelay}ms before next batch`);
+      }
+      await sleep(batchDelay);
     }
   }
 
