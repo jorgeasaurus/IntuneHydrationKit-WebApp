@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "copilot-mem": {
+      "type": "stdio",
+      "command": "copilot-mem-server"
+    }
+  }
+}

@@ -53,7 +53,7 @@ export async function settingsCatalogPolicyExists(
   try {
     const escapedName = escapeODataString(displayName);
     const response = await client.get<{ value: Array<{ name: string }> }>(
-      `/deviceManagement/configurationPolicies?$filter=name eq '${encodeURIComponent(escapedName)}'`
+      `/deviceManagement/configurationPolicies?$filter=name eq '${encodeURIComponent(escapedName)}'&$select=id,name`
     );
     return response.value && response.value.length > 0;
   } catch (error) {
@@ -152,7 +152,7 @@ export async function compliancePolicyExistsByName(
   try {
     const escapedName = escapeODataString(displayName);
     const response = await client.get<{ value: Array<{ displayName: string }> }>(
-      `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedName)}'`
+      `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedName)}'&$select=id,displayName`
     );
     return response.value && response.value.length > 0;
   } catch (error) {
@@ -244,7 +244,7 @@ export async function v2CompliancePolicyExists(
   try {
     const escapedName = escapeODataString(name);
     const response = await client.get<{ value: Array<{ name: string }> }>(
-      `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(escapedName)}'`
+      `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(escapedName)}'&$select=id,name`
     );
     return response.value && response.value.length > 0;
   } catch (error) {
@@ -289,7 +289,7 @@ export async function deviceConfigurationExists(
   try {
     const escapedName = escapeODataString(displayName);
     const response = await client.get<{ value: Array<{ displayName: string }> }>(
-      `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedName)}'`
+      `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedName)}'&$select=id,displayName`
     );
     return response.value && response.value.length > 0;
   } catch (error) {

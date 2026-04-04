@@ -127,7 +127,7 @@ async function verifyCompliancePolicyCreated(
 
       // Fetch fresh compliance policies from Graph API with timeout
       const fetchPromise = context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-        "/deviceManagement/deviceCompliancePolicies"
+        "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
       );
 
       const response = await Promise.race([fetchPromise, timeoutPromise]);
@@ -817,27 +817,41 @@ async function executeBatchGroup(
   const hasThrottleSensitiveTasks = preparedTasks.some(
     (t) => t.task.category === "cisBaseline" || t.task.category === "baseline"
   );
-  const effectiveBatchSize = hasThrottleSensitiveTasks
+  const initialBatchSize = hasThrottleSensitiveTasks
     ? Math.min(config.categoryBatchSizes?.cisBaseline ?? config.defaultBatchSize, config.defaultBatchSize)
     : config.defaultBatchSize;
 
-  const chunks = chunkArray(preparedTasks, effectiveBatchSize);
+  // Adaptive throttle state — tracks across batches to dynamically adjust delay and size
+  let currentBatchDelay = config.delayBetweenBatches;
+  let currentBatchSize = initialBatchSize;
+  let consecutiveUnthrottledBatches = 0;
+  const MIN_BATCH_SIZE = 2;
+
+  // Re-chunk remaining tasks dynamically; start with initial sizing
+  let remainingTasks = [...preparedTasks];
   const maxRetries = 3;
 
   if (hasThrottleSensitiveTasks) {
-    console.log(`[BatchExecutor] Using reduced batch size ${effectiveBatchSize} for throttle-sensitive categories`);
+    console.log(`[BatchExecutor] Using reduced batch size ${initialBatchSize} for throttle-sensitive categories`);
   }
-  console.log(`[BatchExecutor] Processing ${chunks.length} batch(es) of ${version} requests (batch size: ${effectiveBatchSize})`);
+  console.log(`[BatchExecutor] Processing ${Math.ceil(remainingTasks.length / currentBatchSize)} batch(es) of ${version} requests (batch size: ${currentBatchSize})`);
 
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
+  let batchIndex = 0;
+  while (remainingTasks.length > 0) {
+    // Slice off the next chunk at the current adaptive batch size
+    const chunk = remainingTasks.slice(0, currentBatchSize);
+    remainingTasks = remainingTasks.slice(currentBatchSize);
+    const totalEstimatedBatches = batchIndex + 1 + Math.ceil(remainingTasks.length / currentBatchSize);
+    const i = batchIndex;
 
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[BatchExecutor] Execution cancelled`);
-      for (const { task } of chunk) {
+      // Cancel current chunk and all remaining tasks
+      const allCancelled = [...chunk, ...remainingTasks.map(t => t)];
+      for (const { task } of allCancelled) {
         task.status = "skipped";
-        task.error = "Cancelled";  // Set skip reason on task object for UI display
+        task.error = "Cancelled";
         task.endTime = new Date();
         results.push({ task, success: false, skipped: true, error: "Cancelled" });
         context.onTaskComplete?.(task);
@@ -854,7 +868,7 @@ async function executeBatchGroup(
     const batchProgress: BatchProgress = {
       isActive: true,
       currentBatch: i + 1,
-      totalBatches: chunks.length,
+      totalBatches: totalEstimatedBatches,
       itemsInBatch: chunk.length,
       apiVersion: version,
       batchStartTime: new Date(),
@@ -868,11 +882,12 @@ async function executeBatchGroup(
       context.onTaskStart?.(task);
     }
 
-    console.log(`[BatchExecutor] Executing batch ${i + 1}/${chunks.length} with ${chunk.length} requests`);
+    console.log(`[BatchExecutor] Executing batch ${i + 1}/${totalEstimatedBatches} with ${chunk.length} requests`);
 
     // Submit this chunk, with retry support for individual 429/5xx responses
     let currentItems = chunk;
     let retryCount = 0;
+    let batchThrottleCount = 0;
 
     while (currentItems.length > 0 && retryCount <= maxRetries) {
       try {
@@ -953,6 +968,9 @@ async function executeBatchGroup(
             const headerDelay = getRetryAfterFromBatchResponse(response.headers) || 0;
             retryAfterMs = Math.max(retryAfterMs, headerDelay);
             pendingRetry.push(item);
+            if (response.status === 429) {
+              batchThrottleCount++;
+            }
             console.log(`[BatchExecutor] Response ${response.status} for "${task.itemName}" -- queued for retry`);
           } else {
             const error = extractBatchError(response);
@@ -961,6 +979,10 @@ async function executeBatchGroup(
             task.endTime = new Date();
             results.push({ task, success: false, skipped: false, error: error.message });
             context.onTaskError?.(task, new Error(error.message));
+            // Count throttle failures that exhausted retries
+            if (response.status === 429 || isThrottleErrorMessage(error.message)) {
+              batchThrottleCount++;
+            }
           }
         }
 
@@ -981,6 +1003,11 @@ async function executeBatchGroup(
         retryCount++;
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`[BatchExecutor] Batch ${i + 1} failed (attempt ${retryCount}/${maxRetries}):`, errorMessage);
+
+        // Count as throttle event if the HTTP-level error is throttle-related
+        if (isThrottleErrorMessage(errorMessage)) {
+          batchThrottleCount += currentItems.length;
+        }
 
         if (retryCount <= maxRetries) {
           const retryDelay = Math.pow(2, retryCount) * 1000;
@@ -1014,14 +1041,57 @@ async function executeBatchGroup(
       }
     }
 
-    // Delay between batches (except for last batch)
-    if (i < chunks.length - 1) {
-      console.log(`[BatchExecutor] Waiting ${config.delayBetweenBatches}ms before next batch`);
-      await sleep(config.delayBetweenBatches);
+    // Adaptive throttle: adjust delay and batch size based on 429 counts
+    if (batchThrottleCount > 0) {
+      consecutiveUnthrottledBatches = 0;
+      const throttleRatio = batchThrottleCount / chunk.length;
+
+      // Double the inter-batch delay when any throttling is detected
+      currentBatchDelay = Math.min(currentBatchDelay * 2, 30_000);
+      console.log(`[BatchExecutor] Throttling detected in batch ${i + 1} — ${batchThrottleCount}/${chunk.length} items throttled, increasing delay to ${currentBatchDelay}ms`);
+      emitStatus(context, `Throttling detected — slowing down (delay ${currentBatchDelay}ms)`, "warning");
+
+      // If >50% of items were throttled, also reduce batch size for remaining items
+      if (throttleRatio > 0.5 && currentBatchSize > MIN_BATCH_SIZE) {
+        currentBatchSize = Math.max(Math.floor(currentBatchSize / 2), MIN_BATCH_SIZE);
+        console.log(`[BatchExecutor] >50% throttled — reducing batch size to ${currentBatchSize}`);
+        emitStatus(context, `Heavy throttling — reducing batch size to ${currentBatchSize}`, "warning");
+      }
+    } else {
+      consecutiveUnthrottledBatches++;
+
+      // Gradually recover after 2 consecutive unthrottled batches
+      if (consecutiveUnthrottledBatches >= 2) {
+        if (currentBatchDelay > config.delayBetweenBatches) {
+          currentBatchDelay = Math.max(Math.floor(currentBatchDelay / 2), config.delayBetweenBatches);
+          console.log(`[BatchExecutor] Throttle recovery — reducing delay to ${currentBatchDelay}ms`);
+        }
+        if (currentBatchSize < initialBatchSize) {
+          currentBatchSize = Math.min(currentBatchSize + Math.floor(initialBatchSize / 4), initialBatchSize);
+          console.log(`[BatchExecutor] Throttle recovery — increasing batch size to ${currentBatchSize}`);
+        }
+      }
     }
+
+    // Delay between batches (except when no remaining tasks)
+    if (remainingTasks.length > 0) {
+      console.log(`[BatchExecutor] Waiting ${currentBatchDelay}ms before next batch`);
+      await sleep(currentBatchDelay);
+    }
+
+    batchIndex++;
   }
 
   return results;
+}
+
+/**
+ * Check if an error message indicates throttling (429/TooManyRequests).
+ * Used as a fallback when the HTTP status code is not directly 429.
+ */
+function isThrottleErrorMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("429") || lower.includes("toomanyrequests") || lower.includes("throttl");
 }
 
 /**

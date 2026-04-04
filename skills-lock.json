@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "msgraph": {
+      "source": "merill/msgraph",
+      "sourceType": "github",
+      "computedHash": "2cb707dfc252b7aae772f6e76b866e8ff80aab321d2accb18698b6ef9c04a328"
+    }
+  }
+}

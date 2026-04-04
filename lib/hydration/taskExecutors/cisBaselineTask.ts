@@ -159,7 +159,7 @@ export async function executeCISBaselineTask(
           }
           const escapedV2Name = escapeODataString(policyName);
           const v2Response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
-            `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(escapedV2Name)}'`
+            `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(escapedV2Name)}'&$select=id,name,description`
           );
           if (!v2Response.value || v2Response.value.length === 0) {
             console.log(`[CIS Baseline Task] V2 Compliance policy "${policyName}" not found in tenant`);
@@ -186,7 +186,7 @@ export async function executeCISBaselineTask(
           }
           const escapedV1Name = escapeODataString(policyName);
           const v1Response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-            `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedV1Name)}'`
+            `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedV1Name)}'&$select=id,displayName,description`
           );
           if (!v1Response.value || v1Response.value.length === 0) {
             console.log(`[CIS Baseline Task] V1 Compliance policy "${policyName}" not found in tenant`);
@@ -213,7 +213,7 @@ export async function executeCISBaselineTask(
           }
           const escapedDcName = escapeODataString(policyName);
           const dcResponse = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-            `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedDcName)}'`
+            `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedDcName)}'&$select=id,displayName,description`
           );
           if (!dcResponse.value || dcResponse.value.length === 0) {
             console.log(`[CIS Baseline Task] Device Configuration policy "${policyName}" not found in tenant`);

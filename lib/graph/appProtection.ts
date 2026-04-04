@@ -25,7 +25,7 @@ export async function getiOSAppProtectionPolicies(
   client: GraphClient
 ): Promise<AppProtectionPolicy[]> {
   return client.getCollection<AppProtectionPolicy>(
-    "/deviceAppManagement/iosManagedAppProtections"
+    "/deviceAppManagement/iosManagedAppProtections?$select=id,displayName,description"
   );
 }
 
@@ -36,7 +36,7 @@ export async function getAndroidAppProtectionPolicies(
   client: GraphClient
 ): Promise<AppProtectionPolicy[]> {
   return client.getCollection<AppProtectionPolicy>(
-    "/deviceAppManagement/androidManagedAppProtections"
+    "/deviceAppManagement/androidManagedAppProtections?$select=id,displayName,description"
   );
 }
 

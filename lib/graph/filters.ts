@@ -10,7 +10,7 @@ import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarke
  * Get all device filters in the tenant
  */
 export async function getAllFilters(client: GraphClient): Promise<DeviceFilter[]> {
-  return client.getCollection<DeviceFilter>("/deviceManagement/assignmentFilters");
+  return client.getCollection<DeviceFilter>("/deviceManagement/assignmentFilters?$select=id,displayName,description,platform,rule");
 }
 
 /**

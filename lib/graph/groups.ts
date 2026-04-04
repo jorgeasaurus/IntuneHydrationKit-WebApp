@@ -24,8 +24,8 @@ export async function getHydrationKitGroups(client: GraphClient): Promise<Device
   const filter2 = `contains(description,'${HYDRATION_MARKER_LEGACY}')`;
 
   const [groups1, groups2] = await Promise.all([
-    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter1)}`).catch(() => []),
-    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter2)}`).catch(() => [])
+    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter1)}&$select=id,displayName,description`).catch(() => []),
+    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter2)}&$select=id,displayName,description`).catch(() => [])
   ]);
 
   // Combine and deduplicate by id
@@ -47,7 +47,7 @@ export async function getHydrationKitGroups(client: GraphClient): Promise<Device
  */
 export async function getIntuneGroups(client: GraphClient): Promise<DeviceGroup[]> {
   const filter = "startswith(displayName,'[IHD] ') or startswith(displayName,'Intune - ') or startswith(displayName,'Entra - ')";
-  return client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter)}`);
+  return client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter)}&$select=id,displayName,description,membershipRule`);
 }
 
 /**
@@ -69,7 +69,7 @@ export async function getGroupByName(
 ): Promise<DeviceGroup | null> {
   const filter = `displayName eq '${displayName.replace(/'/g, "''")}'`;
   const groups = await client.getCollection<DeviceGroup>(
-    `/groups?$filter=${encodeURIComponent(filter)}`
+    `/groups?$filter=${encodeURIComponent(filter)}&$select=id,displayName,description`
   );
   return groups.length > 0 ? groups[0] : null;
 }

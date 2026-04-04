@@ -254,7 +254,7 @@ export async function executeBaselineTask(
         if (!profiles || profiles.length === 0) {
           console.log(`[Baseline Task] No cached Driver Update Profiles - fetching now...`);
           const response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-            `/deviceManagement/windowsDriverUpdateProfiles`
+            `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description`
           );
           profiles = response.value || [];
           context.cachedDriverUpdateProfiles = profiles;

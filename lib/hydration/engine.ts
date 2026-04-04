@@ -236,7 +236,7 @@ export async function executeTasks(
     console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
     try {
       const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string; state: string }> }>(
-        `/identity/conditionalAccess/policies`
+        `/identity/conditionalAccess/policies?$select=id,displayName,description,state`
       );
       context.cachedConditionalAccessPolicies = response.value || [];
       emitStatus(context, `Found ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`, "success", "prefetch");
@@ -324,7 +324,7 @@ export async function executeTasks(
     console.log("[Execute Tasks] Pre-fetching all Driver Update Profiles...");
     try {
       const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-        `/deviceManagement/windowsDriverUpdateProfiles`
+        `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description`
       );
       context.cachedDriverUpdateProfiles = response.value || [];
       emitStatus(context, `Found ${context.cachedDriverUpdateProfiles.length} Driver Update profiles`, "success", "prefetch");
