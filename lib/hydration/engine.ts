@@ -174,6 +174,8 @@ export async function executeTasks(
   const results: ExecutionResult[] = [];
   const TASK_DELAY_MS = 2000; // 2 second delay between tasks
 
+  emitStatus(context, `Checking tenant for existing resources (${tasks.length} items selected)...`, "info", "prefetch");
+
   // Pre-fetch "Intune - " groups if any group tasks exist
   const hasGroupTasks = tasks.some((task) => task.category === "groups");
   if (hasGroupTasks && !context.cachedIntuneGroups) {
@@ -233,8 +235,8 @@ export async function executeTasks(
     emitStatus(context, "Querying existing Conditional Access policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
     try {
-      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string; state: string }> }>(
-        `/identity/conditionalAccess/policies`
+      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; state: string }> }>(
+        `/identity/conditionalAccess/policies?$select=id,displayName,state`
       );
       context.cachedConditionalAccessPolicies = response.value || [];
       emitStatus(context, `Found ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`, "success", "prefetch");
@@ -322,7 +324,7 @@ export async function executeTasks(
     console.log("[Execute Tasks] Pre-fetching all Driver Update Profiles...");
     try {
       const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-        `/deviceManagement/windowsDriverUpdateProfiles`
+        `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description`
       );
       context.cachedDriverUpdateProfiles = response.value || [];
       emitStatus(context, `Found ${context.cachedDriverUpdateProfiles.length} Driver Update profiles`, "success", "prefetch");
@@ -369,6 +371,8 @@ export async function executeTasks(
   // Preview mode now uses batching with guards in batchExecutor.ts that skip actual API calls
   const useCreateBatching = batchConfig.enableBatching && context.operationMode === "create";
   const useDeleteBatching = batchConfig.enableBatching && context.operationMode === "delete";
+
+  emitStatus(context, "Tenant check complete — starting execution...", "success", "prefetch");
 
   if (useCreateBatching) {
     emitStatus(context, `Starting batch creation (${batchConfig.defaultBatchSize} items per batch)...`, "info", "execute");

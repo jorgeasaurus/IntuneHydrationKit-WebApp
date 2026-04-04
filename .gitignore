@@ -51,3 +51,5 @@ ralph*.md
 VERCEL_MIGRATION.md
 *.csv
 teaser-video/
+playwright-report/index.html
+test-results/.last-run.json

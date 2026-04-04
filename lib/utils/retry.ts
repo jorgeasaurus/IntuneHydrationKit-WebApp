@@ -46,6 +46,15 @@ function calculateDelay(
  * Non-retryable: 4xx (Client Errors) except 429 and transient 400s
  */
 function isRetryableError(error: unknown): boolean {
+  // Check for error.code string for retryable Graph API error codes
+  const errorWithCode = error as { code?: string };
+  if (typeof errorWithCode.code === "string") {
+    const retryableCodes = ["TooManyRequests", "ServiceUnavailable", "GatewayTimeout"];
+    if (retryableCodes.includes(errorWithCode.code)) {
+      return true;
+    }
+  }
+
   // Check for status property on error (added by GraphClient)
   const errorWithStatus = error as { status?: number; message?: string };
   if (typeof errorWithStatus.status === "number") {
@@ -143,9 +152,12 @@ export async function retryWithBackoff<T>(
       // Get status for logging
       const status = getErrorStatus(error);
 
-      // Check for Retry-After header if it's a Response
+      // Check for retryAfterSeconds propagated from GraphClient on 429 errors
+      const errorWithRetry = error as { retryAfterSeconds?: number };
       let retryAfterSeconds: number | undefined;
-      if (error instanceof Response) {
+      if (typeof errorWithRetry.retryAfterSeconds === "number") {
+        retryAfterSeconds = errorWithRetry.retryAfterSeconds;
+      } else if (error instanceof Response) {
         const retryAfter = error.headers.get("Retry-After");
         retryAfterSeconds = retryAfter ? parseInt(retryAfter, 10) : undefined;
       }

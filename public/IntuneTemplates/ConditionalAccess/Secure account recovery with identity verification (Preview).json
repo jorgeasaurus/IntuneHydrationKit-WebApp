@@ -1,5 +1,4 @@
 {
-  "displayName": "Secure account recovery with identity verification (Preview)",
   "grantControls": {
     "termsOfUse": [],
     "authenticationStrength@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/templates('6acdf4c3-6815-485c-a57d-2c349d517ba0')/details/grantControls/authenticationStrength/$entity",
@@ -38,7 +37,9 @@
     "clients": null,
     "agentIdRiskLevels": null,
     "users": {
-      "excludeUsers": [],
+      "excludeUsers": [
+        
+      ],
       "includeUsers": [
         "All"
       ],

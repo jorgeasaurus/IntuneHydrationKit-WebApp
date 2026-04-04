@@ -546,4 +546,4 @@ For deployment issues:
 ---
 
 **Last Updated**: January 7, 2026
-**Application Version**: 0.1.0
+**Application Version**: 2.1.0

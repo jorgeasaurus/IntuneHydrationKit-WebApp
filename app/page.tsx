@@ -43,6 +43,22 @@ import { WebAppDemo } from "@/components/WebAppDemo";
 import { CloudEnvironment } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
 
+function MicrosoftLogo() {
+  return (
+    <svg
+      className="mr-2 h-5 w-5"
+      viewBox="0 0 21 21"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
@@ -90,7 +106,7 @@ export default function Home() {
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-hydrate/10 border border-hydrate/30">
                   <span className="w-2 h-2 rounded-full bg-hydrate animate-pulse" />
                   <span className="text-xs font-mono text-hydrate uppercase tracking-wider">
-                    v2.0
+                    v2.1
                   </span>
                 </div>
 
@@ -118,17 +134,7 @@ export default function Home() {
                       size="lg"
                       className="h-12 px-8 text-base font-semibold border-2"
                     >
-                      <svg
-                        className="mr-2 h-5 w-5"
-                        viewBox="0 0 21 21"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
-                        <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-                        <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-                        <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-                        <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-                      </svg>
+                      <MicrosoftLogo />
                       Sign In with Microsoft
                     </Button>
                   ) : (
@@ -680,17 +686,7 @@ export default function Home() {
                         size="lg"
                         className="h-12 px-8 text-base font-semibold border-2"
                       >
-                        <svg
-                          className="mr-2 h-5 w-5"
-                          viewBox="0 0 21 21"
-                          fill="none"
-                          xmlns="http://www.w3.org/2000/svg"
-                        >
-                          <rect x="1" y="1" width="9" height="9" fill="#f25022" />
-                          <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
-                          <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
-                          <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
-                        </svg>
+                        <MicrosoftLogo />
                         Get Started Now
                       </Button>
                     ) : (

@@ -40,6 +40,7 @@ export class GraphClient {
     return {
       Authorization: `Bearer ${token}`,
       "Content-Type": "application/json",
+      "client-request-id": crypto.randomUUID(),
     };
   }
 
@@ -50,6 +51,7 @@ export class GraphClient {
   private async handleResponse<T>(response: Response): Promise<T> {
     if (!response.ok) {
       let errorMessage = `Graph API error: ${response.status} ${response.statusText}`;
+      let errorCode: string | undefined;
 
       try {
         const responseText = await response.text();
@@ -67,6 +69,19 @@ export class GraphClient {
           else if (errorData.error?.code) {
             errorMessage = `${errorData.error.code}: ${errorData.error.details?.[0]?.message || errorData.error.message || "Unknown error"}`;
           }
+
+          // Extract error code, walking innererror recursively for the most specific code
+          if (errorData.error?.code) {
+            errorCode = errorData.error.code;
+            let inner = errorData.error.innererror;
+            while (inner && typeof inner === "object") {
+              if (typeof inner.code === "string") {
+                errorCode = inner.code;
+              }
+              inner = inner.innererror;
+            }
+          }
+
           // Log full error for debugging
           console.error("[GraphClient] Full error response:", responseText);
         }
@@ -75,8 +90,28 @@ export class GraphClient {
       }
 
       // Always include status code in error message for proper error handling
-      const error = new Error(`[${response.status}] ${errorMessage}`) as Error & { status: number };
+      const error = new Error(`[${response.status}] ${errorMessage}`) as Error & {
+        status: number;
+        code?: string;
+        retryAfterSeconds?: number;
+      };
       error.status = response.status;
+
+      if (errorCode) {
+        error.code = errorCode;
+      }
+
+      // Propagate Retry-After header on 429 responses
+      if (response.status === 429) {
+        const retryAfter = response.headers.get("Retry-After");
+        if (retryAfter) {
+          const parsed = parseInt(retryAfter, 10);
+          if (!isNaN(parsed)) {
+            error.retryAfterSeconds = parsed;
+          }
+        }
+      }
+
       throw error;
     }
 
@@ -210,7 +245,7 @@ export class GraphClient {
       const headers = await this.getHeaders();
       const response = await fetch(url, {
         method: "PATCH",
-        headers,
+        headers: { ...headers, Prefer: "return=minimal" },
         body: JSON.stringify(data),
       });
       return this.handleResponse<T>(response);
@@ -228,7 +263,7 @@ export class GraphClient {
       const headers = await this.getHeaders();
       const response = await fetch(url, {
         method: "DELETE",
-        headers,
+        headers: { ...headers, Prefer: "return=minimal" },
       });
 
       // Treat 404 as success for DELETE (idempotent - resource already gone)

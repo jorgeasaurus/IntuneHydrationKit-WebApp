@@ -36,7 +36,7 @@ export async function getOrganizationInfo(
   }
 
   // The /organization endpoint returns a collection
-  const orgs = await client.getCollection<OrgResponse>("/organization", "beta");
+  const orgs = await client.getCollection<OrgResponse>("/organization?$select=id,displayName,tenantType,verifiedDomains", "beta");
 
   if (!orgs || orgs.length === 0) {
     throw new Error("No organization information found");
@@ -63,7 +63,7 @@ export async function checkLicenses(
 
   // Fetch all subscribed SKUs
   const skus = await client.getCollection<SubscribedSku>(
-    "/subscribedSkus",
+    "/subscribedSkus?$select=skuId,skuPartNumber,servicePlans",
     "beta"
   );
 
@@ -149,7 +149,7 @@ export async function checkPermissions(
 
     try {
       const grants = await client.getCollection<OAuthPermissionGrant>(
-        "/me/oauth2PermissionGrants",
+        "/me/oauth2PermissionGrants?$select=scope,clientId,consentType",
         "beta"
       );
 

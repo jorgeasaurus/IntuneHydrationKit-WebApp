@@ -19,7 +19,7 @@ import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
-import { sleep } from "./utils";
+import { sleep, hasODataUnsafeChars } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   settingsCatalogPolicyExists,
@@ -127,7 +127,7 @@ async function verifyCompliancePolicyCreated(
 
       // Fetch fresh compliance policies from Graph API with timeout
       const fetchPromise = context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-        "/deviceManagement/deviceCompliancePolicies"
+        "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
       );
 
       const response = await Promise.race([fetchPromise, timeoutPromise]);
@@ -200,11 +200,15 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
     return { type: "error", reason: "Template not found" };
   }
 
-  // Check if already exists in cache
+  // Check if already exists in cache — match with or without [IHD] prefix
   console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups?.length || 0} cached groups`);
-  const existingGroup = context.cachedIntuneGroups?.find(
-    (g) => g.displayName.toLowerCase() === template!.displayName.toLowerCase()
-  );
+  const templateName = template!.displayName.toLowerCase();
+  const templateNameStripped = templateName.startsWith("[ihd] ") ? templateName.slice(6) : templateName;
+  const existingGroup = context.cachedIntuneGroups?.find((g) => {
+    const cachedName = g.displayName.toLowerCase();
+    const cachedNameStripped = cachedName.startsWith("[ihd] ") ? cachedName.slice(6) : cachedName;
+    return cachedName === templateName || cachedNameStripped === templateNameStripped;
+  });
   if (existingGroup) {
     console.log(`[BatchExecutor:groups] ✗ Group already exists: "${task.itemName}"`);
     return { type: "skip", reason: "Group already exists" };
@@ -668,17 +672,58 @@ export async function executeTasksInBatches(
   const nonBatchableTasks: HydrationTask[] = [];
   const skippedTasks: { task: HydrationTask; reason: string }[] = [];
 
+  // Build a category summary for logging
+  const categoryCounts = tasks.reduce((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const categoryNames: Record<string, string> = {
+    groups: "Entra Groups", filters: "Device Filters", compliance: "Compliance Policies",
+    conditionalAccess: "Conditional Access", appProtection: "App Protection",
+    enrollment: "Enrollment Profiles", baseline: "OpenIntuneBaseline",
+    cisBaseline: "CIS Baselines", notificationTemplates: "Notification Templates",
+  };
+
   emitStatus(context, `Preparing ${tasks.length} items for batch creation...`, "progress", "create");
   console.log(`[BatchExecutor] Preparing ${tasks.length} tasks for batch execution (batch size: ${config.defaultBatchSize})`);
-  console.log(`[BatchExecutor] Task categories:`, tasks.map(t => t.category).reduce((acc, cat) => {
-    acc[cat] = (acc[cat] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>));
+  console.log(`[BatchExecutor] Task categories:`, categoryCounts);
   console.log(`[BatchExecutor] Context cache: baselineTemplates=${context.cachedBaselineTemplates?.length ?? 'not set'}`);
 
   // Separate tasks into: batchable, skipped, or needs sequential
+  let currentCategory = "";
+  let categoryProcessed = 0;
+  let categoryTotal = 0;
+
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
+
+    // Emit progress when entering a new category
+    if (task.category !== currentCategory) {
+      currentCategory = task.category;
+      categoryTotal = categoryCounts[currentCategory] || 0;
+      categoryProcessed = 0;
+      const friendlyName = categoryNames[currentCategory] || currentCategory;
+      emitStatus(
+        context,
+        `Preparing ${friendlyName} (${categoryTotal} items)...`,
+        "progress",
+        "create"
+      );
+    }
+
+    categoryProcessed++;
+
+    // Emit progress every 25 items within large categories
+    if (categoryTotal > 25 && categoryProcessed % 25 === 0) {
+      const friendlyName = categoryNames[currentCategory] || currentCategory;
+      emitStatus(
+        context,
+        `Preparing ${friendlyName}: ${categoryProcessed}/${categoryTotal}...`,
+        "progress",
+        "create"
+      );
+    }
+
     console.log(`[BatchExecutor] Preparing task ${i + 1}/${tasks.length}: "${task.itemName}" (${task.category})`);
     const prepared = await prepareTaskForBatch(task, context, `req-${i}`);
 
@@ -712,9 +757,11 @@ export async function executeTasksInBatches(
   }
 
   console.log(`[BatchExecutor] Summary: ${batchableTasks.length} batched, ${skippedTasks.length} skipped, ${nonBatchableTasks.length} sequential`);
+  const skipMsg = skippedTasks.length > 0 ? `, ${skippedTasks.length} duplicates skipped` : "";
+  const seqMsg = nonBatchableTasks.length > 0 ? `, ${nonBatchableTasks.length} sequential` : "";
   emitStatus(
     context,
-    `Creating ${batchableTasks.length} items (${skippedTasks.length} duplicates skipped)...`,
+    `Preparation complete — sending ${batchableTasks.length} items${skipMsg}${seqMsg}`,
     "info",
     "create"
   );
@@ -770,27 +817,41 @@ async function executeBatchGroup(
   const hasThrottleSensitiveTasks = preparedTasks.some(
     (t) => t.task.category === "cisBaseline" || t.task.category === "baseline"
   );
-  const effectiveBatchSize = hasThrottleSensitiveTasks
+  const initialBatchSize = hasThrottleSensitiveTasks
     ? Math.min(config.categoryBatchSizes?.cisBaseline ?? config.defaultBatchSize, config.defaultBatchSize)
     : config.defaultBatchSize;
 
-  const chunks = chunkArray(preparedTasks, effectiveBatchSize);
+  // Adaptive throttle state — tracks across batches to dynamically adjust delay and size
+  let currentBatchDelay = config.delayBetweenBatches;
+  let currentBatchSize = initialBatchSize;
+  let consecutiveUnthrottledBatches = 0;
+  const MIN_BATCH_SIZE = 2;
+
+  // Re-chunk remaining tasks dynamically; start with initial sizing
+  let remainingTasks = [...preparedTasks];
   const maxRetries = 3;
 
   if (hasThrottleSensitiveTasks) {
-    console.log(`[BatchExecutor] Using reduced batch size ${effectiveBatchSize} for throttle-sensitive categories`);
+    console.log(`[BatchExecutor] Using reduced batch size ${initialBatchSize} for throttle-sensitive categories`);
   }
-  console.log(`[BatchExecutor] Processing ${chunks.length} batch(es) of ${version} requests (batch size: ${effectiveBatchSize})`);
+  console.log(`[BatchExecutor] Processing ${Math.ceil(remainingTasks.length / currentBatchSize)} batch(es) of ${version} requests (batch size: ${currentBatchSize})`);
 
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
+  let batchIndex = 0;
+  while (remainingTasks.length > 0) {
+    // Slice off the next chunk at the current adaptive batch size
+    const chunk = remainingTasks.slice(0, currentBatchSize);
+    remainingTasks = remainingTasks.slice(currentBatchSize);
+    const totalEstimatedBatches = batchIndex + 1 + Math.ceil(remainingTasks.length / currentBatchSize);
+    const i = batchIndex;
 
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[BatchExecutor] Execution cancelled`);
-      for (const { task } of chunk) {
+      // Cancel current chunk and all remaining tasks
+      const allCancelled = [...chunk, ...remainingTasks.map(t => t)];
+      for (const { task } of allCancelled) {
         task.status = "skipped";
-        task.error = "Cancelled";  // Set skip reason on task object for UI display
+        task.error = "Cancelled";
         task.endTime = new Date();
         results.push({ task, success: false, skipped: true, error: "Cancelled" });
         context.onTaskComplete?.(task);
@@ -807,7 +868,7 @@ async function executeBatchGroup(
     const batchProgress: BatchProgress = {
       isActive: true,
       currentBatch: i + 1,
-      totalBatches: chunks.length,
+      totalBatches: totalEstimatedBatches,
       itemsInBatch: chunk.length,
       apiVersion: version,
       batchStartTime: new Date(),
@@ -821,11 +882,12 @@ async function executeBatchGroup(
       context.onTaskStart?.(task);
     }
 
-    console.log(`[BatchExecutor] Executing batch ${i + 1}/${chunks.length} with ${chunk.length} requests`);
+    console.log(`[BatchExecutor] Executing batch ${i + 1}/${totalEstimatedBatches} with ${chunk.length} requests`);
 
     // Submit this chunk, with retry support for individual 429/5xx responses
     let currentItems = chunk;
     let retryCount = 0;
+    let batchThrottleCount = 0;
 
     while (currentItems.length > 0 && retryCount <= maxRetries) {
       try {
@@ -906,6 +968,9 @@ async function executeBatchGroup(
             const headerDelay = getRetryAfterFromBatchResponse(response.headers) || 0;
             retryAfterMs = Math.max(retryAfterMs, headerDelay);
             pendingRetry.push(item);
+            if (response.status === 429) {
+              batchThrottleCount++;
+            }
             console.log(`[BatchExecutor] Response ${response.status} for "${task.itemName}" -- queued for retry`);
           } else {
             const error = extractBatchError(response);
@@ -914,6 +979,10 @@ async function executeBatchGroup(
             task.endTime = new Date();
             results.push({ task, success: false, skipped: false, error: error.message });
             context.onTaskError?.(task, new Error(error.message));
+            // Count throttle failures that exhausted retries
+            if (response.status === 429 || isThrottleErrorMessage(error.message)) {
+              batchThrottleCount++;
+            }
           }
         }
 
@@ -934,6 +1003,11 @@ async function executeBatchGroup(
         retryCount++;
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`[BatchExecutor] Batch ${i + 1} failed (attempt ${retryCount}/${maxRetries}):`, errorMessage);
+
+        // Count as throttle event if the HTTP-level error is throttle-related
+        if (isThrottleErrorMessage(errorMessage)) {
+          batchThrottleCount += currentItems.length;
+        }
 
         if (retryCount <= maxRetries) {
           const retryDelay = Math.pow(2, retryCount) * 1000;
@@ -967,14 +1041,57 @@ async function executeBatchGroup(
       }
     }
 
-    // Delay between batches (except for last batch)
-    if (i < chunks.length - 1) {
-      console.log(`[BatchExecutor] Waiting ${config.delayBetweenBatches}ms before next batch`);
-      await sleep(config.delayBetweenBatches);
+    // Adaptive throttle: adjust delay and batch size based on 429 counts
+    if (batchThrottleCount > 0) {
+      consecutiveUnthrottledBatches = 0;
+      const throttleRatio = batchThrottleCount / chunk.length;
+
+      // Double the inter-batch delay when any throttling is detected
+      currentBatchDelay = Math.min(currentBatchDelay * 2, 30_000);
+      console.log(`[BatchExecutor] Throttling detected in batch ${i + 1} — ${batchThrottleCount}/${chunk.length} items throttled, increasing delay to ${currentBatchDelay}ms`);
+      emitStatus(context, `Throttling detected — slowing down (delay ${currentBatchDelay}ms)`, "warning");
+
+      // If >50% of items were throttled, also reduce batch size for remaining items
+      if (throttleRatio > 0.5 && currentBatchSize > MIN_BATCH_SIZE) {
+        currentBatchSize = Math.max(Math.floor(currentBatchSize / 2), MIN_BATCH_SIZE);
+        console.log(`[BatchExecutor] >50% throttled — reducing batch size to ${currentBatchSize}`);
+        emitStatus(context, `Heavy throttling — reducing batch size to ${currentBatchSize}`, "warning");
+      }
+    } else {
+      consecutiveUnthrottledBatches++;
+
+      // Gradually recover after 2 consecutive unthrottled batches
+      if (consecutiveUnthrottledBatches >= 2) {
+        if (currentBatchDelay > config.delayBetweenBatches) {
+          currentBatchDelay = Math.max(Math.floor(currentBatchDelay / 2), config.delayBetweenBatches);
+          console.log(`[BatchExecutor] Throttle recovery — reducing delay to ${currentBatchDelay}ms`);
+        }
+        if (currentBatchSize < initialBatchSize) {
+          currentBatchSize = Math.min(currentBatchSize + Math.floor(initialBatchSize / 4), initialBatchSize);
+          console.log(`[BatchExecutor] Throttle recovery — increasing batch size to ${currentBatchSize}`);
+        }
+      }
     }
+
+    // Delay between batches (except when no remaining tasks)
+    if (remainingTasks.length > 0) {
+      console.log(`[BatchExecutor] Waiting ${currentBatchDelay}ms before next batch`);
+      await sleep(currentBatchDelay);
+    }
+
+    batchIndex++;
   }
 
   return results;
+}
+
+/**
+ * Check if an error message indicates throttling (429/TooManyRequests).
+ * Used as a fallback when the HTTP status code is not directly 429.
+ */
+function isThrottleErrorMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return lower.includes("429") || lower.includes("toomanyrequests") || lower.includes("throttl");
 }
 
 /**
@@ -1097,7 +1214,8 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name}")`);
       return true;
     }
-    if (await settingsCatalogPolicyExists(context.client, policyName)) {
+    // API fallback — skip if name has chars that break OData $filter (e.g. [IHD] prefix)
+    if (!hasODataUnsafeChars(policyName) && await settingsCatalogPolicyExists(context.client, policyName)) {
       console.log(`${logPrefix} SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
@@ -1120,7 +1238,7 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} V2Compliance already exists (SC cache hit), skipping: "${policyName}" (matched: "${existingSC.name}")`);
       return true;
     }
-    if (await v2CompliancePolicyExists(context.client, policyName)) {
+    if (!hasODataUnsafeChars(policyName) && await v2CompliancePolicyExists(context.client, policyName)) {
       console.log(`${logPrefix} V2Compliance already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
@@ -1135,7 +1253,7 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} DeviceConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
       return true;
     }
-    if (await deviceConfigurationExists(context.client, policyName)) {
+    if (!hasODataUnsafeChars(policyName) && await deviceConfigurationExists(context.client, policyName)) {
       console.log(`${logPrefix} DeviceConfiguration already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
@@ -1189,9 +1307,12 @@ function findResourceIdForDelete(
 
   switch (task.category) {
     case "groups": {
-      const group = context.cachedIntuneGroups?.find(
-        (g) => g.displayName.toLowerCase() === nameToFind
-      );
+      const nameStripped = nameToFind.startsWith("[ihd] ") ? nameToFind.slice(6) : nameToFind;
+      const group = context.cachedIntuneGroups?.find((g) => {
+        const n = g.displayName.toLowerCase();
+        const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
+        return n === nameToFind || ns === nameStripped;
+      });
       if (group?.id) {
         return { id: group.id, hasMarker: hasHydrationMarker(group.description) };
       }
@@ -1922,8 +2043,8 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
 const FAST_DELETE_CONFIG = {
   /** Number of concurrent delete requests (NukeTune uses 3) */
   parallelRequests: 3,
-  /** Delay between batches of parallel requests (ms) (NukeTune uses 300) */
-  delayBetweenBatches: 300,
+  /** Delay between batches of parallel requests (ms) */
+  delayBetweenBatches: 500,
 };
 
 /**
@@ -2081,13 +2202,16 @@ export async function executeDeletesInParallel(
               return { task, success: true, skipped: false };
             }
 
-            // Check if it's a 400 error (transient backend issue) but NOT ResourceNotFound
+            // Check if it's a 429 (throttled) or 400 error (transient backend issue) but NOT ResourceNotFound
+            const is429Error = lastError.includes("[429]") || lastError.includes("TooManyRequests");
             const is400Error = lastError.includes("[400]") || lastError.includes("400");
-            const isRetryable = is400Error && attempt < maxRetries - 1;
+            const isRetryable = (is429Error || is400Error) && attempt < maxRetries - 1;
 
             if (isRetryable) {
-              const retryDelay = (attempt + 1) * 500; // 500ms, 1000ms, 1500ms
-              console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms`);
+              const retryDelay = is429Error
+                ? (attempt + 1) * 3000  // 3s, 6s, 9s for throttling
+                : (attempt + 1) * 500;  // 500ms, 1000ms, 1500ms for transient
+              console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms (${is429Error ? "throttled" : "transient"})`);
               await sleep(retryDelay);
               continue;
             }
@@ -2112,6 +2236,11 @@ export async function executeDeletesInParallel(
 
     results.push(...batchResults);
 
+    // Check if any results in this batch had throttling errors — add extra cooldown
+    const hadThrottling = batchResults.some(
+      (r) => r.error?.includes("[429]") || r.error?.includes("TooManyRequests")
+    );
+
     // Update progress
     context.onBatchProgress?.({
       isActive: true,
@@ -2121,9 +2250,13 @@ export async function executeDeletesInParallel(
       apiVersion: "beta",
     });
 
-    // Short delay between batches (except for last batch)
+    // Delay between batches (except for last batch); extra cooldown after throttling
     if (i + parallelRequests < toDelete.length) {
-      await sleep(delayBetweenBatches);
+      const batchDelay = hadThrottling ? 5000 : delayBetweenBatches;
+      if (hadThrottling) {
+        console.log(`[FastDelete] Throttling detected — cooling down for ${batchDelay}ms before next batch`);
+      }
+      await sleep(batchDelay);
     }
   }
 

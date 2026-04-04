@@ -1,20 +1,52 @@
 /**
  * Microsoft Graph API operations for Enrollment Profiles
- * Handles Autopilot Deployment Profiles and Enrollment Status Page (ESP) configurations
+ * Handles Autopilot Deployment Profiles, Enrollment Status Page (ESP),
+ * and Device Preparation profiles (Settings Catalog-based)
  */
 
 import { GraphClient } from "./client";
 import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import type { DevicePreparationProfile } from "@/templates/enrollment";
 
-/**
- * Add hydration marker to enrollment profile description
- */
+const AUTOPILOT_PATH = "/deviceManagement/windowsAutopilotDeploymentProfiles";
+const ESP_PATH = "/deviceManagement/deviceEnrollmentConfigurations";
+const CONFIG_POLICIES_PATH = "/deviceManagement/configurationPolicies";
+
 function addEnrollmentHydrationMarker(description: string | undefined | null): string {
   const desc = String(description || "");
   if (hasHydrationMarker(desc)) {
     return desc;
   }
   return desc ? `${desc} ${HYDRATION_MARKER}` : HYDRATION_MARKER;
+}
+
+/**
+ * Shared delete logic: verify hydration marker, check for assignments, then delete.
+ */
+async function deleteEnrollmentEntity(
+  client: GraphClient,
+  basePath: string,
+  entityId: string,
+  entityLabel: string
+): Promise<void> {
+  const entity = await client.get<{ displayName: string; description?: string }>(
+    `${basePath}/${entityId}`
+  );
+
+  if (!hasHydrationMarker(entity.description)) {
+    throw new Error(
+      `Cannot delete ${entityLabel} "${entity.displayName}": Not created by Intune Hydration Kit`
+    );
+  }
+
+  const assignments = await client.getCollection(`${basePath}/${entityId}/assignments`);
+  if (assignments.length > 0) {
+    throw new Error(
+      `Cannot delete ${entityLabel} "${entity.displayName}": Has ${assignments.length} assignment(s). Remove all assignments before deleting.`
+    );
+  }
+
+  await client.delete(`${basePath}/${entityId}`);
 }
 
 /**
@@ -78,22 +110,14 @@ export interface EnrollmentStatusPageConfiguration {
 /**
  * Union type for all enrollment profile types
  */
-export type EnrollmentProfile = AutopilotDeploymentProfile | EnrollmentStatusPageConfiguration;
+export type EnrollmentProfile = AutopilotDeploymentProfile | EnrollmentStatusPageConfiguration | DevicePreparationProfile;
 
-/**
- * Get all Autopilot deployment profiles
- */
 export async function getAllAutopilotProfiles(
   client: GraphClient
 ): Promise<AutopilotDeploymentProfile[]> {
-  return client.getCollection<AutopilotDeploymentProfile>(
-    "/deviceManagement/windowsAutopilotDeploymentProfiles"
-  );
+  return client.getCollection<AutopilotDeploymentProfile>(AUTOPILOT_PATH);
 }
 
-/**
- * Get an Autopilot profile by display name
- */
 export async function getAutopilotProfileByName(
   client: GraphClient,
   displayName: string
@@ -104,9 +128,6 @@ export async function getAutopilotProfileByName(
   ) || null;
 }
 
-/**
- * Check if an Autopilot profile exists by display name
- */
 export async function autopilotProfileExists(
   client: GraphClient,
   displayName: string
@@ -115,9 +136,6 @@ export async function autopilotProfileExists(
   return profile !== null;
 }
 
-/**
- * Clean and normalize an Autopilot profile for creation
- */
 function cleanAutopilotProfile(profile: AutopilotDeploymentProfile): Record<string, unknown> {
   const cleaned = JSON.parse(JSON.stringify(profile)) as Record<string, unknown>;
 
@@ -125,105 +143,56 @@ function cleanAutopilotProfile(profile: AutopilotDeploymentProfile): Record<stri
   cleaned.description = addEnrollmentHydrationMarker(profile.description);
 
   // Graph API doesn't accept "os-default" for language/locale
-  if (cleaned.language === "os-default") {
-    delete cleaned.language;
-  }
-  if (cleaned.locale === "os-default") {
-    delete cleaned.locale;
-  }
+  if (cleaned.language === "os-default") delete cleaned.language;
+  if (cleaned.locale === "os-default") delete cleaned.locale;
 
   return cleaned;
 }
 
-/**
- * Create an Autopilot deployment profile
- */
 export async function createAutopilotProfile(
   client: GraphClient,
   profile: AutopilotDeploymentProfile
 ): Promise<AutopilotDeploymentProfile> {
-  const profileBody = cleanAutopilotProfile(profile);
-
   return client.post<AutopilotDeploymentProfile>(
-    "/deviceManagement/windowsAutopilotDeploymentProfiles",
-    profileBody
+    AUTOPILOT_PATH,
+    cleanAutopilotProfile(profile)
   );
 }
 
-/**
- * Get assignments for an Autopilot deployment profile
- */
 export async function getAutopilotProfileAssignments(
   client: GraphClient,
   profileId: string
 ): Promise<unknown[]> {
-  return client.getCollection(
-    `/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}/assignments`
-  );
+  return client.getCollection(`${AUTOPILOT_PATH}/${profileId}/assignments`);
 }
 
-/**
- * Delete an Autopilot deployment profile
- * Only deletes if the profile was created by Intune Hydration Kit and has no assignments
- */
 export async function deleteAutopilotProfile(
   client: GraphClient,
   profileId: string
 ): Promise<void> {
-  const profile = await client.get<AutopilotDeploymentProfile>(
-    `/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}`
-  );
-
-  if (!hasHydrationMarker(profile.description)) {
-    throw new Error(
-      `Cannot delete profile "${profile.displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  const assignments = await getAutopilotProfileAssignments(client, profileId);
-  if (assignments.length > 0) {
-    throw new Error(
-      `Cannot delete profile "${profile.displayName}": Profile has ${assignments.length} assignment(s). Remove all assignments before deleting.`
-    );
-  }
-
-  await client.delete(`/deviceManagement/windowsAutopilotDeploymentProfiles/${profileId}`);
+  await deleteEnrollmentEntity(client, AUTOPILOT_PATH, profileId, "profile");
 }
 
-/**
- * Delete an Autopilot profile by display name
- */
 export async function deleteAutopilotProfileByName(
   client: GraphClient,
   displayName: string
 ): Promise<void> {
   const profile = await getAutopilotProfileByName(client, displayName);
-
-  if (!profile || !profile.id) {
+  if (!profile?.id) {
     throw new Error(`Autopilot profile "${displayName}" not found`);
   }
-
   await deleteAutopilotProfile(client, profile.id);
 }
 
-/**
- * Get all device enrollment configurations (includes ESP)
- */
 export async function getAllEnrollmentConfigurations(
   client: GraphClient
 ): Promise<EnrollmentStatusPageConfiguration[]> {
-  const configs = await client.getCollection<EnrollmentStatusPageConfiguration>(
-    "/deviceManagement/deviceEnrollmentConfigurations"
-  );
-  // Filter to only ESP configurations
+  const configs = await client.getCollection<EnrollmentStatusPageConfiguration>(ESP_PATH);
   return configs.filter(
     (c) => c["@odata.type"] === "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration"
   );
 }
 
-/**
- * Get an ESP configuration by display name
- */
 export async function getESPConfigurationByName(
   client: GraphClient,
   displayName: string
@@ -234,9 +203,6 @@ export async function getESPConfigurationByName(
   ) || null;
 }
 
-/**
- * Check if an ESP configuration exists by display name
- */
 export async function espConfigurationExists(
   client: GraphClient,
   displayName: string
@@ -245,139 +211,153 @@ export async function espConfigurationExists(
   return config !== null;
 }
 
-/**
- * Create an Enrollment Status Page configuration
- */
 export async function createESPConfiguration(
   client: GraphClient,
   config: EnrollmentStatusPageConfiguration
 ): Promise<EnrollmentStatusPageConfiguration> {
   const configBody = JSON.parse(JSON.stringify(config)) as EnrollmentStatusPageConfiguration;
-
   delete configBody.id;
   configBody.description = addEnrollmentHydrationMarker(configBody.description);
 
-  return client.post<EnrollmentStatusPageConfiguration>(
-    "/deviceManagement/deviceEnrollmentConfigurations",
-    configBody
-  );
+  return client.post<EnrollmentStatusPageConfiguration>(ESP_PATH, configBody);
 }
 
-/**
- * Get assignments for an ESP configuration
- */
 export async function getESPConfigurationAssignments(
   client: GraphClient,
   configId: string
 ): Promise<unknown[]> {
-  return client.getCollection(
-    `/deviceManagement/deviceEnrollmentConfigurations/${configId}/assignments`
-  );
+  return client.getCollection(`${ESP_PATH}/${configId}/assignments`);
 }
 
-/**
- * Delete an ESP configuration
- * Only deletes if the configuration was created by Intune Hydration Kit and has no assignments
- */
 export async function deleteESPConfiguration(
   client: GraphClient,
   configId: string
 ): Promise<void> {
-  const config = await client.get<EnrollmentStatusPageConfiguration>(
-    `/deviceManagement/deviceEnrollmentConfigurations/${configId}`
-  );
-
-  if (!hasHydrationMarker(config.description)) {
-    throw new Error(
-      `Cannot delete ESP configuration "${config.displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  const assignments = await getESPConfigurationAssignments(client, configId);
-  if (assignments.length > 0) {
-    throw new Error(
-      `Cannot delete ESP configuration "${config.displayName}": Configuration has ${assignments.length} assignment(s). Remove all assignments before deleting.`
-    );
-  }
-
-  await client.delete(`/deviceManagement/deviceEnrollmentConfigurations/${configId}`);
+  await deleteEnrollmentEntity(client, ESP_PATH, configId, "ESP configuration");
 }
 
-/**
- * Delete an ESP configuration by display name
- */
 export async function deleteESPConfigurationByName(
   client: GraphClient,
   displayName: string
 ): Promise<void> {
   const config = await getESPConfigurationByName(client, displayName);
-
-  if (!config || !config.id) {
+  if (!config?.id) {
     throw new Error(`ESP configuration "${displayName}" not found`);
   }
-
   await deleteESPConfiguration(client, config.id);
 }
 
-/**
- * Determine the enrollment profile type from @odata.type
- */
 export function getEnrollmentProfileType(
   profile: EnrollmentProfile
-): "autopilot" | "esp" {
-  const odataType = profile["@odata.type"];
-
-  if (odataType === "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration") {
+): "autopilot" | "esp" | "devicePreparation" {
+  if (profile["@odata.type"] === "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration") {
     return "esp";
   }
-
-  // All other types are Autopilot profiles
+  if ("technologies" in profile && (profile as DevicePreparationProfile).technologies === "enrollment") {
+    return "devicePreparation";
+  }
   return "autopilot";
 }
 
+// ---------------------------------------------------------------------------
+// Device Preparation Profiles (Settings Catalog-based)
+// ---------------------------------------------------------------------------
+
+export async function devicePreparationExists(
+  client: GraphClient,
+  name: string
+): Promise<boolean> {
+  try {
+    const response = await client.get<{ value: Array<{ name: string }> }>(
+      `${CONFIG_POLICIES_PATH}?$filter=name eq '${encodeURIComponent(name)}'&$select=id,name`
+    );
+    return response.value && response.value.length > 0;
+  } catch (error) {
+    console.error(`[DevicePreparation] Error checking if policy exists: ${name}`, error);
+    return false;
+  }
+}
+
+export async function createDevicePreparationProfile(
+  client: GraphClient,
+  profile: DevicePreparationProfile
+): Promise<DevicePreparationProfile> {
+  const payload = { ...profile };
+  delete payload.id;
+  delete (payload as Record<string, unknown>).displayName; // Settings Catalog uses `name`, not `displayName`
+  payload.description = addEnrollmentHydrationMarker(payload.description);
+
+  return client.post<DevicePreparationProfile>(CONFIG_POLICIES_PATH, payload);
+}
+
+export async function deleteDevicePreparationByName(
+  client: GraphClient,
+  name: string
+): Promise<void> {
+  const response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
+    `${CONFIG_POLICIES_PATH}?$filter=name eq '${encodeURIComponent(name)}'&$select=id,name,description`
+  );
+
+  const match = response.value?.find(p => hasHydrationMarker(p.description) || hasHydrationMarker(p.name));
+  if (!match?.id) {
+    throw new Error(`Device Preparation policy "${name}" not found`);
+  }
+
+  await client.delete(`${CONFIG_POLICIES_PATH}('${match.id}')`);
+}
+
 /**
- * Create an enrollment profile (auto-detects type)
+ * Get the display name from any enrollment profile type.
  */
+export function getEnrollmentProfileName(profile: EnrollmentProfile): string {
+  if ("displayName" in profile && profile.displayName) {
+    return String(profile.displayName);
+  }
+  if ("name" in profile && profile.name) {
+    return String(profile.name);
+  }
+  return "";
+}
+
 export async function createEnrollmentProfile(
   client: GraphClient,
   profile: EnrollmentProfile
 ): Promise<EnrollmentProfile> {
-  const profileType = getEnrollmentProfileType(profile);
-
-  if (profileType === "esp") {
-    return createESPConfiguration(client, profile as EnrollmentStatusPageConfiguration);
+  switch (getEnrollmentProfileType(profile)) {
+    case "esp":
+      return createESPConfiguration(client, profile as EnrollmentStatusPageConfiguration);
+    case "devicePreparation":
+      return createDevicePreparationProfile(client, profile as DevicePreparationProfile);
+    case "autopilot":
+      return createAutopilotProfile(client, profile as AutopilotDeploymentProfile);
   }
-
-  return createAutopilotProfile(client, profile as AutopilotDeploymentProfile);
 }
 
-/**
- * Check if an enrollment profile exists (auto-detects type)
- */
 export async function enrollmentProfileExists(
   client: GraphClient,
   profile: EnrollmentProfile
 ): Promise<boolean> {
-  const profileType = getEnrollmentProfileType(profile);
-
-  if (profileType === "esp") {
-    return espConfigurationExists(client, profile.displayName);
+  switch (getEnrollmentProfileType(profile)) {
+    case "esp":
+      return espConfigurationExists(client, (profile as EnrollmentStatusPageConfiguration).displayName);
+    case "devicePreparation":
+      return devicePreparationExists(client, (profile as DevicePreparationProfile).name);
+    case "autopilot":
+      return autopilotProfileExists(client, (profile as AutopilotDeploymentProfile).displayName);
   }
-
-  return autopilotProfileExists(client, profile.displayName);
 }
 
-/**
- * Delete an enrollment profile by name (auto-detects type)
- */
 export async function deleteEnrollmentProfileByName(
   client: GraphClient,
   displayName: string,
-  profileType: "autopilot" | "esp"
+  profileType: "autopilot" | "esp" | "devicePreparation"
 ): Promise<void> {
-  if (profileType === "esp") {
-    await deleteESPConfigurationByName(client, displayName);
-  } else {
-    await deleteAutopilotProfileByName(client, displayName);
+  switch (profileType) {
+    case "esp":
+      return deleteESPConfigurationByName(client, displayName);
+    case "devicePreparation":
+      return deleteDevicePreparationByName(client, displayName);
+    case "autopilot":
+      return deleteAutopilotProfileByName(client, displayName);
   }
 }

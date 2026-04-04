@@ -14,7 +14,7 @@ import {
   compliancePolicyExistsByName,
   createBaselineCompliancePolicy,
 } from "../policyCreators";
-import { escapeODataString } from "../utils";
+import { escapeODataString, hasODataUnsafeChars } from "../utils";
 import { createAppProtectionPolicy, deleteAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy, AppProtectionTemplate } from "@/lib/templates/loader";
 
@@ -158,6 +158,10 @@ export async function executeBaselineTask(
     try {
       if (policyType === "CompliancePolicies") {
         // Find compliance policy by name first (to get ID)
+        if (hasODataUnsafeChars(policyName)) {
+          console.log(`[Baseline Task] Cannot query compliance for "${policyName}" (OData-unsafe chars) — skipping`);
+          return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
+        }
         const escapedPolicyName = escapeODataString(policyName);
         const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
           `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedPolicyName)}'&$select=id,displayName`
@@ -214,6 +218,10 @@ export async function executeBaselineTask(
 
       } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
         // DeviceConfiguration and UpdatePolicies use /deviceManagement/deviceConfigurations endpoint
+        if (hasODataUnsafeChars(policyName)) {
+          console.log(`[Baseline Task] Cannot query device config for "${policyName}" (OData-unsafe chars) — skipping`);
+          return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
+        }
         const escapedPolicyNameDel = escapeODataString(policyName);
         const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
           `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedPolicyNameDel)}'&$select=id,displayName`
@@ -246,7 +254,7 @@ export async function executeBaselineTask(
         if (!profiles || profiles.length === 0) {
           console.log(`[Baseline Task] No cached Driver Update Profiles - fetching now...`);
           const response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-            `/deviceManagement/windowsDriverUpdateProfiles`
+            `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description`
           );
           profiles = response.value || [];
           context.cachedDriverUpdateProfiles = profiles;

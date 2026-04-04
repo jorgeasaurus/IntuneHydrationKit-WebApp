@@ -71,9 +71,9 @@ export interface ConditionalAccessPolicy {
   conditions: {
     signInRiskLevels?: string[];
     userRiskLevels?: string[];
-    insiderRiskLevels?: string;
-    agentIdRiskLevels?: string[] | string;
-    servicePrincipalRiskLevels?: string[] | string;
+    insiderRiskLevels?: string | null;
+    agentIdRiskLevels?: string[] | string | null;
+    servicePrincipalRiskLevels?: string[] | string | null;
     [key: string]: unknown;
   };
   grantControls?: unknown;

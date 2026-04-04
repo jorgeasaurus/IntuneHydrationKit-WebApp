@@ -1,4 +1,4 @@
-import { AccountInfo, InteractionRequiredAuthError } from "@azure/msal-browser";
+import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
 
@@ -49,13 +49,13 @@ export function getActiveAccount(): AccountInfo | null {
 
 /**
  * Acquire an access token silently
- * Falls back to interactive login if silent acquisition fails
+ * Falls back to interactive login if silent acquisition fails (timeout, interaction required)
  */
 export async function getAccessToken(): Promise<string> {
   const account = getActiveAccount();
 
   if (!account) {
-    throw new Error("No active account found. Please sign in.");
+    throw new AuthSessionExpiredError();
   }
 
   // Get authority for the selected cloud environment
@@ -69,15 +69,31 @@ export async function getAccessToken(): Promise<string> {
     });
     return response.accessToken;
   } catch (error) {
-    if (error instanceof InteractionRequiredAuthError) {
-      // Fallback to interactive login
-      const response = await msalInstance.acquireTokenPopup({
-        ...loginRequest,
-        authority,
-      });
-      return response.accessToken;
+    if (error instanceof InteractionRequiredAuthError || error instanceof BrowserAuthError) {
+      // Silent acquisition failed (iframe timeout, expired session, etc.) — try popup
+      try {
+        const response = await msalInstance.acquireTokenPopup({
+          ...loginRequest,
+          authority,
+        });
+        return response.accessToken;
+      } catch {
+        throw new AuthSessionExpiredError(
+          "Session expired. Please sign out and sign in again."
+        );
+      }
     }
     throw error;
+  }
+}
+
+/**
+ * Custom error class for auth session issues — allows callers to detect and show sign-in UI
+ */
+export class AuthSessionExpiredError extends Error {
+  constructor(message = "No active account found. Please sign in.") {
+    super(message);
+    this.name = "AuthSessionExpiredError";
   }
 }
 

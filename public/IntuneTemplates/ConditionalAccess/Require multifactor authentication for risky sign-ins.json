@@ -1,5 +1,4 @@
 {
-  "displayName": "Require multifactor authentication for risky sign-ins",
   "sessionControls": {
     "continuousAccessEvaluation": null,
     "disableResilienceDefaults": null,
