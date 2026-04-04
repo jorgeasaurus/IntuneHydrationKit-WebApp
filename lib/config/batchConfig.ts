@@ -23,14 +23,14 @@ export interface BatchConfiguration {
 export const BATCH_CONFIG: BatchConfiguration = {
   defaultBatchSize: 20,
   maxBatchSize: 20,
-  delayBetweenBatches: 2000,
+  delayBetweenBatches: 1000,
   enableBatching: true,
   categoryBatchSizes: {
     // CIS and OIB baselines all write to /deviceManagement/configurationPolicies (settings catalog),
     // hitting the per-tenant deviceintent.tenant.app.write throttle bucket.
     // Smaller batches avoid overwhelming this limit.
-    cisBaseline: 5,
-    baseline: 5,
+    cisBaseline: 15,
+    baseline: 15,
   },
 };
 

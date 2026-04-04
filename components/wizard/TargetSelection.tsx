@@ -122,6 +122,61 @@ interface CategoryItem {
   subtype?: string;
 }
 
+/** Fetch and map raw template data to CategoryItem[] for a given category (excludes baseline/cisBaseline). */
+async function fetchCategoryData(category: TaskCategory): Promise<CategoryItem[]> {
+  switch (category) {
+    case "groups": {
+      const [dynamic, static_] = await Promise.all([fetchDynamicGroups(), fetchStaticGroups()]);
+      return [...dynamic, ...static_].map(g => ({
+        displayName: g.displayName,
+        description: g.description,
+        subtype: g.membershipRule ? "Dynamic" : "Static",
+      }));
+    }
+    case "filters": {
+      const filters = await fetchFilters();
+      return filters.map(f => ({
+        displayName: f.displayName,
+        description: f.description,
+        subtype: f.platform,
+      }));
+    }
+    case "compliance": {
+      const policies = await fetchCompliancePolicies();
+      return policies.map(p => ({
+        displayName: p.displayName,
+        description: p.description,
+        subtype: p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") || "",
+      }));
+    }
+    case "conditionalAccess": {
+      const policies = await fetchConditionalAccessPolicies();
+      return policies.map(p => ({
+        displayName: p.displayName,
+        subtype: "CA Policy",
+      }));
+    }
+    case "appProtection": {
+      const policies = await fetchAppProtectionPolicies();
+      return policies.map(p => ({
+        displayName: p.displayName,
+        description: p.description,
+        subtype: p["@odata.type"]?.includes("ios") ? "iOS" : "Android",
+      }));
+    }
+    case "enrollment": {
+      const profiles = await fetchEnrollmentProfiles();
+      return (profiles as Array<{ displayName?: string; name?: string; description?: string }>).map(p => ({
+        displayName: p.displayName || p.name || "Unknown Profile",
+        description: p.description,
+        subtype: "Autopilot",
+      }));
+    }
+    default:
+      return [];
+  }
+}
+
 export function TargetSelection() {
   const { state, setSelectedTargets, setSelectedCISCategories, setBaselineSelection, setCategorySelections, nextStep, previousStep } = useWizardState();
   const [targets, setTargets] = useState<TaskCategory[]>(state.selectedTargets || []);
@@ -178,72 +233,18 @@ export function TargetSelection() {
     try {
       let items: CategoryItem[] = [];
 
-      switch (category) {
-        case "groups": {
-          const [dynamic, static_] = await Promise.all([fetchDynamicGroups(), fetchStaticGroups()]);
-          items = [...dynamic, ...static_].map(g => ({
-            displayName: g.displayName,
-            description: g.description,
-            subtype: g.membershipRule ? "Dynamic" : "Static",
+      if (category === "baseline") {
+        const manifest = await fetchOIBManifest();
+        setBaselineManifest(manifest);
+        if (manifest) {
+          items = manifest.files.map(f => ({
+            displayName: f.path,
+            description: f.displayName,
+            subtype: `${f.platform} - ${f.policyType || "Config"}`,
           }));
-          break;
         }
-        case "filters": {
-          const filters = await fetchFilters();
-          items = filters.map(f => ({
-            displayName: f.displayName,
-            description: f.description,
-            subtype: f.platform,
-          }));
-          break;
-        }
-        case "compliance": {
-          const policies = await fetchCompliancePolicies();
-          items = policies.map(p => ({
-            displayName: p.displayName,
-            description: p.description,
-            subtype: p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") || "",
-          }));
-          break;
-        }
-        case "conditionalAccess": {
-          const policies = await fetchConditionalAccessPolicies();
-          items = policies.map(p => ({
-            displayName: p.displayName,
-            subtype: "CA Policy",
-          }));
-          break;
-        }
-        case "appProtection": {
-          const policies = await fetchAppProtectionPolicies();
-          items = policies.map(p => ({
-            displayName: p.displayName,
-            description: p.description,
-            subtype: p["@odata.type"]?.includes("ios") ? "iOS" : "Android",
-          }));
-          break;
-        }
-        case "enrollment": {
-          const profiles = await fetchEnrollmentProfiles();
-          items = (profiles as Array<{ displayName?: string; name?: string; description?: string }>).map(p => ({
-            displayName: p.displayName || p.name || "Unknown Profile",
-            description: p.description,
-            subtype: "Autopilot",
-          }));
-          break;
-        }
-        case "baseline": {
-          const manifest = await fetchOIBManifest();
-          setBaselineManifest(manifest);
-          if (manifest) {
-            items = manifest.files.map(f => ({
-              displayName: f.path, // Use path as key for baseline
-              description: f.displayName,
-              subtype: `${f.platform} - ${f.policyType || "Config"}`,
-            }));
-          }
-          break;
-        }
+      } else {
+        items = await fetchCategoryData(category);
       }
 
       setCategoryItems(prev => ({ ...prev, [category]: items }));
@@ -734,68 +735,9 @@ export function TargetSelection() {
 
   // Helper to load category items inline (for platform filter)
   const loadCategoryItemsInline = async (category: TaskCategory): Promise<CategoryItem[]> => {
-    // Return cached items if available
     if (categoryItems[category]) return categoryItems[category];
 
-    let items: CategoryItem[] = [];
-
-    switch (category) {
-      case "groups": {
-        const [dynamic, static_] = await Promise.all([fetchDynamicGroups(), fetchStaticGroups()]);
-        items = [...dynamic, ...static_].map(g => ({
-          displayName: g.displayName,
-          description: g.description,
-          subtype: g.membershipRule ? "Dynamic" : "Static",
-        }));
-        break;
-      }
-      case "filters": {
-        const filters = await fetchFilters();
-        items = filters.map(f => ({
-          displayName: f.displayName,
-          description: f.description,
-          subtype: f.platform,
-        }));
-        break;
-      }
-      case "compliance": {
-        const policies = await fetchCompliancePolicies();
-        items = policies.map(p => ({
-          displayName: p.displayName,
-          description: p.description,
-          subtype: p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") || "",
-        }));
-        break;
-      }
-      case "conditionalAccess": {
-        const policies = await fetchConditionalAccessPolicies();
-        items = policies.map(p => ({
-          displayName: p.displayName,
-          subtype: "CA Policy",
-        }));
-        break;
-      }
-      case "appProtection": {
-        const policies = await fetchAppProtectionPolicies();
-        items = policies.map(p => ({
-          displayName: p.displayName,
-          description: p.description,
-          subtype: p["@odata.type"]?.includes("ios") ? "iOS" : "Android",
-        }));
-        break;
-      }
-      case "enrollment": {
-        const profiles = await fetchEnrollmentProfiles();
-        items = (profiles as Array<{ displayName?: string; name?: string; description?: string }>).map(p => ({
-          displayName: p.displayName || p.name || "Unknown Profile",
-          description: p.description,
-          subtype: "Autopilot",
-        }));
-        break;
-      }
-    }
-
-    // Cache the items
+    const items = await fetchCategoryData(category);
     if (items.length > 0) {
       setCategoryItems(prev => ({ ...prev, [category]: items }));
     }

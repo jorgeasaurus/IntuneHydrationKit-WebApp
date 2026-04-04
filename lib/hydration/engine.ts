@@ -174,6 +174,8 @@ export async function executeTasks(
   const results: ExecutionResult[] = [];
   const TASK_DELAY_MS = 2000; // 2 second delay between tasks
 
+  emitStatus(context, `Checking tenant for existing resources (${tasks.length} items selected)...`, "info", "prefetch");
+
   // Pre-fetch "Intune - " groups if any group tasks exist
   const hasGroupTasks = tasks.some((task) => task.category === "groups");
   if (hasGroupTasks && !context.cachedIntuneGroups) {
@@ -369,6 +371,8 @@ export async function executeTasks(
   // Preview mode now uses batching with guards in batchExecutor.ts that skip actual API calls
   const useCreateBatching = batchConfig.enableBatching && context.operationMode === "create";
   const useDeleteBatching = batchConfig.enableBatching && context.operationMode === "delete";
+
+  emitStatus(context, "Tenant check complete — starting execution...", "success", "prefetch");
 
   if (useCreateBatching) {
     emitStatus(context, `Starting batch creation (${batchConfig.defaultBatchSize} items per batch)...`, "info", "execute");

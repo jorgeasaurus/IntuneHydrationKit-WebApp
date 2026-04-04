@@ -37,10 +37,14 @@ export async function executeGroupTask(
   }
 
   if (mode === "create") {
-    // Check if group already exists using pre-fetched cache
-    const existingGroup = context.cachedIntuneGroups?.find(
-      (g) => g.displayName.toLowerCase() === template!.displayName.toLowerCase()
-    );
+    // Check if group already exists using pre-fetched cache (match with or without [IHD] prefix)
+    const targetName = template!.displayName.toLowerCase();
+    const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
+    const existingGroup = context.cachedIntuneGroups?.find((g) => {
+      const n = g.displayName.toLowerCase();
+      const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
+      return n === targetName || ns === targetNameStripped;
+    });
 
     if (existingGroup) {
       return {
@@ -101,10 +105,14 @@ export async function executeGroupTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
-    // Check if group exists using pre-fetched cache
-    const existingGroup = context.cachedIntuneGroups?.find(
-      (g) => g.displayName.toLowerCase() === template!.displayName.toLowerCase()
-    );
+    // Check if group exists using pre-fetched cache (match with or without [IHD] prefix)
+    const targetName = template!.displayName.toLowerCase();
+    const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
+    const existingGroup = context.cachedIntuneGroups?.find((g) => {
+      const n = g.displayName.toLowerCase();
+      const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
+      return n === targetName || ns === targetNameStripped;
+    });
 
     if (!existingGroup) {
       return { task, success: true, skipped: true, error: "Not found in tenant" };

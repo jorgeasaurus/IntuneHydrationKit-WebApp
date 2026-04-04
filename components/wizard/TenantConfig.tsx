@@ -11,7 +11,7 @@ import { useWizardState } from "@/hooks/useWizardState";
 import { InfoIcon, Loader2, CheckCircle2, AlertTriangle, XCircle, RefreshCw } from "lucide-react";
 import { createGraphClient } from "@/lib/graph/client";
 import { validatePrerequisites } from "@/lib/graph/prerequisites";
-import { getSelectedCloudEnvironment } from "@/lib/auth/authUtils";
+import { getSelectedCloudEnvironment, AuthSessionExpiredError } from "@/lib/auth/authUtils";
 import { CloudEnvironment } from "@/types/hydration";
 
 // Cloud environment display labels
@@ -59,6 +59,8 @@ export function TenantConfig() {
           setPrerequisiteStatus(getStatusFromResult(result));
         } catch (error) {
           console.error("Failed to validate prerequisites:", error);
+          const isAuthError = error instanceof AuthSessionExpiredError ||
+            (error instanceof Error && error.message.includes("sign in"));
           setPrerequisiteStatus("error");
           setPrerequisiteResult({
             organization: null,
@@ -66,7 +68,11 @@ export function TenantConfig() {
             permissions: null,
             isValid: false,
             warnings: [],
-            errors: [error instanceof Error ? error.message : "Unknown error"],
+            errors: [
+              isAuthError
+                ? "Your session has expired. Please sign out and sign in again."
+                : error instanceof Error ? error.message : "Unknown error"
+            ],
             timestamp: new Date(),
           });
         } finally {
@@ -92,7 +98,22 @@ export function TenantConfig() {
       setPrerequisiteStatus(getStatusFromResult(result));
     } catch (error) {
       console.error("Failed to recheck prerequisites:", error);
+      const isAuthError = error instanceof AuthSessionExpiredError ||
+        (error instanceof Error && error.message.includes("sign in"));
       setPrerequisiteStatus("error");
+      setPrerequisiteResult({
+        organization: null,
+        licenses: null,
+        permissions: null,
+        isValid: false,
+        warnings: [],
+        errors: [
+          isAuthError
+            ? "Your session has expired. Please sign out and sign in again."
+            : error instanceof Error ? error.message : "Unknown error"
+        ],
+        timestamp: new Date(),
+      });
     }
   };
 

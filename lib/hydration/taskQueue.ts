@@ -278,19 +278,22 @@ export async function buildTaskQueueAsync(
         case "enrollment":
           {
             emit?.("Fetching enrollment profile templates...");
-            let profiles = await fetchEnrollmentProfiles() as Array<{ displayName?: string; name?: string }>;
+            const rawProfiles = await fetchEnrollmentProfiles() as Array<{ displayName?: string; name?: string }>;
+            let profiles = rawProfiles.map(p => ({
+              ...p,
+              displayName: p.displayName || p.name || "Unknown Profile",
+            }));
 
-            // Filter by selected items if categorySelections is provided
             const enrollmentSelection = options?.categorySelections?.enrollment;
             if (enrollmentSelection?.selectedItems && enrollmentSelection.selectedItems.length > 0) {
               const selectedSet = new Set(enrollmentSelection.selectedItems);
               const totalCount = profiles.length;
-              profiles = profiles.filter(p => selectedSet.has(p.displayName || p.name || ""));
+              profiles = profiles.filter(p => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${profiles.length} selected enrollment profiles`);
               emit?.(`Filtered to ${profiles.length} of ${totalCount} enrollment profiles based on selection`, "info");
             }
 
-            items = profiles as Array<{ displayName: string }>;
+            items = profiles;
             cacheTemplates(category, items);
           }
           break;

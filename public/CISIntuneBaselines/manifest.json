@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
   "generatedAt": "2026-01-25T04:32:37.657Z",
-  "totalFiles": 720,
+  "totalFiles": 717,
   "categories": [
     {
       "id": "cis-android",
@@ -97,7 +97,7 @@
       "folder": "6.0 - Microsoft Endpoint Security Benchmarks",
       "name": "Microsoft Endpoint Security",
       "description": "Endpoint Security antivirus and firewall policies",
-      "count": 60,
+      "count": 57,
       "subcategories": [
         {
           "name": "Microsoft Defender for Endpoint",
@@ -105,7 +105,7 @@
         },
         {
           "name": "Microsoft Endpoint Security Benchmarks",
-          "count": 52
+          "count": 49
         }
       ]
     },
@@ -3375,10 +3375,10 @@
       "displayName": "CISv3 - EDGE - L1 - Standalone Sidebar Enabled"
     },
     {
-      "path": "4.0 - CIS Benchmarks/CIS - Microsoft Edge Level 1 and Level 2 Benchmarks/CISv3 Microsoft Edge Level 1 Benchmark/CISv3 - EDGE - L1 - Suggest similar pages when a webpage can’t be found.json",
+      "path": "4.0 - CIS Benchmarks/CIS - Microsoft Edge Level 1 and Level 2 Benchmarks/CISv3 Microsoft Edge Level 1 Benchmark/CISv3 - EDGE - L1 - Suggest similar pages when a webpage can\u2019t be found.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "CIS - Microsoft Edge Level 1 and Level 2 Benchmarks",
-      "displayName": "CISv3 - EDGE - L1 - Suggest similar pages when a webpage can’t be found"
+      "displayName": "CISv3 - EDGE - L1 - Suggest similar pages when a webpage can\u2019t be found"
     },
     {
       "path": "4.0 - CIS Benchmarks/CIS - Microsoft Edge Level 1 and Level 2 Benchmarks/CISv3 Microsoft Edge Level 1 Benchmark/CISv3 - EDGE - L1 - Suppress the unsupported OS warning.json",
@@ -4239,10 +4239,10 @@
       "displayName": "Baseline - AVD - FSLogic Include Teams data"
     },
     {
-      "path": "8.0 - Windows 11 Benchmarks/Microsoft Teams/Baseline - Teams - Don’t install Microsoft Teams with new installations or updates of Office.json",
+      "path": "8.0 - Windows 11 Benchmarks/Microsoft Teams/Baseline - Teams - Don\u2019t install Microsoft Teams with new installations or updates of Office.json",
       "category": "8.0 - Windows 11 Benchmarks",
       "subcategory": "Microsoft Teams",
-      "displayName": "Baseline - Teams - Don’t install Microsoft Teams with new installations or updates of Office"
+      "displayName": "Baseline - Teams - Don\u2019t install Microsoft Teams with new installations or updates of Office"
     },
     {
       "path": "8.0 - Windows 11 Benchmarks/Microsoft Teams/Baseline - Teams - File links open preference default selection as Desktop App.json",

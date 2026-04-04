@@ -8,7 +8,7 @@ import { HYDRATION_MARKER, IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 17; // Add [IHD] prefix to CIS Intune Baseline policies
+const CACHE_VERSION = 18; // Fix Endpoint Security manifest count (60→57)
 
 export interface GroupTemplate {
   displayName: string;
@@ -71,8 +71,7 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
 
       const data = await response.json();
 
-      // The JSON files have a "groups" array
-      if (data.groups && Array.isArray(data.groups)) {
+      if (Array.isArray(data.groups)) {
         const groups = data.groups.map((group: GroupTemplate) => ({
           ...group,
           displayName: `${IMPORT_PREFIX}${group.displayName}`,
@@ -625,52 +624,6 @@ async function fetchCISBaselineFile(filePath: string): Promise<unknown | null> {
   }
 }
 
-/**
- * Fetch all CIS Intune Baseline policies from local templates
- * Returns an array of policy objects with their category info
- */
-export async function fetchCISBaselinePolicies(): Promise<CISBaselinePolicy[]> {
-  const allPolicies: CISBaselinePolicy[] = [];
-
-  // We need to fetch the manifest or list of files
-  // Since we can't list directories from the browser, we'll use a manifest file
-  // For now, return empty and we'll implement the manifest approach
-
-  try {
-    const response = await fetch(`${CIS_BASELINES_PATH}/manifest.json`);
-    if (!response.ok) {
-      console.warn("CIS Baselines manifest not found. Run the build script to generate it.");
-      return [];
-    }
-
-    const manifest: CISBaselineManifest = await response.json();
-
-    for (const file of manifest.files) {
-      const policy = await fetchCISBaselineFile(file.path);
-      if (policy && typeof policy === "object") {
-        const policyObj = policy as Record<string, unknown>;
-        const resolvedName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
-        allPolicies.push({
-          ...policyObj,
-          // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
-          displayName: `${IMPORT_PREFIX}${resolvedName}`,
-          name: `${IMPORT_PREFIX}${resolvedName}`,
-          _cisCategory: file.category,
-          _cisSubcategory: file.subcategory,
-          _cisFilePath: file.path,
-          description: policyObj.description
-            ? `${policyObj.description} ${HYDRATION_MARKER}`
-            : HYDRATION_MARKER,
-        });
-      }
-    }
-  } catch (error) {
-    console.error("Error fetching CIS baseline policies:", error);
-  }
-
-  return allPolicies;
-}
-
 export interface CISBaselinePolicy {
   "@odata.type"?: string;
   displayName?: string;
@@ -724,51 +677,73 @@ export async function fetchCISBaselineManifest(): Promise<CISBaselineManifest | 
 }
 
 /**
+ * Build CISBaselinePolicy objects from manifest file entries by fetching and transforming each policy
+ */
+async function loadCISPoliciesFromFiles(
+  files: CISBaselineManifest["files"]
+): Promise<CISBaselinePolicy[]> {
+  const policies: CISBaselinePolicy[] = [];
+
+  for (const file of files) {
+    const policy = await fetchCISBaselineFile(file.path);
+    if (policy && typeof policy === "object") {
+      const policyObj = policy as Record<string, unknown>;
+      // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
+      const resolvedName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
+      policies.push({
+        ...policyObj,
+        displayName: `${IMPORT_PREFIX}${resolvedName}`,
+        name: `${IMPORT_PREFIX}${resolvedName}`,
+        _cisCategory: file.category,
+        _cisSubcategory: file.subcategory,
+        _cisFilePath: file.path,
+        description: policyObj.description
+          ? `${policyObj.description} ${HYDRATION_MARKER}`
+          : HYDRATION_MARKER,
+      });
+    }
+  }
+
+  return policies;
+}
+
+/**
+ * Fetch all CIS Intune Baseline policies from local templates
+ */
+export async function fetchCISBaselinePolicies(): Promise<CISBaselinePolicy[]> {
+  try {
+    const manifest = await fetchCISBaselineManifest();
+    if (!manifest) return [];
+    return await loadCISPoliciesFromFiles(manifest.files);
+  } catch (error) {
+    console.error("Error fetching CIS baseline policies:", error);
+    return [];
+  }
+}
+
+/**
  * Fetch CIS Baseline policies filtered by selected category IDs
  */
 export async function fetchCISBaselinePoliciesByCategories(
   selectedCategoryIds: string[]
 ): Promise<CISBaselinePolicy[]> {
-  const allPolicies: CISBaselinePolicy[] = [];
-
   try {
     const manifest = await fetchCISBaselineManifest();
     if (!manifest) return [];
 
-    // Get the folder names for selected category IDs
     const selectedFolders = manifest.categories
       .filter(cat => selectedCategoryIds.includes(cat.id))
       .map(cat => cat.folder);
 
-    // Filter files by selected categories
     const filteredFiles = manifest.files.filter(file =>
       selectedFolders.includes(file.category)
     );
 
-    for (const file of filteredFiles) {
-      const policy = await fetchCISBaselineFile(file.path);
-      if (policy && typeof policy === "object") {
-        const policyObj = policy as Record<string, unknown>;
-        const resolvedName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
-        allPolicies.push({
-          ...policyObj,
-          // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
-          displayName: `${IMPORT_PREFIX}${resolvedName}`,
-          name: `${IMPORT_PREFIX}${resolvedName}`,
-          _cisCategory: file.category,
-          _cisSubcategory: file.subcategory,
-          _cisFilePath: file.path,
-          description: policyObj.description
-            ? `${policyObj.description} ${HYDRATION_MARKER}`
-            : HYDRATION_MARKER,
-        });
-      }
-    }
+    return await loadCISPoliciesFromFiles(filteredFiles);
   } catch (error) {
     console.error("Error fetching CIS baseline policies:", error);
+    return [];
   }
-
-  return allPolicies;
 }
 
 /**

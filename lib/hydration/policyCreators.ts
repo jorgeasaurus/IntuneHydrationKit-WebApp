@@ -6,7 +6,37 @@
 import { GraphClient } from "@/lib/graph/client";
 import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
-import { containsSecretPlaceholders, escapeODataString } from "./utils";
+import { containsSecretPlaceholders, escapeODataString, hasODataUnsafeChars } from "./utils";
+
+const CIS_METADATA_KEYS = ["_cisCategory", "_cisSubcategory", "_cisFilePath"] as const;
+
+/**
+ * Remove CIS-specific metadata fields from a policy object.
+ */
+function removeCISMetadata(policy: Record<string, unknown>): void {
+  for (const key of CIS_METADATA_KEYS) {
+    delete policy[key];
+  }
+}
+
+/**
+ * V1 APIs use `displayName`; ensure it's set from `name` if missing, then remove `name`.
+ */
+function normalizeToDisplayName(policy: Record<string, unknown>): void {
+  if (!policy.displayName && policy.name) {
+    policy.displayName = policy.name;
+  }
+  delete policy.name;
+}
+
+/**
+ * Settings Catalog APIs use `name`; ensure it's set from `displayName` if missing.
+ */
+function normalizeToName(policy: Record<string, unknown>): void {
+  if (policy.displayName && !policy.name) {
+    policy.name = policy.displayName;
+  }
+}
 
 /**
  * Check if a Settings Catalog policy exists by name
@@ -15,6 +45,11 @@ export async function settingsCatalogPolicyExists(
   client: GraphClient,
   displayName: string
 ): Promise<boolean> {
+  // Names with brackets/special chars cause Graph API InternalServerError in $filter
+  if (hasODataUnsafeChars(displayName)) {
+    console.log(`[Settings Catalog] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
+    return false;
+  }
   try {
     const escapedName = escapeODataString(displayName);
     const response = await client.get<{ value: Array<{ name: string }> }>(
@@ -27,15 +62,10 @@ export async function settingsCatalogPolicyExists(
   }
 }
 
-/**
- * Create a Settings Catalog policy
- * Returns warning if policy contains placeholder secrets that need manual configuration
- */
 export async function createSettingsCatalogPolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string; warning?: string }> {
-  // Check for placeholder secrets - warn but continue
   const settings = policy.settings;
   const policyName = (policy.name || policy.displayName) as string;
   let warning: string | undefined;
@@ -44,14 +74,9 @@ export async function createSettingsCatalogPolicy(
     warning = `Policy "${policyName}" contains placeholder values that require manual configuration with actual secrets.`;
   }
 
-  // Clean the policy before sending
   const cleanedPolicy = cleanSettingsCatalogPolicy(policy);
-
-  // Use 'name' field for Settings Catalog (not 'displayName')
-  if (cleanedPolicy.displayName && !cleanedPolicy.name) {
-    cleanedPolicy.name = cleanedPolicy.displayName;
-    delete cleanedPolicy.displayName;
-  }
+  normalizeToName(cleanedPolicy);
+  if (cleanedPolicy.name) delete cleanedPolicy.displayName;
 
   const result = await client.post<{ id: string }>(
     "/deviceManagement/configurationPolicies",
@@ -68,10 +93,7 @@ export async function createDeviceConfigurationPolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy before sending (removes id, OData metadata, read-only fields)
   const cleanedPolicy = cleanPolicyRecursively(policy) as Record<string, unknown>;
-
-  // Ensure hydration marker in description
   cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
 
   return client.post<{ id: string }>(
@@ -82,18 +104,15 @@ export async function createDeviceConfigurationPolicy(
 
 /**
  * Create a Driver Update Profile (WUfB Drivers)
- * Note: The Graph API may return an empty body on success (201 Created)
- * In that case, we query for the created profile by name to get the ID
+ * Note: The Graph API may return an empty body on success (201 Created),
+ * so we fall back to querying by name to get the ID.
  */
 export async function createDriverUpdateProfile(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy before sending (removes id, OData metadata, read-only fields)
   const cleanedPolicy = cleanPolicyRecursively(policy) as Record<string, unknown>;
   const displayName = cleanedPolicy.displayName as string;
-
-  // Ensure hydration marker in description
   cleanedPolicy.description = addHydrationMarker(cleanedPolicy.description as string | undefined);
 
   const result = await client.post<{ id?: string }>(
@@ -101,12 +120,10 @@ export async function createDriverUpdateProfile(
     cleanedPolicy
   );
 
-  // If the API returned an ID, use it
   if (result.id) {
     return { id: result.id };
   }
 
-  // Otherwise, query for the created profile by name
   console.log(`[PolicyCreators] Driver Update Profile created but no ID returned, querying by name: "${displayName}"`);
   const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
     `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName`
@@ -120,18 +137,18 @@ export async function createDriverUpdateProfile(
     return { id: createdProfile.id };
   }
 
-  // If we still can't find it, return empty ID (profile was likely created)
   console.warn(`[PolicyCreators] Created Driver Update Profile "${displayName}" but could not find ID`);
   return { id: "" };
 }
 
-/**
- * Check if a compliance policy exists by name
- */
 export async function compliancePolicyExistsByName(
   client: GraphClient,
   displayName: string
 ): Promise<boolean> {
+  if (hasODataUnsafeChars(displayName)) {
+    console.log(`[Compliance] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
+    return false;
+  }
   try {
     const escapedName = escapeODataString(displayName);
     const response = await client.get<{ value: Array<{ displayName: string }> }>(
@@ -160,27 +177,16 @@ export async function createBaselineCompliancePolicy(
   );
 }
 
-/**
- * Create a CIS Baseline compliance policy
- * Cleans the policy payload to remove metadata that Graph API rejects
- */
 export async function createCISCompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
   const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
 
-  // Remove id and CIS-specific metadata
   delete cleaned.id;
-  delete cleaned._cisCategory;
-  delete cleaned._cisSubcategory;
-  delete cleaned._cisFilePath;
+  removeCISMetadata(cleaned);
   delete cleaned.assignments;
-
-  if (!cleaned.displayName && cleaned.name) {
-    cleaned.displayName = cleaned.name;
-  }
-  delete cleaned.name;
+  normalizeToDisplayName(cleaned);
 
   return client.post<{ id: string }>(
     "/deviceManagement/deviceCompliancePolicies",
@@ -188,43 +194,27 @@ export async function createCISCompliancePolicy(
   );
 }
 
-/**
- * Create a V2 Compliance policy (Settings Catalog compliance)
- */
 export async function createV2CompliancePolicy(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy recursively
   const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
 
-  // Remove root-level id and CIS metadata
   delete cleaned.id;
-  delete cleaned._cisCategory;
-  delete cleaned._cisSubcategory;
-  delete cleaned._cisFilePath;
-
-  // Ensure hydration marker in description
+  removeCISMetadata(cleaned);
   cleaned.description = addHydrationMarker(cleaned.description as string | undefined);
+  normalizeToName(cleaned);
 
-  // Use 'name' for Settings Catalog compliance (not displayName)
-  if (cleaned.displayName && !cleaned.name) {
-    cleaned.name = cleaned.displayName;
-  }
-
-  // Clean settings array - must have settingInstance structure
   const settings = cleaned.settings as Array<Record<string, unknown>> | undefined;
   if (settings && Array.isArray(settings)) {
-    cleaned.settings = settings.map((setting: Record<string, unknown>) => {
-      const cleanedSetting: Record<string, unknown> = {};
+    cleaned.settings = settings.map((setting) => {
+      const result: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(setting)) {
-        // Skip id and @odata metadata except @odata.type
-        if (key === "id") continue;
+        if (key === "id" || key === "settingDefinitions") continue;
         if (key.includes("@odata.") && key !== "@odata.type") continue;
-        if (key === "settingDefinitions") continue;
-        cleanedSetting[key] = value;
+        result[key] = value;
       }
-      return cleanedSetting;
+      return result;
     });
   }
 
@@ -247,6 +237,10 @@ export async function v2CompliancePolicyExists(
   client: GraphClient,
   name: string
 ): Promise<boolean> {
+  if (hasODataUnsafeChars(name)) {
+    console.log(`[V2 Compliance] Skipping API existence check for "${name}" (OData-unsafe chars)`);
+    return false;
+  }
   try {
     const escapedName = escapeODataString(name);
     const response = await client.get<{ value: Array<{ name: string }> }>(
@@ -259,30 +253,16 @@ export async function v2CompliancePolicyExists(
   }
 }
 
-/**
- * Create a CIS Device Configuration policy
- */
 export async function createCISDeviceConfiguration(
   client: GraphClient,
   policy: Record<string, unknown>
 ): Promise<{ id: string }> {
-  // Clean the policy recursively
   const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
 
-  // Remove root-level id and CIS metadata
   delete cleaned.id;
-  delete cleaned._cisCategory;
-  delete cleaned._cisSubcategory;
-  delete cleaned._cisFilePath;
-
-  // Ensure hydration marker in description
+  removeCISMetadata(cleaned);
   cleaned.description = addHydrationMarker(cleaned.description as string | undefined);
-
-  // V1 device configs use displayName, not name
-  if (!cleaned.displayName && cleaned.name) {
-    cleaned.displayName = cleaned.name;
-  }
-  delete cleaned.name;
+  normalizeToDisplayName(cleaned);
 
   console.log(`[CIS Device Config] Creating policy: "${cleaned.displayName}"`);
 
@@ -302,6 +282,10 @@ export async function deviceConfigurationExists(
   client: GraphClient,
   displayName: string
 ): Promise<boolean> {
+  if (hasODataUnsafeChars(displayName)) {
+    console.log(`[Device Configuration] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
+    return false;
+  }
   try {
     const escapedName = escapeODataString(displayName);
     const response = await client.get<{ value: Array<{ displayName: string }> }>(

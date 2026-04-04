@@ -41,11 +41,12 @@ export async function getHydrationKitGroups(client: GraphClient): Promise<Device
 }
 
 /**
- * Get all groups that start with "Intune - " prefix
- * Used for efficient existence checking before group creation
+ * Get all groups created by or relevant to this tool.
+ * Fetches groups with [IHD] prefix, "Intune - " prefix, and "Entra - " prefix
+ * to support duplicate detection for both new and legacy naming conventions.
  */
 export async function getIntuneGroups(client: GraphClient): Promise<DeviceGroup[]> {
-  const filter = "startswith(displayName,'Intune - ')";
+  const filter = "startswith(displayName,'[IHD] ') or startswith(displayName,'Intune - ') or startswith(displayName,'Entra - ')";
   return client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter)}`);
 }
 

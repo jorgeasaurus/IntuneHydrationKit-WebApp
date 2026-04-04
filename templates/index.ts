@@ -59,7 +59,7 @@ export const TEMPLATE_METADATA = {
   cisBaseline: {
     displayName: "CIS Intune Baselines",
     description: "CIS security benchmarks for Windows, macOS, iOS, Android, and browsers",
-    count: 720,
+    count: 717,
     icon: "ShieldAlert",
     hasSubcategories: true,
   },
@@ -104,7 +104,7 @@ export const CIS_CATEGORY_METADATA = {
     id: "cis-endpoint-security",
     name: "Microsoft Endpoint Security",
     description: "Endpoint Security antivirus and firewall policies",
-    count: 60,
+    count: 57,
   },
   "cis-visual-studio": {
     id: "cis-visual-studio",

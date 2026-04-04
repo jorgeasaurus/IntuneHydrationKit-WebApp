@@ -19,7 +19,7 @@ import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
-import { sleep } from "./utils";
+import { sleep, hasODataUnsafeChars } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   settingsCatalogPolicyExists,
@@ -200,11 +200,15 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
     return { type: "error", reason: "Template not found" };
   }
 
-  // Check if already exists in cache
+  // Check if already exists in cache — match with or without [IHD] prefix
   console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups?.length || 0} cached groups`);
-  const existingGroup = context.cachedIntuneGroups?.find(
-    (g) => g.displayName.toLowerCase() === template!.displayName.toLowerCase()
-  );
+  const templateName = template!.displayName.toLowerCase();
+  const templateNameStripped = templateName.startsWith("[ihd] ") ? templateName.slice(6) : templateName;
+  const existingGroup = context.cachedIntuneGroups?.find((g) => {
+    const cachedName = g.displayName.toLowerCase();
+    const cachedNameStripped = cachedName.startsWith("[ihd] ") ? cachedName.slice(6) : cachedName;
+    return cachedName === templateName || cachedNameStripped === templateNameStripped;
+  });
   if (existingGroup) {
     console.log(`[BatchExecutor:groups] ✗ Group already exists: "${task.itemName}"`);
     return { type: "skip", reason: "Group already exists" };
@@ -668,17 +672,58 @@ export async function executeTasksInBatches(
   const nonBatchableTasks: HydrationTask[] = [];
   const skippedTasks: { task: HydrationTask; reason: string }[] = [];
 
+  // Build a category summary for logging
+  const categoryCounts = tasks.reduce((acc, t) => {
+    acc[t.category] = (acc[t.category] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+  const categoryNames: Record<string, string> = {
+    groups: "Entra Groups", filters: "Device Filters", compliance: "Compliance Policies",
+    conditionalAccess: "Conditional Access", appProtection: "App Protection",
+    enrollment: "Enrollment Profiles", baseline: "OpenIntuneBaseline",
+    cisBaseline: "CIS Baselines", notificationTemplates: "Notification Templates",
+  };
+
   emitStatus(context, `Preparing ${tasks.length} items for batch creation...`, "progress", "create");
   console.log(`[BatchExecutor] Preparing ${tasks.length} tasks for batch execution (batch size: ${config.defaultBatchSize})`);
-  console.log(`[BatchExecutor] Task categories:`, tasks.map(t => t.category).reduce((acc, cat) => {
-    acc[cat] = (acc[cat] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>));
+  console.log(`[BatchExecutor] Task categories:`, categoryCounts);
   console.log(`[BatchExecutor] Context cache: baselineTemplates=${context.cachedBaselineTemplates?.length ?? 'not set'}`);
 
   // Separate tasks into: batchable, skipped, or needs sequential
+  let currentCategory = "";
+  let categoryProcessed = 0;
+  let categoryTotal = 0;
+
   for (let i = 0; i < tasks.length; i++) {
     const task = tasks[i];
+
+    // Emit progress when entering a new category
+    if (task.category !== currentCategory) {
+      currentCategory = task.category;
+      categoryTotal = categoryCounts[currentCategory] || 0;
+      categoryProcessed = 0;
+      const friendlyName = categoryNames[currentCategory] || currentCategory;
+      emitStatus(
+        context,
+        `Preparing ${friendlyName} (${categoryTotal} items)...`,
+        "progress",
+        "create"
+      );
+    }
+
+    categoryProcessed++;
+
+    // Emit progress every 25 items within large categories
+    if (categoryTotal > 25 && categoryProcessed % 25 === 0) {
+      const friendlyName = categoryNames[currentCategory] || currentCategory;
+      emitStatus(
+        context,
+        `Preparing ${friendlyName}: ${categoryProcessed}/${categoryTotal}...`,
+        "progress",
+        "create"
+      );
+    }
+
     console.log(`[BatchExecutor] Preparing task ${i + 1}/${tasks.length}: "${task.itemName}" (${task.category})`);
     const prepared = await prepareTaskForBatch(task, context, `req-${i}`);
 
@@ -712,9 +757,11 @@ export async function executeTasksInBatches(
   }
 
   console.log(`[BatchExecutor] Summary: ${batchableTasks.length} batched, ${skippedTasks.length} skipped, ${nonBatchableTasks.length} sequential`);
+  const skipMsg = skippedTasks.length > 0 ? `, ${skippedTasks.length} duplicates skipped` : "";
+  const seqMsg = nonBatchableTasks.length > 0 ? `, ${nonBatchableTasks.length} sequential` : "";
   emitStatus(
     context,
-    `Creating ${batchableTasks.length} items (${skippedTasks.length} duplicates skipped)...`,
+    `Preparation complete — sending ${batchableTasks.length} items${skipMsg}${seqMsg}`,
     "info",
     "create"
   );
@@ -1097,7 +1144,8 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name}")`);
       return true;
     }
-    if (await settingsCatalogPolicyExists(context.client, policyName)) {
+    // API fallback — skip if name has chars that break OData $filter (e.g. [IHD] prefix)
+    if (!hasODataUnsafeChars(policyName) && await settingsCatalogPolicyExists(context.client, policyName)) {
       console.log(`${logPrefix} SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
@@ -1120,7 +1168,7 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} V2Compliance already exists (SC cache hit), skipping: "${policyName}" (matched: "${existingSC.name}")`);
       return true;
     }
-    if (await v2CompliancePolicyExists(context.client, policyName)) {
+    if (!hasODataUnsafeChars(policyName) && await v2CompliancePolicyExists(context.client, policyName)) {
       console.log(`${logPrefix} V2Compliance already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
@@ -1135,7 +1183,7 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} DeviceConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
       return true;
     }
-    if (await deviceConfigurationExists(context.client, policyName)) {
+    if (!hasODataUnsafeChars(policyName) && await deviceConfigurationExists(context.client, policyName)) {
       console.log(`${logPrefix} DeviceConfiguration already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
@@ -1189,9 +1237,12 @@ function findResourceIdForDelete(
 
   switch (task.category) {
     case "groups": {
-      const group = context.cachedIntuneGroups?.find(
-        (g) => g.displayName.toLowerCase() === nameToFind
-      );
+      const nameStripped = nameToFind.startsWith("[ihd] ") ? nameToFind.slice(6) : nameToFind;
+      const group = context.cachedIntuneGroups?.find((g) => {
+        const n = g.displayName.toLowerCase();
+        const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
+        return n === nameToFind || ns === nameStripped;
+      });
       if (group?.id) {
         return { id: group.id, hasMarker: hasHydrationMarker(group.description) };
       }
