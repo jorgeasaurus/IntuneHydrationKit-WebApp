@@ -235,8 +235,8 @@ export async function executeTasks(
     emitStatus(context, "Querying existing Conditional Access policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
     try {
-      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string; state: string }> }>(
-        `/identity/conditionalAccess/policies?$select=id,displayName,description,state`
+      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; state: string }> }>(
+        `/identity/conditionalAccess/policies?$select=id,displayName,state`
       );
       context.cachedConditionalAccessPolicies = response.value || [];
       emitStatus(context, `Found ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`, "success", "prefetch");
