@@ -13,6 +13,140 @@ const PLATFORM_ENDPOINTS: Record<AppProtectionPlatform, string> = {
   android: "/deviceAppManagement/androidManagedAppProtections",
 };
 
+const COMMON_CREATE_FIELDS = new Set([
+  "@odata.type",
+  "displayName",
+  "description",
+  "roleScopeTagIds",
+  "periodOfflineBeforeAccessCheck",
+  "periodOnlineBeforeAccessCheck",
+  "allowedInboundDataTransferSources",
+  "allowedOutboundDataTransferDestinations",
+  "organizationalCredentialsRequired",
+  "allowedOutboundClipboardSharingLevel",
+  "dataBackupBlocked",
+  "deviceComplianceRequired",
+  "managedBrowserToOpenLinksRequired",
+  "saveAsBlocked",
+  "periodOfflineBeforeWipeIsEnforced",
+  "pinRequired",
+  "maximumPinRetries",
+  "simplePinBlocked",
+  "minimumPinLength",
+  "pinCharacterSet",
+  "periodBeforePinReset",
+  "allowedDataStorageLocations",
+  "contactSyncBlocked",
+  "printBlocked",
+  "fingerprintBlocked",
+  "disableAppPinIfDevicePinIsSet",
+  "maximumRequiredOsVersion",
+  "maximumWarningOsVersion",
+  "maximumWipeOsVersion",
+  "minimumRequiredOsVersion",
+  "minimumWarningOsVersion",
+  "minimumRequiredAppVersion",
+  "minimumWarningAppVersion",
+  "minimumWipeOsVersion",
+  "minimumWipeAppVersion",
+  "appActionIfDeviceComplianceRequired",
+  "appActionIfMaximumPinRetriesExceeded",
+  "pinRequiredInsteadOfBiometricTimeout",
+  "allowedOutboundClipboardSharingExceptionLength",
+  "notificationRestriction",
+  "previousPinBlockCount",
+  "managedBrowser",
+  "maximumAllowedDeviceThreatLevel",
+  "mobileThreatDefenseRemediationAction",
+  "blockDataIngestionIntoOrganizationDocuments",
+  "allowedDataIngestionLocations",
+  "appActionIfUnableToAuthenticateUser",
+  "dialerRestrictionLevel",
+  "gracePeriodToBlockAppsDuringOffClockHours",
+  "appGroupType",
+  "appActionIfAccountIsClockedOut",
+  "minimumRequiredCompanyPortalVersion",
+  "minimumWarningCompanyPortalVersion",
+  "minimumWipeCompanyPortalVersion",
+  "blockAfterCompanyPortalUpdateDeferralInDays",
+  "warnAfterCompanyPortalUpdateDeferralInDays",
+  "wipeAfterCompanyPortalUpdateDeferralInDays",
+]);
+
+const ANDROID_CREATE_FIELDS = new Set([
+  ...COMMON_CREATE_FIELDS,
+  "screenCaptureBlocked",
+  "disableAppEncryptionIfDeviceEncryptionIsEnabled",
+  "encryptAppData",
+  "minimumRequiredPatchVersion",
+  "minimumWarningPatchVersion",
+  "minimumWipePatchVersion",
+  "allowedAndroidDeviceManufacturers",
+  "appActionIfAndroidDeviceManufacturerNotAllowed",
+  "requiredAndroidSafetyNetDeviceAttestationType",
+  "appActionIfAndroidSafetyNetDeviceAttestationFailed",
+  "requiredAndroidSafetyNetAppsVerificationType",
+  "appActionIfAndroidSafetyNetAppsVerificationFailed",
+  "customBrowserPackageId",
+  "customBrowserDisplayName",
+  "keyboardsRestricted",
+  "approvedKeyboards",
+  "allowedAndroidDeviceModels",
+  "appActionIfAndroidDeviceModelNotAllowed",
+  "customDialerAppPackageId",
+  "customDialerAppDisplayName",
+  "biometricAuthenticationBlocked",
+  "requiredAndroidSafetyNetEvaluationType",
+  "deviceLockRequired",
+  "appActionIfDeviceLockNotSet",
+  "connectToVpnOnLaunch",
+  "appActionIfDevicePasscodeComplexityLessThanLow",
+  "appActionIfDevicePasscodeComplexityLessThanMedium",
+  "appActionIfDevicePasscodeComplexityLessThanHigh",
+  "requireClass3Biometrics",
+  "requirePinAfterBiometricChange",
+  "exemptedAppPackages",
+]);
+
+const IOS_CREATE_FIELDS = new Set([
+  ...COMMON_CREATE_FIELDS,
+  "appDataEncryptionType",
+  "minimumRequiredSdkVersion",
+  "faceIdBlocked",
+  "minimumWipeSdkVersion",
+  "allowedIosDeviceModels",
+  "appActionIfIosDeviceModelNotAllowed",
+  "thirdPartyKeyboardsBlocked",
+  "filterOpenInToOnlyManagedApps",
+  "disableProtectionOfManagedOutboundOpenInData",
+  "protectInboundDataFromUnknownSources",
+  "customBrowserProtocol",
+  "customDialerAppProtocol",
+  "managedUniversalLinks",
+  "exemptedUniversalLinks",
+  "minimumWarningSdkVersion",
+  "exemptedAppProtocols",
+]);
+
+const EMPTY_STRING_OPTIONAL_FIELDS = new Set([
+  "allowedAndroidDeviceManufacturers",
+  "allowedIosDeviceModels",
+  "customBrowserProtocol",
+  "customBrowserPackageId",
+  "customBrowserDisplayName",
+  "customDialerAppProtocol",
+  "customDialerAppPackageId",
+  "customDialerAppDisplayName",
+]);
+
+const EMPTY_ARRAY_OPTIONAL_FIELDS = new Set([
+  "allowedAndroidDeviceModels",
+  "approvedKeyboards",
+  "exemptedAppPackages",
+]);
+
+const PLACEHOLDER_VERSION_VALUES = new Set(["0000-00-00"]);
+
 function getPlatformEndpoint(platform: AppProtectionPlatform, policyId?: string): string {
   const base = PLATFORM_ENDPOINTS[platform];
   return policyId ? `${base}/${policyId}` : base;
@@ -105,128 +239,104 @@ export async function appProtectionPolicyExists(
   return policy !== null;
 }
 
-/**
- * Recursively clean a policy object to remove OData metadata
- * Keeps @odata.type but removes all other @odata.* properties, ids, timestamps, etc.
- */
-function cleanAppProtectionPolicyRecursively(obj: unknown): unknown {
-  if (obj === null || obj === undefined) {
-    return obj;
+function getAllowedCreateFields(platform: AppProtectionPlatform): Set<string> {
+  return platform === "iOS" ? IOS_CREATE_FIELDS : ANDROID_CREATE_FIELDS;
+}
+
+function cleanNestedValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => cleanNestedValue(item));
   }
 
-  if (Array.isArray(obj)) {
-    return obj.map((item) => cleanAppProtectionPolicyRecursively(item));
-  }
-
-  if (typeof obj === "object") {
+  if (value && typeof value === "object") {
     const cleaned: Record<string, unknown> = {};
-    const excludeFields = [
-      // OData metadata
-      "@odata.context", "@odata.id", "@odata.editLink",
-      // Timestamps and version
-      "createdDateTime", "lastModifiedDateTime", "version",
-      // OData actions
-      "#microsoft.graph.assign",
-      // Read-only properties that cause "The request is invalid" errors
-      "isAssigned",
-      "deployedAppCount",
-      // ID should always be removed (new policies get their own ID)
-      "id",
-      // Deprecated or read-only properties that cause API errors
-      "fingerprintAndBiometricEnabled",
-      "mobileThreatDefensePartnerPriority",
-      "gracePeriodToBlockAppsDuringOffClockHours",
-      "appActionIfDevicePasscodeComplexityLessThanLow",
-      "appActionIfDevicePasscodeComplexityLessThanHigh",
-      // Navigation/computed properties from OIB templates
-      "apps",
-      "assignments",
-      "deploymentSummary",
-      "targetedAppManagementLevels",
-      // Custom display name properties that are computed
-      "customBrowserDisplayName",
-      "customDialerAppDisplayName",
-      // Internal platform tag (used for delete operations only)
-      "_platform",
-    ];
 
-    // Fields where empty string should be removed entirely
-    const removeIfEmptyString = [
-      "customBrowserProtocol",
-      "customDialerAppProtocol",
-      "customBrowserPackageId",
-      "customDialerAppPackageId",
-      "allowedIosDeviceModels",
-      "allowedAndroidDeviceManufacturers",
-    ];
-
-    // Fields where empty array should be removed entirely
-    const removeIfEmptyArray = [
-      "allowedAndroidDeviceModels",
-      "exemptedAppPackages",
-      "approvedKeyboards",
-    ];
-
-    // Fields where null value should be removed entirely (optional properties)
-    const removeIfNull = [
-      "maximumRequiredOsVersion",
-      "maximumWarningOsVersion",
-      "maximumWipeOsVersion",
-      "minimumRequiredOsVersion",
-      "minimumWarningOsVersion",
-      "minimumRequiredAppVersion",
-      "minimumWarningAppVersion",
-      "minimumWipeOsVersion",
-      "minimumWipeAppVersion",
-      "minimumRequiredSdkVersion",
-      "minimumWipeSdkVersion",
-      "minimumWarningSdkVersion",
-      "minimumRequiredCompanyPortalVersion",
-      "minimumWarningCompanyPortalVersion",
-      "minimumWipeCompanyPortalVersion",
-      "allowedIosDeviceModels",
-      "allowedAndroidDeviceManufacturers",
-    ];
-
-    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
-      // Skip excluded fields
-      if (excludeFields.includes(key)) {
+    for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+      if (nestedKey.includes("@odata.") && nestedKey !== "@odata.type") {
         continue;
       }
 
-      // Skip any property containing @odata. (except @odata.type)
-      if (key.includes("@odata.") && key !== "@odata.type") {
+      if (nestedKey.startsWith("#")) {
         continue;
       }
 
-      // Skip properties starting with # (OData actions)
-      if (key.startsWith("#")) {
+      if (nestedValue === undefined) {
         continue;
       }
 
-      // Skip empty strings for specific fields
-      if (removeIfEmptyString.includes(key) && value === "") {
-        continue;
-      }
-
-      // Skip empty arrays for specific fields
-      if (removeIfEmptyArray.includes(key) && Array.isArray(value) && value.length === 0) {
-        continue;
-      }
-
-      // Skip null values for optional properties
-      if (removeIfNull.includes(key) && value === null) {
-        continue;
-      }
-
-      // Recursively clean nested objects and arrays
-      cleaned[key] = cleanAppProtectionPolicyRecursively(value);
+      cleaned[nestedKey] = cleanNestedValue(nestedValue);
     }
 
     return cleaned;
   }
 
-  return obj;
+  return value;
+}
+
+export function normalizeAppProtectionPolicyForCreate(
+  policy: AppProtectionPolicy
+): AppProtectionPolicy {
+  const platform: AppProtectionPlatform =
+    policy["@odata.type"] === "#microsoft.graph.iosManagedAppProtection" ? "iOS" : "android";
+  const allowedFields = getAllowedCreateFields(platform);
+  const normalized: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(policy)) {
+    if (!allowedFields.has(key)) {
+      continue;
+    }
+
+    if (value === null || value === undefined) {
+      continue;
+    }
+
+    if (EMPTY_STRING_OPTIONAL_FIELDS.has(key) && value === "") {
+      continue;
+    }
+
+    if (EMPTY_ARRAY_OPTIONAL_FIELDS.has(key) && Array.isArray(value) && value.length === 0) {
+      continue;
+    }
+
+    if (
+      typeof value === "string" &&
+      PLACEHOLDER_VERSION_VALUES.has(value) &&
+      (key === "minimumRequiredPatchVersion" ||
+        key === "minimumWarningPatchVersion" ||
+        key === "minimumWipePatchVersion")
+    ) {
+      continue;
+    }
+
+    normalized[key] = cleanNestedValue(value);
+  }
+
+  normalized.description = addHydrationMarker(
+    typeof normalized.description === "string" ? normalized.description : policy.description
+  );
+
+  return normalized as AppProtectionPolicy;
+}
+
+async function createAppProtectionPolicyWithRecovery(
+  client: GraphClient,
+  endpoint: string,
+  policyBody: AppProtectionPolicy
+): Promise<AppProtectionPolicy> {
+  try {
+    // Avoid retrying POST creates: Intune may create the policy even if the client sees a transient failure.
+    return await client.postNoRetry<AppProtectionPolicy>(endpoint, policyBody);
+  } catch (error) {
+    const recoveredPolicy = await getAppProtectionPolicyByName(client, policyBody.displayName);
+    if (recoveredPolicy) {
+      console.warn(
+        `[AppProtection] Recovered from create error for "${policyBody.displayName}" by finding the policy in tenant after POST failure.`
+      );
+      return recoveredPolicy;
+    }
+
+    throw error;
+  }
 }
 
 /**
@@ -236,10 +346,10 @@ export async function createiOSAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
-  const policyBody = cleanAppProtectionPolicyRecursively(policy) as AppProtectionPolicy;
-  policyBody.description = addHydrationMarker(policyBody.description);
+  const policyBody = normalizeAppProtectionPolicyForCreate(policy);
 
-  return client.post<AppProtectionPolicy>(
+  return createAppProtectionPolicyWithRecovery(
+    client,
     "/deviceAppManagement/iosManagedAppProtections",
     policyBody
   );
@@ -252,10 +362,10 @@ export async function createAndroidAppProtectionPolicy(
   client: GraphClient,
   policy: AppProtectionPolicy
 ): Promise<AppProtectionPolicy> {
-  const policyBody = cleanAppProtectionPolicyRecursively(policy) as AppProtectionPolicy;
-  policyBody.description = addHydrationMarker(policyBody.description);
+  const policyBody = normalizeAppProtectionPolicyForCreate(policy);
 
-  return client.post<AppProtectionPolicy>(
+  return createAppProtectionPolicyWithRecovery(
+    client,
     "/deviceAppManagement/androidManagedAppProtections",
     policyBody
   );

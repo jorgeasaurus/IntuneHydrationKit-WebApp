@@ -1,0 +1,94 @@
+name: Sync OpenIntuneBaseline Templates
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check for upstream updates
+        id: check
+        run: |
+          node scripts/sync-oib-templates.js --check-only && echo "status=current" >> "$GITHUB_OUTPUT" || {
+            code=$?
+            if [ "$code" -eq 2 ]; then
+              echo "status=update-available" >> "$GITHUB_OUTPUT"
+            else
+              echo "status=error" >> "$GITHUB_OUTPUT"
+              exit 1
+            fi
+          }
+
+      - name: Sync templates
+        if: steps.check.outputs.status == 'update-available'
+        run: node scripts/sync-oib-templates.js
+
+      - name: Read upstream SHA
+        if: steps.check.outputs.status == 'update-available'
+        id: sha
+        run: |
+          SHA=$(cat public/IntuneTemplates/OpenIntuneBaseline/.upstream-sha | tr -d '\n')
+          echo "upstream_sha=${SHA}" >> "$GITHUB_OUTPUT"
+          echo "short_sha=${SHA:0:10}" >> "$GITHUB_OUTPUT"
+
+      - name: Count changes
+        if: steps.check.outputs.status == 'update-available'
+        id: changes
+        run: |
+          ADDED=$(git diff --name-only --diff-filter=A | grep 'OpenIntuneBaseline/' | wc -l | tr -d ' ')
+          MODIFIED=$(git diff --name-only --diff-filter=M | grep 'OpenIntuneBaseline/' | wc -l | tr -d ' ')
+          DELETED=$(git diff --name-only --diff-filter=D | grep 'OpenIntuneBaseline/' | wc -l | tr -d ' ')
+          TOTAL=$(git diff --name-only | grep 'OpenIntuneBaseline/' | wc -l | tr -d ' ')
+          echo "added=${ADDED}" >> "$GITHUB_OUTPUT"
+          echo "modified=${MODIFIED}" >> "$GITHUB_OUTPUT"
+          echo "deleted=${DELETED}" >> "$GITHUB_OUTPUT"
+          echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        if: steps.check.outputs.status == 'update-available'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            chore: sync OpenIntuneBaseline templates (${{ steps.sha.outputs.short_sha }})
+
+            Upstream: SkipToTheEndpoint/OpenIntuneBaseline@${{ steps.sha.outputs.upstream_sha }}
+            Files changed: ${{ steps.changes.outputs.total }} (added: ${{ steps.changes.outputs.added }}, modified: ${{ steps.changes.outputs.modified }}, deleted: ${{ steps.changes.outputs.deleted }})
+          branch: chore/sync-oib-templates
+          delete-branch: true
+          title: "chore: update OpenIntuneBaseline templates"
+          labels: dependencies,automated
+          body: |
+            ## OpenIntuneBaseline Template Sync
+
+            Upstream commit: [`${{ steps.sha.outputs.short_sha }}`](https://github.com/SkipToTheEndpoint/OpenIntuneBaseline/commit/${{ steps.sha.outputs.upstream_sha }})
+
+            ### Changes
+            | Type | Count |
+            |------|-------|
+            | Added | ${{ steps.changes.outputs.added }} |
+            | Modified | ${{ steps.changes.outputs.modified }} |
+            | Deleted | ${{ steps.changes.outputs.deleted }} |
+            | **Total** | **${{ steps.changes.outputs.total }}** |
+
+            ---
+            *This PR was automatically created by the [Sync OpenIntuneBaseline Templates](${{ github.server_url }}/${{ github.repository }}/actions/workflows/sync-oib-templates.yml) workflow.*
+            *Review the changes to ensure no breaking modifications to policy JSON structures.*

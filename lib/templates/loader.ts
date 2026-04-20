@@ -3,7 +3,7 @@
  * Loads templates from local IntuneTemplates directory
  */
 
-import { HYDRATION_MARKER, IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
+import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hydrationMarker";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
@@ -524,9 +524,13 @@ export async function fetchBaselinePolicies(): Promise<BaselinePolicy[]> {
         // Get display name from 'name' field (Settings Catalog uses 'name' not 'displayName')
         const displayName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
 
+        const prefixedName = addImportPrefix(displayName);
+
         allPolicies.push({
           ...policyObj,
-          displayName, // Normalize to displayName for consistency
+          // Add [IHD] prefix to name fields (matches CIS baseline behavior)
+          ...(policyObj.name ? { name: addImportPrefix(policyObj.name as string) } : {}),
+          displayName: prefixedName,
           _oibPlatform: file.platform,
           _oibPolicyType: file.policyType,
           _oibFilePath: file.path,

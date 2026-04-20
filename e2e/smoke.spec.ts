@@ -17,7 +17,7 @@ test.describe("Landing Page", () => {
 
   test("shows version badge", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("v2.1")).toBeVisible();
+    await expect(page.getByText("v2.2")).toBeVisible();
   });
 
   test("has no unexpected console errors on load", async ({ page }) => {

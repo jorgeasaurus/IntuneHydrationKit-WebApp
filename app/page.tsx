@@ -106,7 +106,7 @@ export default function Home() {
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-hydrate/10 border border-hydrate/30">
                   <span className="w-2 h-2 rounded-full bg-hydrate animate-pulse" />
                   <span className="text-xs font-mono text-hydrate uppercase tracking-wider">
-                    v2.1
+                    v2.2
                   </span>
                 </div>
 

@@ -402,6 +402,9 @@ async function buildBaselineRequestBody(
   if (oibPolicyType) {
     // OIB manifest provides explicit policy type
     switch (oibPolicyType) {
+      case "AppProtection":
+        policyType = "AppProtection";
+        break;
       case "SettingsCatalog":
         policyType = "SettingsCatalog";
         break;
@@ -426,9 +429,14 @@ async function buildBaselineRequestBody(
     console.log(`[BatchExecutor] OIB policy "${policyName}" type detected: ${policyType}`);
   }
 
-  // Only batch SettingsCatalog, DeviceConfiguration, DriverUpdateProfiles, and V2Compliance
-  // Other types require special handling
-  if (policyType === "Unsupported" || policyType === "SecurityIntent" || policyType === "V1Compliance") {
+  // Only batch SettingsCatalog, DeviceConfiguration, DriverUpdateProfiles, and V2Compliance.
+  // App Protection baselines need the dedicated sequential create path.
+  if (
+    policyType === "Unsupported" ||
+    policyType === "SecurityIntent" ||
+    policyType === "V1Compliance" ||
+    policyType === "AppProtection"
+  ) {
     console.log(`[BatchExecutor] Skipping "${policyName}" - unsupported type for batching: ${policyType}`);
     return null;
   }
