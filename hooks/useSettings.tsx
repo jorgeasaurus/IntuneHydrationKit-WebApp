@@ -8,6 +8,20 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: "system",
 };
 
+function normalizeTheme(theme: unknown): AppSettings["theme"] {
+  if (
+    theme === "light" ||
+    theme === "dark" ||
+    theme === "system" ||
+    theme === "blueprint" ||
+    theme === "corporate-1999"
+  ) {
+    return theme;
+  }
+
+  return DEFAULT_SETTINGS.theme;
+}
+
 function normalizeSettings(candidate: unknown): AppSettings {
   if (!candidate || typeof candidate !== "object") {
     return DEFAULT_SETTINGS;
@@ -17,7 +31,7 @@ function normalizeSettings(candidate: unknown): AppSettings {
 
   return {
     stopOnFirstError: parsed.stopOnFirstError ?? DEFAULT_SETTINGS.stopOnFirstError,
-    theme: parsed.theme ?? DEFAULT_SETTINGS.theme,
+    theme: normalizeTheme(parsed.theme),
   };
 }
 

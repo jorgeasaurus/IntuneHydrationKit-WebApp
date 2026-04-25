@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { CloudEnvironment } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { LIGHT_DARK_THEME_CYCLE, ThemeToggle } from "@/components/ThemeToggle";
 import { Terminal, Github } from "lucide-react";
 
 export function Navigation() {
@@ -111,7 +111,7 @@ export function Navigation() {
                 >
                   <Github className="w-5 h-5" />
                 </a>
-                <ThemeToggle />
+                <ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />
 
                 {/* Terminal Status Indicator */}
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">

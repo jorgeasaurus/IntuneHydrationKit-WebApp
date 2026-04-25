@@ -20,6 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useSettings } from "@/hooks/useSettings";
+import { AppSettings } from "@/types/hydration";
 import { RotateCcw } from "lucide-react";
 
 interface SettingsModalProps {
@@ -88,7 +89,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             <Label htmlFor="theme">Theme</Label>
             <Select
               value={localSettings.theme}
-              onValueChange={(value: "light" | "dark" | "system") =>
+              onValueChange={(value: AppSettings["theme"]) =>
                 setLocalSettings({ ...localSettings, theme: value })
               }
             >
@@ -98,6 +99,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               <SelectContent>
                 <SelectItem value="light">Light</SelectItem>
                 <SelectItem value="dark">Dark</SelectItem>
+                <SelectItem value="blueprint">Blueprint</SelectItem>
+                <SelectItem value="corporate-1999">Corporate Intranet 1999</SelectItem>
                 <SelectItem value="system">System</SelectItem>
               </SelectContent>
             </Select>
