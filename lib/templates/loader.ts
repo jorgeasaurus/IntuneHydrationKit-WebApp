@@ -46,6 +46,10 @@ export interface AppProtectionTemplate {
   [key: string]: unknown;
 }
 
+function getTemplateFileName(filePath: string): string {
+  return filePath.split("/").pop()?.replace(/\.json$/i, "") ?? filePath;
+}
+
 /**
  * Fetch dynamic groups from local templates
  */
@@ -252,12 +256,13 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
       }
 
       const data = await response.json();
+      const displayName = data.displayName ?? getTemplateFileName(file);
 
       // CA policy files contain single policy objects
-      if (data.displayName) {
+      if (displayName) {
         const policy: ConditionalAccessTemplate = {
           ...data,
-          displayName: `${IMPORT_PREFIX}${data.displayName}`,
+          displayName: `${IMPORT_PREFIX}${displayName}`,
           state: "disabled", // CA policies are always created in disabled state
         };
         allPolicies.push(policy);

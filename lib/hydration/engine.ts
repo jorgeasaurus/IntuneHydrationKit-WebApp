@@ -372,6 +372,23 @@ export async function executeTasks(
     }
   }
 
+  // Pre-fetch Group Policy Configurations (Administrative Templates / ADMX) for baseline/CIS delete paths
+  if (needsBaselinePolicyCaches && !context.cachedGroupPolicyConfigurations) {
+    emitStatus(context, "Querying Administrative Templates...", "progress", "prefetch");
+    console.log("[Execute Tasks] Pre-fetching all Group Policy Configurations...");
+    try {
+      context.cachedGroupPolicyConfigurations = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
+        `/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description`
+      );
+      emitStatus(context, `Found ${context.cachedGroupPolicyConfigurations.length} Administrative Templates`, "success", "prefetch");
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedGroupPolicyConfigurations.length} Group Policy Configurations`);
+    } catch (error) {
+      emitStatus(context, "Failed to query Administrative Templates", "warning", "prefetch");
+      console.error("[Execute Tasks] Failed to pre-fetch Group Policy Configurations:", error);
+      context.cachedGroupPolicyConfigurations = [];
+    }
+  }
+
   // Pre-fetch baseline templates from cache for batch operations
   // This ensures templates are passed directly to batch executor without relying on global cache
   if (batchConfig.enableBatching && hasBaselineTasks && !context.cachedBaselineTemplates) {

@@ -56,6 +56,8 @@ export interface ExecutionContext {
   cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached device configurations for delete operations (Health Monitoring, etc.)
   cachedDeviceConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
+  // Cached group policy configurations for delete operations (Administrative Templates / ADMX)
+  cachedGroupPolicyConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached baseline templates for batch creation (passed directly to avoid cache issues)
   cachedBaselineTemplates?: BaselinePolicy[];
   // License flags for conditional skipping

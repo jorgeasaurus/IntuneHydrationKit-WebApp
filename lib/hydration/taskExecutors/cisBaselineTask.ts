@@ -21,6 +21,16 @@ import {
 import { escapeODataString, hasODataUnsafeChars } from "../utils";
 import { getCachedTemplates, getAllTemplateCacheKeys, CISBaselinePolicy } from "@/lib/templates/loader";
 
+function findCachedGroupPolicyConfiguration(
+  policyName: string,
+  context: ExecutionContext
+): { id: string; displayName?: string; description?: string } | undefined {
+  const normalizedPolicyName = policyName.toLowerCase().trim();
+  return context.cachedGroupPolicyConfigurations?.find(
+    (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
+  );
+}
+
 /**
  * Execute a CIS Baseline task (create or delete)
  * Routes to correct endpoint based on policy type
@@ -58,6 +68,7 @@ export async function executeCISBaselineTask(
   // Detect the policy type for proper routing
   const policyType = detectCISPolicyType(template as Record<string, unknown>);
   const odataType = template["@odata.type"] as string || "";
+  const normalizedODataType = odataType.toLowerCase();
   const policyName = template.displayName || (template as Record<string, unknown>).name as string || task.itemName;
 
   console.log(`[CIS Baseline Task] Processing "${policyName}" (type: ${policyType}, @odata.type: ${odataType})`);
@@ -70,7 +81,7 @@ export async function executeCISBaselineTask(
           console.log(`[CIS Baseline Task] Skipping unsupported policy type: "${policyName}" (@odata.type: ${odataType})`);
           // Provide specific error message based on policy type
           let unsupportedReason = "This policy type is not supported for automated creation.";
-          if (odataType.includes("grouppolicyconfiguration")) {
+          if (normalizedODataType.includes("grouppolicyconfiguration")) {
             unsupportedReason = "ADMX-based policies require complex 2-step creation with definition bindings. Please create manually in Intune.";
           } else if (odataType.includes("devicemanagementintent")) {
             unsupportedReason = "Security Intents require template instance creation. Please create manually in Intune.";
@@ -98,6 +109,28 @@ export async function executeCISBaselineTask(
 
         case "V1Compliance": {
           // Legacy compliance -> /deviceCompliancePolicies
+          const normalizedPolicyName = policyName.toLowerCase().trim();
+          let compliancePolicies = context.cachedCompliancePolicies;
+
+          if (
+            (!compliancePolicies || compliancePolicies.length === 0) &&
+            hasODataUnsafeChars(policyName)
+          ) {
+            compliancePolicies = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
+              "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
+            );
+            context.cachedCompliancePolicies = compliancePolicies;
+          }
+
+          const existingV1Policy = compliancePolicies?.find(
+            (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
+          );
+
+          if (existingV1Policy) {
+            console.log(`[CIS Baseline Task] V1 Compliance policy already exists (cache), skipping: "${policyName}"`);
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+
           const v1Exists = await compliancePolicyExistsByName(client, policyName);
           if (v1Exists) {
             console.log(`[CIS Baseline Task] V1 Compliance policy already exists, skipping: "${policyName}"`);
@@ -107,6 +140,13 @@ export async function executeCISBaselineTask(
             return { task, success: true, skipped: false };
           }
           const v1Created = await createCISCompliancePolicy(client, template as Record<string, unknown>);
+          if (context.cachedCompliancePolicies && v1Created.id) {
+            context.cachedCompliancePolicies.push({
+              id: v1Created.id,
+              displayName: policyName,
+              description: "",
+            });
+          }
           return { task, success: true, skipped: false, createdId: v1Created.id };
         }
 
@@ -146,8 +186,54 @@ export async function executeCISBaselineTask(
     }
   } else if (mode === "delete") {
     try {
-      switch (policyType) {
-        case "Unsupported":
+        switch (policyType) {
+          case "Unsupported":
+          if (normalizedODataType.includes("grouppolicyconfiguration")) {
+            let policy = findCachedGroupPolicyConfiguration(policyName, context);
+
+            if (!policy) {
+              const allPolicies = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
+                `/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description`
+              );
+              context.cachedGroupPolicyConfigurations = allPolicies;
+              policy = findCachedGroupPolicyConfiguration(policyName, context);
+            }
+
+            if (!policy) {
+              return { task, success: true, skipped: true, error: "Not found in tenant" };
+            }
+
+            if (!hasHydrationMarker(policy.description)) {
+              return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+            }
+
+            try {
+              const assignmentsResponse = await client.get<{ value: Array<{ id: string }> }>(
+                `/deviceManagement/groupPolicyConfigurations/${policy.id}/assignments`
+              );
+              const assignmentCount = assignmentsResponse.value?.length ?? 0;
+              if (assignmentCount > 0) {
+                return { task, success: true, skipped: true, error: `Policy has ${assignmentCount} active assignment(s)` };
+              }
+            } catch {
+              // Continue if assignments can't be checked
+            }
+
+            if (isPreview) {
+              return { task, success: true, skipped: false };
+            }
+
+            await client.delete(`/deviceManagement/groupPolicyConfigurations/${policy.id}`);
+
+            if (context.cachedGroupPolicyConfigurations) {
+              context.cachedGroupPolicyConfigurations = context.cachedGroupPolicyConfigurations.filter(
+                (cachedPolicy) => cachedPolicy.id !== policy.id
+              );
+            }
+
+            return { task, success: true, skipped: false };
+          }
+
           // Can't delete what we can't create
           return { task, success: true, skipped: true, error: "Unsupported policy type" };
 

@@ -54,6 +54,28 @@ export async function executeBaselineTask(
       // Route based on policy type
       if (policyType === "CompliancePolicies") {
         // Compliance policies go to deviceCompliancePolicies endpoint
+        const normalizedPolicyName = policyName.toLowerCase().trim();
+        let compliancePolicies = context.cachedCompliancePolicies;
+
+        if (
+          (!compliancePolicies || compliancePolicies.length === 0) &&
+          hasODataUnsafeChars(policyName)
+        ) {
+          compliancePolicies = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
+            "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
+          );
+          context.cachedCompliancePolicies = compliancePolicies;
+        }
+
+        const existingCompliancePolicy = compliancePolicies?.find(
+          (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
+        );
+
+        if (existingCompliancePolicy) {
+          console.log(`[Baseline Task] Compliance policy already exists (cache), skipping: "${policyName}"`);
+          return { task, success: true, skipped: true, error: "Already exists" };
+        }
+
         const exists = await compliancePolicyExistsByName(client, policyName);
         if (exists) {
           console.log(`[Baseline Task] Compliance policy already exists, skipping: "${policyName}"`);
@@ -63,6 +85,13 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: false };
         }
         const created = await createBaselineCompliancePolicy(client, template as Record<string, unknown>);
+        if (context.cachedCompliancePolicies && created.id) {
+          context.cachedCompliancePolicies.push({
+            id: created.id,
+            displayName: policyName,
+            description: "",
+          });
+        }
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else if (policyType === "AppProtection") {

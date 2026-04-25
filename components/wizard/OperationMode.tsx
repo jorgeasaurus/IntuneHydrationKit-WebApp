@@ -83,7 +83,7 @@ export function OperationModeSelection(): React.JSX.Element {
   const { state, setOperationMode, setIsPreview, nextStep, previousStep } =
     useWizardState();
   const [mode, setMode] = useState<OperationMode>(state.operationMode || "create");
-  const [isPreview, setIsPreviewLocal] = useState(state.isPreview || false);
+  const [isPreview, setIsPreviewLocal] = useState(state.isPreview ?? true);
   const executionTone = getExecutionTone(isPreview);
   const executionOptions = [
     {

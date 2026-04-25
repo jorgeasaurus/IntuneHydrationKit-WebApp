@@ -14,6 +14,7 @@ import {
   EnrollmentProfile,
 } from "@/lib/graph/enrollment";
 import { getCachedTemplates } from "@/lib/templates/loader";
+import { hasODataUnsafeChars } from "../utils";
 
 function findEnrollmentTemplate(itemName: string): EnrollmentProfile | undefined {
   const cached = getCachedTemplates("enrollment");
@@ -40,6 +41,29 @@ export async function executeEnrollmentTask(
   const profileName = getEnrollmentProfileName(template) || task.itemName;
 
   if (mode === "create") {
+    if (profileType === "devicePreparation") {
+      const normalizedProfileName = profileName.toLowerCase().trim();
+      let settingsCatalogPolicies = context.cachedSettingsCatalogPolicies;
+
+      if (
+        (!settingsCatalogPolicies || settingsCatalogPolicies.length === 0) &&
+        hasODataUnsafeChars(profileName)
+      ) {
+        settingsCatalogPolicies = await client.getCollection<{ id: string; name: string; description?: string }>(
+          "/deviceManagement/configurationPolicies?$select=id,name,description"
+        );
+        context.cachedSettingsCatalogPolicies = settingsCatalogPolicies;
+      }
+
+      const existingProfile = settingsCatalogPolicies?.find(
+        (policy) => policy.name?.toLowerCase().trim() === normalizedProfileName
+      );
+
+      if (existingProfile) {
+        return { task, success: true, skipped: true, error: "Already exists" };
+      }
+    }
+
     if (await enrollmentProfileExists(client, template)) {
       return { task, success: true, skipped: true, error: "Already exists" };
     }
@@ -47,6 +71,15 @@ export async function executeEnrollmentTask(
       return { task, success: true, skipped: false };
     }
     const created = await createEnrollmentProfile(client, template);
+
+    if (profileType === "devicePreparation" && context.cachedSettingsCatalogPolicies && created.id) {
+      context.cachedSettingsCatalogPolicies.push({
+        id: created.id,
+        name: profileName,
+        description: "",
+      });
+    }
+
     return { task, success: true, skipped: false, createdId: created.id };
   }
 

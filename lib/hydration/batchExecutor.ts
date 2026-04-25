@@ -1206,7 +1206,15 @@ type DeletePrepareResult =
 /**
  * Endpoint type for baseline policies (determines delete URL)
  */
-type BaselineEndpointType = "settingsCatalog" | "v2Compliance" | "v1Compliance" | "deviceConfiguration" | "driverUpdate";
+type BaselineEndpointType =
+  | "settingsCatalog"
+  | "v2Compliance"
+  | "v1Compliance"
+  | "deviceConfiguration"
+  | "groupPolicyConfiguration"
+  | "driverUpdate"
+  | "appProtection_ios"
+  | "appProtection_android";
 
 /**
  * Normalize a name for comparison by:
@@ -1466,6 +1474,26 @@ function findResourceIdForDelete(
         return { id: deviceConfig.id, hasMarker, endpointType: "deviceConfiguration" };
       }
 
+      let groupPolicyConfiguration = context.cachedGroupPolicyConfigurations?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
+      );
+
+      if (!groupPolicyConfiguration) {
+        groupPolicyConfiguration = context.cachedGroupPolicyConfigurations?.find(
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
+        );
+      }
+
+      if (groupPolicyConfiguration?.id) {
+        const hasMarker = hasHydrationMarker(groupPolicyConfiguration.description);
+        console.log(`[BatchExecutor:DELETE] Found Group Policy Configuration "${groupPolicyConfiguration.displayName}" (ID: ${groupPolicyConfiguration.id}), hasMarker: ${hasMarker}`);
+        return { id: groupPolicyConfiguration.id, hasMarker, endpointType: "groupPolicyConfiguration" };
+      }
+
       // If not found in Device Configurations, check Driver Update Profiles
       let driverProfile = context.cachedDriverUpdateProfiles?.find(
         (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
@@ -1488,7 +1516,20 @@ function findResourceIdForDelete(
         return { id: driverProfile.id, hasMarker, endpointType: "driverUpdate" };
       }
 
-      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), or Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0})`);
+      const appProtectionPolicy = context.cachedAppProtectionPolicies?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
+      );
+
+      if (appProtectionPolicy?.id) {
+        const endpointType = appProtectionPolicy._platform === "iOS"
+          ? "appProtection_ios"
+          : "appProtection_android";
+        const hasMarker = hasHydrationMarker(appProtectionPolicy.description);
+        console.log(`[BatchExecutor:DELETE] Found App Protection policy "${appProtectionPolicy.displayName}" (ID: ${appProtectionPolicy.id}), hasMarker: ${hasMarker}`);
+        return { id: appProtectionPolicy.id, hasMarker, endpointType };
+      }
+
+      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), Group Policy Configurations (${context.cachedGroupPolicyConfigurations?.length || 0}), Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0}), or App Protection (${context.cachedAppProtectionPolicies?.length || 0})`);
       return null;
     }
 
@@ -1524,10 +1565,18 @@ function findResourceIdForDelete(
       const searchNameWithShortMarker = `${nameToFind} ${markerShort}`.toLowerCase();
       const searchNameWithFullMarker = `${nameToFind} ${markerFull}`.toLowerCase();
 
-      const ca = context.cachedConditionalAccessPolicies?.find(
-        (c) => c.displayName?.toLowerCase() === searchNameWithShortMarker ||
-               c.displayName?.toLowerCase() === searchNameWithFullMarker
-      );
+      const ca = context.cachedConditionalAccessPolicies?.find((c) => {
+        const policyName = c.displayName?.toLowerCase();
+        if (!policyName || !hasHydrationMarker(c.displayName)) {
+          return false;
+        }
+
+        return (
+          policyName === nameToFind ||
+          policyName === searchNameWithShortMarker ||
+          policyName === searchNameWithFullMarker
+        );
+      });
       if (ca?.id) {
         // Policy found with marker in displayName - it was created by this tool
         return { id: ca.id, hasMarker: true };
@@ -1573,8 +1622,13 @@ function getAssignmentEndpoint(
           return `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
         case "deviceConfiguration":
           return `/deviceManagement/deviceConfigurations/${resourceId}/assignments`;
+        case "groupPolicyConfiguration":
+          return `/deviceManagement/groupPolicyConfigurations/${resourceId}/assignments`;
         case "driverUpdate":
           return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}/assignments`;
+        case "appProtection_ios":
+        case "appProtection_android":
+          return null;
         default:
           return `/deviceManagement/configurationPolicies/${resourceId}/assignments`;
       }
@@ -1647,6 +1701,9 @@ function getDeleteEndpoint(category: string, resourceId: string, endpointType?: 
       }
       if (endpointType === "deviceConfiguration") {
         return `/deviceManagement/deviceConfigurations/${resourceId}`;
+      }
+      if (endpointType === "groupPolicyConfiguration") {
+        return `/deviceManagement/groupPolicyConfigurations/${resourceId}`;
       }
       if (endpointType === "driverUpdate") {
         return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}`;
@@ -2053,6 +2110,24 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
         );
         if (index !== -1) {
           context.cachedDriverUpdateProfiles.splice(index, 1);
+          break;
+        }
+      }
+      if (context.cachedGroupPolicyConfigurations) {
+        const index = context.cachedGroupPolicyConfigurations.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedGroupPolicyConfigurations.splice(index, 1);
+          break;
+        }
+      }
+      if (context.cachedAppProtectionPolicies) {
+        const index = context.cachedAppProtectionPolicies.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedAppProtectionPolicies.splice(index, 1);
         }
       }
       break;
@@ -2072,7 +2147,8 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
       if (context.cachedConditionalAccessPolicies) {
         const index = context.cachedConditionalAccessPolicies.findIndex(
           (c) => c.displayName?.toLowerCase() === nameToRemove ||
-                 c.displayName?.toLowerCase() === `${nameToRemove} [intune hydration kit]`
+                 c.displayName?.toLowerCase() === `${nameToRemove} [intune hydration kit]` ||
+                 c.displayName?.toLowerCase() === `${nameToRemove} [imported by intune hydration kit]`
         );
         if (index !== -1) {
           context.cachedConditionalAccessPolicies.splice(index, 1);
@@ -2378,8 +2454,14 @@ function buildDeleteUrl(
           return `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
         case "deviceConfiguration":
           return `/deviceManagement/deviceConfigurations/${resourceInfo.id}`;
+        case "groupPolicyConfiguration":
+          return `/deviceManagement/groupPolicyConfigurations/${resourceInfo.id}`;
         case "driverUpdate":
           return `/deviceManagement/windowsDriverUpdateProfiles/${resourceInfo.id}`;
+        case "appProtection_ios":
+          return `/deviceAppManagement/iosManagedAppProtections/${resourceInfo.id}`;
+        case "appProtection_android":
+          return `/deviceAppManagement/androidManagedAppProtections/${resourceInfo.id}`;
         default:
           // Default to Settings Catalog
           return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;
