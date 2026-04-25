@@ -13,7 +13,6 @@ function normalizeTheme(theme: unknown): AppSettings["theme"] {
     theme === "light" ||
     theme === "dark" ||
     theme === "system" ||
-    theme === "blueprint" ||
     theme === "corporate-1999"
   ) {
     return theme;

@@ -10,9 +10,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
   const toasterTheme =
     theme === "corporate-1999"
       ? "light"
-      : theme === "blueprint"
-        ? "dark"
-        : theme;
+      : theme;
 
   return (
     <Sonner

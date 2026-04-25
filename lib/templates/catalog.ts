@@ -129,7 +129,7 @@ const PLATFORM_ORDER = [
 const OIB_PLATFORM_LABELS: Record<string, string> = {
   WINDOWS: "Windows",
   MACOS: "macOS",
-  BYOD: "iOS/iPadOS",
+  BYOD: "BYOD (Bring Your Own Device)",
   WINDOWS365: "Windows",
 };
 
@@ -280,6 +280,10 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     fetchCISBaselineManifest(),
   ]);
 
+  const oibPlatformLabels = Object.fromEntries(
+    (oibManifest?.platforms ?? []).map((platform) => [platform.id, platform.name])
+  );
+
   const groupItems: TemplateDocumentationItem[] = [
     ...dynamicGroups.map((group) => ({
       id: createItemId("groups", group.displayName),
@@ -415,7 +419,10 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     displayName: file.displayName,
     description: `${file.policyType} template from the bundled OpenIntuneBaseline catalog.`,
     subcategory: file.platform,
-    platform: OIB_PLATFORM_LABELS[file.platform] ?? pickPlatform(file.platform, file.displayName),
+    platform:
+      oibPlatformLabels[file.platform] ??
+      OIB_PLATFORM_LABELS[file.platform] ??
+      pickPlatform(file.platform, file.displayName),
     itemType: file.policyType,
     sourcePath: file.path,
     payloadSource: oibPayloadSource(file),

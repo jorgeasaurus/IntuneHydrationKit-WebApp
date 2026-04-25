@@ -1,7 +1,6 @@
 "use client";
 
 import { ReactNode, useState } from "react";
-import Link from "next/link";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -35,7 +34,6 @@ import {
   Lock,
   Activity,
   Box,
-  Boxes,
   Layers,
   ChevronRight,
 } from "lucide-react";
@@ -233,17 +231,6 @@ export default function Home() {
                       Launch Wizard
                     </Button>
                   )}
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    className="h-12 px-8 text-base font-semibold border-2"
-                    asChild
-                  >
-                    <Link href="/templates">
-                      <Boxes className="mr-2 h-5 w-5" />
-                      Browse Templates
-                    </Link>
-                  </Button>
                   <Button
                     variant="outline"
                     size="lg"

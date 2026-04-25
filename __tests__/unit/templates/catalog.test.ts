@@ -65,13 +65,33 @@ vi.mock('@/lib/templates/loader', () => ({
     },
   ]),
   fetchOIBManifest: vi.fn().mockResolvedValue({
-    totalFiles: 1,
+    totalFiles: 2,
+    platforms: [
+      {
+        id: 'WINDOWS',
+        name: 'Windows',
+        count: 1,
+        policyTypes: [],
+      },
+      {
+        id: 'BYOD',
+        name: 'BYOD (Bring Your Own Device)',
+        count: 1,
+        policyTypes: [],
+      },
+    ],
     files: [
       {
         path: 'Windows/SettingsCatalog/Baseline.json',
         platform: 'WINDOWS',
         policyType: 'Settings Catalog',
         displayName: 'Baseline - Windows Hardening',
+      },
+      {
+        path: 'BYOD/AppProtection/Android - Baseline - BYOD - App Protection.json',
+        platform: 'BYOD',
+        policyType: 'AppProtection',
+        displayName: 'Android - Baseline - BYOD - App Protection',
       },
     ],
   }),
@@ -112,15 +132,23 @@ describe('template catalog', () => {
   it('builds a catalog from loader-backed sources and manifests', async () => {
     const catalog = await loadTemplateDocumentationCatalog()
 
-    expect(catalog.totalCount).toBe(10)
+    expect(catalog.totalCount).toBe(11)
     expect(catalog.categories.find((category) => category.id === 'groups')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'notification')?.count).toBe(1)
-    expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(1)
+    expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'cisBaseline')?.count).toBe(1)
 
-    const baselineItem = catalog.items.find((item) => item.category === 'baseline')
+    const baselineItem = catalog.items.find(
+      (item) => item.sourcePath === 'Windows/SettingsCatalog/Baseline.json'
+    )
     expect(baselineItem?.sourcePath).toBe('Windows/SettingsCatalog/Baseline.json')
     expect(baselineItem?.platform).toBe('Windows')
+
+    const byodItem = catalog.items.find(
+      (item) =>
+        item.sourcePath === 'BYOD/AppProtection/Android - Baseline - BYOD - App Protection.json'
+    )
+    expect(byodItem?.platform).toBe('BYOD (Bring Your Own Device)')
 
     const cisItem = catalog.items.find((item) => item.category === 'cisBaseline')
     expect(cisItem?.subcategory).toBe('Windows 11 - Intune Benchmarks')

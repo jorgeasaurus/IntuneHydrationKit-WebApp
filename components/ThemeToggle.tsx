@@ -2,14 +2,14 @@
 
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
-import { Moon, Ruler, Sun, TableProperties } from "lucide-react";
+import { Moon, Sun, TableProperties } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/hooks/useSettings";
 import { AppSettings } from "@/types/hydration";
 
 type SelectableTheme = Exclude<AppSettings["theme"], "system">;
 
-const THEME_CYCLE: readonly SelectableTheme[] = ["light", "dark", "blueprint", "corporate-1999"];
+const THEME_CYCLE: readonly SelectableTheme[] = ["light", "dark", "corporate-1999"];
 const LIGHT_DARK_THEME_CYCLE: readonly SelectableTheme[] = ["light", "dark"];
 
 interface ThemeToggleProps {
@@ -24,7 +24,6 @@ function getActiveTheme(
   if (
     (theme === "light" ||
       theme === "dark" ||
-      theme === "blueprint" ||
       theme === "corporate-1999") &&
     themes.includes(theme)
   ) {
@@ -53,8 +52,6 @@ function getThemeActionIcon(nextTheme: SelectableTheme): React.JSX.Element {
       return <Sun className="h-4 w-4" />;
     case "dark":
       return <Moon className="h-4 w-4" />;
-    case "blueprint":
-      return <Ruler className="h-4 w-4" />;
     case "corporate-1999":
       return <TableProperties className="h-4 w-4" />;
   }

@@ -100,9 +100,11 @@ export function TenantConfig(): React.JSX.Element {
   const { accounts } = useMsal();
   const [isLoading, setIsLoading] = useState(false);
   const [prerequisiteStatus, setPrerequisiteStatus] =
-    useState<PrerequisiteCheckStatus>("pending");
+    useState<PrerequisiteCheckStatus>(
+      state.prerequisiteResult ? getStatusFromResult(state.prerequisiteResult) : "pending"
+    );
   const [prerequisiteResult, setPrerequisiteResult] =
-    useState<PrerequisiteCheckResult | null>(null);
+    useState<PrerequisiteCheckResult | null>(state.prerequisiteResult ?? null);
 
   const tenantId = accounts.length > 0 ? accounts[0].tenantId : "";
   const tenantName = prerequisiteResult?.organization?.displayName || "";
@@ -121,9 +123,11 @@ export function TenantConfig(): React.JSX.Element {
       setWizardPrerequisiteResult(result);
       setPrerequisiteStatus(getStatusFromResult(result));
     } catch (error) {
+      const errorResult = createErrorResult(error);
       console.error("Failed to validate prerequisites:", error);
       setPrerequisiteStatus("error");
-      setPrerequisiteResult(createErrorResult(error));
+      setPrerequisiteResult(errorResult);
+      setWizardPrerequisiteResult(errorResult);
     } finally {
       if (showLoadingState) {
         setIsLoading(false);
@@ -132,11 +136,20 @@ export function TenantConfig(): React.JSX.Element {
   }
 
   useEffect(() => {
-    if (accounts.length > 0 && !state.tenantConfig) {
+    if (accounts.length > 0 && !state.prerequisiteResult) {
       void runPrerequisiteValidation(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts, state.tenantConfig]);
+  }, [accounts, state.prerequisiteResult]);
+
+  useEffect(() => {
+    if (!state.prerequisiteResult) {
+      return;
+    }
+
+    setPrerequisiteResult(state.prerequisiteResult);
+    setPrerequisiteStatus(getStatusFromResult(state.prerequisiteResult));
+  }, [state.prerequisiteResult]);
 
   async function handleRecheck(): Promise<void> {
     if (accounts.length === 0) return;

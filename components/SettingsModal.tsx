@@ -99,7 +99,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               <SelectContent>
                 <SelectItem value="light">Light</SelectItem>
                 <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="blueprint">Blueprint</SelectItem>
                 <SelectItem value="corporate-1999">Corporate Intranet 1999</SelectItem>
                 <SelectItem value="system">System</SelectItem>
               </SelectContent>

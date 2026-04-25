@@ -54,7 +54,7 @@ const CIS_CATEGORIES = Object.entries(CIS_CATEGORY_METADATA).map(([id, meta]) =>
 const PLATFORM_NAMES: Record<OIBPlatformId, string> = {
   WINDOWS: "Windows",
   MACOS: "macOS",
-  BYOD: "BYOD (App Protection)",
+  BYOD: "BYOD (Bring Your Own Device)",
   WINDOWS365: "Windows 365 Cloud PC",
 };
 
@@ -1441,7 +1441,9 @@ export function TargetSelection() {
                                   onClick={() => togglePlatformExpanded(platformId)}
                                 >
                                   <div>
-                                    <Label className="font-medium cursor-pointer">{PLATFORM_NAMES[platformId] || platform.name}</Label>
+                                    <Label className="font-medium cursor-pointer">
+                                      {platform.name || PLATFORM_NAMES[platformId]}
+                                    </Label>
                                     <p className="text-xs text-muted-foreground">
                                       {displaySelected} of {displayCount} policies{normalizedSearch ? " matching" : " selected"}
                                     </p>
