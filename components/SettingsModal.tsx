@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -31,6 +31,12 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { settings, updateSettings, resetSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState(settings);
+
+  useEffect(() => {
+    if (open) {
+      setLocalSettings(settings);
+    }
+  }, [open, settings]);
 
   const handleSave = () => {
     updateSettings(localSettings);
