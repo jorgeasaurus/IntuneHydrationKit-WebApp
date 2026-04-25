@@ -56,6 +56,24 @@ test.describe("Landing Page", () => {
       /github\.com\/jorgeasaurus\/IntuneHydrationKit/
     );
   });
+
+  test("template page nav links return to landing sections", async ({ page }) => {
+    await page.goto("/templates");
+
+    await page.getByRole("link", { name: "Features" }).click();
+    await page.waitForURL(/\/#features$/);
+    await expect(page.getByText(/core features/i)).toBeVisible();
+
+    await page.goto("/templates");
+    await page.getByRole("link", { name: "Configurations" }).click();
+    await page.waitForURL(/\/#what-gets-deployed$/);
+    await expect(page.getByText(/available configurations/i)).toBeVisible();
+
+    await page.goto("/templates");
+    await page.getByRole("link", { name: "FAQs" }).click();
+    await page.waitForURL(/\/#faq$/);
+    await expect(page.getByRole("heading", { name: /frequently asked questions/i })).toBeVisible();
+  });
 });
 
 test.describe("Protected Routes", () => {

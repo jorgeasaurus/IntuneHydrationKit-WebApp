@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -16,9 +16,12 @@ import { Terminal, Github } from "lucide-react";
 
 export function Navigation() {
   const isAuthenticated = useIsAuthenticated();
+  const pathname = usePathname();
   const router = useRouter();
   const { resetWizard } = useWizardState();
   const [showCloudSelector, setShowCloudSelector] = useState(false);
+
+  const getSectionHref = (hash: string) => (pathname === "/" ? hash : `/${hash}`);
 
   const handleSignInClick = () => {
     setShowCloudSelector(true);
@@ -83,14 +86,17 @@ export function Navigation() {
 
               {/* Navigation Links */}
               <div className="hidden md:flex items-center gap-8">
-                <Link href="#features" className="nav-link text-sm font-medium">
+                <Link href={getSectionHref("#features")} className="nav-link text-sm font-medium">
                   Features
                 </Link>
-                <Link href="#what-gets-deployed" className="nav-link text-sm font-medium">
+                <Link href={getSectionHref("#what-gets-deployed")} className="nav-link text-sm font-medium">
                   Configurations
                 </Link>
-                <Link href="#faq" className="nav-link text-sm font-medium">
+                <Link href={getSectionHref("#faq")} className="nav-link text-sm font-medium">
                   FAQs
+                </Link>
+                <Link href="/templates" className="nav-link text-sm font-medium">
+                  Template Docs
                 </Link>
               </div>
 

@@ -8,8 +8,9 @@ A web-based version of the [IntuneHydrationKit PowerShell module](https://github
 
 - **Streamlined 4-Step Wizard**: Guided configuration process from tenant setup to execution
 - **MSAL Authentication**: Secure authentication with Microsoft Entra ID
-- **Multi-Cloud Support**: Compatible with Global, USGov, Germany, and China clouds
+- **Cloud Support**: The web app currently supports Global (Commercial); use the PowerShell module for US Government, Germany, and China tenants
 - **Local Templates**: 183+ pre-built templates bundled with the app (no external dependencies)
+- **Template Catalog**: Browse every importable item and inspect the import-ready JSON payloads at `/templates`
 - **Safety First**: Built-in safeguards prevent accidental deletions
 - **Real-time Progress**: Live updates during policy deployment with pause/resume/cancel controls
 - **Comprehensive Coverage**: Deploy 47 groups, 24 filters, 10 compliance policies, 10 app protection policies, 21 conditional access policies, and more
@@ -223,7 +224,7 @@ The application guides you through a streamlined 4-step process:
 
 ### Step 1: Tenant Configuration
 - Enter your Tenant ID and optional display name
-- Select your cloud environment (Global, USGov, USGovDoD, Germany, China)
+- Use the Global (Commercial) cloud environment in the web app
 - Authenticate with Microsoft Entra ID
 
 ### Step 2: Operation Mode
@@ -250,9 +251,12 @@ Select which policy categories to deploy:
 
 ### Cloud Environments
 
-The application supports multiple Microsoft cloud environments:
+The web app currently supports the following Microsoft cloud environment:
 
 - **global** - Commercial cloud (default)
+
+For sovereign and government clouds, use the IntuneHydrationKit PowerShell module:
+
 - **usgov** - US Government (GCC High)
 - **usgovdod** - US Government (DoD)
 - **germany** - Germany cloud

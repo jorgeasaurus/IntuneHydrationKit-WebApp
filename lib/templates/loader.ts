@@ -408,12 +408,14 @@ export interface OIBManifest {
       count: number;
     }>;
   }>;
-  files: Array<{
-    path: string;
-    platform: string;
-    policyType: string;
-    displayName: string;
-  }>;
+  files: OIBManifestFile[];
+}
+
+export interface OIBManifestFile {
+  path: string;
+  platform: string;
+  policyType: string;
+  displayName: string;
 }
 
 export interface BaselinePolicy {
@@ -484,6 +486,30 @@ async function fetchOIBFile(filePath: string): Promise<unknown | null> {
   }
 }
 
+function transformOIBPolicy(
+  policyObj: Record<string, unknown>,
+  file: OIBManifestFile
+): BaselinePolicy {
+  const displayName =
+    (policyObj.name as string) ||
+    (policyObj.displayName as string) ||
+    file.displayName;
+
+  const prefixedName = addImportPrefix(displayName);
+
+  return {
+    ...policyObj,
+    ...(policyObj.name ? { name: addImportPrefix(policyObj.name as string) } : {}),
+    displayName: prefixedName,
+    _oibPlatform: file.platform,
+    _oibPolicyType: file.policyType,
+    _oibFilePath: file.path,
+    description: policyObj.description
+      ? `${policyObj.description} ${HYDRATION_MARKER}`
+      : HYDRATION_MARKER,
+  };
+}
+
 /**
  * Fetch the OpenIntuneBaseline manifest
  */
@@ -517,27 +543,9 @@ export async function fetchBaselinePolicies(): Promise<BaselinePolicy[]> {
     console.log(`[OIB Loader] Loading ${manifest.totalFiles} baseline policies...`);
 
     for (const file of manifest.files) {
-      const policy = await fetchOIBFile(file.path);
-      if (policy && typeof policy === "object") {
-        const policyObj = policy as Record<string, unknown>;
-
-        // Get display name from 'name' field (Settings Catalog uses 'name' not 'displayName')
-        const displayName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
-
-        const prefixedName = addImportPrefix(displayName);
-
-        allPolicies.push({
-          ...policyObj,
-          // Add [IHD] prefix to name fields (matches CIS baseline behavior)
-          ...(policyObj.name ? { name: addImportPrefix(policyObj.name as string) } : {}),
-          displayName: prefixedName,
-          _oibPlatform: file.platform,
-          _oibPolicyType: file.policyType,
-          _oibFilePath: file.path,
-          description: policyObj.description
-            ? `${policyObj.description} ${HYDRATION_MARKER}`
-            : HYDRATION_MARKER,
-        });
+      const policy = await fetchBaselinePolicyByManifestFile(file);
+      if (policy) {
+        allPolicies.push(policy);
       }
     }
 
@@ -547,6 +555,17 @@ export async function fetchBaselinePolicies(): Promise<BaselinePolicy[]> {
   }
 
   return allPolicies;
+}
+
+export async function fetchBaselinePolicyByManifestFile(
+  file: OIBManifestFile
+): Promise<BaselinePolicy | null> {
+  const policy = await fetchOIBFile(file.path);
+  if (!policy || typeof policy !== "object") {
+    return null;
+  }
+
+  return transformOIBPolicy(policy as Record<string, unknown>, file);
 }
 
 /**
@@ -655,12 +674,14 @@ export interface CISBaselineManifest {
   generatedAt: string;
   totalFiles: number;
   categories: CISBaselineManifestCategory[];
-  files: Array<{
-    path: string;
-    category: string;
-    subcategory: string;
-    displayName: string;
-  }>;
+  files: CISBaselineManifestFile[];
+}
+
+export interface CISBaselineManifestFile {
+  path: string;
+  category: string;
+  subcategory: string;
+  displayName: string;
 }
 
 /**
@@ -684,31 +705,51 @@ export async function fetchCISBaselineManifest(): Promise<CISBaselineManifest | 
  * Build CISBaselinePolicy objects from manifest file entries by fetching and transforming each policy
  */
 async function loadCISPoliciesFromFiles(
-  files: CISBaselineManifest["files"]
+  files: CISBaselineManifestFile[]
 ): Promise<CISBaselinePolicy[]> {
   const policies: CISBaselinePolicy[] = [];
 
   for (const file of files) {
-    const policy = await fetchCISBaselineFile(file.path);
-    if (policy && typeof policy === "object") {
-      const policyObj = policy as Record<string, unknown>;
-      // Prefer actual policy name from JSON over manifest displayName (which may be derived from filename)
-      const resolvedName = (policyObj.name as string) || (policyObj.displayName as string) || file.displayName;
-      policies.push({
-        ...policyObj,
-        displayName: `${IMPORT_PREFIX}${resolvedName}`,
-        name: `${IMPORT_PREFIX}${resolvedName}`,
-        _cisCategory: file.category,
-        _cisSubcategory: file.subcategory,
-        _cisFilePath: file.path,
-        description: policyObj.description
-          ? `${policyObj.description} ${HYDRATION_MARKER}`
-          : HYDRATION_MARKER,
-      });
+    const policy = await fetchCISBaselinePolicyByManifestFile(file);
+    if (policy) {
+      policies.push(policy);
     }
   }
 
   return policies;
+}
+
+function transformCISPolicy(
+  policyObj: Record<string, unknown>,
+  file: CISBaselineManifestFile
+): CISBaselinePolicy {
+  const resolvedName =
+    (policyObj.name as string) ||
+    (policyObj.displayName as string) ||
+    file.displayName;
+
+  return {
+    ...policyObj,
+    displayName: `${IMPORT_PREFIX}${resolvedName}`,
+    name: `${IMPORT_PREFIX}${resolvedName}`,
+    _cisCategory: file.category,
+    _cisSubcategory: file.subcategory,
+    _cisFilePath: file.path,
+    description: policyObj.description
+      ? `${policyObj.description} ${HYDRATION_MARKER}`
+      : HYDRATION_MARKER,
+  };
+}
+
+export async function fetchCISBaselinePolicyByManifestFile(
+  file: CISBaselineManifestFile
+): Promise<CISBaselinePolicy | null> {
+  const policy = await fetchCISBaselineFile(file.path);
+  if (!policy || typeof policy !== "object") {
+    return null;
+  }
+
+  return transformCISPolicy(policy as Record<string, unknown>, file);
 }
 
 /**

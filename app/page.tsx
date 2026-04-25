@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -34,6 +35,7 @@ import {
   Lock,
   Activity,
   Box,
+  Boxes,
   Layers,
   ChevronRight,
 } from "lucide-react";
@@ -154,6 +156,17 @@ export default function Home() {
                     className="h-12 px-8 text-base font-semibold border-2"
                     asChild
                   >
+                    <Link href="/templates">
+                      <Boxes className="mr-2 h-5 w-5" />
+                      Browse Templates
+                    </Link>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="h-12 px-8 text-base font-semibold border-2"
+                    asChild
+                  >
                     <a
                       href="https://github.com/jorgeasaurus/IntuneHydrationKit"
                       target="_blank"
@@ -212,9 +225,9 @@ export default function Home() {
                   },
                   {
                     icon: Cloud,
-                    title: "Multi-Cloud Support",
+                    title: "Cloud Environment Support",
                     description:
-                      "Works with Global, US Government (GCC High & DoD), Germany, and China (21Vianet) clouds.",
+                      "The web app currently supports Global (Commercial). For GCC High, DoD, Germany, and China (21Vianet), use the IntuneHydrationKit PowerShell module.",
                     status: "ACTIVE",
                   },
                   {
@@ -638,7 +651,7 @@ export default function Home() {
                   },
                   {
                     q: "Does this work with government cloud environments?",
-                    a: "Yes. The tool supports multiple cloud environments including Global (Commercial), US Government (GCC High), US Government DoD, Germany, and China (21Vianet).",
+                    a: "Not in the web app yet. The current web app supports Global (Commercial) only. For GCC High, DoD, Germany, and China (21Vianet), use the IntuneHydrationKit PowerShell module.",
                   },
                   {
                     q: "What happens if an object already exists?",
