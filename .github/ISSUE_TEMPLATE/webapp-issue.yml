@@ -1,0 +1,160 @@
+name: Web app issue
+description: Report a bug, UX problem, or improvement request for the Intune Hydration Kit web app
+title: "[Issue]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for opening an issue.
+
+        Please include enough detail for us to reproduce the problem or understand the requested change. Redact any tenant IDs, tokens, policy payloads, or other sensitive information before submitting.
+
+  - type: checkboxes
+    id: preflight
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues first.
+          required: true
+        - label: I removed or redacted sensitive information from screenshots, logs, and text.
+          required: true
+        - label: I can reproduce this issue consistently, or I clearly explained why I cannot.
+          required: true
+
+  - type: dropdown
+    id: issue_type
+    attributes:
+      label: Issue type
+      description: Pick the option that best matches this submission.
+      options:
+        - Bug or regression
+        - UI or UX issue
+        - Template or content issue
+        - Feature request
+        - Documentation improvement
+    validations:
+      required: true
+
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected area
+      description: Where did you hit the issue?
+      options:
+        - Landing page
+        - Sign-in or tenant connection
+        - Wizard - tenant configuration
+        - Wizard - target selection
+        - Wizard - review and confirmation
+        - Validation or readiness checks
+        - Execution dashboard
+        - Results or reports
+        - Template catalog or template loading
+        - Settings
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operation_mode
+    attributes:
+      label: Operation mode
+      description: Which mode were you using when the issue happened?
+      options:
+        - Preview
+        - Create
+        - Delete
+        - Not applicable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Edge
+        - Firefox
+        - Safari
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: browser_version
+    attributes:
+      label: Browser version
+      description: "Example: Chrome 135, Safari 18.4"
+      placeholder: Browser and version
+
+  - type: input
+    id: app_version
+    attributes:
+      label: App version or commit
+      description: If known, share the deployed version, branch, or commit SHA.
+      placeholder: v2.2.0, main, feature/ui-console-refresh, abc1234
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: One short paragraph describing the issue or request.
+      placeholder: The results page groups are hard to scan because...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce or context
+      description: For bugs, list the exact steps. For requests, describe the current workflow and pain point.
+      placeholder: |
+        1. Sign in to the web app
+        2. Open the wizard
+        3. Select Preview mode
+        4. Start execution
+        5. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: I expected the app to...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      placeholder: Instead, the app...
+    validations:
+      required: true
+
+  - type: textarea
+    id: tenant_context
+    attributes:
+      label: Tenant and environment context
+      description: Share only non-sensitive context that helps triage.
+      placeholder: |
+        - Cloud: Global
+        - Tenant type: Dev tenant
+        - Signed in role: Intune Administrator
+        - Selected targets: Groups, Filters, Compliance
+
+  - type: textarea
+    id: errors
+    attributes:
+      label: Redacted errors, logs, or console output
+      description: Paste any relevant messages after removing secrets and sensitive identifiers.
+      render: shell
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or recordings
+      description: Add links or describe what the screenshots show.
+      placeholder: Screenshot link or short description
