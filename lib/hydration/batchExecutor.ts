@@ -19,7 +19,7 @@ import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
-import { sleep, hasODataUnsafeChars } from "./utils";
+import { sleep, sleepWithExecutionControl, waitWhilePaused, hasODataUnsafeChars } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   settingsCatalogPolicyExists,
@@ -37,6 +37,22 @@ import {
 } from "@/lib/templates/loader";
 import * as Templates from "@/templates";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
+
+function markPreparedTasksCancelled(
+  items: Array<{ task: HydrationTask }>,
+  results: ExecutionResult[],
+  context: ExecutionContext
+): void {
+  const cancelledAt = new Date();
+
+  for (const { task } of items) {
+    task.status = "skipped";
+    task.error = "Cancelled";
+    task.endTime = cancelledAt;
+    results.push({ task, success: false, skipped: true, error: "Cancelled" });
+    context.onTaskComplete?.(task);
+  }
+}
 
 /**
  * Helper to emit status updates to UI
@@ -855,21 +871,16 @@ async function executeBatchGroup(
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[BatchExecutor] Execution cancelled`);
-      // Cancel current chunk and all remaining tasks
-      const allCancelled = [...chunk, ...remainingTasks.map(t => t)];
-      for (const { task } of allCancelled) {
-        task.status = "skipped";
-        task.error = "Cancelled";
-        task.endTime = new Date();
-        results.push({ task, success: false, skipped: true, error: "Cancelled" });
-        context.onTaskComplete?.(task);
-      }
+      markPreparedTasksCancelled([...chunk, ...remainingTasks], results, context);
       break;
     }
 
     // Check for pause
-    while (context.shouldPause?.()) {
-      await sleep(500);
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log(`[BatchExecutor] Execution cancelled while paused`);
+      markPreparedTasksCancelled([...chunk, ...remainingTasks], results, context);
+      break;
     }
 
     // Report batch progress to UI
@@ -1000,7 +1011,13 @@ async function executeBatchGroup(
           const delay = Math.max(retryAfterMs, backoff);
           console.log(`[BatchExecutor] ${pendingRetry.length} responses need retry (attempt ${retryCount}/${maxRetries}), waiting ${delay}ms`);
           emitStatus(context, `Retrying ${pendingRetry.length} throttled requests (attempt ${retryCount}/${maxRetries})...`, "warning");
-          await sleep(delay);
+          const waitResult = await sleepWithExecutionControl(delay, context);
+          if (waitResult === "cancelled") {
+            console.log(`[BatchExecutor] Execution cancelled during retry backoff`);
+            markPreparedTasksCancelled([...pendingRetry, ...remainingTasks], results, context);
+            currentItems = [];
+            break;
+          }
           currentItems = pendingRetry;
         } else {
           // All items handled, exit the retry loop
@@ -1020,7 +1037,13 @@ async function executeBatchGroup(
         if (retryCount <= maxRetries) {
           const retryDelay = Math.pow(2, retryCount) * 1000;
           console.log(`[BatchExecutor] Retrying entire batch in ${retryDelay}ms...`);
-          await sleep(retryDelay);
+          const waitResult = await sleepWithExecutionControl(retryDelay, context);
+          if (waitResult === "cancelled") {
+            console.log(`[BatchExecutor] Execution cancelled during batch retry delay`);
+            markPreparedTasksCancelled([...currentItems, ...remainingTasks], results, context);
+            currentItems = [];
+            break;
+          }
           // currentItems stays the same -- re-submit all
         } else {
           // Max retries exhausted, mark all remaining as failed
@@ -1034,6 +1057,10 @@ async function executeBatchGroup(
           currentItems = [];
         }
       }
+    }
+
+    if (context.shouldCancel?.()) {
+      break;
     }
 
     // If we exhausted retries but still have items (shouldn't happen, but safety net)
@@ -1084,7 +1111,12 @@ async function executeBatchGroup(
     // Delay between batches (except when no remaining tasks)
     if (remainingTasks.length > 0) {
       console.log(`[BatchExecutor] Waiting ${currentBatchDelay}ms before next batch`);
-      await sleep(currentBatchDelay);
+      const waitResult = await sleepWithExecutionControl(currentBatchDelay, context);
+      if (waitResult === "cancelled") {
+        console.log(`[BatchExecutor] Execution cancelled during inter-batch delay`);
+        markPreparedTasksCancelled(remainingTasks, results, context);
+        break;
+      }
     }
 
     batchIndex++;
@@ -1784,19 +1816,16 @@ async function executeDeleteBatchGroup(
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[BatchExecutor:DELETE] Execution cancelled`);
-      for (const { task } of chunk) {
-        task.status = "skipped";
-        task.error = "Cancelled";  // Set skip reason on task object for UI display
-        task.endTime = new Date();
-        results.push({ task, success: false, skipped: true, error: "Cancelled" });
-        context.onTaskComplete?.(task);
-      }
+      markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
       break;
     }
 
     // Handle pause
-    while (context.shouldPause?.()) {
-      await sleep(500);
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log(`[BatchExecutor:DELETE] Execution cancelled while paused`);
+      markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
+      break;
     }
 
     // Report batch progress to UI
@@ -1908,7 +1937,12 @@ async function executeDeleteBatchGroup(
         if (retryCount < maxRetries) {
           const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff
           console.log(`[BatchExecutor:DELETE] Retrying in ${retryDelay}ms...`);
-          await sleep(retryDelay);
+          const waitResult = await sleepWithExecutionControl(retryDelay, context);
+          if (waitResult === "cancelled") {
+            console.log(`[BatchExecutor:DELETE] Execution cancelled during retry delay`);
+            markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
+            batchSuccess = true;
+          }
         } else {
           // Max retries reached, mark all as failed
           for (const { task } of chunk) {
@@ -1922,10 +1956,19 @@ async function executeDeleteBatchGroup(
       }
     }
 
+    if (context.shouldCancel?.()) {
+      break;
+    }
+
     // Delay between batches
     if (i < chunks.length - 1) {
       console.log(`[BatchExecutor:DELETE] Waiting ${config.delayBetweenBatches}ms before next batch`);
-      await sleep(config.delayBetweenBatches);
+      const waitResult = await sleepWithExecutionControl(config.delayBetweenBatches, context);
+      if (waitResult === "cancelled") {
+        console.log(`[BatchExecutor:DELETE] Execution cancelled during inter-batch delay`);
+        markPreparedTasksCancelled(chunks.slice(i + 1).flat(), results, context);
+        break;
+      }
     }
   }
 
@@ -2155,14 +2198,14 @@ export async function executeDeletesInParallel(
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[FastDelete] Execution cancelled`);
-      for (let j = i; j < toDelete.length; j++) {
-        const { task } = toDelete[j];
-        task.status = "skipped";
-        task.error = "Cancelled";
-        task.endTime = new Date();
-        results.push({ task, success: false, skipped: true, error: "Cancelled" });
-        context.onTaskComplete?.(task);
-      }
+      markPreparedTasksCancelled(toDelete.slice(i), results, context);
+      break;
+    }
+
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log(`[FastDelete] Execution cancelled while paused`);
+      markPreparedTasksCancelled(toDelete.slice(i), results, context);
       break;
     }
 
@@ -2220,7 +2263,14 @@ export async function executeDeletesInParallel(
                 ? (attempt + 1) * 3000  // 3s, 6s, 9s for throttling
                 : (attempt + 1) * 500;  // 500ms, 1000ms, 1500ms for transient
               console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms (${is429Error ? "throttled" : "transient"})`);
-              await sleep(retryDelay);
+              const waitResult = await sleepWithExecutionControl(retryDelay, context);
+              if (waitResult === "cancelled") {
+                task.status = "skipped";
+                task.error = "Cancelled";
+                task.endTime = new Date();
+                context.onTaskComplete?.(task);
+                return { task, success: false, skipped: true, error: "Cancelled" };
+              }
               continue;
             }
 
@@ -2264,7 +2314,12 @@ export async function executeDeletesInParallel(
       if (hadThrottling) {
         console.log(`[FastDelete] Throttling detected — cooling down for ${batchDelay}ms before next batch`);
       }
-      await sleep(batchDelay);
+      const waitResult = await sleepWithExecutionControl(batchDelay, context);
+      if (waitResult === "cancelled") {
+        console.log(`[FastDelete] Execution cancelled during inter-batch delay`);
+        markPreparedTasksCancelled(toDelete.slice(i + parallelRequests), results, context);
+        break;
+      }
     }
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { ReactNode, useState } from "react";
 import Link from "next/link";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
@@ -61,86 +61,94 @@ function MicrosoftLogo() {
   );
 }
 
+type FaqItem = {
+  question: string;
+  answer: ReactNode;
+};
+
+const FAQ_LINK_CLASS_NAME = "text-hydrate hover:underline";
+
+const FAQ_ITEMS: readonly FaqItem[] = [
+  {
+    question: "Is this tool free to use?",
+    answer:
+      "Yes, the Intune Hydration Kit is completely free and open-source. There are no licensing fees, subscriptions, or hidden costs. You only need valid Microsoft licenses for the Intune features you want to deploy.",
+  },
+  {
+    question: "Is this tool safe to use in production?",
+    answer:
+      "Yes. Safety features include: hydration markers on all created objects, assignment checks before deletion (objects with assignments are skipped), Conditional Access policies created disabled, and duplicate detection to prevent overwrites. We recommend testing in a dev/test tenant first.",
+  },
+  {
+    question: "What permissions do I need?",
+    answer:
+      "You need to be a Global Administrator or Intune Administrator with the ability to consent to the required Microsoft Graph API permissions. Admin consent is required during sign-in.",
+  },
+  {
+    question: "What licenses are required?",
+    answer:
+      "At minimum, you need an Intune license (Microsoft 365 E3/E5, Business Premium, or standalone). Risk-based Conditional Access policies require Premium P2. Driver Update profiles require Windows E3/E5.",
+  },
+  {
+    question: "Can I undo or rollback changes?",
+    answer:
+      "Yes. Use the Delete operation mode to remove all objects created by this tool. The delete operation verifies hydration markers, checks for active assignments, and ensures Conditional Access policies are disabled before removal.",
+  },
+  {
+    question: "What is OpenIntuneBaseline?",
+    answer: (
+      <>
+        OpenIntuneBaseline is an open-source community project that provides 70+
+        security and configuration policies for Windows and macOS. These policies
+        follow Microsoft&apos;s security recommendations and industry best practices.{" "}
+        <a
+          href="https://github.com/skiptotheendpoint/OpenIntuneBaseline"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={FAQ_LINK_CLASS_NAME}
+        >
+          Explore OpenIntuneBaseline on GitHub
+        </a>
+        .
+      </>
+    ),
+  },
+  {
+    question: "What are the CIS Baselines in this app?",
+    answer: (
+      <>
+        The CIS Baselines section packages Microsoft Intune-ready templates derived
+        from the CIS benchmark work maintained in the Intune Baselines project. Use
+        it when you want opinionated security settings aligned to CIS guidance.{" "}
+        <a
+          href="https://github.com/jorgeasaurus/IntuneBaselines"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={FAQ_LINK_CLASS_NAME}
+        >
+          View the IntuneBaselines repository
+        </a>
+        .
+      </>
+    ),
+  },
+  {
+    question: "Does this work with government cloud environments?",
+    answer:
+      "Not in the web app yet. The current web app supports Global (Commercial) only. For GCC High, DoD, Germany, and China (21Vianet), use the IntuneHydrationKit PowerShell module.",
+  },
+  {
+    question: "What happens if an object already exists?",
+    answer:
+      "In Create mode, objects are checked against a pre-fetched cache of existing tenant objects. If a match is found by display name (case-insensitive), the object is skipped. This makes deployments idempotent and safe to re-run.",
+  },
+];
+
 export default function Home() {
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
   const { resetWizard } = useWizardState();
   const [showCloudSelector, setShowCloudSelector] = useState(false);
-  const faqItems = [
-    {
-      question: "Is this tool free to use?",
-      answer:
-        "Yes, the Intune Hydration Kit is completely free and open-source. There are no licensing fees, subscriptions, or hidden costs. You only need valid Microsoft licenses for the Intune features you want to deploy.",
-    },
-    {
-      question: "Is this tool safe to use in production?",
-      answer:
-        "Yes. Safety features include: hydration markers on all created objects, assignment checks before deletion (objects with assignments are skipped), Conditional Access policies created disabled, and duplicate detection to prevent overwrites. We recommend testing in a dev/test tenant first.",
-    },
-    {
-      question: "What permissions do I need?",
-      answer:
-        "You need to be a Global Administrator or Intune Administrator with the ability to consent to the required Microsoft Graph API permissions. Admin consent is required during sign-in.",
-    },
-    {
-      question: "What licenses are required?",
-      answer:
-        "At minimum, you need an Intune license (Microsoft 365 E3/E5, Business Premium, or standalone). Risk-based Conditional Access policies require Premium P2. Driver Update profiles require Windows E3/E5.",
-    },
-    {
-      question: "Can I undo or rollback changes?",
-      answer:
-        "Yes. Use the Delete operation mode to remove all objects created by this tool. The delete operation verifies hydration markers, checks for active assignments, and ensures Conditional Access policies are disabled before removal.",
-    },
-    {
-      question: "What is OpenIntuneBaseline?",
-      answer: (
-        <>
-          OpenIntuneBaseline is an open-source community project that provides 70+
-          security and configuration policies for Windows and macOS. These policies
-          follow Microsoft&apos;s security recommendations and industry best practices.{" "}
-          <a
-            href="https://github.com/skiptotheendpoint/OpenIntuneBaseline"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-hydrate hover:underline"
-          >
-            Explore OpenIntuneBaseline on GitHub
-          </a>
-          .
-        </>
-      ),
-    },
-    {
-      question: "What are the CIS Baselines in this app?",
-      answer: (
-        <>
-          The CIS Baselines section packages Microsoft Intune-ready templates derived
-          from the CIS benchmark work maintained in the Intune Baselines project. Use
-          it when you want opinionated security settings aligned to CIS guidance.{" "}
-          <a
-            href="https://github.com/jorgeasaurus/IntuneBaselines"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-hydrate hover:underline"
-          >
-            View the IntuneBaselines repository
-          </a>
-          .
-        </>
-      ),
-    },
-    {
-      question: "Does this work with government cloud environments?",
-      answer:
-        "Not in the web app yet. The current web app supports Global (Commercial) only. For GCC High, DoD, Germany, and China (21Vianet), use the IntuneHydrationKit PowerShell module.",
-    },
-    {
-      question: "What happens if an object already exists?",
-      answer:
-        "In Create mode, objects are checked against a pre-fetched cache of existing tenant objects. If a match is found by display name (case-insensitive), the object is skipped. This makes deployments idempotent and safe to re-run.",
-    },
-  ] as const;
 
   const handleSignInClick = () => {
     setShowCloudSelector(true);
@@ -699,7 +707,7 @@ export default function Home() {
               </div>
 
               <Accordion type="single" collapsible className="w-full space-y-2">
-                {faqItems.map((item, index) => (
+                {FAQ_ITEMS.map((item, index) => (
                   <AccordionItem
                     key={index}
                     value={`item-${index}`}

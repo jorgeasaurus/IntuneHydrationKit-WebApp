@@ -122,10 +122,7 @@ export interface TenantConfig {
 }
 
 export interface AppSettings {
-  defaultCloudEnvironment: CloudEnvironment;
   stopOnFirstError: boolean;
-  enableVerboseLogging: boolean;
-  autoDownloadReports: boolean;
   theme: "light" | "dark" | "system";
 }
 

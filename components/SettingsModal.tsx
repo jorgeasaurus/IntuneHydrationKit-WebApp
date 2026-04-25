@@ -10,7 +10,6 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
@@ -64,62 +63,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         </DialogHeader>
 
         <div className="space-y-6 py-4">
-          {/* Cloud Environment */}
-          <div className="space-y-2">
-            <Label htmlFor="cloudEnvironment">Default Cloud Environment</Label>
-            <Select
-              value={localSettings.defaultCloudEnvironment}
-              onValueChange={(value) =>
-                setLocalSettings({ ...localSettings, defaultCloudEnvironment: value })
-              }
-            >
-              <SelectTrigger id="cloudEnvironment">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Global">Global (Commercial)</SelectItem>
-                <SelectItem value="USGov">US Government (GCC High)</SelectItem>
-                <SelectItem value="USGovDoD">US Government DoD</SelectItem>
-                <SelectItem value="Germany">Germany</SelectItem>
-                <SelectItem value="China">China (21Vianet)</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">
-              The default cloud environment for new tenant connections
-            </p>
-          </div>
-
-          {/* Baseline Repository */}
-          <div className="space-y-2">
-            <Label htmlFor="baselineRepo">Default Baseline Repository</Label>
-            <Input
-              id="baselineRepo"
-              value={localSettings.defaultBaselineRepo}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, defaultBaselineRepo: e.target.value })
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Default GitHub repository URL for OpenIntuneBaseline
-            </p>
-          </div>
-
-          {/* Baseline Branch */}
-          <div className="space-y-2">
-            <Label htmlFor="baselineBranch">Default Baseline Branch</Label>
-            <Input
-              id="baselineBranch"
-              value={localSettings.defaultBaselineBranch}
-              onChange={(e) =>
-                setLocalSettings({ ...localSettings, defaultBaselineBranch: e.target.value })
-              }
-            />
-            <p className="text-sm text-muted-foreground">
-              Default branch to download baseline from
-            </p>
-          </div>
-
-          {/* Execution Settings */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold">Execution Settings</h3>
 
@@ -127,7 +70,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               <div className="space-y-0.5">
                 <Label htmlFor="stopOnError">Stop on First Error</Label>
                 <p className="text-sm text-muted-foreground">
-                  Stop execution when a task fails instead of continuing
+                  Stop execution after the current task fails instead of continuing through the queue
                 </p>
               </div>
               <Switch
@@ -135,38 +78,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 checked={localSettings.stopOnFirstError}
                 onCheckedChange={(checked: boolean) =>
                   setLocalSettings({ ...localSettings, stopOnFirstError: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="verboseLogging">Verbose Logging</Label>
-                <p className="text-sm text-muted-foreground">
-                  Enable detailed logging for debugging
-                </p>
-              </div>
-              <Switch
-                id="verboseLogging"
-                checked={localSettings.enableVerboseLogging}
-                onCheckedChange={(checked: boolean) =>
-                  setLocalSettings({ ...localSettings, enableVerboseLogging: checked })
-                }
-              />
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="autoDownload">Auto-download Reports</Label>
-                <p className="text-sm text-muted-foreground">
-                  Automatically download execution reports when complete
-                </p>
-              </div>
-              <Switch
-                id="autoDownload"
-                checked={localSettings.autoDownloadReports}
-                onCheckedChange={(checked: boolean) =>
-                  setLocalSettings({ ...localSettings, autoDownloadReports: checked })
                 }
               />
             </div>

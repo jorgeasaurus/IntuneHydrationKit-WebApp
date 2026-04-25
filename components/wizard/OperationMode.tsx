@@ -2,13 +2,12 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   AlertTriangle,
   Eye,
+  Radio,
   PlusCircle,
   ShieldAlert,
   Trash2,
@@ -86,6 +85,26 @@ export function OperationModeSelection(): React.JSX.Element {
   const [mode, setMode] = useState<OperationMode>(state.operationMode || "create");
   const [isPreview, setIsPreviewLocal] = useState(state.isPreview || false);
   const executionTone = getExecutionTone(isPreview);
+  const executionOptions = [
+    {
+      id: "preview" as const,
+      title: "Preview",
+      description: "Read-only validation mode. No Graph mutations will be sent.",
+      eyebrow: "Dry run",
+      accent: "border-blue-500/30 bg-blue-500/10",
+      badge: "border-blue-500/40 bg-blue-500/15 text-blue-500",
+      marker: "bg-blue-500 shadow-[0_0_18px_rgba(59,130,246,0.75)]",
+    },
+    {
+      id: "live" as const,
+      title: "Live",
+      description: "Apply changes to the selected tenant when the run starts.",
+      eyebrow: "Mutating",
+      accent: "border-amber-500/35 bg-amber-500/10",
+      badge: "border-amber-500/40 bg-amber-500/15 text-amber-500",
+      marker: "bg-amber-500 shadow-[0_0_18px_rgba(245,158,11,0.75)]",
+    },
+  ];
 
   const modeOptions = [
     {
@@ -163,11 +182,11 @@ export function OperationModeSelection(): React.JSX.Element {
         </div>
 
         <div className={`rounded-2xl border p-5 transition-colors ${executionTone.shell}`}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="space-y-4">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
                 <p className={`text-[11px] font-mono uppercase tracking-[0.28em] ${executionTone.label}`}>
-                  Dry run
+                  Execution behavior
                 </p>
                 <span
                   className={`rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] ${executionTone.badge}`}
@@ -181,33 +200,57 @@ export function OperationModeSelection(): React.JSX.Element {
                   {isPreview ? "Safe mode" : "Mutating mode"}
                 </span>
               </div>
-              <Label
-                htmlFor="preview"
-                className="flex cursor-pointer items-center gap-2 text-base font-semibold"
-              >
+              <div className="flex items-center gap-2 text-base font-semibold">
                 <Eye className="h-4 w-4" />
                 {getPreviewLabel(isPreview)}
-              </Label>
+              </div>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {getPreviewDescription(isPreview, mode)}
               </p>
             </div>
 
-            <div className={`flex items-center gap-3 rounded-xl border px-4 py-3 transition-colors ${executionTone.panel}`}>
-              <Checkbox
-                id="preview"
-                checked={isPreview}
-                onCheckedChange={(checked) => setIsPreviewLocal(checked as boolean)}
-              />
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className={`h-2.5 w-2.5 rounded-full ${executionTone.marker}`} />
-                  <p className="text-sm font-medium">{executionTone.title}</p>
-                </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {executionTone.detail}
-                </p>
-              </div>
+            <div className="grid gap-4 md:grid-cols-2">
+              {executionOptions.map((option) => {
+                const selected =
+                  (option.id === "preview" && isPreview) ||
+                  (option.id === "live" && !isPreview);
+
+                return (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setIsPreviewLocal(option.id === "preview")}
+                    className={`rounded-2xl border p-5 text-left transition ${
+                      selected
+                        ? `${option.accent} shadow-[0_0_0_1px_hsl(var(--hydrate)/0.12)]`
+                        : "border-border/80 bg-background/60 hover:border-hydrate/30 hover:bg-muted/30"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="rounded-xl border border-current/15 bg-background/70 p-2 text-foreground">
+                        <Radio className="h-5 w-5" />
+                      </div>
+                      {selected && (
+                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] ${option.badge}`}>
+                          Selected
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="mt-4 flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${option.marker}`} />
+                      <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                        {option.eyebrow}
+                      </p>
+                    </div>
+
+                    <p className="mt-2 text-lg font-semibold">{option.title}</p>
+                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                      {option.description}
+                    </p>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

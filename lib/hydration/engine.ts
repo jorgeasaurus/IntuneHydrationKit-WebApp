@@ -25,7 +25,7 @@ import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
-import { sleep } from "./utils";
+import { sleep, sleepWithExecutionControl, waitWhilePaused } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage } from "./types";
 import {
   executeGroupTask,
@@ -54,6 +54,25 @@ function emitStatus(
     type,
     category,
   });
+}
+
+function markTaskCancelled(
+  task: HydrationTask,
+  results: ExecutionResult[]
+): void {
+  task.status = "skipped";
+  task.error = "Cancelled by user";
+  results.push({ task, success: false, skipped: true, error: "Cancelled by user" });
+}
+
+function cancelRemainingTasks(
+  tasks: HydrationTask[],
+  startIndex: number,
+  results: ExecutionResult[]
+): void {
+  for (let i = startIndex; i < tasks.length; i++) {
+    markTaskCancelled(tasks[i], results);
+  }
 }
 
 // Re-export types for backwards compatibility
@@ -417,9 +436,11 @@ export async function executeTasks(
       }
 
       // Handle pause
-      while (context.shouldPause?.()) {
-        console.log("[Execute Tasks] Execution paused, waiting...");
-        await sleep(500);
+      const pauseResult = await waitWhilePaused(context);
+      if (pauseResult === "cancelled") {
+        console.log("[Execute Tasks] Execution cancelled while paused");
+        markTaskCancelled(task, results);
+        continue;
       }
 
       const result = await executeTask(task, context);
@@ -432,7 +453,7 @@ export async function executeTasks(
 
       // Add delay between tasks to avoid API throttling
       if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
-        await sleep(TASK_DELAY_MS);
+        await sleepWithExecutionControl(TASK_DELAY_MS, context);
       }
     }
 
@@ -477,9 +498,11 @@ export async function executeTasks(
       }
 
       // Handle pause
-      while (context.shouldPause?.()) {
-        console.log("[Execute Tasks] Execution paused, waiting...");
-        await sleep(500);
+      const pauseResult = await waitWhilePaused(context);
+      if (pauseResult === "cancelled") {
+        console.log("[Execute Tasks] Execution cancelled while paused");
+        markTaskCancelled(task, results);
+        continue;
       }
 
       const result = await executeTask(task, context);
@@ -492,7 +515,7 @@ export async function executeTasks(
 
       // Add delay between tasks to avoid API throttling
       if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
-        await sleep(TASK_DELAY_MS);
+        await sleepWithExecutionControl(TASK_DELAY_MS, context);
       }
     }
 
@@ -518,9 +541,11 @@ export async function executeTasks(
     }
 
     // Handle pause
-    while (context.shouldPause?.()) {
-      console.log("[Execute Tasks] Execution paused, waiting...");
-      await sleep(500);
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log("[Execute Tasks] Execution cancelled while paused");
+      cancelRemainingTasks(tasks, tasks.indexOf(task), results);
+      break;
     }
 
     const result = await executeTask(task, context);
@@ -533,7 +558,7 @@ export async function executeTasks(
 
     // Add delay between tasks to avoid API throttling
     if (tasks.indexOf(task) < tasks.length - 1) {
-      await sleep(TASK_DELAY_MS);
+      await sleepWithExecutionControl(TASK_DELAY_MS, context);
     }
   }
 

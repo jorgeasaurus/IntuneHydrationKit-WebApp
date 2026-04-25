@@ -1,26 +1,25 @@
 "use client";
 
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-
-export interface AppSettings {
-  defaultCloudEnvironment: string;
-  defaultBaselineRepo: string;
-  defaultBaselineBranch: string;
-  stopOnFirstError: boolean;
-  enableVerboseLogging: boolean;
-  autoDownloadReports: boolean;
-  theme: "light" | "dark" | "system";
-}
+import { AppSettings } from "@/types/hydration";
 
 const DEFAULT_SETTINGS: AppSettings = {
-  defaultCloudEnvironment: "Global",
-  defaultBaselineRepo: "https://github.com/jorgeasaurus/OpenIntuneBaseline",
-  defaultBaselineBranch: "main",
-  stopOnFirstError: false,
-  enableVerboseLogging: false,
-  autoDownloadReports: false,
+  stopOnFirstError: true,
   theme: "system",
 };
+
+function normalizeSettings(candidate: unknown): AppSettings {
+  if (!candidate || typeof candidate !== "object") {
+    return DEFAULT_SETTINGS;
+  }
+
+  const parsed = candidate as Partial<AppSettings>;
+
+  return {
+    stopOnFirstError: parsed.stopOnFirstError ?? DEFAULT_SETTINGS.stopOnFirstError,
+    theme: parsed.theme ?? DEFAULT_SETTINGS.theme,
+  };
+}
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -39,7 +38,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
+        setSettings(normalizeSettings(parsed));
       } catch (error) {
         console.error("Failed to parse stored settings:", error);
       }

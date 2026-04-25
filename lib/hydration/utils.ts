@@ -10,6 +10,62 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export interface ExecutionControlAccessors {
+  shouldPause?: () => boolean;
+  shouldCancel?: () => boolean;
+}
+
+export async function waitWhilePaused(
+  controls: ExecutionControlAccessors,
+  pollMs = 250
+): Promise<"resumed" | "cancelled"> {
+  while (controls.shouldPause?.()) {
+    if (controls.shouldCancel?.()) {
+      return "cancelled";
+    }
+
+    await sleep(pollMs);
+  }
+
+  if (controls.shouldCancel?.()) {
+    return "cancelled";
+  }
+
+  return "resumed";
+}
+
+export async function sleepWithExecutionControl(
+  ms: number,
+  controls: ExecutionControlAccessors,
+  pollMs = 250
+): Promise<"completed" | "cancelled"> {
+  let remainingMs = ms;
+
+  while (remainingMs > 0) {
+    if (controls.shouldCancel?.()) {
+      return "cancelled";
+    }
+
+    if (controls.shouldPause?.()) {
+      const pauseResult = await waitWhilePaused(controls, pollMs);
+      if (pauseResult === "cancelled") {
+        return "cancelled";
+      }
+      continue;
+    }
+
+    const waitMs = Math.min(remainingMs, pollMs);
+    await sleep(waitMs);
+    remainingMs -= waitMs;
+  }
+
+  if (controls.shouldCancel?.()) {
+    return "cancelled";
+  }
+
+  return "completed";
+}
+
 /**
  * Escape special characters in OData filter strings
  * Single quotes must be doubled in OData $filter expressions

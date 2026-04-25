@@ -12,7 +12,6 @@ import { OperationModeSelection } from "@/components/wizard/OperationMode";
 import { TargetSelection } from "@/components/wizard/TargetSelection";
 import { ReviewConfirm } from "@/components/wizard/ReviewConfirm";
 import { Button } from "@/components/ui/button";
-import { Progress } from "@/components/ui/progress";
 import { useWizardState } from "@/hooks/useWizardState";
 import { getEstimatedTaskCount } from "@/lib/hydration/engine";
 import { signOut } from "@/lib/auth/authUtils";
@@ -179,7 +178,7 @@ function WizardContent() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
-                    Mission Flow
+                    Hydration Flow
                   </p>
                   <h2 className="mt-2 text-lg font-semibold">Execution runway</h2>
                 </div>
@@ -187,7 +186,12 @@ function WizardContent() {
                   {Math.round(progress)}%
                 </div>
               </div>
-              <Progress value={progress} variant="glow" className="mt-4 h-2.5" />
+              <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-secondary">
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-hydrate to-cyan-400 transition-all duration-500 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              </div>
             </div>
 
             <div className="space-y-2 p-3">

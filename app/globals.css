@@ -10,26 +10,26 @@
 @layer base {
   :root {
     /* Base colors - Clean, high-contrast light theme */
-    --background: 210 25% 98%;
-    --foreground: 215 50% 12%;
+    --background: 210 28% 96%;
+    --foreground: 215 44% 11%;
 
     /* Card surfaces */
-    --card: 0 0% 100%;
-    --card-foreground: 215 50% 12%;
+    --card: 210 25% 99%;
+    --card-foreground: 215 44% 11%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 50% 12%;
+    --popover: 210 25% 99%;
+    --popover-foreground: 215 44% 11%;
 
     /* Primary: Sky blue matching logo */
     --primary: 200 100% 50%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary: Slate blue undertones */
-    --secondary: 210 25% 93%;
-    --secondary-foreground: 215 50% 15%;
+    --secondary: 210 22% 88%;
+    --secondary-foreground: 215 34% 18%;
 
-    --muted: 210 20% 92%;
-    --muted-foreground: 215 20% 45%;
+    --muted: 210 20% 89%;
+    --muted-foreground: 215 18% 34%;
 
     /* Accent: Deep navy from logo */
     --accent: 210 65% 35%;
@@ -38,8 +38,8 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 25% 88%;
-    --input: 210 25% 88%;
+    --border: 210 20% 80%;
+    --input: 210 20% 80%;
     --ring: 200 100% 50%;
 
     /* Custom palette - Logo colors */
@@ -349,11 +349,11 @@
    ============================================ */
 
 .nav-industrial {
-  background: hsl(var(--background) / 0.85);
+  background: hsl(var(--background) / 0.94);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid hsl(var(--border) / 0.5);
-  box-shadow: 0 4px 30px hsl(var(--foreground) / 0.05);
+  border: 1px solid hsl(var(--border) / 0.75);
+  box-shadow: 0 6px 26px hsl(var(--foreground) / 0.08);
 }
 
 .dark .nav-industrial {

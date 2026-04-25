@@ -3,6 +3,7 @@ import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
+import { SettingsThemeSync } from "@/components/providers/SettingsThemeSync";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
@@ -53,6 +54,7 @@ export default function RootLayout({
         >
           <MsalProvider>
             <SettingsProvider>
+              <SettingsThemeSync />
               <WizardProvider>
                 <IndustrialBackground />
                 {children}
