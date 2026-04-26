@@ -56,6 +56,10 @@ export interface ExecutionContext {
   cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached device configurations for delete operations (Health Monitoring, etc.)
   cachedDeviceConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
+  // Cached group policy configurations for delete operations (Administrative Templates / ADMX)
+  cachedGroupPolicyConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
+  // Cached security intents for baseline/CIS endpoint security policies
+  cachedSecurityIntents?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached baseline templates for batch creation (passed directly to avoid cache issues)
   cachedBaselineTemplates?: BaselinePolicy[];
   // License flags for conditional skipping
@@ -84,6 +88,7 @@ export type CISPolicyType =
   | "V2Compliance"              // compliancePolicies - Settings Catalog compliance
   | "V1Compliance"              // deviceCompliancePolicies - Legacy compliance
   | "DeviceConfiguration"       // deviceConfigurations - OMA-URI custom policies
+  | "GroupPolicyConfiguration"  // groupPolicyConfigurations - Administrative Templates / ADMX
   | "DriverUpdateProfiles"      // windowsDriverUpdateProfiles - Driver update profiles
   | "SecurityIntent"            // intents - Security baseline intents (deprecated)
   | "Unsupported";              // Policy type not supported for creation

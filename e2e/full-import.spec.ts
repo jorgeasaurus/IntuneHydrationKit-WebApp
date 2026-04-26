@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 /**
- * Full import flow test — requires manual MSAL authentication.
+ * Full import flow test - requires manual MSAL authentication.
  * Run with: npx playwright test e2e/full-import.spec.ts --headed --timeout=600000
  */
 
@@ -13,19 +13,19 @@ test.describe("Full Import Flow", () => {
     await page.goto("/");
     await expect(page.getByText("v2.2")).toBeVisible();
 
-    // Step 2: Click sign-in — user authenticates manually in the browser
+    // Step 2: Click sign-in - user authenticates manually in the browser
     console.log("🔐 Waiting for manual sign-in... Please authenticate in the browser.");
     const signInButton = page.getByRole("button", { name: /sign in/i });
     await expect(signInButton).toBeVisible();
     await signInButton.click();
 
-    // Wait for authentication to complete — user will interact with MSAL popup/redirect
+    // Wait for authentication to complete - user will interact with MSAL popup/redirect
     // After auth, the wizard page or a "signed in" indicator should appear
     console.log("⏳ Waiting for authentication to complete...");
     await page.waitForURL("**/wizard**", { timeout: 120_000 });
-    console.log("✅ Authentication complete — on wizard page");
+    console.log("✅ Authentication complete - on wizard page");
 
-    // Step 3: Wizard — verify we're on the wizard
+    // Step 3: Wizard - verify we're on the wizard
     await expect(page.getByText(/IntuneHydrationKit/i)).toBeVisible();
 
     // Take screenshots at each step for documentation

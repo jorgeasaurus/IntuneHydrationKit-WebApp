@@ -1,26 +1,38 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-
-export interface AppSettings {
-  defaultCloudEnvironment: string;
-  defaultBaselineRepo: string;
-  defaultBaselineBranch: string;
-  stopOnFirstError: boolean;
-  enableVerboseLogging: boolean;
-  autoDownloadReports: boolean;
-  theme: "light" | "dark" | "system";
-}
+import { createContext, useContext, useState, ReactNode } from "react";
+import { AppSettings } from "@/types/hydration";
 
 const DEFAULT_SETTINGS: AppSettings = {
-  defaultCloudEnvironment: "Global",
-  defaultBaselineRepo: "https://github.com/jorgeasaurus/OpenIntuneBaseline",
-  defaultBaselineBranch: "main",
   stopOnFirstError: false,
-  enableVerboseLogging: false,
-  autoDownloadReports: false,
   theme: "system",
 };
+
+function normalizeTheme(theme: unknown): AppSettings["theme"] {
+  if (
+    theme === "light" ||
+    theme === "dark" ||
+    theme === "system" ||
+    theme === "corporate-1999"
+  ) {
+    return theme;
+  }
+
+  return DEFAULT_SETTINGS.theme;
+}
+
+function normalizeSettings(candidate: unknown): AppSettings {
+  if (!candidate || typeof candidate !== "object") {
+    return DEFAULT_SETTINGS;
+  }
+
+  const parsed = candidate as Partial<AppSettings>;
+
+  return {
+    stopOnFirstError: parsed.stopOnFirstError ?? DEFAULT_SETTINGS.stopOnFirstError,
+    theme: normalizeTheme(parsed.theme),
+  };
+}
 
 interface SettingsContextType {
   settings: AppSettings;
@@ -30,25 +42,30 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+function readStoredSettings(): AppSettings {
+  if (typeof window === "undefined") {
+    return DEFAULT_SETTINGS;
+  }
 
-  // Load settings from localStorage on mount
-  useEffect(() => {
-    const stored = localStorage.getItem("app-settings");
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        setSettings({ ...DEFAULT_SETTINGS, ...parsed });
-      } catch (error) {
-        console.error("Failed to parse stored settings:", error);
-      }
-    }
-  }, []);
+  const stored = localStorage.getItem("app-settings");
+  if (!stored) {
+    return DEFAULT_SETTINGS;
+  }
+
+  try {
+    return normalizeSettings(JSON.parse(stored));
+  } catch (error) {
+    console.error("Failed to parse stored settings:", error);
+    return DEFAULT_SETTINGS;
+  }
+}
+
+export function SettingsProvider({ children }: { children: ReactNode }) {
+  const [settings, setSettings] = useState<AppSettings>(() => readStoredSettings());
 
   const updateSettings = (newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
-      const updated = { ...prev, ...newSettings };
+      const updated = normalizeSettings({ ...prev, ...newSettings });
       localStorage.setItem("app-settings", JSON.stringify(updated));
       return updated;
     });

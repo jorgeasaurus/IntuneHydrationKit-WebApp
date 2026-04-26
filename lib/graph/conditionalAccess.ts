@@ -47,12 +47,17 @@ export async function getConditionalAccessPolicyByName(
 ): Promise<ConditionalAccessPolicy | null> {
   const policies = await getAllConditionalAccessPolicies(client);
   const lowerName = displayName.toLowerCase();
-  // CA policies created by the kit have " [Intune Hydration Kit]" suffix
   const suffixedLowerName = `${lowerName} [intune hydration kit]`;
+  const fullMarkerLowerName = `${lowerName} [imported by intune hydration kit]`;
 
   const found = policies.find((policy) => {
     const policyLower = policy.displayName.toLowerCase();
-    return policyLower === lowerName || policyLower === suffixedLowerName;
+    return (
+      hasHydrationMarker(policy.displayName) &&
+      (policyLower === lowerName ||
+        policyLower === suffixedLowerName ||
+        policyLower === fullMarkerLowerName)
+    );
   });
   return found || null;
 }

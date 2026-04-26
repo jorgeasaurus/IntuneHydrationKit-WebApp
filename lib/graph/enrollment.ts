@@ -12,6 +12,13 @@ const AUTOPILOT_PATH = "/deviceManagement/windowsAutopilotDeploymentProfiles";
 const ESP_PATH = "/deviceManagement/deviceEnrollmentConfigurations";
 const CONFIG_POLICIES_PATH = "/deviceManagement/configurationPolicies";
 
+function normalizeEnrollmentDisplayName(displayName: string | undefined | null): string {
+  return String(displayName || "")
+    .replace(/^\[IHD\]\s*-\s*/i, "[IHD] ")
+    .trim()
+    .toLowerCase();
+}
+
 function addEnrollmentHydrationMarker(description: string | undefined | null): string {
   const desc = String(description || "");
   if (hasHydrationMarker(desc)) {
@@ -112,6 +119,12 @@ export interface EnrollmentStatusPageConfiguration {
  */
 export type EnrollmentProfile = AutopilotDeploymentProfile | EnrollmentStatusPageConfiguration | DevicePreparationProfile;
 
+interface DevicePreparationPolicySummary {
+  id: string;
+  name: string;
+  description?: string;
+}
+
 export async function getAllAutopilotProfiles(
   client: GraphClient
 ): Promise<AutopilotDeploymentProfile[]> {
@@ -123,8 +136,9 @@ export async function getAutopilotProfileByName(
   displayName: string
 ): Promise<AutopilotDeploymentProfile | null> {
   const profiles = await getAllAutopilotProfiles(client);
+  const normalizedDisplayName = normalizeEnrollmentDisplayName(displayName);
   return profiles.find(
-    (p) => p.displayName.toLowerCase() === displayName.toLowerCase()
+    (p) => normalizeEnrollmentDisplayName(p.displayName) === normalizedDisplayName
   ) || null;
 }
 
@@ -198,8 +212,9 @@ export async function getESPConfigurationByName(
   displayName: string
 ): Promise<EnrollmentStatusPageConfiguration | null> {
   const configs = await getAllEnrollmentConfigurations(client);
+  const normalizedDisplayName = normalizeEnrollmentDisplayName(displayName);
   return configs.find(
-    (c) => c.displayName.toLowerCase() === displayName.toLowerCase()
+    (c) => normalizeEnrollmentDisplayName(c.displayName) === normalizedDisplayName
   ) || null;
 }
 
@@ -267,15 +282,8 @@ export async function devicePreparationExists(
   client: GraphClient,
   name: string
 ): Promise<boolean> {
-  try {
-    const response = await client.get<{ value: Array<{ name: string }> }>(
-      `${CONFIG_POLICIES_PATH}?$filter=name eq '${encodeURIComponent(name)}'&$select=id,name`
-    );
-    return response.value && response.value.length > 0;
-  } catch (error) {
-    console.error(`[DevicePreparation] Error checking if policy exists: ${name}`, error);
-    return false;
-  }
+  const policy = await findDevicePreparationPolicyByName(client, name);
+  return policy !== null;
 }
 
 export async function createDevicePreparationProfile(
@@ -294,16 +302,43 @@ export async function deleteDevicePreparationByName(
   client: GraphClient,
   name: string
 ): Promise<void> {
-  const response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
-    `${CONFIG_POLICIES_PATH}?$filter=name eq '${encodeURIComponent(name)}'&$select=id,name,description`
-  );
-
-  const match = response.value?.find(p => hasHydrationMarker(p.description) || hasHydrationMarker(p.name));
+  const match = await findDevicePreparationPolicyByName(client, name);
   if (!match?.id) {
     throw new Error(`Device Preparation policy "${name}" not found`);
   }
 
-  await client.delete(`${CONFIG_POLICIES_PATH}('${match.id}')`);
+  if (!hasHydrationMarker(match.description) && !hasHydrationMarker(match.name)) {
+    throw new Error(
+      `Cannot delete Device Preparation policy "${match.name}": Not created by Intune Hydration Kit`
+    );
+  }
+
+  const assignments = await client.getCollection(`${CONFIG_POLICIES_PATH}/${match.id}/assignments`);
+  if (assignments.length > 0) {
+    throw new Error(
+      `Cannot delete Device Preparation policy "${match.name}": Has ${assignments.length} assignment(s). Remove all assignments before deleting.`
+    );
+  }
+
+  await client.delete(`${CONFIG_POLICIES_PATH}/${match.id}`);
+}
+
+async function findDevicePreparationPolicyByName(
+  client: GraphClient,
+  name: string
+): Promise<DevicePreparationPolicySummary | null> {
+  try {
+    const policies = await client.getCollection<DevicePreparationPolicySummary>(
+      `${CONFIG_POLICIES_PATH}?$select=id,name,description`
+    );
+    const normalizedName = normalizeEnrollmentDisplayName(name);
+    return policies.find(
+      (policy) => normalizeEnrollmentDisplayName(policy.name) === normalizedName
+    ) || null;
+  } catch (error) {
+    console.error(`[DevicePreparation] Error checking if policy exists: ${name}`, error);
+    return null;
+  }
 }
 
 /**

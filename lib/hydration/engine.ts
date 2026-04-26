@@ -25,7 +25,7 @@ import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
-import { sleep } from "./utils";
+import { sleep, sleepWithExecutionControl, waitWhilePaused } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage } from "./types";
 import {
   executeGroupTask,
@@ -54,6 +54,25 @@ function emitStatus(
     type,
     category,
   });
+}
+
+function markTaskCancelled(
+  task: HydrationTask,
+  results: ExecutionResult[]
+): void {
+  task.status = "skipped";
+  task.error = "Cancelled by user";
+  results.push({ task, success: false, skipped: true, error: "Cancelled by user" });
+}
+
+function cancelRemainingTasks(
+  tasks: HydrationTask[],
+  startIndex: number,
+  results: ExecutionResult[]
+): void {
+  for (let i = startIndex; i < tasks.length; i++) {
+    markTaskCancelled(tasks[i], results);
+  }
 }
 
 // Re-export types for backwards compatibility
@@ -235,10 +254,9 @@ export async function executeTasks(
     emitStatus(context, "Querying existing Conditional Access policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
     try {
-      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; state: string }> }>(
+      context.cachedConditionalAccessPolicies = await context.client.getCollection<{ id: string; displayName: string; state: string }>(
         `/identity/conditionalAccess/policies?$select=id,displayName,state`
       );
-      context.cachedConditionalAccessPolicies = response.value || [];
       emitStatus(context, `Found ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`);
     } catch (error) {
@@ -297,8 +315,14 @@ export async function executeTasks(
     }
   }
 
-  // Pre-fetch V2 Compliance policies for DELETE mode (used by OIB compliance policies)
-  if (needsSettingsCatalogCache && !context.cachedV2CompliancePolicies) {
+  // Pre-fetch V2 Compliance policies for DELETE/PREVIEW mode.
+  // Used by OIB/CIS compliance deletes and Linux compliance templates.
+  const needsV2ComplianceCache =
+    ((context.operationMode === "delete" || context.isPreview) &&
+      (hasComplianceTasks || hasBaselineTasks || hasCISTasks)) ||
+    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
+
+  if (needsV2ComplianceCache && !context.cachedV2CompliancePolicies) {
     emitStatus(context, "Querying V2 Compliance policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all V2 Compliance policies for delete operations...");
     try {
@@ -353,6 +377,39 @@ export async function executeTasks(
     }
   }
 
+  // Pre-fetch Group Policy Configurations (Administrative Templates / ADMX) for baseline/CIS delete paths
+  if (needsBaselinePolicyCaches && !context.cachedGroupPolicyConfigurations) {
+    emitStatus(context, "Querying Administrative Templates...", "progress", "prefetch");
+    console.log("[Execute Tasks] Pre-fetching all Group Policy Configurations...");
+    try {
+      context.cachedGroupPolicyConfigurations = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
+        `/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description`
+      );
+      emitStatus(context, `Found ${context.cachedGroupPolicyConfigurations.length} Administrative Templates`, "success", "prefetch");
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedGroupPolicyConfigurations.length} Group Policy Configurations`);
+    } catch (error) {
+      emitStatus(context, "Failed to query Administrative Templates", "warning", "prefetch");
+      console.error("[Execute Tasks] Failed to pre-fetch Group Policy Configurations:", error);
+      context.cachedGroupPolicyConfigurations = [];
+    }
+  }
+
+  if (needsBaselinePolicyCaches && !context.cachedSecurityIntents) {
+    emitStatus(context, "Querying Endpoint Security profiles...", "progress", "prefetch");
+    console.log("[Execute Tasks] Pre-fetching all Security Intents...");
+    try {
+      context.cachedSecurityIntents = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
+        `/deviceManagement/intents?$select=id,displayName,description`
+      );
+      emitStatus(context, `Found ${context.cachedSecurityIntents.length} Endpoint Security profiles`, "success", "prefetch");
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedSecurityIntents.length} Security Intents`);
+    } catch (error) {
+      emitStatus(context, "Failed to query Endpoint Security profiles", "warning", "prefetch");
+      console.error("[Execute Tasks] Failed to pre-fetch Security Intents:", error);
+      context.cachedSecurityIntents = [];
+    }
+  }
+
   // Pre-fetch baseline templates from cache for batch operations
   // This ensures templates are passed directly to batch executor without relying on global cache
   if (batchConfig.enableBatching && hasBaselineTasks && !context.cachedBaselineTemplates) {
@@ -372,7 +429,7 @@ export async function executeTasks(
   const useCreateBatching = batchConfig.enableBatching && context.operationMode === "create";
   const useDeleteBatching = batchConfig.enableBatching && context.operationMode === "delete";
 
-  emitStatus(context, "Tenant check complete — starting execution...", "success", "prefetch");
+  emitStatus(context, "Tenant check complete - starting execution...", "success", "prefetch");
 
   if (useCreateBatching) {
     emitStatus(context, `Starting batch creation (${batchConfig.defaultBatchSize} items per batch)...`, "info", "execute");
@@ -417,9 +474,11 @@ export async function executeTasks(
       }
 
       // Handle pause
-      while (context.shouldPause?.()) {
-        console.log("[Execute Tasks] Execution paused, waiting...");
-        await sleep(500);
+      const pauseResult = await waitWhilePaused(context);
+      if (pauseResult === "cancelled") {
+        console.log("[Execute Tasks] Execution cancelled while paused");
+        markTaskCancelled(task, results);
+        continue;
       }
 
       const result = await executeTask(task, context);
@@ -432,7 +491,7 @@ export async function executeTasks(
 
       // Add delay between tasks to avoid API throttling
       if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
-        await sleep(TASK_DELAY_MS);
+        await sleepWithExecutionControl(TASK_DELAY_MS, context);
       }
     }
 
@@ -477,9 +536,11 @@ export async function executeTasks(
       }
 
       // Handle pause
-      while (context.shouldPause?.()) {
-        console.log("[Execute Tasks] Execution paused, waiting...");
-        await sleep(500);
+      const pauseResult = await waitWhilePaused(context);
+      if (pauseResult === "cancelled") {
+        console.log("[Execute Tasks] Execution cancelled while paused");
+        markTaskCancelled(task, results);
+        continue;
       }
 
       const result = await executeTask(task, context);
@@ -492,7 +553,7 @@ export async function executeTasks(
 
       // Add delay between tasks to avoid API throttling
       if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
-        await sleep(TASK_DELAY_MS);
+        await sleepWithExecutionControl(TASK_DELAY_MS, context);
       }
     }
 
@@ -518,9 +579,11 @@ export async function executeTasks(
     }
 
     // Handle pause
-    while (context.shouldPause?.()) {
-      console.log("[Execute Tasks] Execution paused, waiting...");
-      await sleep(500);
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log("[Execute Tasks] Execution cancelled while paused");
+      cancelRemainingTasks(tasks, tasks.indexOf(task), results);
+      break;
     }
 
     const result = await executeTask(task, context);
@@ -533,7 +596,7 @@ export async function executeTasks(
 
     // Add delay between tasks to avoid API throttling
     if (tasks.indexOf(task) < tasks.length - 1) {
-      await sleep(TASK_DELAY_MS);
+      await sleepWithExecutionControl(TASK_DELAY_MS, context);
     }
   }
 

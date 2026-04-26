@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -11,14 +11,17 @@ import { toast } from "sonner";
 import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { CloudEnvironment } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
-import { ThemeToggle } from "@/components/ThemeToggle";
+import { LIGHT_DARK_THEME_CYCLE, ThemeToggle } from "@/components/ThemeToggle";
 import { Terminal, Github } from "lucide-react";
 
 export function Navigation() {
   const isAuthenticated = useIsAuthenticated();
+  const pathname = usePathname();
   const router = useRouter();
   const { resetWizard } = useWizardState();
   const [showCloudSelector, setShowCloudSelector] = useState(false);
+
+  const getSectionHref = (hash: string) => (pathname === "/" ? hash : `/${hash}`);
 
   const handleSignInClick = () => {
     setShowCloudSelector(true);
@@ -83,14 +86,17 @@ export function Navigation() {
 
               {/* Navigation Links */}
               <div className="hidden md:flex items-center gap-8">
-                <Link href="#features" className="nav-link text-sm font-medium">
+                <Link href={getSectionHref("#features")} className="nav-link text-sm font-medium">
                   Features
                 </Link>
-                <Link href="#what-gets-deployed" className="nav-link text-sm font-medium">
+                <Link href={getSectionHref("#what-gets-deployed")} className="nav-link text-sm font-medium">
                   Configurations
                 </Link>
-                <Link href="#faq" className="nav-link text-sm font-medium">
+                <Link href={getSectionHref("#faq")} className="nav-link text-sm font-medium">
                   FAQs
+                </Link>
+                <Link href="/templates" className="nav-link text-sm font-medium">
+                  Template Docs
                 </Link>
               </div>
 
@@ -105,7 +111,7 @@ export function Navigation() {
                 >
                   <Github className="w-5 h-5" />
                 </a>
-                <ThemeToggle />
+                <ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />
 
                 {/* Terminal Status Indicator */}
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">

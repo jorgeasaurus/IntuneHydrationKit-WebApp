@@ -290,6 +290,8 @@ export class GraphClient {
    * Execute a batch request against the Graph API $batch endpoint
    * All requests in a batch must use the same API version
    * Microsoft Graph supports up to 20 requests per batch
+   * Batch requests intentionally do not use the generic retry wrapper.
+   * Callers need to decide whether retrying an entire batch is safe.
    *
    * @param requests - Array of batch requests (max 20)
    * @param version - API version (v1.0 or beta) - all requests must use same version
@@ -311,15 +313,13 @@ export class GraphClient {
 
     console.log(`[GraphClient] Executing batch with ${requests.length} requests (${version})`);
 
-    return retryWithBackoff(async () => {
-      const headers = await this.getHeaders();
-      const response = await fetch(url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ requests }),
-      });
-      return this.handleResponse<BatchResult>(response);
+    const headers = await this.getHeaders();
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ requests }),
     });
+    return this.handleResponse<BatchResult>(response);
   }
 }
 

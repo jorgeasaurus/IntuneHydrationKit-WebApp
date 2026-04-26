@@ -150,7 +150,7 @@ const IOS_FILTERS: DeviceFilter[] = [
   },
 ];
 
-// ── Android Filters (3) — PS "androidForWork" mapped to "android" ───────────
+// ── Android Filters (3) - PS "androidForWork" mapped to "android" ───────────
 
 const ANDROID_FILTERS: DeviceFilter[] = [
   {

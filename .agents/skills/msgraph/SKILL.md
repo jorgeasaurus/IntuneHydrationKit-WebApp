@@ -1,6 +1,6 @@
 ---
 name: msgraph
-description: Up-to-date Microsoft Graph API knowledge for AI agents. Search 27,700+ Graph APIs, endpoint docs, resource schemas, and community samples — all locally, no network calls. Use when the agent needs to find, understand, or call Microsoft Graph endpoints.
+description: Up-to-date Microsoft Graph API knowledge for AI agents. Search 27,700+ Graph APIs, endpoint docs, resource schemas, and community samples - all locally, no network calls. Use when the agent needs to find, understand, or call Microsoft Graph endpoints.
 license: MIT
 metadata:
   author: merill
@@ -9,11 +9,11 @@ metadata:
 
 # Microsoft Graph Agent Skill
 
-Search, look up, and call any of the 27,700+ Microsoft Graph APIs — all locally, no network calls needed. Use the three search commands to find the right endpoint, check permissions and parameters, then optionally execute calls directly or hand off to a Graph MCP server.
+Search, look up, and call any of the 27,700+ Microsoft Graph APIs - all locally, no network calls needed. Use the three search commands to find the right endpoint, check permissions and parameters, then optionally execute calls directly or hand off to a Graph MCP server.
 
 ## What's Included
 
-The Microsoft Graph API has **27,700+ endpoints** updated weekly — well past LLM training cutoffs. This skill bundles the complete API surface as local indexes that you search instantly with no network calls.
+The Microsoft Graph API has **27,700+ endpoints** updated weekly - well past LLM training cutoffs. This skill bundles the complete API surface as local indexes that you search instantly with no network calls.
 
 | Index | Count | What it contains |
 |---|---|---|
@@ -39,15 +39,15 @@ In all examples below, `msgraph` is shorthand for the full launcher invocation.
 
 ## Finding the Right API
 
-This is the primary purpose of the skill. Follow this progressive lookup strategy — each level adds detail:
+This is the primary purpose of the skill. Follow this progressive lookup strategy - each level adds detail:
 
-1. **Your own knowledge** — try first for well-known endpoints (`/me`, `/users`, `/groups`).
-2. **`sample-search`** — curated, hand-verified samples. Highest quality. Use for common tasks and multi-step workflows.
-3. **`api-docs-search`** — per-endpoint permissions, supported query parameters, required headers, default vs `$select`-only properties, and resource property details with filter operators.
-4. **`openapi-search`** — full catalog of 27,700 Graph APIs. Use when you cannot find the endpoint any other way.
-5. **Reference files** — concept docs on query parameters, advanced queries, paging, batching, throttling, errors, and best practices. Read only when you need specific guidance.
+1. **Your own knowledge** - try first for well-known endpoints (`/me`, `/users`, `/groups`).
+2. **`sample-search`** - curated, hand-verified samples. Highest quality. Use for common tasks and multi-step workflows.
+3. **`api-docs-search`** - per-endpoint permissions, supported query parameters, required headers, default vs `$select`-only properties, and resource property details with filter operators.
+4. **`openapi-search`** - full catalog of 27,700 Graph APIs. Use when you cannot find the endpoint any other way.
+5. **Reference files** - concept docs on query parameters, advanced queries, paging, batching, throttling, errors, and best practices. Read only when you need specific guidance.
 
-This order is guidance — adapt based on the task. For example, jump straight to `api-docs-search` if you already know the endpoint but need its permissions.
+This order is guidance - adapt based on the task. For example, jump straight to `api-docs-search` if you already know the endpoint but need its permissions.
 
 ### sample-search
 
@@ -113,7 +113,7 @@ At least one of `--query`, `--resource`, or `--method` is required.
 
 If the agent has access to a Microsoft Graph MCP server (such as [lokka.dev](https://lokka.dev) or any other Microsoft Graph MCP server), use the search tools above to find the right endpoint, permissions, and request syntax, then use the information with the MCP server for execution.
 
-In this mode, **no authentication through this skill is needed**. The skill acts purely as a knowledge layer — the MCP server handles authentication and API execution.
+In this mode, **no authentication through this skill is needed**. The skill acts purely as a knowledge layer - the MCP server handles authentication and API execution.
 
 ## Direct Microsoft Graph API Execution
 
@@ -132,7 +132,7 @@ msgraph auth signin --device-code  # sign in via device code (headless)
 msgraph auth signout         # clear the session
 ```
 
-- **Delegated auth** (default): Interactive browser sign-in, with device code fallback for headless environments. Supports incremental consent — on 403, the tool re-authenticates with required scopes and retries automatically.
+- **Delegated auth** (default): Interactive browser sign-in, with device code fallback for headless environments. Supports incremental consent - on 403, the tool re-authenticates with required scopes and retries automatically.
 - **App-only auth**: Auto-detected when `MSGRAPH_CLIENT_SECRET`, `MSGRAPH_CLIENT_CERTIFICATE_PATH`, `MSGRAPH_FEDERATED_TOKEN_FILE`, or `MSGRAPH_AUTH_METHOD=managed-identity` is set. Requires `MSGRAPH_TENANT_ID`.
 
 For detailed authentication configuration including certificates, managed identity, workload identity federation, and all environment variables, see [references/docs/authentication.md](references/docs/authentication.md).
@@ -185,21 +185,21 @@ msgraph graph-call PATCH /me --body '{"jobTitle":"Engineer"}' --allow-writes
 
 ### Always (search and knowledge)
 
-1. **Never guess or fabricate Microsoft Graph endpoints** — always verify via search before calling. This skill exists because agents hallucinate endpoints; use it.
-2. **Use the progressive lookup strategy** — start with what you know, then sample-search, api-docs-search, openapi-search as needed.
-3. **Use `--select`** to reduce response size — only request fields you need.
-4. **Use `--top`** to limit results — avoid fetching thousands of records.
+1. **Never guess or fabricate Microsoft Graph endpoints** - always verify via search before calling. This skill exists because agents hallucinate endpoints; use it.
+2. **Use the progressive lookup strategy** - start with what you know, then sample-search, api-docs-search, openapi-search as needed.
+3. **Use `--select`** to reduce response size - only request fields you need.
+4. **Use `--top`** to limit results - avoid fetching thousands of records.
 5. **ConsistencyLevel header** is required for `$count` and `$search` on directory objects (users, groups, etc.). Use `--headers "ConsistencyLevel:eventual"`.
-6. **Default API version is beta** — use `--api-version v1.0` for production-stable endpoints.
+6. **Default API version is beta** - use `--api-version v1.0` for production-stable endpoints.
 
 ### When using direct execution (graph-call)
 
 7. **Check auth status** before the first `graph-call` in a session.
-8. **GET is the default** — no special flags needed.
-9. **Write operations require `--allow-writes`** — YOU MUST confirm with the user first.
-10. **DELETE is always blocked** — inform the user this is not supported.
-11. **403 triggers automatic re-auth** — the tool requests additional scopes and retries (delegated auth only).
-12. **All output is JSON** — parse `statusCode` and `body` fields from the response.
+8. **GET is the default** - no special flags needed.
+9. **Write operations require `--allow-writes`** - YOU MUST confirm with the user first.
+10. **DELETE is always blocked** - inform the user this is not supported.
+11. **403 triggers automatic re-auth** - the tool requests additional scopes and retries (delegated auth only).
+12. **All output is JSON** - parse `statusCode` and `body` fields from the response.
 
 ## Error Handling
 

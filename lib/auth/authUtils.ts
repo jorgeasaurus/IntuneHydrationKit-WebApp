@@ -70,7 +70,7 @@ export async function getAccessToken(): Promise<string> {
     return response.accessToken;
   } catch (error) {
     if (error instanceof InteractionRequiredAuthError || error instanceof BrowserAuthError) {
-      // Silent acquisition failed (iframe timeout, expired session, etc.) — try popup
+      // Silent acquisition failed (iframe timeout, expired session, etc.) - try popup
       try {
         const response = await msalInstance.acquireTokenPopup({
           ...loginRequest,
@@ -88,7 +88,7 @@ export async function getAccessToken(): Promise<string> {
 }
 
 /**
- * Custom error class for auth session issues — allows callers to detect and show sign-in UI
+ * Custom error class for auth session issues - allows callers to detect and show sign-in UI
  */
 export class AuthSessionExpiredError extends Error {
   constructor(message = "No active account found. Please sign in.") {

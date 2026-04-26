@@ -19,12 +19,16 @@ import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
-import { sleep, hasODataUnsafeChars } from "./utils";
+import { sleep, sleepWithExecutionControl, waitWhilePaused, hasODataUnsafeChars } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   settingsCatalogPolicyExists,
   v2CompliancePolicyExists,
   deviceConfigurationExists,
+  groupPolicyConfigurationExists,
+  buildCISGroupPolicyConfigurationPayload,
+  securityIntentExists,
+  buildCISSecurityIntentPayload,
 } from "./policyCreators";
 import {
   getCachedTemplates,
@@ -35,8 +39,25 @@ import {
   CISBaselinePolicy,
   BaselinePolicy,
 } from "@/lib/templates/loader";
+import { conditionalAccessPolicyExists } from "@/lib/graph/conditionalAccess";
 import * as Templates from "@/templates";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
+
+function markPreparedTasksCancelled(
+  items: Array<{ task: HydrationTask }>,
+  results: ExecutionResult[],
+  context: ExecutionContext
+): void {
+  const cancelledAt = new Date();
+
+  for (const { task } of items) {
+    task.status = "skipped";
+    task.error = "Cancelled";
+    task.endTime = cancelledAt;
+    results.push({ task, success: false, skipped: true, error: "Cancelled" });
+    context.onTaskComplete?.(task);
+  }
+}
 
 /**
  * Helper to emit status updates to UI
@@ -87,6 +108,8 @@ const CATEGORY_ENDPOINTS: Record<string, string> = {
   enrollment_esp: "/deviceManagement/deviceEnrollmentConfigurations",
   settingsCatalog: "/deviceManagement/configurationPolicies",
   deviceConfiguration: "/deviceManagement/deviceConfigurations",
+  groupPolicyConfiguration: "/deviceManagement/groupPolicyConfigurations",
+  securityIntent: "/deviceManagement/intents",
   driverUpdate: "/deviceManagement/windowsDriverUpdateProfiles",
   v2Compliance: "/deviceManagement/compliancePolicies",
 };
@@ -200,7 +223,7 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
     return { type: "error", reason: "Template not found" };
   }
 
-  // Check if already exists in cache — match with or without [IHD] prefix
+  // Check if already exists in cache - match with or without [IHD] prefix
   console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups?.length || 0} cached groups`);
   const templateName = template!.displayName.toLowerCase();
   const templateNameStripped = templateName.startsWith("[ihd] ") ? templateName.slice(6) : templateName;
@@ -429,11 +452,11 @@ async function buildBaselineRequestBody(
     console.log(`[BatchExecutor] OIB policy "${policyName}" type detected: ${policyType}`);
   }
 
-  // Only batch SettingsCatalog, DeviceConfiguration, DriverUpdateProfiles, and V2Compliance.
+  // Only batch SettingsCatalog, DeviceConfiguration, GroupPolicyConfiguration,
+  // DriverUpdateProfiles, and V2Compliance.
   // App Protection baselines need the dedicated sequential create path.
   if (
     policyType === "Unsupported" ||
-    policyType === "SecurityIntent" ||
     policyType === "V1Compliance" ||
     policyType === "AppProtection"
   ) {
@@ -460,6 +483,16 @@ async function buildBaselineRequestBody(
       body = cleanPolicyRecursively(template) as Record<string, unknown>;
       body.description = addHydrationMarker(body.description as string | undefined);
       endpoint = CATEGORY_ENDPOINTS.deviceConfiguration;
+      break;
+
+    case "GroupPolicyConfiguration":
+      body = buildCISGroupPolicyConfigurationPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.groupPolicyConfiguration;
+      break;
+
+    case "SecurityIntent":
+      body = buildCISSecurityIntentPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.securityIntent;
       break;
 
     case "DriverUpdateProfiles":
@@ -520,8 +553,9 @@ async function buildCISBaselineRequestBody(
   const policyName = (template.name || template.displayName) as string;
   const policyType = detectCISPolicyType(template as Record<string, unknown>);
 
-  // Only batch SettingsCatalog, DeviceConfiguration, and V2Compliance
-  if (policyType === "Unsupported" || policyType === "SecurityIntent" || policyType === "V1Compliance") {
+  // Only batch SettingsCatalog, DeviceConfiguration, GroupPolicyConfiguration,
+  // SecurityIntent, and V2Compliance
+  if (policyType === "Unsupported" || policyType === "V1Compliance") {
     return null;
   }
 
@@ -544,6 +578,16 @@ async function buildCISBaselineRequestBody(
       body = cleanPolicyRecursively(template) as Record<string, unknown>;
       body.description = addHydrationMarker(body.description as string | undefined);
       endpoint = CATEGORY_ENDPOINTS.deviceConfiguration;
+      break;
+
+    case "GroupPolicyConfiguration":
+      body = buildCISGroupPolicyConfigurationPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.groupPolicyConfiguration;
+      break;
+
+    case "SecurityIntent":
+      body = buildCISSecurityIntentPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.securityIntent;
       break;
 
     case "V2Compliance":
@@ -769,7 +813,7 @@ export async function executeTasksInBatches(
   const seqMsg = nonBatchableTasks.length > 0 ? `, ${nonBatchableTasks.length} sequential` : "";
   emitStatus(
     context,
-    `Preparation complete — sending ${batchableTasks.length} items${skipMsg}${seqMsg}`,
+    `Preparation complete - sending ${batchableTasks.length} items${skipMsg}${seqMsg}`,
     "info",
     "create"
   );
@@ -829,7 +873,7 @@ async function executeBatchGroup(
     ? Math.min(config.categoryBatchSizes?.cisBaseline ?? config.defaultBatchSize, config.defaultBatchSize)
     : config.defaultBatchSize;
 
-  // Adaptive throttle state — tracks across batches to dynamically adjust delay and size
+  // Adaptive throttle state - tracks across batches to dynamically adjust delay and size
   let currentBatchDelay = config.delayBetweenBatches;
   let currentBatchSize = initialBatchSize;
   let consecutiveUnthrottledBatches = 0;
@@ -855,21 +899,16 @@ async function executeBatchGroup(
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[BatchExecutor] Execution cancelled`);
-      // Cancel current chunk and all remaining tasks
-      const allCancelled = [...chunk, ...remainingTasks.map(t => t)];
-      for (const { task } of allCancelled) {
-        task.status = "skipped";
-        task.error = "Cancelled";
-        task.endTime = new Date();
-        results.push({ task, success: false, skipped: true, error: "Cancelled" });
-        context.onTaskComplete?.(task);
-      }
+      markPreparedTasksCancelled([...chunk, ...remainingTasks], results, context);
       break;
     }
 
     // Check for pause
-    while (context.shouldPause?.()) {
-      await sleep(500);
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log(`[BatchExecutor] Execution cancelled while paused`);
+      markPreparedTasksCancelled([...chunk, ...remainingTasks], results, context);
+      break;
     }
 
     // Report batch progress to UI
@@ -1000,40 +1039,38 @@ async function executeBatchGroup(
           const delay = Math.max(retryAfterMs, backoff);
           console.log(`[BatchExecutor] ${pendingRetry.length} responses need retry (attempt ${retryCount}/${maxRetries}), waiting ${delay}ms`);
           emitStatus(context, `Retrying ${pendingRetry.length} throttled requests (attempt ${retryCount}/${maxRetries})...`, "warning");
-          await sleep(delay);
+          const waitResult = await sleepWithExecutionControl(delay, context);
+          if (waitResult === "cancelled") {
+            console.log(`[BatchExecutor] Execution cancelled during retry backoff`);
+            markPreparedTasksCancelled([...pendingRetry, ...remainingTasks], results, context);
+            currentItems = [];
+            break;
+          }
           currentItems = pendingRetry;
         } else {
           // All items handled, exit the retry loop
           currentItems = [];
         }
       } catch (error) {
-        // Entire batch HTTP call failed (network error, etc.)
-        retryCount++;
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[BatchExecutor] Batch ${i + 1} failed (attempt ${retryCount}/${maxRetries}):`, errorMessage);
+        console.error(`[BatchExecutor] Batch ${i + 1} request failed; not retrying create batch:`, errorMessage);
 
-        // Count as throttle event if the HTTP-level error is throttle-related
-        if (isThrottleErrorMessage(errorMessage)) {
-          batchThrottleCount += currentItems.length;
+        // Entire batch HTTP call failed before per-request responses were available.
+        // Re-submitting POST batches can create duplicates if Graph processed the
+        // original request before the transport error surfaced.
+        for (const { task } of currentItems) {
+          task.status = "failed";
+          task.error = errorMessage;
+          task.endTime = new Date();
+          results.push({ task, success: false, skipped: false, error: errorMessage });
+          context.onTaskError?.(task, error instanceof Error ? error : new Error(errorMessage));
         }
-
-        if (retryCount <= maxRetries) {
-          const retryDelay = Math.pow(2, retryCount) * 1000;
-          console.log(`[BatchExecutor] Retrying entire batch in ${retryDelay}ms...`);
-          await sleep(retryDelay);
-          // currentItems stays the same -- re-submit all
-        } else {
-          // Max retries exhausted, mark all remaining as failed
-          for (const { task } of currentItems) {
-            task.status = "failed";
-            task.error = errorMessage;
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: false, error: errorMessage });
-            context.onTaskError?.(task, error instanceof Error ? error : new Error(errorMessage));
-          }
-          currentItems = [];
-        }
+        currentItems = [];
       }
+    }
+
+    if (context.shouldCancel?.()) {
+      break;
     }
 
     // If we exhausted retries but still have items (shouldn't happen, but safety net)
@@ -1056,14 +1093,14 @@ async function executeBatchGroup(
 
       // Double the inter-batch delay when any throttling is detected
       currentBatchDelay = Math.min(currentBatchDelay * 2, 30_000);
-      console.log(`[BatchExecutor] Throttling detected in batch ${i + 1} — ${batchThrottleCount}/${chunk.length} items throttled, increasing delay to ${currentBatchDelay}ms`);
-      emitStatus(context, `Throttling detected — slowing down (delay ${currentBatchDelay}ms)`, "warning");
+      console.log(`[BatchExecutor] Throttling detected in batch ${i + 1} - ${batchThrottleCount}/${chunk.length} items throttled, increasing delay to ${currentBatchDelay}ms`);
+      emitStatus(context, `Throttling detected - slowing down (delay ${currentBatchDelay}ms)`, "warning");
 
       // If >50% of items were throttled, also reduce batch size for remaining items
       if (throttleRatio > 0.5 && currentBatchSize > MIN_BATCH_SIZE) {
         currentBatchSize = Math.max(Math.floor(currentBatchSize / 2), MIN_BATCH_SIZE);
-        console.log(`[BatchExecutor] >50% throttled — reducing batch size to ${currentBatchSize}`);
-        emitStatus(context, `Heavy throttling — reducing batch size to ${currentBatchSize}`, "warning");
+        console.log(`[BatchExecutor] >50% throttled - reducing batch size to ${currentBatchSize}`);
+        emitStatus(context, `Heavy throttling - reducing batch size to ${currentBatchSize}`, "warning");
       }
     } else {
       consecutiveUnthrottledBatches++;
@@ -1072,11 +1109,11 @@ async function executeBatchGroup(
       if (consecutiveUnthrottledBatches >= 2) {
         if (currentBatchDelay > config.delayBetweenBatches) {
           currentBatchDelay = Math.max(Math.floor(currentBatchDelay / 2), config.delayBetweenBatches);
-          console.log(`[BatchExecutor] Throttle recovery — reducing delay to ${currentBatchDelay}ms`);
+          console.log(`[BatchExecutor] Throttle recovery - reducing delay to ${currentBatchDelay}ms`);
         }
         if (currentBatchSize < initialBatchSize) {
           currentBatchSize = Math.min(currentBatchSize + Math.floor(initialBatchSize / 4), initialBatchSize);
-          console.log(`[BatchExecutor] Throttle recovery — increasing batch size to ${currentBatchSize}`);
+          console.log(`[BatchExecutor] Throttle recovery - increasing batch size to ${currentBatchSize}`);
         }
       }
     }
@@ -1084,7 +1121,12 @@ async function executeBatchGroup(
     // Delay between batches (except when no remaining tasks)
     if (remainingTasks.length > 0) {
       console.log(`[BatchExecutor] Waiting ${currentBatchDelay}ms before next batch`);
-      await sleep(currentBatchDelay);
+      const waitResult = await sleepWithExecutionControl(currentBatchDelay, context);
+      if (waitResult === "cancelled") {
+        console.log(`[BatchExecutor] Execution cancelled during inter-batch delay`);
+        markPreparedTasksCancelled(remainingTasks, results, context);
+        break;
+      }
     }
 
     batchIndex++;
@@ -1145,6 +1187,18 @@ function updateCacheAfterCreate(
           name: body.name as string,
           description: body.description as string | undefined,
         });
+      } else if (context.cachedSecurityIntents && body && body.id && body.displayName && body.templateId) {
+        context.cachedSecurityIntents.push({
+          id: body.id as string,
+          displayName: body.displayName as string,
+          description: body.description as string | undefined,
+        });
+      } else if (context.cachedGroupPolicyConfigurations && body && body.id && body.displayName) {
+        context.cachedGroupPolicyConfigurations.push({
+          id: body.id as string,
+          displayName: body.displayName as string,
+          description: body.description as string | undefined,
+        });
       }
       break;
   }
@@ -1174,7 +1228,16 @@ type DeletePrepareResult =
 /**
  * Endpoint type for baseline policies (determines delete URL)
  */
-type BaselineEndpointType = "settingsCatalog" | "v2Compliance" | "v1Compliance" | "deviceConfiguration" | "driverUpdate";
+type BaselineEndpointType =
+  | "settingsCatalog"
+  | "v2Compliance"
+  | "v1Compliance"
+  | "deviceConfiguration"
+  | "groupPolicyConfiguration"
+  | "securityIntent"
+  | "driverUpdate"
+  | "appProtection_ios"
+  | "appProtection_android";
 
 /**
  * Normalize a name for comparison by:
@@ -1222,7 +1285,7 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name}")`);
       return true;
     }
-    // API fallback — skip if name has chars that break OData $filter (e.g. [IHD] prefix)
+    // API fallback - skip if name has chars that break OData $filter (e.g. [IHD] prefix)
     if (!hasODataUnsafeChars(policyName) && await settingsCatalogPolicyExists(context.client, policyName)) {
       console.log(`${logPrefix} SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
       return true;
@@ -1268,6 +1331,36 @@ async function policyExistsInCacheOrApi(
     return false;
   }
 
+  if (policyType === "GroupPolicyConfiguration") {
+    const existing = context.cachedGroupPolicyConfigurations?.find(
+      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
+    );
+    if (existing) {
+      console.log(`${logPrefix} GroupPolicyConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    if (!hasODataUnsafeChars(policyName) && await groupPolicyConfigurationExists(context.client, policyName)) {
+      console.log(`${logPrefix} GroupPolicyConfiguration already exists (API fallback), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
+  if (policyType === "SecurityIntent") {
+    const existing = context.cachedSecurityIntents?.find(
+      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
+    );
+    if (existing) {
+      console.log(`${logPrefix} SecurityIntent already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    if (await securityIntentExists(context.client, policyName)) {
+      console.log(`${logPrefix} SecurityIntent already exists (API fallback), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
   if (policyType === "DriverUpdateProfiles") {
     const existing = context.cachedDriverUpdateProfiles?.find(
       (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
@@ -1293,6 +1386,10 @@ async function policyExistsInCacheOrApi(
     );
     if (existing) {
       console.log(`${logPrefix} ConditionalAccess policy already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    if (await conditionalAccessPolicyExists(context.client, policyName)) {
+      console.log(`${logPrefix} ConditionalAccess policy already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
     return false;
@@ -1434,6 +1531,46 @@ function findResourceIdForDelete(
         return { id: deviceConfig.id, hasMarker, endpointType: "deviceConfiguration" };
       }
 
+      let groupPolicyConfiguration = context.cachedGroupPolicyConfigurations?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
+      );
+
+      if (!groupPolicyConfiguration) {
+        groupPolicyConfiguration = context.cachedGroupPolicyConfigurations?.find(
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
+        );
+      }
+
+      if (groupPolicyConfiguration?.id) {
+        const hasMarker = hasHydrationMarker(groupPolicyConfiguration.description);
+        console.log(`[BatchExecutor:DELETE] Found Group Policy Configuration "${groupPolicyConfiguration.displayName}" (ID: ${groupPolicyConfiguration.id}), hasMarker: ${hasMarker}`);
+        return { id: groupPolicyConfiguration.id, hasMarker, endpointType: "groupPolicyConfiguration" };
+      }
+
+      let securityIntent = context.cachedSecurityIntents?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
+      );
+
+      if (!securityIntent) {
+        securityIntent = context.cachedSecurityIntents?.find(
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
+        );
+      }
+
+      if (securityIntent?.id) {
+        const hasMarker = hasHydrationMarker(securityIntent.description);
+        console.log(`[BatchExecutor:DELETE] Found Security Intent "${securityIntent.displayName}" (ID: ${securityIntent.id}), hasMarker: ${hasMarker}`);
+        return { id: securityIntent.id, hasMarker, endpointType: "securityIntent" };
+      }
+
       // If not found in Device Configurations, check Driver Update Profiles
       let driverProfile = context.cachedDriverUpdateProfiles?.find(
         (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
@@ -1456,11 +1593,44 @@ function findResourceIdForDelete(
         return { id: driverProfile.id, hasMarker, endpointType: "driverUpdate" };
       }
 
-      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), or Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0})`);
+      const appProtectionPolicy = context.cachedAppProtectionPolicies?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
+      );
+
+      if (appProtectionPolicy?.id) {
+        const endpointType = appProtectionPolicy._platform === "iOS"
+          ? "appProtection_ios"
+          : "appProtection_android";
+        const hasMarker = hasHydrationMarker(appProtectionPolicy.description);
+        console.log(`[BatchExecutor:DELETE] Found App Protection policy "${appProtectionPolicy.displayName}" (ID: ${appProtectionPolicy.id}), hasMarker: ${hasMarker}`);
+        return { id: appProtectionPolicy.id, hasMarker, endpointType };
+      }
+
+      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), Group Policy Configurations (${context.cachedGroupPolicyConfigurations?.length || 0}), Security Intents (${context.cachedSecurityIntents?.length || 0}), Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0}), or App Protection (${context.cachedAppProtectionPolicies?.length || 0})`);
       return null;
     }
 
     case "compliance": {
+      let v2Compliance = context.cachedV2CompliancePolicies?.find(
+        (c) => c.name?.toLowerCase() === nameToFind || normalizeName(c.name) === normalizedNameToFind
+      );
+      if (!v2Compliance) {
+        v2Compliance = context.cachedV2CompliancePolicies?.find(
+          (c) => {
+            const normalizedPolicyName = normalizeName(c.name);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
+        );
+      }
+      if (v2Compliance?.id) {
+        return {
+          id: v2Compliance.id,
+          hasMarker: hasHydrationMarker(v2Compliance.description),
+          endpointType: "v2Compliance",
+        };
+      }
+
       let compliance = context.cachedCompliancePolicies?.find(
         (c) => c.displayName?.toLowerCase() === nameToFind || normalizeName(c.displayName) === normalizedNameToFind
       );
@@ -1475,7 +1645,11 @@ function findResourceIdForDelete(
         );
       }
       if (compliance?.id) {
-        return { id: compliance.id, hasMarker: hasHydrationMarker(compliance.description) };
+        return {
+          id: compliance.id,
+          hasMarker: hasHydrationMarker(compliance.description),
+          endpointType: "v1Compliance",
+        };
       }
       return null;
     }
@@ -1492,10 +1666,18 @@ function findResourceIdForDelete(
       const searchNameWithShortMarker = `${nameToFind} ${markerShort}`.toLowerCase();
       const searchNameWithFullMarker = `${nameToFind} ${markerFull}`.toLowerCase();
 
-      const ca = context.cachedConditionalAccessPolicies?.find(
-        (c) => c.displayName?.toLowerCase() === searchNameWithShortMarker ||
-               c.displayName?.toLowerCase() === searchNameWithFullMarker
-      );
+      const ca = context.cachedConditionalAccessPolicies?.find((c) => {
+        const policyName = c.displayName?.toLowerCase();
+        if (!policyName || !hasHydrationMarker(c.displayName)) {
+          return false;
+        }
+
+        return (
+          policyName === nameToFind ||
+          policyName === searchNameWithShortMarker ||
+          policyName === searchNameWithFullMarker
+        );
+      });
       if (ca?.id) {
         // Policy found with marker in displayName - it was created by this tool
         return { id: ca.id, hasMarker: true };
@@ -1528,7 +1710,9 @@ function getAssignmentEndpoint(
       return null;
 
     case "compliance":
-      return `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
+      return endpointType === "v2Compliance"
+        ? `/deviceManagement/compliancePolicies/${resourceId}/assignments`
+        : `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
 
     case "baseline":
     case "cisBaseline":
@@ -1541,8 +1725,15 @@ function getAssignmentEndpoint(
           return `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
         case "deviceConfiguration":
           return `/deviceManagement/deviceConfigurations/${resourceId}/assignments`;
+        case "groupPolicyConfiguration":
+          return `/deviceManagement/groupPolicyConfigurations/${resourceId}/assignments`;
+        case "securityIntent":
+          return `/deviceManagement/intents/${resourceId}/assignments`;
         case "driverUpdate":
           return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}/assignments`;
+        case "appProtection_ios":
+        case "appProtection_android":
+          return null;
         default:
           return `/deviceManagement/configurationPolicies/${resourceId}/assignments`;
       }
@@ -1601,7 +1792,9 @@ function getDeleteEndpoint(category: string, resourceId: string, endpointType?: 
     case "filters":
       return `/deviceManagement/assignmentFilters/${resourceId}`;
     case "compliance":
-      return `/deviceManagement/deviceCompliancePolicies/${resourceId}`;
+      return endpointType === "v2Compliance"
+        ? `/deviceManagement/compliancePolicies/${resourceId}`
+        : `/deviceManagement/deviceCompliancePolicies/${resourceId}`;
     case "conditionalAccess":
       return `/identity/conditionalAccess/policies/${resourceId}`;
     case "baseline":
@@ -1615,6 +1808,12 @@ function getDeleteEndpoint(category: string, resourceId: string, endpointType?: 
       }
       if (endpointType === "deviceConfiguration") {
         return `/deviceManagement/deviceConfigurations/${resourceId}`;
+      }
+      if (endpointType === "groupPolicyConfiguration") {
+        return `/deviceManagement/groupPolicyConfigurations/${resourceId}`;
+      }
+      if (endpointType === "securityIntent") {
+        return `/deviceManagement/intents/${resourceId}`;
       }
       if (endpointType === "driverUpdate") {
         return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}`;
@@ -1784,19 +1983,16 @@ async function executeDeleteBatchGroup(
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[BatchExecutor:DELETE] Execution cancelled`);
-      for (const { task } of chunk) {
-        task.status = "skipped";
-        task.error = "Cancelled";  // Set skip reason on task object for UI display
-        task.endTime = new Date();
-        results.push({ task, success: false, skipped: true, error: "Cancelled" });
-        context.onTaskComplete?.(task);
-      }
+      markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
       break;
     }
 
     // Handle pause
-    while (context.shouldPause?.()) {
-      await sleep(500);
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log(`[BatchExecutor:DELETE] Execution cancelled while paused`);
+      markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
+      break;
     }
 
     // Report batch progress to UI
@@ -1908,7 +2104,12 @@ async function executeDeleteBatchGroup(
         if (retryCount < maxRetries) {
           const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff
           console.log(`[BatchExecutor:DELETE] Retrying in ${retryDelay}ms...`);
-          await sleep(retryDelay);
+          const waitResult = await sleepWithExecutionControl(retryDelay, context);
+          if (waitResult === "cancelled") {
+            console.log(`[BatchExecutor:DELETE] Execution cancelled during retry delay`);
+            markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
+            batchSuccess = true;
+          }
         } else {
           // Max retries reached, mark all as failed
           for (const { task } of chunk) {
@@ -1922,10 +2123,19 @@ async function executeDeleteBatchGroup(
       }
     }
 
+    if (context.shouldCancel?.()) {
+      break;
+    }
+
     // Delay between batches
     if (i < chunks.length - 1) {
       console.log(`[BatchExecutor:DELETE] Waiting ${config.delayBetweenBatches}ms before next batch`);
-      await sleep(config.delayBetweenBatches);
+      const waitResult = await sleepWithExecutionControl(config.delayBetweenBatches, context);
+      if (waitResult === "cancelled") {
+        console.log(`[BatchExecutor:DELETE] Execution cancelled during inter-batch delay`);
+        markPreparedTasksCancelled(chunks.slice(i + 1).flat(), results, context);
+        break;
+      }
     }
   }
 
@@ -2010,6 +2220,33 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
         );
         if (index !== -1) {
           context.cachedDriverUpdateProfiles.splice(index, 1);
+          break;
+        }
+      }
+      if (context.cachedGroupPolicyConfigurations) {
+        const index = context.cachedGroupPolicyConfigurations.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedGroupPolicyConfigurations.splice(index, 1);
+          break;
+        }
+      }
+      if (context.cachedSecurityIntents) {
+        const index = context.cachedSecurityIntents.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedSecurityIntents.splice(index, 1);
+          break;
+        }
+      }
+      if (context.cachedAppProtectionPolicies) {
+        const index = context.cachedAppProtectionPolicies.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedAppProtectionPolicies.splice(index, 1);
         }
       }
       break;
@@ -2023,13 +2260,22 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
           context.cachedCompliancePolicies.splice(index, 1);
         }
       }
+      if (context.cachedV2CompliancePolicies) {
+        const index = context.cachedV2CompliancePolicies.findIndex(
+          (c) => c.name?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedV2CompliancePolicies.splice(index, 1);
+        }
+      }
       break;
 
     case "conditionalAccess":
       if (context.cachedConditionalAccessPolicies) {
         const index = context.cachedConditionalAccessPolicies.findIndex(
           (c) => c.displayName?.toLowerCase() === nameToRemove ||
-                 c.displayName?.toLowerCase() === `${nameToRemove} [intune hydration kit]`
+                 c.displayName?.toLowerCase() === `${nameToRemove} [intune hydration kit]` ||
+                 c.displayName?.toLowerCase() === `${nameToRemove} [imported by intune hydration kit]`
         );
         if (index !== -1) {
           context.cachedConditionalAccessPolicies.splice(index, 1);
@@ -2155,14 +2401,14 @@ export async function executeDeletesInParallel(
     // Check for cancellation
     if (context.shouldCancel?.()) {
       console.log(`[FastDelete] Execution cancelled`);
-      for (let j = i; j < toDelete.length; j++) {
-        const { task } = toDelete[j];
-        task.status = "skipped";
-        task.error = "Cancelled";
-        task.endTime = new Date();
-        results.push({ task, success: false, skipped: true, error: "Cancelled" });
-        context.onTaskComplete?.(task);
-      }
+      markPreparedTasksCancelled(toDelete.slice(i), results, context);
+      break;
+    }
+
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log(`[FastDelete] Execution cancelled while paused`);
+      markPreparedTasksCancelled(toDelete.slice(i), results, context);
       break;
     }
 
@@ -2220,7 +2466,14 @@ export async function executeDeletesInParallel(
                 ? (attempt + 1) * 3000  // 3s, 6s, 9s for throttling
                 : (attempt + 1) * 500;  // 500ms, 1000ms, 1500ms for transient
               console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms (${is429Error ? "throttled" : "transient"})`);
-              await sleep(retryDelay);
+              const waitResult = await sleepWithExecutionControl(retryDelay, context);
+              if (waitResult === "cancelled") {
+                task.status = "skipped";
+                task.error = "Cancelled";
+                task.endTime = new Date();
+                context.onTaskComplete?.(task);
+                return { task, success: false, skipped: true, error: "Cancelled" };
+              }
               continue;
             }
 
@@ -2244,7 +2497,7 @@ export async function executeDeletesInParallel(
 
     results.push(...batchResults);
 
-    // Check if any results in this batch had throttling errors — add extra cooldown
+    // Check if any results in this batch had throttling errors - add extra cooldown
     const hadThrottling = batchResults.some(
       (r) => r.error?.includes("[429]") || r.error?.includes("TooManyRequests")
     );
@@ -2262,9 +2515,14 @@ export async function executeDeletesInParallel(
     if (i + parallelRequests < toDelete.length) {
       const batchDelay = hadThrottling ? 5000 : delayBetweenBatches;
       if (hadThrottling) {
-        console.log(`[FastDelete] Throttling detected — cooling down for ${batchDelay}ms before next batch`);
+        console.log(`[FastDelete] Throttling detected - cooling down for ${batchDelay}ms before next batch`);
       }
-      await sleep(batchDelay);
+      const waitResult = await sleepWithExecutionControl(batchDelay, context);
+      if (waitResult === "cancelled") {
+        console.log(`[FastDelete] Execution cancelled during inter-batch delay`);
+        markPreparedTasksCancelled(toDelete.slice(i + parallelRequests), results, context);
+        break;
+      }
     }
   }
 
@@ -2298,7 +2556,9 @@ function buildDeleteUrl(
       return `/deviceManagement/assignmentFilters/${resourceInfo.id}`;
 
     case "compliance":
-      return `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
+      return resourceInfo.endpointType === "v2Compliance"
+        ? `/deviceManagement/compliancePolicies/${resourceInfo.id}`
+        : `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
 
     case "conditionalAccess":
       return `/identity/conditionalAccess/policies/${resourceInfo.id}`;
@@ -2323,8 +2583,16 @@ function buildDeleteUrl(
           return `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
         case "deviceConfiguration":
           return `/deviceManagement/deviceConfigurations/${resourceInfo.id}`;
+        case "groupPolicyConfiguration":
+          return `/deviceManagement/groupPolicyConfigurations/${resourceInfo.id}`;
+        case "securityIntent":
+          return `/deviceManagement/intents/${resourceInfo.id}`;
         case "driverUpdate":
           return `/deviceManagement/windowsDriverUpdateProfiles/${resourceInfo.id}`;
+        case "appProtection_ios":
+          return `/deviceAppManagement/iosManagedAppProtections/${resourceInfo.id}`;
+        case "appProtection_android":
+          return `/deviceAppManagement/androidManagedAppProtections/${resourceInfo.id}`;
         default:
           // Default to Settings Catalog
           return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;

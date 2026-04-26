@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
 import { useWizardState } from "@/hooks/useWizardState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { getEstimatedTaskCount } from "@/lib/hydration/engine";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -31,6 +32,15 @@ export default function DashboardPage() {
     resume,
     cancel,
   } = useHydrationExecution();
+  const selectedObjectCount = getEstimatedTaskCount(
+    state.selectedTargets,
+    state.categorySelections
+  );
+  const completedTaskCount = tasks.filter(
+    (task) => task.status === "success" || task.status === "failed" || task.status === "skipped"
+  ).length;
+  const successTaskCount = tasks.filter((task) => task.status === "success").length;
+  const failedTaskCount = tasks.filter((task) => task.status === "failed").length;
 
   // Auto-start execution when page loads
   useEffect(() => {
@@ -124,6 +134,43 @@ export default function DashboardPage() {
         </header>
 
         <main className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                Run mode
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {state.isPreview
+                  ? `${state.operationMode === "create" ? "Create" : "Delete"} preview`
+                  : state.operationMode === "create"
+                    ? "Create live"
+                    : "Delete live"}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                Planned scope
+              </p>
+              <p className="mt-2 text-lg font-semibold">{selectedObjectCount} objects</p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                Completed
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {completedTaskCount}/{tasks.length || selectedObjectCount || 0}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                Outcome so far
+              </p>
+              <p className="mt-2 text-lg font-semibold">
+                {failedTaskCount > 0 ? `${failedTaskCount} failed` : `${successTaskCount} succeeded`}
+              </p>
+            </div>
+          </div>
+
           {/* Preview mode indicator */}
           {state.isPreview && !isCompleted && (
             <Alert className="border-blue-500 bg-blue-500/10">

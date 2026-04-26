@@ -54,7 +54,7 @@ const CIS_CATEGORIES = Object.entries(CIS_CATEGORY_METADATA).map(([id, meta]) =>
 const PLATFORM_NAMES: Record<OIBPlatformId, string> = {
   WINDOWS: "Windows",
   MACOS: "macOS",
-  BYOD: "BYOD (App Protection)",
+  BYOD: "BYOD (Bring Your Own Device)",
   WINDOWS365: "Windows 365 Cloud PC",
 };
 
@@ -146,7 +146,9 @@ async function fetchCategoryData(category: TaskCategory): Promise<CategoryItem[]
       return policies.map(p => ({
         displayName: p.displayName,
         description: p.description,
-        subtype: p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") || "",
+        subtype:
+          p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") ||
+          String(p.platforms || p.technologies || ""),
       }));
     }
     case "conditionalAccess": {
@@ -1022,6 +1024,23 @@ export function TargetSelection() {
   // Search filter helpers
   const normalizedSearch = searchQuery.toLowerCase().trim();
 
+  const getTargetCountLabel = (
+    isSelected: boolean,
+    displaySelectedCount: number,
+    displayCount: number,
+    isLoaded: boolean
+  ): string => {
+    if (normalizedSearch && !isLoaded) {
+      return `${displayCount} items`;
+    }
+
+    if (isSelected) {
+      return `${displaySelectedCount}/${displayCount}${normalizedSearch ? " matching" : ""}`;
+    }
+
+    return `${displayCount}${normalizedSearch ? " matching" : ""}`;
+  };
+
   const filterItems = (items: CategoryItem[]): CategoryItem[] => {
     if (!normalizedSearch) return items;
     return items.filter(item =>
@@ -1214,6 +1233,12 @@ export function TargetSelection() {
             // When searching but data not loaded, show total count (will update when loaded)
             const displayCount = normalizedSearch && isLoaded ? filteredCount : totalCount;
             const displaySelectedCount = normalizedSearch ? selectedMatchingCount : selectedCount;
+            const targetCountLabel = getTargetCountLabel(
+              targets.includes(target.id),
+              displaySelectedCount,
+              displayCount,
+              isLoaded
+            );
 
             return (
               <div key={target.id}>
@@ -1222,27 +1247,23 @@ export function TargetSelection() {
                   className={`flex items-start space-x-3 space-y-0 rounded-md border p-4 ${
                     targets.includes(target.id) && isExpanded ? "rounded-b-none border-b-0" : ""
                   }`}
-                >
+                  >
                   <Checkbox
                     id={target.id}
                     checked={targets.includes(target.id)}
                     onCheckedChange={() => handleToggle(target.id)}
                   />
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor={target.id} className="font-medium cursor-pointer">
-                        {target.label}{" "}
-                        <span className="text-sm text-muted-foreground">
-                          {normalizedSearch && !isLoaded ? (
-                            // Data not loaded yet, show total count
-                            `(${totalCount} items)`
-                          ) : targets.includes(target.id) ? (
-                            `(${displaySelectedCount} of ${displayCount}${normalizedSearch ? " matching" : " items"})`
-                          ) : (
-                            `(${displayCount}${normalizedSearch ? " matching" : " items"})`
-                          )}
-                        </span>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                      <Label
+                        htmlFor={target.id}
+                        className="min-w-0 cursor-pointer text-base font-medium leading-tight break-words"
+                      >
+                        {target.label}
                       </Label>
+                      <span className="inline-flex shrink-0 self-start rounded-full border border-border/80 bg-background/70 px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                        {targetCountLabel}
+                      </span>
                     </div>
                     <p className="text-sm text-muted-foreground">{target.description}</p>
                   </div>
@@ -1422,7 +1443,9 @@ export function TargetSelection() {
                                   onClick={() => togglePlatformExpanded(platformId)}
                                 >
                                   <div>
-                                    <Label className="font-medium cursor-pointer">{PLATFORM_NAMES[platformId] || platform.name}</Label>
+                                    <Label className="font-medium cursor-pointer">
+                                      {platform.name || PLATFORM_NAMES[platformId]}
+                                    </Label>
                                     <p className="text-xs text-muted-foreground">
                                       {displaySelected} of {displayCount} policies{normalizedSearch ? " matching" : " selected"}
                                     </p>

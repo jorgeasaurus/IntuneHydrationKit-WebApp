@@ -10,26 +10,26 @@
 @layer base {
   :root {
     /* Base colors - Clean, high-contrast light theme */
-    --background: 210 25% 98%;
-    --foreground: 215 50% 12%;
+    --background: 210 28% 96%;
+    --foreground: 215 44% 11%;
 
     /* Card surfaces */
-    --card: 0 0% 100%;
-    --card-foreground: 215 50% 12%;
+    --card: 210 25% 99%;
+    --card-foreground: 215 44% 11%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 215 50% 12%;
+    --popover: 210 25% 99%;
+    --popover-foreground: 215 44% 11%;
 
     /* Primary: Sky blue matching logo */
     --primary: 200 100% 50%;
     --primary-foreground: 0 0% 100%;
 
     /* Secondary: Slate blue undertones */
-    --secondary: 210 25% 93%;
-    --secondary-foreground: 215 50% 15%;
+    --secondary: 210 22% 88%;
+    --secondary-foreground: 215 34% 18%;
 
-    --muted: 210 20% 92%;
-    --muted-foreground: 215 20% 45%;
+    --muted: 210 20% 89%;
+    --muted-foreground: 215 18% 34%;
 
     /* Accent: Deep navy from logo */
     --accent: 210 65% 35%;
@@ -38,8 +38,8 @@
     --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 210 25% 88%;
-    --input: 210 25% 88%;
+    --border: 210 20% 80%;
+    --input: 210 20% 80%;
     --ring: 200 100% 50%;
 
     /* Custom palette - Logo colors */
@@ -99,6 +99,49 @@
     --signal-error: 0 72% 58%;
     --signal-info: 200 100% 55%;
   }
+
+  .corporate-1999 {
+    --background: 210 20% 86%;
+    --foreground: 221 40% 18%;
+
+    --card: 210 18% 93%;
+    --card-foreground: 221 40% 18%;
+
+    --popover: 210 18% 94%;
+    --popover-foreground: 221 40% 18%;
+
+    --primary: 220 70% 45%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 14% 80%;
+    --secondary-foreground: 221 32% 22%;
+
+    --muted: 210 14% 83%;
+    --muted-foreground: 220 16% 34%;
+
+    --accent: 45 95% 58%;
+    --accent-foreground: 220 56% 16%;
+
+    --destructive: 0 66% 50%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 18% 58%;
+    --input: 214 18% 58%;
+    --ring: 220 70% 45%;
+
+    --hydrate: 220 70% 45%;
+    --hydrate-foreground: 0 0% 100%;
+    --hydrate-deep: 223 36% 30%;
+    --hydrate-deep-foreground: 0 0% 100%;
+
+    --signal-success: 132 42% 42%;
+    --signal-warning: 40 100% 50%;
+    --signal-error: 0 66% 50%;
+    --signal-info: 220 70% 45%;
+
+    --radius: 0.2rem;
+  }
+
 }
 
 @layer base {
@@ -114,6 +157,13 @@
   html {
     @apply bg-background;
     scroll-behavior: smooth;
+  }
+
+  .corporate-1999 body {
+    background-image:
+      linear-gradient(180deg, hsl(0 0% 100% / 0.4), transparent 96px),
+      linear-gradient(180deg, hsl(var(--background)), hsl(214 18% 82%));
+    background-attachment: fixed;
   }
 
   /* Typography hierarchy */
@@ -150,6 +200,16 @@
   background-size: 40px 40px;
   -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 70%);
   mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 70%);
+}
+
+.corporate-1999 .industrial-bg::before {
+  opacity: 0.55;
+  background-image:
+    linear-gradient(hsl(0 0% 100% / 0.45) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(0 0% 100% / 0.45) 1px, transparent 1px);
+  background-size: 36px 36px;
+  -webkit-mask-image: linear-gradient(180deg, black 40%, transparent 100%);
+  mask-image: linear-gradient(180deg, black 40%, transparent 100%);
 }
 
 /* Animated flowing grid lines */
@@ -349,11 +409,11 @@
    ============================================ */
 
 .nav-industrial {
-  background: hsl(var(--background) / 0.85);
+  background: hsl(var(--background) / 0.94);
   -webkit-backdrop-filter: blur(20px) saturate(150%);
   backdrop-filter: blur(20px) saturate(150%);
-  border: 1px solid hsl(var(--border) / 0.5);
-  box-shadow: 0 4px 30px hsl(var(--foreground) / 0.05);
+  border: 1px solid hsl(var(--border) / 0.75);
+  box-shadow: 0 6px 26px hsl(var(--foreground) / 0.08);
 }
 
 .dark .nav-industrial {
@@ -388,6 +448,121 @@
 
 .nav-link:hover::after {
   width: 100%;
+}
+
+.corporate-1999 .data-card,
+.corporate-1999 .theme-card,
+.corporate-1999 .nav-industrial,
+.corporate-1999 .theme-dialog,
+.corporate-1999 .theme-select-content {
+  border-radius: 4px;
+  border-style: solid;
+  border-width: 1px;
+  border-top-color: hsl(0 0% 100%);
+  border-left-color: hsl(0 0% 100%);
+  border-right-color: hsl(214 18% 46%);
+  border-bottom-color: hsl(214 18% 42%);
+  background:
+    linear-gradient(180deg, hsl(0 0% 100% / 0.75), transparent 18%),
+    linear-gradient(180deg, hsl(var(--card)), hsl(210 16% 88%));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.92);
+}
+
+.corporate-1999 .data-card::before {
+  opacity: 0.82;
+  height: 3px;
+  background: linear-gradient(90deg, hsl(var(--primary)), hsl(var(--accent)));
+}
+
+.corporate-1999 .nav-industrial {
+  background:
+    linear-gradient(180deg, hsl(0 0% 100% / 0.82), transparent 22%),
+    linear-gradient(180deg, hsl(var(--card)), hsl(210 12% 82%));
+}
+
+.corporate-1999 .nav-link {
+  color: hsl(221 34% 28%);
+  font-weight: 600;
+}
+
+.corporate-1999 .nav-link:hover {
+  color: hsl(var(--primary));
+}
+
+.corporate-1999 .nav-link::after {
+  background: hsl(var(--primary));
+}
+
+.corporate-1999 .theme-button,
+.corporate-1999 .theme-input,
+.corporate-1999 .theme-select-trigger,
+.corporate-1999 .theme-dialog,
+.corporate-1999 .theme-switch {
+  border-radius: 3px;
+  border-top-color: hsl(0 0% 100%);
+  border-left-color: hsl(0 0% 100%);
+  border-right-color: hsl(214 18% 46%);
+  border-bottom-color: hsl(214 18% 42%);
+  background:
+    linear-gradient(180deg, hsl(0 0% 100% / 0.88), hsl(210 14% 84%));
+  box-shadow: inset 0 1px 0 hsl(0 0% 100% / 0.96);
+}
+
+.corporate-1999 .theme-button {
+  color: hsl(221 40% 22%);
+  font-weight: 700;
+}
+
+.corporate-1999 .theme-button:hover {
+  background:
+    linear-gradient(180deg, hsl(0 0% 100% / 0.94), hsl(210 14% 80%));
+}
+
+.corporate-1999 .theme-button:active,
+.corporate-1999 .theme-button[data-state="open"] {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px hsl(214 18% 38% / 0.18);
+}
+
+.corporate-1999 .theme-button.bg-primary,
+.corporate-1999 .theme-button[class*="bg-primary"],
+.corporate-1999 .theme-switch[data-state="checked"] {
+  background:
+    linear-gradient(180deg, hsl(219 74% 58%), hsl(var(--primary)));
+  color: hsl(var(--primary-foreground));
+  border-top-color: hsl(220 90% 78%);
+  border-left-color: hsl(220 90% 78%);
+  border-right-color: hsl(223 50% 30%);
+  border-bottom-color: hsl(223 50% 26%);
+}
+
+.corporate-1999 .theme-input:focus-visible,
+.corporate-1999 .theme-select-trigger:focus,
+.corporate-1999 .theme-dialog:focus-within {
+  outline: 2px solid hsl(var(--accent) / 0.65);
+  outline-offset: 1px;
+}
+
+.corporate-1999 .theme-select-item {
+  border-bottom: 1px solid hsl(214 18% 72%);
+}
+
+.corporate-1999 .theme-select-item:last-child {
+  border-bottom: none;
+}
+
+.corporate-1999 .theme-select-item[data-highlighted],
+.corporate-1999 .theme-select-item:focus {
+  background: hsl(var(--primary) / 0.16);
+  color: hsl(221 50% 22%);
+}
+
+.corporate-1999 .theme-switch-thumb {
+  background:
+    linear-gradient(180deg, hsl(0 0% 100%), hsl(210 12% 90%));
+  box-shadow:
+    inset 0 1px 0 hsl(0 0% 100% / 0.96),
+    0 1px 2px hsl(220 28% 18% / 0.2);
 }
 
 /* ============================================

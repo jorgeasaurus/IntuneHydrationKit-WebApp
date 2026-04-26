@@ -55,7 +55,7 @@ When a Graph API call returns 403 Forbidden, the tool:
 3. Re-authenticates with the combined scope set
 4. Retries the original request with the new token
 
-This happens transparently — no manual scope management needed.
+This happens transparently - no manual scope management needed.
 
 ### Session-Scoped Cache
 
@@ -65,7 +65,7 @@ Tokens are cached in a session-scoped temporary file (`os.TempDir()`) for the du
 
 For automation, CI/CD pipelines, and service-to-service scenarios.
 
-**IMPORTANT**: App-only auth requires `MSGRAPH_TENANT_ID` set to a specific tenant (not `common`). The tool errors early with a clear message if this is missing. Incremental consent is not available — all permissions must be pre-configured and admin-consented in the Entra ID app registration.
+**IMPORTANT**: App-only auth requires `MSGRAPH_TENANT_ID` set to a specific tenant (not `common`). The tool errors early with a clear message if this is missing. Incremental consent is not available - all permissions must be pre-configured and admin-consented in the Entra ID app registration.
 
 All pre-granted application permissions are used via the `https://graph.microsoft.com/.default` scope. The `--device-code` and `--scopes` flags are ignored for app-only auth.
 
@@ -88,7 +88,7 @@ msgraph auth signin
 
 ### Client Certificate
 
-More secure than client secrets — uses a certificate for authentication:
+More secure than client secrets - uses a certificate for authentication:
 
 ```
 export MSGRAPH_CLIENT_ID="your-app-id"
@@ -127,7 +127,7 @@ export MSGRAPH_MANAGED_IDENTITY_CLIENT_ID="your-managed-identity-client-id"
 msgraph auth signin
 ```
 
-No client secret or certificate is needed — Azure handles credential management automatically.
+No client secret or certificate is needed - Azure handles credential management automatically.
 
 **Setup:**
 1. Enable managed identity on your Azure resource
@@ -145,8 +145,8 @@ msgraph auth signin
 ```
 
 The tool also auto-reads these standard environment variables:
-- `AZURE_FEDERATED_TOKEN_FILE` — set by AKS workload identity
-- `AWS_WEB_IDENTITY_TOKEN_FILE` — set by AWS IRSA / EKS
+- `AZURE_FEDERATED_TOKEN_FILE` - set by AKS workload identity
+- `AWS_WEB_IDENTITY_TOKEN_FILE` - set by AWS IRSA / EKS
 
 For AKS workload identity, `AZURE_CLIENT_ID` and `AZURE_TENANT_ID` are used as fallbacks if `MSGRAPH_CLIENT_ID` / `MSGRAPH_TENANT_ID` are not set.
 
@@ -185,12 +185,12 @@ msgraph auth signin
 |---|---|---|
 | `MSGRAPH_CLIENT_ID` | Custom Entra ID app client ID | Microsoft Graph CLI Tools app |
 | `MSGRAPH_TENANT_ID` | Target tenant ID (required for app-only) | `common` |
-| `MSGRAPH_CLIENT_SECRET` | App registration client secret | — |
-| `MSGRAPH_CLIENT_CERTIFICATE_PATH` | Path to PEM certificate file | — |
-| `MSGRAPH_CLIENT_CERTIFICATE_PASSWORD` | Password for encrypted certificate key | — |
-| `MSGRAPH_AUTH_METHOD` | Set to `managed-identity` for Azure managed identity | — |
-| `MSGRAPH_MANAGED_IDENTITY_CLIENT_ID` | Client ID for user-assigned managed identity | — |
-| `MSGRAPH_FEDERATED_TOKEN_FILE` | Path to federated token file (workload identity) | — |
+| `MSGRAPH_CLIENT_SECRET` | App registration client secret | - |
+| `MSGRAPH_CLIENT_CERTIFICATE_PATH` | Path to PEM certificate file | - |
+| `MSGRAPH_CLIENT_CERTIFICATE_PASSWORD` | Password for encrypted certificate key | - |
+| `MSGRAPH_AUTH_METHOD` | Set to `managed-identity` for Azure managed identity | - |
+| `MSGRAPH_MANAGED_IDENTITY_CLIENT_ID` | Client ID for user-assigned managed identity | - |
+| `MSGRAPH_FEDERATED_TOKEN_FILE` | Path to federated token file (workload identity) | - |
 | `MSGRAPH_NO_TOKEN_CACHE` | Disable persisted token cache; tokens live only for the current process | `false` |
 
 Also auto-reads: `AZURE_FEDERATED_TOKEN_FILE`, `AWS_WEB_IDENTITY_TOKEN_FILE`, `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`.

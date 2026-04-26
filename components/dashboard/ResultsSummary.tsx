@@ -3,6 +3,12 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { HydrationSummary, HydrationTask } from "@/types/hydration";
 import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle, Eye } from "lucide-react";
 import {
@@ -20,8 +26,29 @@ interface ResultsSummaryProps {
   isPreview?: boolean;
 }
 
-export function ResultsSummary({ summary, tasks, isPreview = false }: ResultsSummaryProps) {
-  const handleDownload = (fileFormat: "md" | "json" | "csv") => {
+function getCategoryDisplayName(category: string): string {
+  return category.charAt(0).toUpperCase() + category.slice(1);
+}
+
+function getTaskStatusClassName(status: HydrationTask["status"]): string {
+  switch (status) {
+    case "success":
+      return "text-green-700 dark:text-green-300";
+    case "skipped":
+      return "text-amber-700 dark:text-amber-300";
+    case "failed":
+      return "text-red-700 dark:text-red-300";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
+export function ResultsSummary({
+  summary,
+  tasks,
+  isPreview = false,
+}: ResultsSummaryProps): React.JSX.Element {
+  function handleDownload(fileFormat: "md" | "json" | "csv"): void {
     let content: string;
     let filename: string;
 
@@ -41,7 +68,7 @@ export function ResultsSummary({ summary, tasks, isPreview = false }: ResultsSum
     }
 
     downloadReport(content, filename);
-  };
+  }
 
   const successRate =
     summary.stats.total > 0
@@ -63,18 +90,18 @@ export function ResultsSummary({ summary, tasks, isPreview = false }: ResultsSum
   };
 
   // Get appropriate labels based on mode and preview state
-  const getActionLabel = () => {
+  function getActionLabel(): string {
     if (isPreview) {
       return summary.operationMode === "create" ? "Would Create" : "Would Delete";
     }
     return summary.operationMode === "create" ? "Created" : "Deleted";
-  };
+  }
 
-  const getActionCount = () => {
+  function getActionCount(): number {
     return summary.operationMode === "create"
       ? summary.stats.created
       : summary.stats.deleted;
-  };
+  }
 
   return (
     <div className="space-y-6">
@@ -157,70 +184,75 @@ export function ResultsSummary({ summary, tasks, isPreview = false }: ResultsSum
           <CardDescription>Results grouped by category</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
+          <Accordion
+            type="multiple"
+            defaultValue={Object.keys(summary.categoryBreakdown)}
+            className="space-y-4"
+          >
             {Object.entries(summary.categoryBreakdown).map(([category, stats]) => {
               const categoryTasks = tasks.filter((task) => task.category === category);
               return (
-                <div key={category} className="space-y-2">
-                  <div className="flex items-center justify-between p-3 rounded-lg border">
-                    <div className="space-y-1">
-                      <p className="font-medium">
-                        {category.charAt(0).toUpperCase() + category.slice(1)}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {stats.total} {stats.total === 1 ? "item" : "items"}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="flex items-center gap-1">
-                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <span className="text-sm font-medium">{stats.success}</span>
+                <AccordionItem
+                  key={category}
+                  value={category}
+                  className="overflow-hidden rounded-lg border px-0"
+                >
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
+                    <div className="flex w-full items-center justify-between gap-4 pr-4 text-left">
+                      <div className="space-y-1">
+                        <p className="font-medium">{getCategoryDisplayName(category)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {stats.total} {stats.total === 1 ? "item" : "items"}
+                        </p>
                       </div>
-                      <div className="flex items-center gap-1">
-                        <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                        <span className="text-sm font-medium">{stats.skipped}</span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
-                        <span className="text-sm font-medium">{stats.failed}</span>
-                      </div>
-                    </div>
-                  </div>
-                  {/* Individual items */}
-                  <div className="ml-4 space-y-1">
-                    {categoryTasks.map((task) => (
-                      <div
-                        key={task.id}
-                        className={`flex items-start gap-2 p-2 rounded text-sm ${
-                          task.status === "success"
-                            ? "text-green-700 dark:text-green-300"
-                            : task.status === "skipped"
-                              ? "text-amber-700 dark:text-amber-300"
-                              : task.status === "failed"
-                                ? "text-red-700 dark:text-red-300"
-                                : "text-muted-foreground"
-                        }`}
-                      >
-                        {task.status === "success" ? (
-                          <CheckCircle2 className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                        ) : task.status === "skipped" ? (
-                          <MinusCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                        ) : task.status === "failed" ? (
-                          <XCircle className="h-3 w-3 flex-shrink-0 mt-0.5" />
-                        ) : null}
-                        <div className="flex-1 min-w-0">
-                          <span className="truncate block">{task.itemName}</span>
-                          {task.error && (task.status === "skipped" || task.status === "failed") && (
-                            <span className="text-xs opacity-75 block mt-0.5">{task.error}</span>
-                          )}
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-1">
+                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <span className="text-sm font-medium">{stats.success}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          <span className="text-sm font-medium">{stats.skipped}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          <span className="text-sm font-medium">{stats.failed}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  </AccordionTrigger>
+
+                  <AccordionContent className="border-t px-4 pb-4 pt-3">
+                    <div className="space-y-1">
+                      {categoryTasks.map((task) => (
+                        <div
+                          key={task.id}
+                          className={`flex items-start gap-2 rounded p-2 text-sm ${getTaskStatusClassName(task.status)}`}
+                        >
+                          {task.status === "success" ? (
+                            <CheckCircle2 className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                          ) : task.status === "skipped" ? (
+                            <MinusCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                          ) : task.status === "failed" ? (
+                            <XCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                          ) : null}
+                          <div className="min-w-0 flex-1">
+                            <span className="block truncate">{task.itemName}</span>
+                            {task.error &&
+                              (task.status === "skipped" || task.status === "failed") && (
+                                <span className="mt-0.5 block text-xs opacity-75">
+                                  {task.error}
+                                </span>
+                              )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               );
             })}
-          </div>
+          </Accordion>
         </CardContent>
       </Card>
 

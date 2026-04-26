@@ -9,6 +9,7 @@ import { createSummary } from "@/lib/hydration/reporter";
 import { useWizardState } from "./useWizardState";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { isBatchableCategory } from "@/lib/hydration/batchExecutor";
+import { useSettings } from "./useSettings";
 
 interface ExecutionState {
   tasks: HydrationTask[];
@@ -26,6 +27,7 @@ interface ExecutionState {
 
 export function useHydrationExecution() {
   const { state } = useWizardState();
+  const { settings } = useSettings();
   const [executionState, setExecutionState] = useState<ExecutionState>({
     tasks: [],
     isRunning: false,
@@ -45,6 +47,24 @@ export function useHydrationExecution() {
   const pauseRef = useRef(false);
   const cancelRef = useRef(false);
   const executionLockRef = useRef(false);
+
+  const appendActivityMessage = useCallback(
+    (message: string, type: ActivityMessage["type"], category = "control") => {
+      const activityMessage: ActivityMessage = {
+        id: `activity-${activityIdCounter.current++}`,
+        timestamp: new Date(),
+        message,
+        type,
+        category,
+      };
+
+      setExecutionState((prev) => ({
+        ...prev,
+        activityLog: [...prev.activityLog.slice(-99), activityMessage],
+      }));
+    },
+    []
+  );
 
   /**
    * Start execution
@@ -153,11 +173,11 @@ export function useHydrationExecution() {
       };
 
       // Create execution context
-      const context: ExecutionContext = {
-        client,
-        operationMode: state.operationMode,
-        isPreview: state.isPreview,
-        stopOnFirstError: false,
+        const context: ExecutionContext = {
+          client,
+          operationMode: state.operationMode,
+          isPreview: state.isPreview,
+          stopOnFirstError: settings.stopOnFirstError,
         hasConditionalAccessLicense: state.prerequisiteResult?.licenses?.hasConditionalAccessLicense ?? true,
         hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,
         hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true,
@@ -223,29 +243,31 @@ export function useHydrationExecution() {
       // Release execution lock
       executionLockRef.current = false;
     }
-  }, [state]);
+  }, [settings.stopOnFirstError, state]);
 
   /**
    * Pause execution
    */
   const pause = useCallback(() => {
     pauseRef.current = true;
+    appendActivityMessage("Pause requested. Execution will stop after the current in-flight work completes.", "warning");
     setExecutionState((prev) => ({
       ...prev,
       isPaused: true,
     }));
-  }, []);
+  }, [appendActivityMessage]);
 
   /**
    * Resume execution
    */
   const resume = useCallback(() => {
     pauseRef.current = false;
+    appendActivityMessage("Execution resumed.", "info");
     setExecutionState((prev) => ({
       ...prev,
       isPaused: false,
     }));
-  }, []);
+  }, [appendActivityMessage]);
 
   /**
    * Cancel execution
@@ -253,6 +275,7 @@ export function useHydrationExecution() {
   const cancel = useCallback(() => {
     cancelRef.current = true;
     pauseRef.current = false;
+    appendActivityMessage("Cancellation requested. Remaining work will be skipped.", "warning");
     setExecutionState((prev) => ({
       ...prev,
       isRunning: false,
@@ -260,7 +283,7 @@ export function useHydrationExecution() {
       isCompleted: true,
       endTime: new Date(),
     }));
-  }, []);
+  }, [appendActivityMessage]);
 
   /**
    * Reset execution state

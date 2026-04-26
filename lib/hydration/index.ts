@@ -45,6 +45,8 @@ export {
 // Utility functions
 export {
   sleep,
+  waitWhilePaused,
+  sleepWithExecutionControl,
   escapeODataString,
   containsSecretPlaceholders,
   isActualSecretField,

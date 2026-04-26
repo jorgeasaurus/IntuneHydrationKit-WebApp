@@ -25,7 +25,7 @@ const WizardContext = createContext<WizardContextType | undefined>(undefined);
 
 const initialState: WizardState = {
   currentStep: 1,
-  isPreview: false,
+  isPreview: true,
   selectedTargets: [],
   selectedCISCategories: [],
   confirmed: false,

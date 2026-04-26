@@ -4,7 +4,7 @@ Thank you for your interest in contributing! This document covers how to add com
 
 ## Why contribute?
 
-Large language models are trained on data that's months old — they don't know about the latest Graph APIs or endpoint changes. Some Graph API docs and endpoints aren't always clear either. Your working query samples go directly into the skill's search index, helping every AI agent using this skill find the right API call.
+Large language models are trained on data that's months old - they don't know about the latest Graph APIs or endpoint changes. Some Graph API docs and endpoints aren't always clear either. Your working query samples go directly into the skill's search index, helping every AI agent using this skill find the right API call.
 
 Read more: [Why Your Samples Matter](https://graph.pm/improve/why-samples-matter/)
 
@@ -59,12 +59,12 @@ Or use the web form at [graph.pm/improve/add-sample](https://graph.pm/improve/ad
 
 ### Guidelines
 
-- **One sample per file** — eliminates merge conflicts when multiple people contribute
-- **Use descriptive file names** — `list-conditional-access-policies.yaml`, not `sample1.yaml`
-- **Be specific in the intent** — "List all Conditional Access policies" beats "Get policies"
-- **Include the full query path** — `GET /beta/identity/conditionalAccess/policies`
-- **Use `$select` where appropriate** — helps agents return only needed fields
-- **Test your query** — verify it works against the Graph API before submitting
+- **One sample per file** - eliminates merge conflicts when multiple people contribute
+- **Use descriptive file names** - `list-conditional-access-policies.yaml`, not `sample1.yaml`
+- **Be specific in the intent** - "List all Conditional Access policies" beats "Get policies"
+- **Include the full query path** - `GET /beta/identity/conditionalAccess/policies`
+- **Use `$select` where appropriate** - helps agents return only needed fields
+- **Test your query** - verify it works against the Graph API before submitting
 
 ### When to contribute
 

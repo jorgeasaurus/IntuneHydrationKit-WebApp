@@ -13,6 +13,23 @@ import {
 import { getCachedTemplates, AppProtectionTemplate } from "@/lib/templates/loader";
 import * as Templates from "@/templates";
 
+function stripImportPrefix(name: string): string {
+  return name.replace(/^\[ihd\]\s/i, "");
+}
+
+function namesMatch(left: string | undefined, right: string | undefined): boolean {
+  if (!left || !right) {
+    return false;
+  }
+
+  const normalizedLeft = left.toLowerCase();
+  const normalizedRight = right.toLowerCase();
+  return (
+    normalizedLeft === normalizedRight ||
+    stripImportPrefix(normalizedLeft) === stripImportPrefix(normalizedRight)
+  );
+}
+
 /**
  * Execute an app protection policy task (create or delete)
  */
@@ -21,24 +38,30 @@ export async function executeAppProtectionTask(
   context: ExecutionContext
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode, isPreview } = context;
+  const requestedName = task.itemName;
+  const normalizedRequestedName = stripImportPrefix(requestedName);
 
   // Try to get template from cache first, fallback to hardcoded templates
   let template: AppProtectionTemplate | AppProtectionPolicy | undefined;
   const cachedAppProtection = getCachedTemplates("appProtection");
   if (cachedAppProtection && Array.isArray(cachedAppProtection)) {
-    template = (cachedAppProtection as AppProtectionTemplate[]).find((ap) => ap.displayName === task.itemName);
+    template = (cachedAppProtection as AppProtectionTemplate[]).find((ap) =>
+      namesMatch(ap.displayName, requestedName)
+    );
   }
 
   // Fallback to hardcoded templates if not in cache
   if (!template) {
-    template = Templates.getAppProtectionPolicyByName(task.itemName);
-  }
-
-  if (!template) {
-    return { task, success: false, skipped: false, error: "Template not found" };
+    template =
+      Templates.getAppProtectionPolicyByName(requestedName) ??
+      Templates.getAppProtectionPolicyByName(normalizedRequestedName);
   }
 
   if (mode === "create") {
+    if (!template) {
+      return { task, success: false, skipped: false, error: "Template not found" };
+    }
+
     // Check if policy already exists using cached policies
     const existingPolicy = context.cachedAppProtectionPolicies?.find(
       (p) => p.displayName.toLowerCase() === template!.displayName.toLowerCase()
@@ -73,9 +96,8 @@ export async function executeAppProtectionTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
-    // Get the policy from cache instead of making an API call
-    const policy = context.cachedAppProtectionPolicies?.find(
-      (p) => p.displayName.toLowerCase() === template.displayName.toLowerCase()
+    const policy = context.cachedAppProtectionPolicies?.find((p) =>
+      namesMatch(p.displayName, template?.displayName ?? requestedName)
     );
 
     if (!policy || !policy.id) {
@@ -98,13 +120,13 @@ export async function executeAppProtectionTask(
       platform = "android";
     } else {
       // Fallback: check template's @odata.type if policy doesn't have it
-      const templateOdataType = template["@odata.type"];
+      const templateOdataType = template?.["@odata.type"];
       if (templateOdataType === "#microsoft.graph.iosManagedAppProtection") {
         platform = "iOS";
       } else if (templateOdataType === "#microsoft.graph.androidManagedAppProtection") {
         platform = "android";
       } else {
-        throw new Error(`Unable to determine platform for policy "${template.displayName}"`);
+        throw new Error(`Unable to determine platform for policy "${policy.displayName}"`);
       }
     }
 

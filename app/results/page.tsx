@@ -13,7 +13,7 @@ import { useWizardState } from "@/hooks/useWizardState";
 
 export default function ResultsPage() {
   const router = useRouter();
-  const { resetWizard } = useWizardState();
+  const { state, resetWizard } = useWizardState();
   const [summary, setSummary] = useState<HydrationSummary | null>(null);
   const [tasks, setTasks] = useState<HydrationTask[]>([]);
   const [isPreview, setIsPreview] = useState(false);
@@ -128,7 +128,55 @@ export default function ResultsPage() {
             </Alert>
           ) : summary ? (
             tasks.length > 0 ? (
-              <ResultsSummary summary={summary} tasks={tasks} isPreview={isPreview} />
+              <div className="space-y-6">
+                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                      Tenant
+                    </p>
+                    <p className="mt-2 text-base font-semibold">
+                      {summary.tenantName || summary.tenantId}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                      Mode
+                    </p>
+                    <p className="mt-2 text-base font-semibold capitalize">
+                      {summary.operationMode}
+                      {isPreview ? " preview" : ""}
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                      Tasks
+                    </p>
+                    <p className="mt-2 text-base font-semibold">{summary.stats.total}</p>
+                  </div>
+                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
+                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                      Duration
+                    </p>
+                    <p className="mt-2 text-base font-semibold">
+                      {Math.round(summary.duration / 1000)}s
+                    </p>
+                  </div>
+                </div>
+
+                {state.selectedTargets.includes("conditionalAccess") &&
+                  summary.operationMode === "create" && (
+                    <Alert className="border-amber-500/30 bg-amber-500/10">
+                      <AlertTriangle className="h-4 w-4" />
+                      <AlertTitle>Conditional Access follow-up</AlertTitle>
+                      <AlertDescription>
+                        Review Conditional Access policies in Intune before enabling them in
+                        production.
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                <ResultsSummary summary={summary} tasks={tasks} isPreview={isPreview} />
+              </div>
             ) : (
               <Alert>
                 <AlertTriangle className="h-4 w-4" />

@@ -94,13 +94,13 @@ https://graph.microsoft.com/{version}/{resource}
 
 ## OData Query Parameters
 
-### $select — Choose fields
+### $select - Choose fields
 
 ```
 /users?$select=displayName,mail,userPrincipalName
 ```
 
-### $filter — Filter results
+### $filter - Filter results
 
 ```
 /users?$filter=startsWith(displayName,'John')
@@ -109,34 +109,34 @@ https://graph.microsoft.com/{version}/{resource}
 /users?$filter=accountEnabled eq true
 ```
 
-### $top — Limit results
+### $top - Limit results
 
 ```
 /users?$top=10
 ```
 
-### $orderby — Sort results
+### $orderby - Sort results
 
 ```
 /users?$orderby=displayName
 /me/messages?$orderby=receivedDateTime desc
 ```
 
-### $expand — Include related resources
+### $expand - Include related resources
 
 ```
 /groups/{id}?$expand=members
 /me/messages/{id}?$expand=attachments
 ```
 
-### $count — Get count (requires ConsistencyLevel header)
+### $count - Get count (requires ConsistencyLevel header)
 
 ```
 /users/$count
 ```
 Use with header: `ConsistencyLevel: eventual`
 
-### $search — Search (requires ConsistencyLevel header)
+### $search - Search (requires ConsistencyLevel header)
 
 ```
 /users?$search="displayName:John"
@@ -222,9 +222,9 @@ Content-Type: application/json
 
 ## Tips
 
-1. **Use $select** to reduce response size — only request fields you need
-2. **Use $top** to limit results — avoid fetching thousands of records
-3. **Check $filter support** — not all properties support filtering
+1. **Use $select** to reduce response size - only request fields you need
+2. **Use $top** to limit results - avoid fetching thousands of records
+3. **Check $filter support** - not all properties support filtering
 4. **ConsistencyLevel header** is required for $count and $search on directory objects
 5. **User identifier** can be the object ID or userPrincipalName (email)
 6. **Group identifier** must be the object ID

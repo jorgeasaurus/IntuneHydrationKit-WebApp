@@ -15,6 +15,36 @@ import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
 import * as Templates from "@/templates";
 
+function normalizeName(name: string | undefined | null): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(/[:'""`''""]/g, " ")
+    .replace(/\.{2,}/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function findCachedConditionalAccessPolicy(
+  displayName: string,
+  policies: ExecutionContext["cachedConditionalAccessPolicies"]
+): { id: string; displayName?: string; description?: string } | undefined {
+  const lowerName = displayName.toLowerCase();
+  const suffixedLowerName = `${lowerName} [intune hydration kit]`;
+  const fullMarkerLowerName = `${lowerName} [imported by intune hydration kit]`;
+  const normalizedDisplayName = normalizeName(displayName);
+
+  return policies?.find((policy) => {
+    const policyLower = policy.displayName?.toLowerCase();
+    return (
+      policyLower === lowerName ||
+      policyLower === suffixedLowerName ||
+      policyLower === fullMarkerLowerName ||
+      normalizeName(policy.displayName) === normalizedDisplayName
+    );
+  });
+}
+
 /**
  * Execute a conditional access policy task (create or delete)
  */
@@ -69,7 +99,20 @@ export async function executeConditionalAccessTask(
   }
 
   if (mode === "create") {
-    // Check if policy already exists
+    const existingPolicy = findCachedConditionalAccessPolicy(
+      template.displayName,
+      context.cachedConditionalAccessPolicies
+    );
+
+    if (existingPolicy) {
+      return {
+        task,
+        success: true,
+        skipped: true,
+        error: "Already exists",
+      };
+    }
+
     const exists = await conditionalAccessPolicyExists(client, template.displayName);
     if (exists) {
       return {
@@ -108,9 +151,9 @@ export async function executeConditionalAccessTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
-    // Check if policy exists first using cached policies if available
-    const existingPolicy = context.cachedConditionalAccessPolicies?.find(
-      (p) => p.displayName?.toLowerCase() === template.displayName.toLowerCase()
+    const existingPolicy = findCachedConditionalAccessPolicy(
+      template.displayName,
+      context.cachedConditionalAccessPolicies
     );
 
     if (!existingPolicy) {
