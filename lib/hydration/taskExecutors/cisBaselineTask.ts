@@ -378,7 +378,7 @@ export async function executeCISBaselineTask(
         case "V2Compliance": {
           // Delete from /compliancePolicies
           if (hasODataUnsafeChars(policyName)) {
-            console.log(`[CIS Baseline Task] Cannot query V2 Compliance for "${policyName}" (OData-unsafe chars) — skipping`);
+            console.log(`[CIS Baseline Task] Cannot query V2 Compliance for "${policyName}" (OData-unsafe chars) - skipping`);
             return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
           }
           const escapedV2Name = escapeODataString(policyName);
@@ -405,7 +405,7 @@ export async function executeCISBaselineTask(
         case "V1Compliance": {
           // Delete from /deviceCompliancePolicies
           if (hasODataUnsafeChars(policyName)) {
-            console.log(`[CIS Baseline Task] Cannot query V1 Compliance for "${policyName}" (OData-unsafe chars) — skipping`);
+            console.log(`[CIS Baseline Task] Cannot query V1 Compliance for "${policyName}" (OData-unsafe chars) - skipping`);
             return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
           }
           const escapedV1Name = escapeODataString(policyName);
@@ -432,7 +432,7 @@ export async function executeCISBaselineTask(
         case "DeviceConfiguration": {
           // Delete from /deviceConfigurations
           if (hasODataUnsafeChars(policyName)) {
-            console.log(`[CIS Baseline Task] Cannot query Device Configuration for "${policyName}" (OData-unsafe chars) — skipping`);
+            console.log(`[CIS Baseline Task] Cannot query Device Configuration for "${policyName}" (OData-unsafe chars) - skipping`);
             return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
           }
           const escapedDcName = escapeODataString(policyName);

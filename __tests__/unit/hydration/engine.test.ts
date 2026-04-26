@@ -265,7 +265,7 @@ describe("executeTasks", () => {
     expect(statusUpdates.map(({ message }) => message)).toEqual(
       expect.arrayContaining([
         "Checking tenant for existing resources (6 items selected)...",
-        "Tenant check complete — starting execution...",
+        "Tenant check complete - starting execution...",
         "Starting batch creation (3 items per batch)...",
       ])
     );

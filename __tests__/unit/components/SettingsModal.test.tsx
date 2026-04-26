@@ -6,7 +6,7 @@ import { SettingsModal } from '@/components/SettingsModal'
 import { SettingsProvider } from '@/hooks/useSettings'
 
 const DEFAULT_SETTINGS = {
-  stopOnFirstError: true,
+  stopOnFirstError: false,
   theme: 'system',
 } as const
 
@@ -68,7 +68,7 @@ describe('SettingsModal', () => {
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(JSON.parse(window.localStorage.getItem('app-settings') ?? 'null')).toEqual({
-      stopOnFirstError: false,
+      stopOnFirstError: true,
       theme: 'dark',
     })
   })

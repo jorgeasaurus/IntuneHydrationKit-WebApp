@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsProvider, useSettings } from "@/hooks/useSettings";
 
 const DEFAULT_SETTINGS = {
-  stopOnFirstError: true,
+  stopOnFirstError: false,
   theme: "system",
 } as const;
 
@@ -45,7 +45,7 @@ describe("useSettings", () => {
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("loads stored settings and normalizes unsupported themes", async () => {
+  it("loads stored settings synchronously and normalizes unsupported themes", () => {
     window.localStorage.setItem(
       "app-settings",
       JSON.stringify({
@@ -56,26 +56,22 @@ describe("useSettings", () => {
 
     const { result } = renderHook(() => useSettings(), { wrapper });
 
-    await waitFor(() => {
-      expect(result.current.settings).toEqual({
-        stopOnFirstError: false,
-        theme: "system",
-      });
+    expect(result.current.settings).toEqual({
+      stopOnFirstError: false,
+      theme: "system",
     });
   });
 
-  it("keeps defaults and logs when stored settings are invalid JSON", async () => {
+  it("keeps defaults and logs when stored settings are invalid JSON", () => {
     window.localStorage.setItem("app-settings", "{");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { result } = renderHook(() => useSettings(), { wrapper });
 
-    await waitFor(() => {
-      expect(errorSpy).toHaveBeenCalledWith(
-        "Failed to parse stored settings:",
-        expect.any(SyntaxError)
-      );
-    });
+    expect(errorSpy).toHaveBeenCalledWith(
+      "Failed to parse stored settings:",
+      expect.any(SyntaxError)
+    );
 
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
   });
@@ -96,6 +92,17 @@ describe("useSettings", () => {
       stopOnFirstError: false,
       theme: "dark",
     });
+  });
+
+  it("normalizes invalid updates before applying and persisting them", () => {
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    act(() => {
+      result.current.updateSettings({ theme: "retro-terminal" as AppSettings["theme"] });
+    });
+
+    expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
+    expect(JSON.parse(window.localStorage.getItem("app-settings") ?? "{}")).toEqual(DEFAULT_SETTINGS);
   });
 
   it("resets settings to defaults and persists the reset", () => {

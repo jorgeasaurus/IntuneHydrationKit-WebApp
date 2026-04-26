@@ -223,7 +223,7 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
     return { type: "error", reason: "Template not found" };
   }
 
-  // Check if already exists in cache — match with or without [IHD] prefix
+  // Check if already exists in cache - match with or without [IHD] prefix
   console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups?.length || 0} cached groups`);
   const templateName = template!.displayName.toLowerCase();
   const templateNameStripped = templateName.startsWith("[ihd] ") ? templateName.slice(6) : templateName;
@@ -813,7 +813,7 @@ export async function executeTasksInBatches(
   const seqMsg = nonBatchableTasks.length > 0 ? `, ${nonBatchableTasks.length} sequential` : "";
   emitStatus(
     context,
-    `Preparation complete — sending ${batchableTasks.length} items${skipMsg}${seqMsg}`,
+    `Preparation complete - sending ${batchableTasks.length} items${skipMsg}${seqMsg}`,
     "info",
     "create"
   );
@@ -873,7 +873,7 @@ async function executeBatchGroup(
     ? Math.min(config.categoryBatchSizes?.cisBaseline ?? config.defaultBatchSize, config.defaultBatchSize)
     : config.defaultBatchSize;
 
-  // Adaptive throttle state — tracks across batches to dynamically adjust delay and size
+  // Adaptive throttle state - tracks across batches to dynamically adjust delay and size
   let currentBatchDelay = config.delayBetweenBatches;
   let currentBatchSize = initialBatchSize;
   let consecutiveUnthrottledBatches = 0;
@@ -1093,14 +1093,14 @@ async function executeBatchGroup(
 
       // Double the inter-batch delay when any throttling is detected
       currentBatchDelay = Math.min(currentBatchDelay * 2, 30_000);
-      console.log(`[BatchExecutor] Throttling detected in batch ${i + 1} — ${batchThrottleCount}/${chunk.length} items throttled, increasing delay to ${currentBatchDelay}ms`);
-      emitStatus(context, `Throttling detected — slowing down (delay ${currentBatchDelay}ms)`, "warning");
+      console.log(`[BatchExecutor] Throttling detected in batch ${i + 1} - ${batchThrottleCount}/${chunk.length} items throttled, increasing delay to ${currentBatchDelay}ms`);
+      emitStatus(context, `Throttling detected - slowing down (delay ${currentBatchDelay}ms)`, "warning");
 
       // If >50% of items were throttled, also reduce batch size for remaining items
       if (throttleRatio > 0.5 && currentBatchSize > MIN_BATCH_SIZE) {
         currentBatchSize = Math.max(Math.floor(currentBatchSize / 2), MIN_BATCH_SIZE);
-        console.log(`[BatchExecutor] >50% throttled — reducing batch size to ${currentBatchSize}`);
-        emitStatus(context, `Heavy throttling — reducing batch size to ${currentBatchSize}`, "warning");
+        console.log(`[BatchExecutor] >50% throttled - reducing batch size to ${currentBatchSize}`);
+        emitStatus(context, `Heavy throttling - reducing batch size to ${currentBatchSize}`, "warning");
       }
     } else {
       consecutiveUnthrottledBatches++;
@@ -1109,11 +1109,11 @@ async function executeBatchGroup(
       if (consecutiveUnthrottledBatches >= 2) {
         if (currentBatchDelay > config.delayBetweenBatches) {
           currentBatchDelay = Math.max(Math.floor(currentBatchDelay / 2), config.delayBetweenBatches);
-          console.log(`[BatchExecutor] Throttle recovery — reducing delay to ${currentBatchDelay}ms`);
+          console.log(`[BatchExecutor] Throttle recovery - reducing delay to ${currentBatchDelay}ms`);
         }
         if (currentBatchSize < initialBatchSize) {
           currentBatchSize = Math.min(currentBatchSize + Math.floor(initialBatchSize / 4), initialBatchSize);
-          console.log(`[BatchExecutor] Throttle recovery — increasing batch size to ${currentBatchSize}`);
+          console.log(`[BatchExecutor] Throttle recovery - increasing batch size to ${currentBatchSize}`);
         }
       }
     }
@@ -1285,7 +1285,7 @@ async function policyExistsInCacheOrApi(
       console.log(`${logPrefix} SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name}")`);
       return true;
     }
-    // API fallback — skip if name has chars that break OData $filter (e.g. [IHD] prefix)
+    // API fallback - skip if name has chars that break OData $filter (e.g. [IHD] prefix)
     if (!hasODataUnsafeChars(policyName) && await settingsCatalogPolicyExists(context.client, policyName)) {
       console.log(`${logPrefix} SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
       return true;
@@ -2497,7 +2497,7 @@ export async function executeDeletesInParallel(
 
     results.push(...batchResults);
 
-    // Check if any results in this batch had throttling errors — add extra cooldown
+    // Check if any results in this batch had throttling errors - add extra cooldown
     const hadThrottling = batchResults.some(
       (r) => r.error?.includes("[429]") || r.error?.includes("TooManyRequests")
     );
@@ -2515,7 +2515,7 @@ export async function executeDeletesInParallel(
     if (i + parallelRequests < toDelete.length) {
       const batchDelay = hadThrottling ? 5000 : delayBetweenBatches;
       if (hadThrottling) {
-        console.log(`[FastDelete] Throttling detected — cooling down for ${batchDelay}ms before next batch`);
+        console.log(`[FastDelete] Throttling detected - cooling down for ${batchDelay}ms before next batch`);
       }
       const waitResult = await sleepWithExecutionControl(batchDelay, context);
       if (waitResult === "cancelled") {

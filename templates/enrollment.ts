@@ -190,7 +190,7 @@ export const ESP_PROFILES: ESPProfile[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Device Preparation Profile (1) — settings-catalog style
+// Device Preparation Profile (1) - settings-catalog style
 // ---------------------------------------------------------------------------
 
 export const DEVICE_PREPARATION_PROFILES: DevicePreparationProfile[] = [

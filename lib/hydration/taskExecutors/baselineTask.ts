@@ -188,7 +188,7 @@ export async function executeBaselineTask(
       if (policyType === "CompliancePolicies") {
         // Find compliance policy by name first (to get ID)
         if (hasODataUnsafeChars(policyName)) {
-          console.log(`[Baseline Task] Cannot query compliance for "${policyName}" (OData-unsafe chars) — skipping`);
+          console.log(`[Baseline Task] Cannot query compliance for "${policyName}" (OData-unsafe chars) - skipping`);
           return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
         }
         const escapedPolicyName = escapeODataString(policyName);
@@ -248,7 +248,7 @@ export async function executeBaselineTask(
       } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
         // DeviceConfiguration and UpdatePolicies use /deviceManagement/deviceConfigurations endpoint
         if (hasODataUnsafeChars(policyName)) {
-          console.log(`[Baseline Task] Cannot query device config for "${policyName}" (OData-unsafe chars) — skipping`);
+          console.log(`[Baseline Task] Cannot query device config for "${policyName}" (OData-unsafe chars) - skipping`);
           return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
         }
         const escapedPolicyNameDel = escapeODataString(policyName);

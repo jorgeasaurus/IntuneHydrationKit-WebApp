@@ -429,7 +429,7 @@ export async function executeTasks(
   const useCreateBatching = batchConfig.enableBatching && context.operationMode === "create";
   const useDeleteBatching = batchConfig.enableBatching && context.operationMode === "delete";
 
-  emitStatus(context, "Tenant check complete — starting execution...", "success", "prefetch");
+  emitStatus(context, "Tenant check complete - starting execution...", "success", "prefetch");
 
   if (useCreateBatching) {
     emitStatus(context, `Starting batch creation (${batchConfig.defaultBatchSize} items per batch)...`, "info", "execute");
