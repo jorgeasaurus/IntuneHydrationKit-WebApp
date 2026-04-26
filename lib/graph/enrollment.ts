@@ -12,6 +12,13 @@ const AUTOPILOT_PATH = "/deviceManagement/windowsAutopilotDeploymentProfiles";
 const ESP_PATH = "/deviceManagement/deviceEnrollmentConfigurations";
 const CONFIG_POLICIES_PATH = "/deviceManagement/configurationPolicies";
 
+function normalizeEnrollmentDisplayName(displayName: string | undefined | null): string {
+  return String(displayName || "")
+    .replace(/^\[IHD\]\s*-\s*/i, "[IHD] ")
+    .trim()
+    .toLowerCase();
+}
+
 function addEnrollmentHydrationMarker(description: string | undefined | null): string {
   const desc = String(description || "");
   if (hasHydrationMarker(desc)) {
@@ -123,8 +130,9 @@ export async function getAutopilotProfileByName(
   displayName: string
 ): Promise<AutopilotDeploymentProfile | null> {
   const profiles = await getAllAutopilotProfiles(client);
+  const normalizedDisplayName = normalizeEnrollmentDisplayName(displayName);
   return profiles.find(
-    (p) => p.displayName.toLowerCase() === displayName.toLowerCase()
+    (p) => normalizeEnrollmentDisplayName(p.displayName) === normalizedDisplayName
   ) || null;
 }
 
@@ -198,8 +206,9 @@ export async function getESPConfigurationByName(
   displayName: string
 ): Promise<EnrollmentStatusPageConfiguration | null> {
   const configs = await getAllEnrollmentConfigurations(client);
+  const normalizedDisplayName = normalizeEnrollmentDisplayName(displayName);
   return configs.find(
-    (c) => c.displayName.toLowerCase() === displayName.toLowerCase()
+    (c) => normalizeEnrollmentDisplayName(c.displayName) === normalizedDisplayName
   ) || null;
 }
 
