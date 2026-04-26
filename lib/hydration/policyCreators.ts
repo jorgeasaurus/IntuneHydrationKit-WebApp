@@ -10,6 +10,14 @@ import { containsSecretPlaceholders, escapeODataString, hasODataUnsafeChars } fr
 
 const CIS_METADATA_KEYS = ["_cisCategory", "_cisSubcategory", "_cisFilePath"] as const;
 
+function normalizePolicyLookupName(name: string | undefined | null): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Remove CIS-specific metadata fields from a policy object.
  */
@@ -192,6 +200,138 @@ export async function createCISCompliancePolicy(
     "/deviceManagement/deviceCompliancePolicies",
     cleaned
   );
+}
+
+function normalizeGroupPolicyDefinitionValues(policy: Record<string, unknown>): void {
+  const definitionValues = policy.definitionValues;
+  if (!definitionValues) {
+    return;
+  }
+
+  const normalizedDefinitionValues = Array.isArray(definitionValues)
+    ? definitionValues
+    : [definitionValues];
+
+  policy.definitionValues = normalizedDefinitionValues.map((definitionValue) => {
+    if (!definitionValue || typeof definitionValue !== "object") {
+      return definitionValue;
+    }
+
+    const normalizedDefinitionValue = definitionValue as Record<string, unknown>;
+    const presentationValues = normalizedDefinitionValue.presentationValues;
+
+    if (presentationValues) {
+      normalizedDefinitionValue.presentationValues = Array.isArray(presentationValues)
+        ? presentationValues
+        : [presentationValues];
+    }
+
+    return normalizedDefinitionValue;
+  });
+}
+
+export function buildCISGroupPolicyConfigurationPayload(
+  policy: Record<string, unknown>
+): Record<string, unknown> {
+  const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
+
+  delete cleaned.id;
+  removeCISMetadata(cleaned);
+  cleaned.description = addHydrationMarker(cleaned.description as string | undefined);
+  normalizeToDisplayName(cleaned);
+  normalizeGroupPolicyDefinitionValues(cleaned);
+
+  return cleaned;
+}
+
+export async function createCISGroupPolicyConfiguration(
+  client: GraphClient,
+  policy: Record<string, unknown>
+): Promise<{ id: string }> {
+  return client.post<{ id: string }>(
+    "/deviceManagement/groupPolicyConfigurations",
+    buildCISGroupPolicyConfigurationPayload(policy)
+  );
+}
+
+export async function groupPolicyConfigurationExists(
+  client: GraphClient,
+  displayName: string
+): Promise<boolean> {
+  if (hasODataUnsafeChars(displayName)) {
+    console.log(`[Group Policy Configuration] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
+    return false;
+  }
+
+  try {
+    const escapedName = escapeODataString(displayName);
+    const response = await client.get<{ value: Array<{ displayName: string }> }>(
+      `/deviceManagement/groupPolicyConfigurations?$filter=displayName eq '${encodeURIComponent(escapedName)}'&$select=id,displayName`
+    );
+    return response.value && response.value.length > 0;
+  } catch (error) {
+    console.error(`[Group Policy Configuration] Error checking if policy exists: ${displayName}`, error);
+    return false;
+  }
+}
+
+export function buildCISSecurityIntentPayload(
+  policy: Record<string, unknown>
+): Record<string, unknown> {
+  const cleaned = cleanPolicyRecursively(policy) as Record<string, unknown>;
+
+  delete cleaned.id;
+  removeCISMetadata(cleaned);
+
+  return {
+    displayName: cleaned.displayName,
+    description: addHydrationMarker(cleaned.description as string | undefined),
+    templateId: cleaned.templateId,
+    roleScopeTagIds: cleaned.roleScopeTagIds,
+    settings: cleaned.settings ?? [],
+  };
+}
+
+export async function createCISSecurityIntent(
+  client: GraphClient,
+  policy: Record<string, unknown>
+): Promise<{ id: string }> {
+  return client.post<{ id: string }>(
+    "/deviceManagement/intents",
+    buildCISSecurityIntentPayload(policy)
+  );
+}
+
+export async function securityIntentExists(
+  client: GraphClient,
+  displayName: string
+): Promise<boolean> {
+  if (hasODataUnsafeChars(displayName)) {
+    console.log(`[Security Intent] Using collection lookup for "${displayName}" (OData-unsafe chars)`);
+    try {
+      const intents = await client.getCollection<{ displayName?: string }>(
+        "/deviceManagement/intents?$select=id,displayName"
+      ) ?? [];
+      const normalizedDisplayName = normalizePolicyLookupName(displayName);
+      return intents.some(
+        (intent) => normalizePolicyLookupName(intent.displayName) === normalizedDisplayName
+      );
+    } catch (error) {
+      console.error(`[Security Intent] Error checking if policy exists: ${displayName}`, error);
+      return false;
+    }
+  }
+
+  try {
+    const escapedName = escapeODataString(displayName);
+    const response = await client.get<{ value: Array<{ displayName: string }> }>(
+      `/deviceManagement/intents?$filter=displayName eq '${escapedName}'&$select=id,displayName`
+    );
+    return response.value && response.value.length > 0;
+  } catch (error) {
+    console.error(`[Security Intent] Error checking if policy exists: ${displayName}`, error);
+    return false;
+  }
 }
 
 export async function createV2CompliancePolicy(

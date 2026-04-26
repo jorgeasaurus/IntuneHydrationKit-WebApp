@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { sleepWithExecutionControl, waitWhilePaused } from "@/lib/hydration/utils";
+import {
+  containsSecretPlaceholders,
+  escapeODataString,
+  hasODataUnsafeChars,
+  isActualSecretField,
+  sleepWithExecutionControl,
+  waitWhilePaused,
+} from "@/lib/hydration/utils";
 
 describe("hydration execution controls", () => {
   beforeEach(() => {
@@ -83,5 +90,58 @@ describe("hydration execution controls", () => {
     await vi.advanceTimersByTimeAsync(700);
 
     await expect(resultPromise).resolves.toBe("completed");
+  });
+
+  it("cancels immediately when a controlled sleep starts after cancellation", async () => {
+    await expect(
+      sleepWithExecutionControl(
+        1000,
+        {
+          shouldPause: () => false,
+          shouldCancel: () => true,
+        },
+        100
+      )
+    ).resolves.toBe("cancelled");
+  });
+});
+
+describe("hydration utility helpers", () => {
+  it("escapes OData strings and detects OData-unsafe characters", () => {
+    expect(escapeODataString("O'Brien")).toBe("O''Brien");
+    expect(hasODataUnsafeChars("[IHD] Baseline: Windows")).toBe(true);
+    expect(hasODataUnsafeChars("Baseline Windows")).toBe(false);
+  });
+
+  it("detects placeholder secrets in nested password settings", () => {
+    expect(
+      containsSecretPlaceholders({
+        settings: [
+          {
+            settingDefinitionId: "vpn_password",
+            simpleSettingValue: {
+              value: "<YOUR VPN PASSWORD>",
+            },
+          },
+        ],
+      })
+    ).toBe(true);
+
+    expect(
+      containsSecretPlaceholders({
+        settingDefinitionId: "vpn_password",
+        value: "production-password",
+      })
+    ).toBe(false);
+
+    expect(containsSecretPlaceholders(["safe", { nested: "CHANGE_ME" }])).toBe(true);
+    expect(containsSecretPlaceholders(null)).toBe(false);
+  });
+
+  it("distinguishes actual secret fields from password-related policy settings", () => {
+    expect(isActualSecretField("wifi_profile_networkPassword")).toBe(true);
+    expect(isActualSecretField("vpnConnection_sharedKey")).toBe(true);
+    expect(isActualSecretField("device_passwordRequired")).toBe(false);
+    expect(isActualSecretField("networkPasswordEncryptionStore")).toBe(false);
   });
 });

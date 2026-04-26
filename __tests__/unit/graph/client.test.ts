@@ -281,6 +281,38 @@ describe('GraphClient', () => {
     })
   })
 
+  describe('batch', () => {
+    it('submits the batch request once and does not retry the whole request on transport errors', async () => {
+      let requestCount = 0
+
+      server.use(
+        http.post(`${GRAPH_BASE}/beta/$batch`, () => {
+          requestCount++
+          return HttpResponse.json(
+            { error: { code: 'ServiceUnavailable', message: 'Try again later' } },
+            { status: 503 }
+          )
+        })
+      )
+
+      const client = new GraphClient()
+
+      await expect(
+        client.batch([
+          {
+            id: '1',
+            method: 'POST',
+            url: '/groups',
+            body: { displayName: 'Test Group' },
+            headers: { 'Content-Type': 'application/json' },
+          },
+        ])
+      ).rejects.toThrow('Try again later')
+
+      expect(requestCount).toBe(1)
+    })
+  })
+
   describe('delete', () => {
     it('sends DELETE request', async () => {
       let capturedMethod = ''

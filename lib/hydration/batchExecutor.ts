@@ -25,6 +25,10 @@ import {
   settingsCatalogPolicyExists,
   v2CompliancePolicyExists,
   deviceConfigurationExists,
+  groupPolicyConfigurationExists,
+  buildCISGroupPolicyConfigurationPayload,
+  securityIntentExists,
+  buildCISSecurityIntentPayload,
 } from "./policyCreators";
 import {
   getCachedTemplates,
@@ -35,6 +39,7 @@ import {
   CISBaselinePolicy,
   BaselinePolicy,
 } from "@/lib/templates/loader";
+import { conditionalAccessPolicyExists } from "@/lib/graph/conditionalAccess";
 import * as Templates from "@/templates";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
 
@@ -103,6 +108,8 @@ const CATEGORY_ENDPOINTS: Record<string, string> = {
   enrollment_esp: "/deviceManagement/deviceEnrollmentConfigurations",
   settingsCatalog: "/deviceManagement/configurationPolicies",
   deviceConfiguration: "/deviceManagement/deviceConfigurations",
+  groupPolicyConfiguration: "/deviceManagement/groupPolicyConfigurations",
+  securityIntent: "/deviceManagement/intents",
   driverUpdate: "/deviceManagement/windowsDriverUpdateProfiles",
   v2Compliance: "/deviceManagement/compliancePolicies",
 };
@@ -445,11 +452,11 @@ async function buildBaselineRequestBody(
     console.log(`[BatchExecutor] OIB policy "${policyName}" type detected: ${policyType}`);
   }
 
-  // Only batch SettingsCatalog, DeviceConfiguration, DriverUpdateProfiles, and V2Compliance.
+  // Only batch SettingsCatalog, DeviceConfiguration, GroupPolicyConfiguration,
+  // DriverUpdateProfiles, and V2Compliance.
   // App Protection baselines need the dedicated sequential create path.
   if (
     policyType === "Unsupported" ||
-    policyType === "SecurityIntent" ||
     policyType === "V1Compliance" ||
     policyType === "AppProtection"
   ) {
@@ -476,6 +483,16 @@ async function buildBaselineRequestBody(
       body = cleanPolicyRecursively(template) as Record<string, unknown>;
       body.description = addHydrationMarker(body.description as string | undefined);
       endpoint = CATEGORY_ENDPOINTS.deviceConfiguration;
+      break;
+
+    case "GroupPolicyConfiguration":
+      body = buildCISGroupPolicyConfigurationPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.groupPolicyConfiguration;
+      break;
+
+    case "SecurityIntent":
+      body = buildCISSecurityIntentPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.securityIntent;
       break;
 
     case "DriverUpdateProfiles":
@@ -536,8 +553,9 @@ async function buildCISBaselineRequestBody(
   const policyName = (template.name || template.displayName) as string;
   const policyType = detectCISPolicyType(template as Record<string, unknown>);
 
-  // Only batch SettingsCatalog, DeviceConfiguration, and V2Compliance
-  if (policyType === "Unsupported" || policyType === "SecurityIntent" || policyType === "V1Compliance") {
+  // Only batch SettingsCatalog, DeviceConfiguration, GroupPolicyConfiguration,
+  // SecurityIntent, and V2Compliance
+  if (policyType === "Unsupported" || policyType === "V1Compliance") {
     return null;
   }
 
@@ -560,6 +578,16 @@ async function buildCISBaselineRequestBody(
       body = cleanPolicyRecursively(template) as Record<string, unknown>;
       body.description = addHydrationMarker(body.description as string | undefined);
       endpoint = CATEGORY_ENDPOINTS.deviceConfiguration;
+      break;
+
+    case "GroupPolicyConfiguration":
+      body = buildCISGroupPolicyConfigurationPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.groupPolicyConfiguration;
+      break;
+
+    case "SecurityIntent":
+      body = buildCISSecurityIntentPayload(template as Record<string, unknown>);
+      endpoint = CATEGORY_ENDPOINTS.securityIntent;
       break;
 
     case "V2Compliance":
@@ -1024,38 +1052,20 @@ async function executeBatchGroup(
           currentItems = [];
         }
       } catch (error) {
-        // Entire batch HTTP call failed (network error, etc.)
-        retryCount++;
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[BatchExecutor] Batch ${i + 1} failed (attempt ${retryCount}/${maxRetries}):`, errorMessage);
+        console.error(`[BatchExecutor] Batch ${i + 1} request failed; not retrying create batch:`, errorMessage);
 
-        // Count as throttle event if the HTTP-level error is throttle-related
-        if (isThrottleErrorMessage(errorMessage)) {
-          batchThrottleCount += currentItems.length;
+        // Entire batch HTTP call failed before per-request responses were available.
+        // Re-submitting POST batches can create duplicates if Graph processed the
+        // original request before the transport error surfaced.
+        for (const { task } of currentItems) {
+          task.status = "failed";
+          task.error = errorMessage;
+          task.endTime = new Date();
+          results.push({ task, success: false, skipped: false, error: errorMessage });
+          context.onTaskError?.(task, error instanceof Error ? error : new Error(errorMessage));
         }
-
-        if (retryCount <= maxRetries) {
-          const retryDelay = Math.pow(2, retryCount) * 1000;
-          console.log(`[BatchExecutor] Retrying entire batch in ${retryDelay}ms...`);
-          const waitResult = await sleepWithExecutionControl(retryDelay, context);
-          if (waitResult === "cancelled") {
-            console.log(`[BatchExecutor] Execution cancelled during batch retry delay`);
-            markPreparedTasksCancelled([...currentItems, ...remainingTasks], results, context);
-            currentItems = [];
-            break;
-          }
-          // currentItems stays the same -- re-submit all
-        } else {
-          // Max retries exhausted, mark all remaining as failed
-          for (const { task } of currentItems) {
-            task.status = "failed";
-            task.error = errorMessage;
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: false, error: errorMessage });
-            context.onTaskError?.(task, error instanceof Error ? error : new Error(errorMessage));
-          }
-          currentItems = [];
-        }
+        currentItems = [];
       }
     }
 
@@ -1177,6 +1187,18 @@ function updateCacheAfterCreate(
           name: body.name as string,
           description: body.description as string | undefined,
         });
+      } else if (context.cachedSecurityIntents && body && body.id && body.displayName && body.templateId) {
+        context.cachedSecurityIntents.push({
+          id: body.id as string,
+          displayName: body.displayName as string,
+          description: body.description as string | undefined,
+        });
+      } else if (context.cachedGroupPolicyConfigurations && body && body.id && body.displayName) {
+        context.cachedGroupPolicyConfigurations.push({
+          id: body.id as string,
+          displayName: body.displayName as string,
+          description: body.description as string | undefined,
+        });
       }
       break;
   }
@@ -1212,6 +1234,7 @@ type BaselineEndpointType =
   | "v1Compliance"
   | "deviceConfiguration"
   | "groupPolicyConfiguration"
+  | "securityIntent"
   | "driverUpdate"
   | "appProtection_ios"
   | "appProtection_android";
@@ -1308,6 +1331,36 @@ async function policyExistsInCacheOrApi(
     return false;
   }
 
+  if (policyType === "GroupPolicyConfiguration") {
+    const existing = context.cachedGroupPolicyConfigurations?.find(
+      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
+    );
+    if (existing) {
+      console.log(`${logPrefix} GroupPolicyConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    if (!hasODataUnsafeChars(policyName) && await groupPolicyConfigurationExists(context.client, policyName)) {
+      console.log(`${logPrefix} GroupPolicyConfiguration already exists (API fallback), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
+  if (policyType === "SecurityIntent") {
+    const existing = context.cachedSecurityIntents?.find(
+      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
+    );
+    if (existing) {
+      console.log(`${logPrefix} SecurityIntent already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    if (await securityIntentExists(context.client, policyName)) {
+      console.log(`${logPrefix} SecurityIntent already exists (API fallback), skipping: "${policyName}"`);
+      return true;
+    }
+    return false;
+  }
+
   if (policyType === "DriverUpdateProfiles") {
     const existing = context.cachedDriverUpdateProfiles?.find(
       (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
@@ -1333,6 +1386,10 @@ async function policyExistsInCacheOrApi(
     );
     if (existing) {
       console.log(`${logPrefix} ConditionalAccess policy already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
+      return true;
+    }
+    if (await conditionalAccessPolicyExists(context.client, policyName)) {
+      console.log(`${logPrefix} ConditionalAccess policy already exists (API fallback), skipping: "${policyName}"`);
       return true;
     }
     return false;
@@ -1494,6 +1551,26 @@ function findResourceIdForDelete(
         return { id: groupPolicyConfiguration.id, hasMarker, endpointType: "groupPolicyConfiguration" };
       }
 
+      let securityIntent = context.cachedSecurityIntents?.find(
+        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
+      );
+
+      if (!securityIntent) {
+        securityIntent = context.cachedSecurityIntents?.find(
+          (p) => {
+            const normalizedPolicyName = normalizeName(p.displayName);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
+        );
+      }
+
+      if (securityIntent?.id) {
+        const hasMarker = hasHydrationMarker(securityIntent.description);
+        console.log(`[BatchExecutor:DELETE] Found Security Intent "${securityIntent.displayName}" (ID: ${securityIntent.id}), hasMarker: ${hasMarker}`);
+        return { id: securityIntent.id, hasMarker, endpointType: "securityIntent" };
+      }
+
       // If not found in Device Configurations, check Driver Update Profiles
       let driverProfile = context.cachedDriverUpdateProfiles?.find(
         (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
@@ -1529,7 +1606,7 @@ function findResourceIdForDelete(
         return { id: appProtectionPolicy.id, hasMarker, endpointType };
       }
 
-      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), Group Policy Configurations (${context.cachedGroupPolicyConfigurations?.length || 0}), Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0}), or App Protection (${context.cachedAppProtectionPolicies?.length || 0})`);
+      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), Group Policy Configurations (${context.cachedGroupPolicyConfigurations?.length || 0}), Security Intents (${context.cachedSecurityIntents?.length || 0}), Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0}), or App Protection (${context.cachedAppProtectionPolicies?.length || 0})`);
       return null;
     }
 
@@ -1650,6 +1727,8 @@ function getAssignmentEndpoint(
           return `/deviceManagement/deviceConfigurations/${resourceId}/assignments`;
         case "groupPolicyConfiguration":
           return `/deviceManagement/groupPolicyConfigurations/${resourceId}/assignments`;
+        case "securityIntent":
+          return `/deviceManagement/intents/${resourceId}/assignments`;
         case "driverUpdate":
           return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}/assignments`;
         case "appProtection_ios":
@@ -1732,6 +1811,9 @@ function getDeleteEndpoint(category: string, resourceId: string, endpointType?: 
       }
       if (endpointType === "groupPolicyConfiguration") {
         return `/deviceManagement/groupPolicyConfigurations/${resourceId}`;
+      }
+      if (endpointType === "securityIntent") {
+        return `/deviceManagement/intents/${resourceId}`;
       }
       if (endpointType === "driverUpdate") {
         return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}`;
@@ -2150,6 +2232,15 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
           break;
         }
       }
+      if (context.cachedSecurityIntents) {
+        const index = context.cachedSecurityIntents.findIndex(
+          (p) => p.displayName?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedSecurityIntents.splice(index, 1);
+          break;
+        }
+      }
       if (context.cachedAppProtectionPolicies) {
         const index = context.cachedAppProtectionPolicies.findIndex(
           (p) => p.displayName?.toLowerCase() === nameToRemove
@@ -2494,6 +2585,8 @@ function buildDeleteUrl(
           return `/deviceManagement/deviceConfigurations/${resourceInfo.id}`;
         case "groupPolicyConfiguration":
           return `/deviceManagement/groupPolicyConfigurations/${resourceInfo.id}`;
+        case "securityIntent":
+          return `/deviceManagement/intents/${resourceInfo.id}`;
         case "driverUpdate":
           return `/deviceManagement/windowsDriverUpdateProfiles/${resourceInfo.id}`;
         case "appProtection_ios":

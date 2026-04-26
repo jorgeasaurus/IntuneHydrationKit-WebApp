@@ -11,17 +11,14 @@ import { CISPolicyType } from "./types";
 export function detectCISPolicyType(template: Record<string, unknown>): CISPolicyType {
   const odataType = (template["@odata.type"] as string || "").toLowerCase();
 
-  // Security Intents (deprecated security baselines) - NOT supported for creation
-  // These require using the template createInstance endpoint which is complex
+  // Security Intents (deprecated security baselines)
   if (odataType.includes("devicemanagementintent")) {
-    return "Unsupported";
+    return "SecurityIntent";
   }
 
-  // Group Policy Configuration (ADMX-based templates like VS Code, Outlook profile) - NOT supported
-  // These require a complex 2-step creation: create policy, then add definitionValues with bindings
-  // Examples: groupPolicyConfiguration for VS Code settings, OneDrive KFM, Outlook profile
+  // Group Policy Configuration (ADMX-based templates like VS Code, Outlook profile)
   if (odataType.includes("grouppolicyconfiguration")) {
-    return "Unsupported";
+    return "GroupPolicyConfiguration";
   }
 
   // Device Configurations - various subtypes that all use /deviceConfigurations endpoint

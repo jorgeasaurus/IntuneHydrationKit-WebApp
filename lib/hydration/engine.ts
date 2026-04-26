@@ -254,10 +254,9 @@ export async function executeTasks(
     emitStatus(context, "Querying existing Conditional Access policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
     try {
-      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; state: string }> }>(
+      context.cachedConditionalAccessPolicies = await context.client.getCollection<{ id: string; displayName: string; state: string }>(
         `/identity/conditionalAccess/policies?$select=id,displayName,state`
       );
-      context.cachedConditionalAccessPolicies = response.value || [];
       emitStatus(context, `Found ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`, "success", "prefetch");
       console.log(`[Execute Tasks] Pre-fetched ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`);
     } catch (error) {
@@ -392,6 +391,22 @@ export async function executeTasks(
       emitStatus(context, "Failed to query Administrative Templates", "warning", "prefetch");
       console.error("[Execute Tasks] Failed to pre-fetch Group Policy Configurations:", error);
       context.cachedGroupPolicyConfigurations = [];
+    }
+  }
+
+  if (needsBaselinePolicyCaches && !context.cachedSecurityIntents) {
+    emitStatus(context, "Querying Endpoint Security profiles...", "progress", "prefetch");
+    console.log("[Execute Tasks] Pre-fetching all Security Intents...");
+    try {
+      context.cachedSecurityIntents = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
+        `/deviceManagement/intents?$select=id,displayName,description`
+      );
+      emitStatus(context, `Found ${context.cachedSecurityIntents.length} Endpoint Security profiles`, "success", "prefetch");
+      console.log(`[Execute Tasks] Pre-fetched ${context.cachedSecurityIntents.length} Security Intents`);
+    } catch (error) {
+      emitStatus(context, "Failed to query Endpoint Security profiles", "warning", "prefetch");
+      console.error("[Execute Tasks] Failed to pre-fetch Security Intents:", error);
+      context.cachedSecurityIntents = [];
     }
   }
 

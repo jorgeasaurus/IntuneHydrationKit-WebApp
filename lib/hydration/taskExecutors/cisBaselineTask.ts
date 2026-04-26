@@ -17,6 +17,10 @@ import {
   createCISCompliancePolicy,
   deviceConfigurationExists,
   createCISDeviceConfiguration,
+  groupPolicyConfigurationExists,
+  createCISGroupPolicyConfiguration,
+  securityIntentExists,
+  createCISSecurityIntent,
 } from "../policyCreators";
 import { escapeODataString, hasODataUnsafeChars } from "../utils";
 import { getCachedTemplates, getAllTemplateCacheKeys, CISBaselinePolicy } from "@/lib/templates/loader";
@@ -77,13 +81,11 @@ export async function executeCISBaselineTask(
     try {
       switch (policyType) {
         case "Unsupported":
-          // Security Intents, ADMX policies, and other unsupported types
+          // Security Intents and other unsupported types
           console.log(`[CIS Baseline Task] Skipping unsupported policy type: "${policyName}" (@odata.type: ${odataType})`);
           // Provide specific error message based on policy type
           let unsupportedReason = "This policy type is not supported for automated creation.";
-          if (normalizedODataType.includes("grouppolicyconfiguration")) {
-            unsupportedReason = "ADMX-based policies require complex 2-step creation with definition bindings. Please create manually in Intune.";
-          } else if (odataType.includes("devicemanagementintent")) {
+          if (odataType.includes("devicemanagementintent")) {
             unsupportedReason = "Security Intents require template instance creation. Please create manually in Intune.";
           }
           return {
@@ -92,6 +94,90 @@ export async function executeCISBaselineTask(
             skipped: true,
             error: `Unsupported policy type: ${odataType}. ${unsupportedReason}`
           };
+
+        case "GroupPolicyConfiguration": {
+          const normalizedPolicyName = policyName.toLowerCase().trim();
+          let groupPolicyConfigurations = context.cachedGroupPolicyConfigurations;
+
+          if (
+            (!groupPolicyConfigurations || groupPolicyConfigurations.length === 0) &&
+            hasODataUnsafeChars(policyName)
+          ) {
+            groupPolicyConfigurations = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
+              "/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description"
+            );
+            context.cachedGroupPolicyConfigurations = groupPolicyConfigurations;
+          }
+
+          const existingGroupPolicyConfiguration = groupPolicyConfigurations?.find(
+            (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
+          );
+
+          if (existingGroupPolicyConfiguration) {
+            console.log(`[CIS Baseline Task] Group Policy Configuration already exists (cache), skipping: "${policyName}"`);
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+
+          const groupPolicyExists = await groupPolicyConfigurationExists(client, policyName);
+          if (groupPolicyExists) {
+            console.log(`[CIS Baseline Task] Group Policy Configuration already exists, skipping: "${policyName}"`);
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
+          }
+          const createdGroupPolicy = await createCISGroupPolicyConfiguration(client, template as Record<string, unknown>);
+          if (context.cachedGroupPolicyConfigurations && createdGroupPolicy.id) {
+            context.cachedGroupPolicyConfigurations.push({
+              id: createdGroupPolicy.id,
+              displayName: policyName,
+              description: "",
+            });
+          }
+          return { task, success: true, skipped: false, createdId: createdGroupPolicy.id };
+        }
+
+        case "SecurityIntent": {
+          const normalizedPolicyName = policyName.toLowerCase().trim();
+          let securityIntents = context.cachedSecurityIntents;
+
+          if (
+            (!securityIntents || securityIntents.length === 0) &&
+            hasODataUnsafeChars(policyName)
+          ) {
+            securityIntents = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
+              "/deviceManagement/intents?$select=id,displayName,description"
+            );
+            context.cachedSecurityIntents = securityIntents;
+          }
+
+          const existingSecurityIntent = securityIntents?.find(
+            (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
+          );
+
+          if (existingSecurityIntent) {
+            console.log(`[CIS Baseline Task] Security Intent already exists (cache), skipping: "${policyName}"`);
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+
+          const intentExists = await securityIntentExists(client, policyName);
+          if (intentExists) {
+            console.log(`[CIS Baseline Task] Security Intent already exists, skipping: "${policyName}"`);
+            return { task, success: true, skipped: true, error: "Already exists" };
+          }
+          if (isPreview) {
+            return { task, success: true, skipped: false };
+          }
+          const createdIntent = await createCISSecurityIntent(client, template as Record<string, unknown>);
+          if (context.cachedSecurityIntents && createdIntent.id) {
+            context.cachedSecurityIntents.push({
+              id: createdIntent.id,
+              displayName: policyName,
+              description: "",
+            });
+          }
+          return { task, success: true, skipped: false, createdId: createdIntent.id };
+        }
 
         case "V2Compliance": {
           // Settings Catalog compliance -> /compliancePolicies
@@ -187,8 +273,10 @@ export async function executeCISBaselineTask(
   } else if (mode === "delete") {
     try {
         switch (policyType) {
+          case "GroupPolicyConfiguration":
+          case "SecurityIntent":
           case "Unsupported":
-          if (normalizedODataType.includes("grouppolicyconfiguration")) {
+          if (policyType === "GroupPolicyConfiguration" || normalizedODataType.includes("grouppolicyconfiguration")) {
             let policy = findCachedGroupPolicyConfiguration(policyName, context);
 
             if (!policy) {
@@ -227,6 +315,56 @@ export async function executeCISBaselineTask(
 
             if (context.cachedGroupPolicyConfigurations) {
               context.cachedGroupPolicyConfigurations = context.cachedGroupPolicyConfigurations.filter(
+                (cachedPolicy) => cachedPolicy.id !== policy.id
+              );
+            }
+
+            return { task, success: true, skipped: false };
+          }
+
+          if (policyType === "SecurityIntent" || normalizedODataType.includes("devicemanagementintent")) {
+            let policy = context.cachedSecurityIntents?.find(
+              (intent) => intent.displayName?.toLowerCase().trim() === policyName.toLowerCase().trim()
+            );
+
+            if (!policy) {
+              const allIntents = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
+                "/deviceManagement/intents?$select=id,displayName,description"
+              );
+              context.cachedSecurityIntents = allIntents;
+              policy = context.cachedSecurityIntents?.find(
+                (intent) => intent.displayName?.toLowerCase().trim() === policyName.toLowerCase().trim()
+              );
+            }
+
+            if (!policy) {
+              return { task, success: true, skipped: true, error: "Not found in tenant" };
+            }
+
+            if (!hasHydrationMarker(policy.description)) {
+              return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+            }
+
+            try {
+              const assignmentsResponse = await client.get<{ value: Array<{ id: string }> }>(
+                `/deviceManagement/intents/${policy.id}/assignments`
+              );
+              const assignmentCount = assignmentsResponse.value?.length ?? 0;
+              if (assignmentCount > 0) {
+                return { task, success: true, skipped: true, error: `Policy has ${assignmentCount} active assignment(s)` };
+              }
+            } catch {
+              // Continue if assignments can't be checked
+            }
+
+            if (isPreview) {
+              return { task, success: true, skipped: false };
+            }
+
+            await client.delete(`/deviceManagement/intents/${policy.id}`);
+
+            if (context.cachedSecurityIntents) {
+              context.cachedSecurityIntents = context.cachedSecurityIntents.filter(
                 (cachedPolicy) => cachedPolicy.id !== policy.id
               );
             }
