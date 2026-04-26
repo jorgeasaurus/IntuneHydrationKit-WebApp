@@ -128,4 +128,45 @@ describe("executeDeletesInParallel", () => {
       "beta"
     );
   });
+
+  it("deletes Linux compliance policies from the V2 compliance cache", async () => {
+    const task: HydrationTask = {
+      id: "linux-compliance-delete",
+      category: "compliance",
+      operation: "delete",
+      itemName: "[IHD] Linux Compliance",
+      status: "pending",
+    };
+
+    const client = {
+      delete: vi.fn().mockResolvedValue(undefined),
+      get: vi.fn().mockResolvedValue({ value: [] }),
+      post: vi.fn(),
+      getCollection: vi.fn(),
+      patch: vi.fn(),
+    } as unknown as ExecutionContext["client"];
+
+    const context: ExecutionContext = {
+      client,
+      operationMode: "delete",
+      isPreview: false,
+      stopOnFirstError: false,
+      cachedV2CompliancePolicies: [
+        {
+          id: "linux-compliance-id",
+          name: "[IHD] Linux Compliance",
+          description: "Imported by Intune Hydration Kit",
+        },
+      ],
+    };
+
+    const results = await executeDeletesInParallel([task], context);
+
+    expect(results).toHaveLength(1);
+    expect(results[0]).toMatchObject({ success: true, skipped: false });
+    expect(client.delete).toHaveBeenCalledWith(
+      "/deviceManagement/compliancePolicies/linux-compliance-id",
+      "beta"
+    );
+  });
 });

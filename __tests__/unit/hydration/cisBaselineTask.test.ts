@@ -76,6 +76,83 @@ describe("executeCISBaselineTask", () => {
     expect(client.post).not.toHaveBeenCalled();
   });
 
+  it("creates group policy configuration CIS templates instead of skipping them as unsupported", async () => {
+    const policyName = "[IHD] CISv1 - VS Code - L2 - Ensure EnableFeedback is set to Disabled";
+
+    mockGetAllTemplateCacheKeys.mockReturnValue([
+      "intune-hydration-templates-cisBaseline-cis-visual-studio",
+    ]);
+    mockGetCachedTemplates.mockReturnValue([
+      {
+        "@odata.type": "#microsoft.graph.groupPolicyConfiguration",
+        displayName: policyName,
+        description: "",
+        roleScopeTagIds: ["0"],
+        policyConfigurationIngestionType: "custom",
+        definitionValues: [
+          {
+            enabled: false,
+            "definition@odata.bind": "https://graph.microsoft.com/beta/deviceManagement/groupPolicyDefinitions('def-1')",
+            presentationValues: [
+              {
+                "@odata.type": "#microsoft.graph.groupPolicyPresentationValueText",
+                value: "default",
+                "presentation@odata.bind": "https://graph.microsoft.com/beta/deviceManagement/groupPolicyDefinitions('def-1')/presentations('pres-1')",
+              },
+            ],
+          },
+        ],
+        _cisFilePath: "4.0 - CIS Benchmarks/CIS - Visual Studio Code/CISv1 - VS Code - L2 - Ensure EnableFeedback is set to Disabled.json",
+      },
+    ]);
+
+    const client = {
+      get: vi.fn(),
+      post: vi.fn().mockResolvedValue({ id: "group-policy-id" }),
+      delete: vi.fn(),
+      getCollection: vi.fn(),
+    } as unknown as ExecutionContext["client"];
+
+    const task: HydrationTask = {
+      id: "cis-baseline-group-policy-create",
+      category: "cisBaseline",
+      operation: "create",
+      itemName: policyName,
+      status: "pending",
+    };
+
+    const context: ExecutionContext = {
+      client,
+      operationMode: "create",
+      isPreview: false,
+      stopOnFirstError: false,
+    };
+
+    const result = await executeCISBaselineTask(task, context);
+
+    expect(result).toMatchObject({
+      success: true,
+      skipped: false,
+      createdId: "group-policy-id",
+    });
+    expect(client.post).toHaveBeenCalledWith(
+      "/deviceManagement/groupPolicyConfigurations",
+      expect.objectContaining({
+        displayName: policyName,
+        definitionValues: [
+          expect.objectContaining({
+            enabled: false,
+            presentationValues: [
+              expect.objectContaining({
+                value: "default",
+              }),
+            ],
+          }),
+        ],
+      })
+    );
+  });
+
   it("deletes group policy configurations for unsupported CIS templates when a cached match exists", async () => {
     const policyName = "[IHD] CISv1 - VS Code - L1 - Ensure UpdateMode is set to Enabled";
 

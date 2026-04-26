@@ -1534,6 +1534,26 @@ function findResourceIdForDelete(
     }
 
     case "compliance": {
+      let v2Compliance = context.cachedV2CompliancePolicies?.find(
+        (c) => c.name?.toLowerCase() === nameToFind || normalizeName(c.name) === normalizedNameToFind
+      );
+      if (!v2Compliance) {
+        v2Compliance = context.cachedV2CompliancePolicies?.find(
+          (c) => {
+            const normalizedPolicyName = normalizeName(c.name);
+            return normalizedPolicyName.includes(normalizedNameToFind) ||
+                   normalizedNameToFind.includes(normalizedPolicyName);
+          }
+        );
+      }
+      if (v2Compliance?.id) {
+        return {
+          id: v2Compliance.id,
+          hasMarker: hasHydrationMarker(v2Compliance.description),
+          endpointType: "v2Compliance",
+        };
+      }
+
       let compliance = context.cachedCompliancePolicies?.find(
         (c) => c.displayName?.toLowerCase() === nameToFind || normalizeName(c.displayName) === normalizedNameToFind
       );
@@ -1548,7 +1568,11 @@ function findResourceIdForDelete(
         );
       }
       if (compliance?.id) {
-        return { id: compliance.id, hasMarker: hasHydrationMarker(compliance.description) };
+        return {
+          id: compliance.id,
+          hasMarker: hasHydrationMarker(compliance.description),
+          endpointType: "v1Compliance",
+        };
       }
       return null;
     }
@@ -1609,7 +1633,9 @@ function getAssignmentEndpoint(
       return null;
 
     case "compliance":
-      return `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
+      return endpointType === "v2Compliance"
+        ? `/deviceManagement/compliancePolicies/${resourceId}/assignments`
+        : `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
 
     case "baseline":
     case "cisBaseline":
@@ -1687,7 +1713,9 @@ function getDeleteEndpoint(category: string, resourceId: string, endpointType?: 
     case "filters":
       return `/deviceManagement/assignmentFilters/${resourceId}`;
     case "compliance":
-      return `/deviceManagement/deviceCompliancePolicies/${resourceId}`;
+      return endpointType === "v2Compliance"
+        ? `/deviceManagement/compliancePolicies/${resourceId}`
+        : `/deviceManagement/deviceCompliancePolicies/${resourceId}`;
     case "conditionalAccess":
       return `/identity/conditionalAccess/policies/${resourceId}`;
     case "baseline":
@@ -2141,6 +2169,14 @@ function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext):
           context.cachedCompliancePolicies.splice(index, 1);
         }
       }
+      if (context.cachedV2CompliancePolicies) {
+        const index = context.cachedV2CompliancePolicies.findIndex(
+          (c) => c.name?.toLowerCase() === nameToRemove
+        );
+        if (index !== -1) {
+          context.cachedV2CompliancePolicies.splice(index, 1);
+        }
+      }
       break;
 
     case "conditionalAccess":
@@ -2429,7 +2465,9 @@ function buildDeleteUrl(
       return `/deviceManagement/assignmentFilters/${resourceInfo.id}`;
 
     case "compliance":
-      return `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
+      return resourceInfo.endpointType === "v2Compliance"
+        ? `/deviceManagement/compliancePolicies/${resourceInfo.id}`
+        : `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
 
     case "conditionalAccess":
       return `/identity/conditionalAccess/policies/${resourceInfo.id}`;

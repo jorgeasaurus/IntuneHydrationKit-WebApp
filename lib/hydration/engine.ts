@@ -316,8 +316,14 @@ export async function executeTasks(
     }
   }
 
-  // Pre-fetch V2 Compliance policies for DELETE mode (used by OIB compliance policies)
-  if (needsSettingsCatalogCache && !context.cachedV2CompliancePolicies) {
+  // Pre-fetch V2 Compliance policies for DELETE/PREVIEW mode.
+  // Used by OIB/CIS compliance deletes and Linux compliance templates.
+  const needsV2ComplianceCache =
+    ((context.operationMode === "delete" || context.isPreview) &&
+      (hasComplianceTasks || hasBaselineTasks || hasCISTasks)) ||
+    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
+
+  if (needsV2ComplianceCache && !context.cachedV2CompliancePolicies) {
     emitStatus(context, "Querying V2 Compliance policies...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all V2 Compliance policies for delete operations...");
     try {

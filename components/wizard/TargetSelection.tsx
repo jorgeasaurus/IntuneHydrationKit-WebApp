@@ -146,7 +146,9 @@ async function fetchCategoryData(category: TaskCategory): Promise<CategoryItem[]
       return policies.map(p => ({
         displayName: p.displayName,
         description: p.description,
-        subtype: p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") || "",
+        subtype:
+          p["@odata.type"]?.replace("#microsoft.graph.", "").replace("CompliancePolicy", "") ||
+          String(p.platforms || p.technologies || ""),
       }));
     }
     case "conditionalAccess": {

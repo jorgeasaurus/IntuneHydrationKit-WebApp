@@ -34,8 +34,8 @@ export const TEMPLATE_METADATA = {
   },
   compliance: {
     displayName: "Compliance Policies",
-    description: "Device compliance policies for all platforms (excl. Linux)",
-    count: 8,
+    description: "Device compliance policies for Windows, Apple, Android, and Linux",
+    count: 10,
     icon: "Shield",
   },
   appProtection: {

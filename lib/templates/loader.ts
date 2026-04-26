@@ -8,7 +8,7 @@ import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hy
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 18; // Fix Endpoint Security manifest count (60→57)
+const CACHE_VERSION = 19; // Include Linux compliance templates in the cached compliance set
 
 export interface GroupTemplate {
   displayName: string;
@@ -25,7 +25,7 @@ export interface FilterTemplate {
 }
 
 export interface ComplianceTemplate {
-  "@odata.type": string;
+  "@odata.type"?: string;
   displayName: string;
   description: string;
   [key: string]: unknown;
@@ -170,9 +170,6 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
  * Fetch compliance policies from local templates
  */
 export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
-  // Note: Linux compliance templates removed - they use Settings Catalog format (platforms/technologies)
-  // and cannot be created through the /deviceManagement/deviceCompliancePolicies endpoint.
-  // Linux compliance policies must be created through the Settings Catalog endpoint instead.
   const complianceFiles = [
     "Compliance/Android-Compliance-FullyManaged-Basic.json",
     "Compliance/Android-Compliance-FullyManaged-Strict.json",
@@ -182,6 +179,8 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
     "Compliance/iOS-Compliance-Strict.json",
     "Compliance/macOS-Compliance-Basic.json",
     "Compliance/macOS-Compliance-Strict.json",
+    "Compliance/Linux-Compliance-Basic.json",
+    "Compliance/Linux-Compliance-Strict.json",
   ];
 
   const allPolicies: ComplianceTemplate[] = [];
