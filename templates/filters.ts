@@ -9,7 +9,7 @@ import { DeviceFilter } from "@/types/graph";
 
 const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
-// ── Windows – Manufacturer Filters (3) ──────────────────────────────────────
+// ── Windows - Manufacturer Filters (3) ──────────────────────────────────────
 
 const WINDOWS_MANUFACTURER_FILTERS: DeviceFilter[] = [
   {
@@ -35,7 +35,7 @@ const WINDOWS_MANUFACTURER_FILTERS: DeviceFilter[] = [
   },
 ];
 
-// ── Windows – VM Filters (12) ───────────────────────────────────────────────
+// ── Windows - VM Filters (12) ───────────────────────────────────────────────
 
 const WINDOWS_VM_FILTERS: DeviceFilter[] = [
   {

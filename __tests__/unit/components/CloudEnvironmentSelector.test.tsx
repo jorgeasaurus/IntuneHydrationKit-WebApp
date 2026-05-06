@@ -5,7 +5,7 @@ import { render, screen } from '@/__tests__/setup/test-utils'
 import { CloudEnvironmentSelector } from '@/components/CloudEnvironmentSelector'
 
 describe('CloudEnvironmentSelector', () => {
-  it('renders the supported and PowerShell-only cloud options', () => {
+  it('renders the commercial cloud option and sovereign cloud PowerShell guidance', () => {
     render(
       <CloudEnvironmentSelector
         open
@@ -16,12 +16,14 @@ describe('CloudEnvironmentSelector', () => {
 
     expect(screen.getByRole('heading', { name: /select cloud environment/i })).toBeInTheDocument()
     expect(screen.getByText('Global (Commercial)')).toBeInTheDocument()
-    expect(screen.getByText('US Government (GCC High)')).toBeInTheDocument()
-    expect(screen.getByText('US Government (DoD)')).toBeInTheDocument()
-    expect(screen.getByText('Germany')).toBeInTheDocument()
-    expect(screen.getByText('China (21Vianet)')).toBeInTheDocument()
+    expect(screen.queryByText('US Government (GCC High)')).not.toBeInTheDocument()
+    expect(screen.queryByText('US Government (DoD)')).not.toBeInTheDocument()
+    expect(screen.queryByText('Germany')).not.toBeInTheDocument()
+    expect(screen.queryByText('China (21Vianet)')).not.toBeInTheDocument()
     expect(screen.getByText('Supported')).toBeInTheDocument()
-    expect(screen.getAllByText('PowerShell only')).toHaveLength(4)
+    expect(
+      screen.getByText('Need a sovereign cloud? Please use the PowerShell module.')
+    ).toBeInTheDocument()
     expect(
       screen.getByRole('link', { name: /view intunehydrationkit powershell module/i })
     ).toHaveAttribute('href', 'https://github.com/jorgeasaurus/IntuneHydrationKit')

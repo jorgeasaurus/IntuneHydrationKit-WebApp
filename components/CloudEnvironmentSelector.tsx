@@ -10,7 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Cloud, Globe, Shield, Building2, ExternalLink, Terminal } from "lucide-react";
+import { Cloud, ExternalLink, Globe, Terminal } from "lucide-react";
 
 const POWERSHELL_MODULE_URL = "https://github.com/jorgeasaurus/IntuneHydrationKit";
 
@@ -25,46 +25,14 @@ interface CloudEnvironmentOption {
   label: string;
   description: string;
   icon: React.ReactNode;
-  supported: boolean;
 }
 
-const CLOUD_ENVIRONMENTS: CloudEnvironmentOption[] = [
-  {
-    value: "global",
-    label: "Global (Commercial)",
-    description: "Microsoft 365 commercial cloud for worldwide customers",
-    icon: <Globe className="h-5 w-5" />,
-    supported: true,
-  },
-  {
-    value: "usgov",
-    label: "US Government (GCC High)",
-    description: "Government Community Cloud High for US federal agencies",
-    icon: <Shield className="h-5 w-5" />,
-    supported: false,
-  },
-  {
-    value: "usgovdod",
-    label: "US Government (DoD)",
-    description: "Department of Defense cloud environment",
-    icon: <Shield className="h-5 w-5" />,
-    supported: false,
-  },
-  {
-    value: "germany",
-    label: "Germany",
-    description: "Microsoft Cloud Germany (data residency in Germany)",
-    icon: <Building2 className="h-5 w-5" />,
-    supported: false,
-  },
-  {
-    value: "china",
-    label: "China (21Vianet)",
-    description: "Microsoft Azure operated by 21Vianet in China",
-    icon: <Cloud className="h-5 w-5" />,
-    supported: false,
-  },
-];
+const COMMERCIAL_CLOUD: CloudEnvironmentOption = {
+  value: "global",
+  label: "Global (Commercial)",
+  description: "Microsoft 365 commercial cloud for worldwide customers",
+  icon: <Globe className="h-5 w-5" />,
+};
 
 export function CloudEnvironmentSelector({
   open,
@@ -90,44 +58,27 @@ export function CloudEnvironmentSelector({
         </DialogHeader>
 
         <div className="py-4 space-y-3">
-          {CLOUD_ENVIRONMENTS.map((env) => (
-            <div
-              key={env.value}
-              className={`flex items-start gap-4 rounded-lg border p-4 transition-colors ${
-                env.supported
-                  ? "border-primary bg-primary/5"
-                  : "border-muted bg-muted/30 opacity-60"
-              }`}
-            >
-              <div className="flex-1 space-y-1">
-                <div className="flex items-center gap-2">
-                  {env.icon}
-                  <span className={`font-medium ${!env.supported ? "text-muted-foreground" : ""}`}>
-                    {env.label}
-                  </span>
-                  {env.supported ? (
-                    <span className="ml-auto inline-flex items-center rounded-md bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
-                      Supported
-                    </span>
-                  ) : (
-                    <span className="ml-auto inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700 ring-1 ring-inset ring-amber-600/20 dark:bg-amber-500/10 dark:text-amber-400 dark:ring-amber-500/20">
-                      <Terminal className="h-3 w-3" />
-                      PowerShell only
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-muted-foreground">{env.description}</p>
+          <div className="flex items-start gap-4 rounded-lg border border-primary bg-primary/5 p-4 transition-colors">
+            <div className="flex-1 space-y-1">
+              <div className="flex items-center gap-2">
+                {COMMERCIAL_CLOUD.icon}
+                <span className="font-medium">{COMMERCIAL_CLOUD.label}</span>
+                <span className="ml-auto inline-flex items-center rounded-md bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
+                  Supported
+                </span>
               </div>
+              <p className="text-sm text-muted-foreground">
+                {COMMERCIAL_CLOUD.description}
+              </p>
             </div>
-          ))}
+          </div>
 
-          {/* PowerShell module callout */}
-          <div className="rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 p-4 mt-4">
+          <div className="rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 p-4">
             <div className="flex items-start gap-3">
               <Terminal className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="space-y-2">
                 <p className="text-sm font-medium">
-                  Need a sovereign or government cloud?
+                  Need a sovereign cloud? Please use the PowerShell module.
                 </p>
                 <p className="text-sm text-muted-foreground">
                   The PowerShell module supports all Microsoft cloud environments
