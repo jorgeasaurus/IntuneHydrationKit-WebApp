@@ -96,8 +96,8 @@ const FAQ_ITEMS: readonly FaqItem[] = [
     question: "What is OpenIntuneBaseline?",
     answer: (
       <>
-        OpenIntuneBaseline is an open-source community project that provides 70+
-        security and configuration policies for Windows and macOS. These policies
+        OpenIntuneBaseline is an open-source community project that provides nearly 100
+        security and configuration policies across Windows, macOS, BYOD, and Windows 365. These policies
         follow Microsoft&apos;s security recommendations and industry best practices.{" "}
         <a
           href="https://github.com/skiptotheendpoint/OpenIntuneBaseline"

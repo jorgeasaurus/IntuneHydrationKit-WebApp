@@ -27,12 +27,38 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://intunehydrationkit.com"
+  ),
   title: "Intune Hydration Kit",
   description:
     "Bootstrap Microsoft Intune tenants with best-practice configurations",
   icons: {
     icon: "/IHTLogoClear.png",
     apple: "/IHTLogoClear.png",
+  },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "Intune Hydration Kit",
+    title: "Intune Hydration Kit",
+    description:
+      "Bootstrap Microsoft Intune tenants with best-practice configurations",
+    images: [
+      {
+        url: "/SocialCard.png",
+        width: 1211,
+        height: 636,
+        alt: "Intune Hydration Kit social preview card",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Intune Hydration Kit",
+    description:
+      "Bootstrap Microsoft Intune tenants with best-practice configurations",
+    images: ["/SocialCard.png"],
   },
 };
 

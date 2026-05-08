@@ -1,7 +1,7 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-04-20T02:22:54.005Z",
-  "totalFiles": 95,
+  "generatedAt": "2026-05-08T20:03:55.789Z",
+  "totalFiles": 98,
   "platforms": [
     {
       "id": "BYOD",
@@ -35,7 +35,7 @@
     {
       "id": "WINDOWS",
       "name": "Windows",
-      "count": 70,
+      "count": 73,
       "policyTypes": [
         {
           "type": "CompliancePolicies",
@@ -55,7 +55,7 @@
         {
           "type": "SettingsCatalog",
           "description": "Settings Catalog configuration policies",
-          "count": 59
+          "count": 62
         },
         {
           "type": "UpdatePolicies",
@@ -330,6 +330,12 @@
       "displayName": "Win - OIB - ES - Windows Firewall - D - Firewall Configuration - v3.1"
     },
     {
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Windows Firewall - D - Security Rules - v3.8.json",
+      "platform": "WINDOWS",
+      "policyType": "SettingsCatalog",
+      "displayName": "Win - OIB - ES - Windows Firewall - D - Security Rules - v3.8"
+    },
+    {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Windows Hello for Business - D - WHfB Configuration - v3.2.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
@@ -354,10 +360,10 @@
       "displayName": "Win - OIB - SC - Credential Management - D - Passwordless - v3.3"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v3.6.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v3.6"
+      "displayName": "Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Administrator Protection - v3.7.json",
@@ -402,10 +408,10 @@
       "displayName": "Win - OIB - SC - Device Security - D - Location and Privacy - v3.2"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Login and Lock Screen - v3.1.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Login and Lock Screen - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Device Security - D - Login and Lock Screen - v3.1"
+      "displayName": "Win - OIB - SC - Device Security - D - Login and Lock Screen - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Printing - v3.7.json",
@@ -492,10 +498,10 @@
       "displayName": "Win - OIB - SC - Microsoft Accounts - D - Configuration - v3.2"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - D - Security - v3.7.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - D - Security - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Microsoft Edge - D - Security - v3.7"
+      "displayName": "Win - OIB - SC - Microsoft Edge - D - Security - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - D - Updates - v3.6.json",
@@ -522,10 +528,10 @@
       "displayName": "Win - OIB - SC - Microsoft Edge - U - Profiles, Sign-In and Sync - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - User Experience - v3.7.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - User Experience - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Microsoft Edge - U - User Experience - v3.7"
+      "displayName": "Win - OIB - SC - Microsoft Edge - U - User Experience - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Office - D - Security - v3.6.json",
@@ -558,22 +564,28 @@
       "displayName": "Win - OIB - SC - Microsoft OneDrive - D - Configuration - v3.2"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft OneDrive - U - Configuration - v3.0.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft OneDrive - U - Configuration - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Microsoft OneDrive - U - Configuration - v3.0"
+      "displayName": "Win - OIB - SC - Microsoft OneDrive - U - Configuration - v3.8"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Store - D - Configuration - v3.4.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Store - D - Configuration - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Microsoft Store - D - Configuration - v3.4"
+      "displayName": "Win - OIB - SC - Microsoft Store - D - Configuration - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Store - U - Configuration - v3.3.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
       "displayName": "Win - OIB - SC - Microsoft Store - U - Configuration - v3.3"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Network Security - D - Disable NTLM - v3.8.json",
+      "platform": "WINDOWS",
+      "policyType": "SettingsCatalog",
+      "displayName": "Win - OIB - SC - Network Security - D - Disable NTLM - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Apps - D - In-Box App Removal - v3.7.json",
@@ -600,10 +612,16 @@
       "displayName": "Win - OIB - SC - Windows Update for Business - D - Reports and Telemetry - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - D - Feature Configuration - v3.1.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - D - Automatic Restart Sign-On - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Windows User Experience - D - Feature Configuration - v3.1"
+      "displayName": "Win - OIB - SC - Windows User Experience - D - Automatic Restart Sign-On - v3.8"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - D - Feature Configuration - v3.8.json",
+      "platform": "WINDOWS",
+      "policyType": "SettingsCatalog",
+      "displayName": "Win - OIB - SC - Windows User Experience - D - Feature Configuration - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - D - Settings Sync - v3.7.json",
@@ -612,10 +630,10 @@
       "displayName": "Win - OIB - SC - Windows User Experience - D - Settings Sync - v3.7"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - U - Copilot - v3.6.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - U - Copilot - v3.8.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
-      "displayName": "Win - OIB - SC - Windows User Experience - U - Copilot - v3.6"
+      "displayName": "Win - OIB - SC - Windows User Experience - U - Copilot - v3.8"
     },
     {
       "path": "WINDOWS/IntuneManagement/UpdatePolicies/Win - OIB - WUfB - Ring 1 - Pilot - v3.0.json",

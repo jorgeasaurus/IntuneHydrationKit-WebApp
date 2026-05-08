@@ -3,14 +3,14 @@ import { describe, expect, it } from "vitest";
 
 describe("OpenIntuneBaseline manifest parity", () => {
   it("matches the expected PowerShell inventory and BYOD metadata", () => {
-    expect(manifest.totalFiles).toBe(95);
+    expect(manifest.totalFiles).toBe(98);
 
     expect(
       Object.fromEntries(manifest.platforms.map((platform) => [platform.id, platform.count]))
     ).toEqual({
       BYOD: 2,
       MACOS: 20,
-      WINDOWS: 70,
+      WINDOWS: 73,
       WINDOWS365: 3,
     });
 
