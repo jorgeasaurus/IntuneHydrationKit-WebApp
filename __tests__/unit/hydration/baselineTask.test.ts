@@ -312,6 +312,7 @@ describe("executeBaselineTask", () => {
       stopOnFirstError: false,
       cachedAppProtectionPolicies: [
         {
+          "@odata.type": "#microsoft.graph.androidManagedAppProtection",
           id: "app-policy-id",
           displayName: policyName,
           description: "Created manually",
@@ -372,6 +373,7 @@ describe("executeBaselineTask", () => {
       stopOnFirstError: false,
       cachedAppProtectionPolicies: [
         {
+          "@odata.type": "#microsoft.graph.iosManagedAppProtection",
           id: "app-policy-id",
           displayName: policyName,
           description: "Imported by Intune Hydration Kit",
@@ -403,6 +405,7 @@ describe("executeBaselineTask", () => {
       stopOnFirstError: false,
       cachedAppProtectionPolicies: [
         {
+          "@odata.type": "#microsoft.graph.androidManagedAppProtection",
           id: "app-policy-id",
           displayName: policyName,
           description: "Imported by Intune Hydration Kit",
@@ -438,6 +441,7 @@ describe("executeBaselineTask", () => {
       stopOnFirstError: false,
       cachedAppProtectionPolicies: [
         {
+          "@odata.type": "#microsoft.graph.androidManagedAppProtection",
           id: "app-policy-id",
           displayName: policyName,
           description: "Imported by Intune Hydration Kit",

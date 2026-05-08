@@ -207,8 +207,9 @@ describe("policyCreators", () => {
   });
 
   it("creates settings catalog policies with normalized names and secret warnings", async () => {
+    const post = vi.fn().mockResolvedValue({ id: "settings-policy-id" });
     const client = {
-      post: vi.fn().mockResolvedValue({ id: "settings-policy-id" }),
+      post,
     } as unknown as Parameters<typeof createSettingsCatalogPolicy>[0];
 
     const result = await createSettingsCatalogPolicy(client, {
@@ -239,7 +240,7 @@ describe("policyCreators", () => {
         description: "Imported by Intune Hydration Kit",
       })
     );
-    expect(client.post.mock.calls[0][1]).not.toHaveProperty("displayName");
+    expect(post.mock.calls[0][1]).not.toHaveProperty("displayName");
   });
 
   it("creates settings catalog policies without a secret warning when placeholders are absent", async () => {

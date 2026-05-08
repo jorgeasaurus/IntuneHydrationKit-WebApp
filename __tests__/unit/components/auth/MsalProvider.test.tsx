@@ -4,7 +4,7 @@ import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
 import { MsalProvider } from '@/components/auth/MsalProvider'
 
 const { baseMsalProvider, initializeMsal, msalInstance } = vi.hoisted(() => ({
-  baseMsalProvider: vi.fn(({ children }: { children: React.ReactNode }) => (
+  baseMsalProvider: vi.fn(({ children }: { children: React.ReactNode; instance: unknown }) => (
     <div data-testid="base-msal-provider">{children}</div>
   )),
   initializeMsal: vi.fn(),

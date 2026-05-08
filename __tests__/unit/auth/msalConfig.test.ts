@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LogLevel } from "@azure/msal-browser";
 
 const mocks = vi.hoisted(() => {
   const initialize = vi.fn().mockResolvedValue(undefined);
@@ -79,11 +80,11 @@ describe("msalConfig", () => {
     const module = await importModule();
     const logger = module.msalConfig.system?.loggerOptions?.loggerCallback;
 
-    logger?.("error", "error message", false);
-    logger?.("info", "info message", false);
-    logger?.("verbose", "debug message", false);
-    logger?.("warning", "warn message", false);
-    logger?.("error", "pii message", true);
+    logger?.(LogLevel.Error, "error message", false);
+    logger?.(LogLevel.Info, "info message", false);
+    logger?.(LogLevel.Verbose, "debug message", false);
+    logger?.(LogLevel.Warning, "warn message", false);
+    logger?.(LogLevel.Error, "pii message", true);
 
     expect(errorSpy).toHaveBeenCalledWith("error message");
     expect(infoSpy).toHaveBeenCalledWith("info message");

@@ -707,9 +707,10 @@ describe("batchExecutor branch coverage", () => {
       cachedFilters: [
         {
           id: "existing-filter-id",
+          "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
           displayName: "existing filter",
           description: "Imported by Intune Hydration Kit",
-          platform: "windows",
+          platform: "windows10AndLater",
           rule: '(device.deviceOwnership -eq "Personal")',
         },
       ],
@@ -855,9 +856,10 @@ describe("batchExecutor branch coverage", () => {
       cachedFilters: [
         {
           id: "filter-blocked-id",
+          "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
           displayName: "Trusted Filter",
           description: "Imported by Intune Hydration Kit",
-          platform: "windows",
+          platform: "windows10AndLater",
           rule: '(device.deviceOwnership -eq "Company")',
         },
       ],

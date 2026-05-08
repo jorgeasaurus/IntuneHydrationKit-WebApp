@@ -3,6 +3,7 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsProvider, useSettings } from "@/hooks/useSettings";
+import { AppSettings } from "@/types/hydration";
 
 const DEFAULT_SETTINGS = {
   stopOnFirstError: false,

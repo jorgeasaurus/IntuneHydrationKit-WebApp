@@ -25,9 +25,12 @@ vi.mock('framer-motion', async () => {
     {},
     {
       get: (_, tag: string) => {
-        const Component = React.forwardRef<HTMLElement, Record<string, unknown>>(
+        const Component = React.forwardRef<
+          HTMLElement,
+          React.PropsWithChildren<Record<string, unknown>>
+        >(
           ({ children, ...props }, ref) =>
-            React.createElement(tag, { ref, ...stripMotionProps(props) }, children)
+            React.createElement(tag, { ref, ...stripMotionProps(props) }, children as React.ReactNode)
         )
         Component.displayName = `motion.${tag}`
         return Component
