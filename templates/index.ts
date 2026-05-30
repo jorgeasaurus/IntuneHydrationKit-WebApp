@@ -53,7 +53,7 @@ export const TEMPLATE_METADATA = {
   conditionalAccess: {
     displayName: "Conditional Access",
     description: "Microsoft starter pack CA policies (created in disabled state)",
-    count: 21,
+    count: 20,
     icon: "Lock",
   },
   cisBaseline: {

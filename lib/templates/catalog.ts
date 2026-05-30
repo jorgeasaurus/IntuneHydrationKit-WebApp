@@ -159,7 +159,7 @@ function createItemId(category: TaskCategory, seed: string): string {
 }
 
 function sortItems(items: TemplateDocumentationItem[]): TemplateDocumentationItem[] {
-  return [...items].sort((left, right) => {
+  return items.toSorted((left, right) => {
     const categoryDiff =
       CATEGORY_ORDER.indexOf(left.category) - CATEGORY_ORDER.indexOf(right.category);
     if (categoryDiff !== 0) {
@@ -492,7 +492,7 @@ export async function loadTemplateDocumentationPayload(
 }
 
 export function getPlatformFilterOrder(platforms: string[]): string[] {
-  return [...platforms].sort((left, right) => {
+  return platforms.toSorted((left, right) => {
     const leftIndex = PLATFORM_ORDER.indexOf(left);
     const rightIndex = PLATFORM_ORDER.indexOf(right);
 

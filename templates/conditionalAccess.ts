@@ -2,7 +2,7 @@
  * Conditional Access Policy Templates for Intune Hydration Kit
  *
  * Sourced from the PowerShell IntuneHydrationKit project (Templates/ConditionalAccess/).
- * All 21 policies match the JSON files from the source project exactly.
+ * All 20 policies match the supported JSON files from the source project.
  *
  * IMPORTANT: All CA policies are created in DISABLED state for safety.
  * Administrators must review and enable policies manually after deployment.
@@ -1018,66 +1018,7 @@ export const CONDITIONAL_ACCESS_POLICIES: ConditionalAccessPolicy[] = [
     sessionControls: null,
   },
 
-  // ─── 19. Secure account recovery with identity verification (Preview) ────────
-  {
-    "@odata.type": "#microsoft.graph.conditionalAccessPolicy",
-    displayName:
-      "Secure account recovery with identity verification (Preview)",
-    state: "disabled",
-    conditions: {
-      locations: null,
-      signInRiskLevels: [],
-      times: null,
-      servicePrincipalRiskLevels: [],
-      clientApplications: null,
-      clientAppTypes: ["all"],
-      applications: {
-        excludeApplications: [],
-        includeUserActions: ["urn:user:accountrecovery"],
-        networkAccess: null,
-        globalSecureAccess: null,
-        includeApplications: [],
-        applicationFilter: null,
-        includeAuthenticationContextClassReferences: [],
-      },
-      authenticationFlows: null,
-      userRiskLevels: [],
-      platforms: null,
-      insiderRiskLevels: null,
-      deviceStates: null,
-      clients: null,
-      agentIdRiskLevels: null,
-      users: {
-        excludeUsers: [],
-        includeUsers: ["All"],
-        includeRoles: [],
-        excludeGuestsOrExternalUsers: {
-          guestOrExternalUserTypes:
-            "b2bCollaborationGuest,b2bCollaborationMember,b2bDirectConnectUser,otherExternalUser,serviceProvider",
-          externalTenants: {
-            membershipKind: "all",
-            "@odata.type":
-              "#microsoft.graph.conditionalAccessAllExternalTenants",
-          },
-        },
-        includeGroups: [],
-        includeGuestsOrExternalUsers: null,
-        excludeGroups: [],
-        excludeRoles: [],
-      },
-      devices: null,
-    },
-    grantControls: {
-      operator: "AND",
-      builtInControls: ["verifiedID"],
-      customAuthenticationFactors: [],
-      termsOfUse: [],
-      authenticationStrength: null,
-    },
-    sessionControls: null,
-  },
-
-  // ─── 20. Securing security info registration ─────────────────────────────────
+  // ─── 19. Securing security info registration ─────────────────────────────────
   {
     "@odata.type": "#microsoft.graph.conditionalAccessPolicy",
     displayName: "Securing security info registration",
@@ -1132,7 +1073,7 @@ export const CONDITIONAL_ACCESS_POLICIES: ConditionalAccessPolicy[] = [
     sessionControls: null,
   },
 
-  // ─── 21. Use application enforced restrictions for O365 apps ─────────────────
+  // ─── 20. Use application enforced restrictions for O365 apps ─────────────────
   {
     "@odata.type": "#microsoft.graph.conditionalAccessPolicy",
     displayName: "Use application enforced restrictions for O365 apps",

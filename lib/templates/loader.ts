@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- template loading preserves manifest order and per-file fallback behavior. */
 /**
  * Template loader for Intune Hydration Kit
  * Loads templates from local IntuneTemplates directory
@@ -239,7 +240,6 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
     "ConditionalAccess/Require multifactor authentication for risky sign-ins.json",
     "ConditionalAccess/Require password change for high-risk users.json",
     "ConditionalAccess/Require phishing-resistant multifactor authentication for admins.json",
-    "ConditionalAccess/Secure account recovery with identity verification (Preview).json",
     "ConditionalAccess/Securing security info registration.json",
     "ConditionalAccess/Use application enforced restrictions for O365 apps.json",
   ];
@@ -780,12 +780,17 @@ export async function fetchCISBaselinePoliciesByCategories(
     const manifest = await fetchCISBaselineManifest();
     if (!manifest) return [];
 
-    const selectedFolders = manifest.categories
-      .filter(cat => selectedCategoryIds.includes(cat.id))
-      .map(cat => cat.folder);
+    const selectedCategoryIdSet = new Set(selectedCategoryIds);
+    const selectedFolders = manifest.categories.reduce<string[]>((folders, category) => {
+      if (selectedCategoryIdSet.has(category.id)) {
+        folders.push(category.folder);
+      }
+      return folders;
+    }, []);
+    const selectedFolderSet = new Set(selectedFolders);
 
     const filteredFiles = manifest.files.filter(file =>
-      selectedFolders.includes(file.category)
+      selectedFolderSet.has(file.category)
     );
 
     return await loadCISPoliciesFromFiles(filteredFiles);
@@ -903,9 +908,11 @@ export function getAllTemplateCacheKeys(): string[] {
 
   // Add sessionStorage keys
   try {
-    Object.keys(sessionStorage)
-      .filter(k => k.startsWith("intune-hydration-templates-"))
-      .forEach(k => keys.add(k));
+    for (const key of Object.keys(sessionStorage)) {
+      if (key.startsWith("intune-hydration-templates-")) {
+        keys.add(key);
+      }
+    }
   } catch {
     // Ignore errors
   }

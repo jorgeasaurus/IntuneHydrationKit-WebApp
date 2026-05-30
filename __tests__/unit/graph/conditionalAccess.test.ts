@@ -4,12 +4,14 @@ import {
   batchCreateConditionalAccessPolicies,
   batchDeleteConditionalAccessPolicies,
   batchDisableConditionalAccessPolicies,
+  buildConditionalAccessCreatePlan,
   createConditionalAccessPolicy,
   deleteConditionalAccessPolicy,
   deleteConditionalAccessPolicyByName,
   enableConditionalAccessPolicy,
   getConditionalAccessPolicyByName,
   getHydrationKitConditionalAccessPolicies,
+  normalizeConditionalAccessPolicyForCreate,
   validateConditionalAccessPolicy,
 } from "@/lib/graph/conditionalAccess";
 import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
@@ -80,7 +82,100 @@ describe("conditionalAccess graph helpers", () => {
       expect.objectContaining({
         displayName: `Block legacy auth [${HYDRATION_MARKER}]`,
         state: "disabled",
-      })
+      }),
+      "v1.0"
+    );
+  });
+
+  it("plans beta creates only for beta-only conditional access payload features", () => {
+    const stablePlan = buildConditionalAccessCreatePlan(
+      createPolicy({ displayName: "Require compliant device (Preview)" }) as unknown as Record<string, unknown>
+    );
+    const betaPlan = buildConditionalAccessCreatePlan(
+      createPolicy({
+        displayName: "Secure account recovery with identity verification (Preview)",
+        conditions: {
+          applications: {
+            includeUserActions: ["urn:user:accountrecovery"],
+          },
+        },
+        grantControls: {
+          operator: "AND",
+          builtInControls: ["verifiedID"],
+        },
+      }) as unknown as Record<string, unknown>
+    );
+
+    expect(stablePlan.apiVersion).toBe("v1.0");
+    expect(betaPlan.apiVersion).toBe("beta");
+  });
+
+  it("strips exported Graph response metadata from create payloads", () => {
+    const normalized = normalizeConditionalAccessPolicyForCreate({
+      "@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/policies/$entity",
+      "@odata.type": "#microsoft.graph.conditionalAccessPolicy",
+      id: "exported-policy-id",
+      createdDateTime: "2026-05-30T18:00:00Z",
+      modifiedDateTime: null,
+      displayName: "Secure account recovery with identity verification (Preview)",
+      state: "disabled",
+      sessionControls: null,
+      conditions: {
+        locations: null,
+        applications: {
+          includeApplications: [],
+          includeUserActions: ["urn:user:accountrecovery"],
+          networkAccess: null,
+        },
+        users: {
+          includeUsers: ["All"],
+          includeGuestsOrExternalUsers: null,
+          excludeGuestsOrExternalUsers: {
+            externalTenants: {
+              "@odata.type": "#microsoft.graph.conditionalAccessAllExternalTenants",
+              membershipKind: "all",
+            },
+          },
+        },
+      },
+      grantControls: {
+        "authenticationStrength@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/templates('template-id')/details/grantControls/authenticationStrength/$entity",
+        authenticationStrength: null,
+        operator: "AND",
+        builtInControls: ["verifiedID"],
+      },
+    });
+
+    expect(normalized).not.toHaveProperty("@odata.context");
+    expect(normalized).not.toHaveProperty("id");
+    expect(normalized).not.toHaveProperty("createdDateTime");
+    expect(normalized).not.toHaveProperty("modifiedDateTime");
+    expect(normalized).not.toHaveProperty("sessionControls");
+    expect(normalized).toHaveProperty("@odata.type", "#microsoft.graph.conditionalAccessPolicy");
+
+    const grantControls = normalized.grantControls as Record<string, unknown>;
+    expect(grantControls).not.toHaveProperty("authenticationStrength@odata.context");
+    expect(grantControls).not.toHaveProperty("authenticationStrength");
+    expect(grantControls).toMatchObject({
+      operator: "AND",
+      builtInControls: ["verifiedID"],
+    });
+
+    const conditions = normalized.conditions as Record<string, unknown>;
+    expect(conditions).not.toHaveProperty("locations");
+
+    const applications = conditions.applications as Record<string, unknown>;
+    expect(applications).not.toHaveProperty("networkAccess");
+    expect(applications).toHaveProperty("includeUserActions", ["urn:user:accountrecovery"]);
+
+    const users = conditions.users as Record<string, unknown>;
+    expect(users).not.toHaveProperty("includeGuestsOrExternalUsers");
+
+    const excludedGuests = users.excludeGuestsOrExternalUsers as Record<string, unknown>;
+    const externalTenants = excludedGuests.externalTenants as Record<string, unknown>;
+    expect(externalTenants).toHaveProperty(
+      "@odata.type",
+      "#microsoft.graph.conditionalAccessAllExternalTenants"
     );
   });
 
@@ -201,12 +296,12 @@ describe("conditionalAccess graph helpers", () => {
         error: "Policy already exists",
       }),
       expect.objectContaining({
-        policy: expect.objectContaining({ displayName: `Create ok [${HYDRATION_MARKER}]` }),
+        policy: expect.objectContaining({ displayName: "Create ok" }),
         success: true,
         id: "created-id",
       }),
       expect.objectContaining({
-        policy: expect.objectContaining({ displayName: `Create bad [${HYDRATION_MARKER}]` }),
+        policy: expect.objectContaining({ displayName: "Create bad" }),
         success: false,
         error: "Graph create failed",
       }),

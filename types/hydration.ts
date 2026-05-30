@@ -31,6 +31,7 @@ export interface HydrationTask {
   category: TaskCategory;
   operation: OperationMode;
   itemName: string;
+  templatePath?: string;
   status: TaskStatus;
   error?: string;
   warning?: string;

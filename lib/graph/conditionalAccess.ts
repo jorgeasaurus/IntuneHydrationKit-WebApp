@@ -1,11 +1,123 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- Conditional Access writes are intentionally sequenced for policy safety and throttling. */
 /**
  * Microsoft Graph API operations for Conditional Access Policies
  * IMPORTANT: All CA policies are created in DISABLED state for safety
  */
 
 import { GraphClient } from "./client";
+import type { ApiVersion } from "@/lib/graph/batch";
 import { ConditionalAccessPolicy } from "@/types/graph";
 import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+
+export const CONDITIONAL_ACCESS_POLICIES_ENDPOINT =
+  "/identity/conditionalAccess/policies";
+
+const TOP_LEVEL_CREATE_OMIT_KEYS = new Set([
+  "id",
+  "createdDateTime",
+  "modifiedDateTime",
+  "deletedDateTime",
+]);
+const BETA_ONLY_GRANT_CONTROLS = new Set(["verifiedID"]);
+const BETA_ONLY_USER_ACTIONS = new Set(["urn:user:accountrecovery"]);
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return undefined;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function stringArrayIncludesAny(value: unknown, expected: Set<string>): boolean {
+  return Array.isArray(value) && value.some((item) => typeof item === "string" && expected.has(item));
+}
+
+function normalizeCreateValue(value: unknown, depth = 0): unknown {
+  if (value === null || value === undefined) {
+    return undefined;
+  }
+
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeCreateValue(item, depth + 1))
+      .filter((item) => item !== undefined);
+  }
+
+  if (typeof value !== "object") {
+    return value;
+  }
+
+  const normalized: Record<string, unknown> = {};
+
+  for (const [key, nestedValue] of Object.entries(value as Record<string, unknown>)) {
+    if (
+      key === "@odata.context" ||
+      key.endsWith("@odata.context") ||
+      (depth === 0 && TOP_LEVEL_CREATE_OMIT_KEYS.has(key))
+    ) {
+      continue;
+    }
+
+    const normalizedValue = normalizeCreateValue(nestedValue, depth + 1);
+    if (normalizedValue !== undefined) {
+      normalized[key] = normalizedValue;
+    }
+  }
+
+  return normalized;
+}
+
+export function normalizeConditionalAccessPolicyForCreate(
+  policy: Record<string, unknown>
+): Record<string, unknown> {
+  return normalizeCreateValue(policy) as Record<string, unknown>;
+}
+
+export function conditionalAccessCreateRequiresBetaGraph(
+  policy: Record<string, unknown>
+): boolean {
+  const grantControls = asRecord(policy.grantControls);
+  const conditions = asRecord(policy.conditions);
+  const applications = asRecord(conditions?.applications);
+
+  return (
+    stringArrayIncludesAny(grantControls?.builtInControls, BETA_ONLY_GRANT_CONTROLS) ||
+    stringArrayIncludesAny(applications?.includeUserActions, BETA_ONLY_USER_ACTIONS)
+  );
+}
+
+export function getConditionalAccessCreateApiVersion(
+  policy: Record<string, unknown>
+): ApiVersion {
+  return conditionalAccessCreateRequiresBetaGraph(policy) ? "beta" : "v1.0";
+}
+
+export interface ConditionalAccessCreatePlan {
+  endpoint: typeof CONDITIONAL_ACCESS_POLICIES_ENDPOINT;
+  payload: Record<string, unknown>;
+  apiVersion: ApiVersion;
+}
+
+export function buildConditionalAccessCreatePlan(
+  policy: Record<string, unknown>
+): ConditionalAccessCreatePlan {
+  const displayName = typeof policy.displayName === "string" ? policy.displayName : "";
+  const markedDisplayName = hasHydrationMarker(displayName)
+    ? displayName
+    : `${displayName} [${HYDRATION_MARKER}]`.trim();
+  const payload = normalizeConditionalAccessPolicyForCreate({
+    ...policy,
+    displayName: markedDisplayName,
+    state: "disabled",
+  });
+
+  return {
+    endpoint: CONDITIONAL_ACCESS_POLICIES_ENDPOINT,
+    payload,
+    apiVersion: getConditionalAccessCreateApiVersion(payload),
+  };
+}
 
 /**
  * Get all conditional access policies in the tenant
@@ -13,7 +125,7 @@ import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarke
 export async function getAllConditionalAccessPolicies(
   client: GraphClient
 ): Promise<ConditionalAccessPolicy[]> {
-  return client.getCollection<ConditionalAccessPolicy>("/identity/conditionalAccess/policies");
+  return client.getCollection<ConditionalAccessPolicy>(CONDITIONAL_ACCESS_POLICIES_ENDPOINT);
 }
 
 /**
@@ -92,17 +204,12 @@ export async function createConditionalAccessPolicy(
   client: GraphClient,
   policy: ConditionalAccessPolicy
 ): Promise<ConditionalAccessPolicy> {
-  // CRITICAL: Force policy to disabled state for safety
-  policy.state = "disabled";
-
-  // Add hydration marker to display name
-  if (!hasHydrationMarker(policy.displayName)) {
-    policy.displayName = `${policy.displayName || ""} [${HYDRATION_MARKER}]`.trim();
-  }
+  const plan = buildConditionalAccessCreatePlan(policy as Record<string, unknown>);
 
   return client.post<ConditionalAccessPolicy>(
-    "/identity/conditionalAccess/policies",
-    policy
+    plan.endpoint,
+    plan.payload,
+    plan.apiVersion
   );
 }
 

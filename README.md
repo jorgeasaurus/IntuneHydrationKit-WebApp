@@ -9,11 +9,11 @@ A web-based version of the [IntuneHydrationKit PowerShell module](https://github
 - **Streamlined 4-Step Wizard**: Guided configuration process from tenant setup to execution
 - **MSAL Authentication**: Secure authentication with Microsoft Entra ID
 - **Cloud Support**: The web app currently supports Global (Commercial); use the PowerShell module for US Government, Germany, and China tenants
-- **Local Templates**: 183+ pre-built templates bundled with the app (no external dependencies)
+- **Local Templates**: 182+ pre-built templates bundled with the app (no external dependencies)
 - **Template Catalog**: Browse every importable item and inspect the import-ready JSON payloads at `/templates`
 - **Safety First**: Built-in safeguards prevent accidental deletions
 - **Real-time Progress**: Live updates during policy deployment with pause/resume/cancel controls
-- **Comprehensive Coverage**: Deploy 47 groups, 24 filters, 10 compliance policies, 10 app protection policies, 21 conditional access policies, and more
+- **Comprehensive Coverage**: Deploy 47 groups, 24 filters, 10 compliance policies, 10 app protection policies, 20 conditional access policies, and more
 - **Optimized Performance**: Pre-fetch optimization reduces API calls by 90% for App Protection operations
 - **Execution Control**: Pause, resume, or cancel operations mid-execution
 
@@ -238,7 +238,7 @@ Select which policy categories to deploy:
 - **Device Filters** (24 items) - Assignment filters for targeting
 - **Compliance Policies** (10 items) - Platform-specific compliance rules
 - **App Protection** (10 items) - MAM policies for iOS and Android
-- **Conditional Access** (21 items) - Zero Trust access policies
+- **Conditional Access** (20 items) - Zero Trust access policies
 - **Enrollment Profiles** (3 items) - Autopilot and DEP profiles
 
 ### Step 4: Review & Confirm
