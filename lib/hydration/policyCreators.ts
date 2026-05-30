@@ -351,7 +351,7 @@ export async function createV2CompliancePolicy(
       const result: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(setting)) {
         if (key === "id" || key === "settingDefinitions") continue;
-        if (key.includes("@odata.") && key !== "@odata.type") continue;
+        if (/@odata\./.test(key) && key !== "@odata.type") continue;
         result[key] = value;
       }
       return result;

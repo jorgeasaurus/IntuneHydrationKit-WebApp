@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- Graph writes are intentionally sequenced to preserve throttling and deterministic error handling. */
 /**
  * Microsoft Graph API operations for Azure AD Groups
  */

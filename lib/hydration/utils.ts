@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- wait loops intentionally poll pause/cancel state sequentially. */
 /**
  * Hydration Engine Utilities
  * Common utility functions used across the hydration engine

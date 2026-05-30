@@ -77,14 +77,28 @@ vi.mock("@/lib/hydration/utils", () => ({
   waitWhilePaused: mockWaitWhilePaused,
 }));
 
-vi.mock("@/lib/hydration/taskExecutors", () => ({
+vi.mock("@/lib/hydration/taskExecutors/groupTask", () => ({
   executeGroupTask: mockExecuteGroupTask,
+}));
+vi.mock("@/lib/hydration/taskExecutors/filterTask", () => ({
   executeFilterTask: mockExecuteFilterTask,
+}));
+vi.mock("@/lib/hydration/taskExecutors/complianceTask", () => ({
   executeComplianceTask: mockExecuteComplianceTask,
+}));
+vi.mock("@/lib/hydration/taskExecutors/conditionalAccessTask", () => ({
   executeConditionalAccessTask: mockExecuteConditionalAccessTask,
+}));
+vi.mock("@/lib/hydration/taskExecutors/appProtectionTask", () => ({
   executeAppProtectionTask: mockExecuteAppProtectionTask,
+}));
+vi.mock("@/lib/hydration/taskExecutors/enrollmentTask", () => ({
   executeEnrollmentTask: mockExecuteEnrollmentTask,
+}));
+vi.mock("@/lib/hydration/taskExecutors/baselineTask", () => ({
   executeBaselineTask: mockExecuteBaselineTask,
+}));
+vi.mock("@/lib/hydration/taskExecutors/cisBaselineTask", () => ({
   executeCISBaselineTask: mockExecuteCISBaselineTask,
 }));
 

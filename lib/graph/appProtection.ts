@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- Graph writes are intentionally sequenced to preserve throttling and deterministic error handling. */
 /**
  * Microsoft Graph API operations for App Protection Policies (MAM)
  */
@@ -252,7 +253,7 @@ function cleanNestedValue(value: unknown): unknown {
     const cleaned: Record<string, unknown> = {};
 
     for (const [nestedKey, nestedValue] of Object.entries(value as Record<string, unknown>)) {
-      if (nestedKey.includes("@odata.") && nestedKey !== "@odata.type") {
+      if (/@odata\./.test(nestedKey) && nestedKey !== "@odata.type") {
         continue;
       }
 
