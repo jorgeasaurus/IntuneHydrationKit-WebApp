@@ -30,6 +30,34 @@
       }
     },
     {
+      "label": "test:run",
+      "type": "npm",
+      "script": "test:run",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "doctor",
+      "type": "npm",
+      "script": "doctor",
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": false
+      }
+    },
+    {
       "label": "dev",
       "type": "npm",
       "script": "dev",
