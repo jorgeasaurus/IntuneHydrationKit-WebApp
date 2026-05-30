@@ -31,7 +31,7 @@ const COMMERCIAL_CLOUD: CloudEnvironmentOption = {
   value: "global",
   label: "Global (Commercial)",
   description: "Microsoft 365 commercial cloud for worldwide customers",
-  icon: <Globe className="h-5 w-5" />,
+  icon: <Globe className="size-5" />,
 };
 
 export function CloudEnvironmentSelector({
@@ -48,7 +48,7 @@ export function CloudEnvironmentSelector({
       <DialogContent className="sm:max-w-[540px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Cloud className="h-5 w-5" />
+            <Cloud className="size-5" />
             Select Cloud Environment
           </DialogTitle>
           <DialogDescription>
@@ -75,7 +75,7 @@ export function CloudEnvironmentSelector({
 
           <div className="rounded-lg border border-dashed border-muted-foreground/25 bg-muted/20 p-4">
             <div className="flex items-start gap-3">
-              <Terminal className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <Terminal className="size-5 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="space-y-2">
                 <p className="text-sm font-medium">
                   Need a sovereign cloud? Please use the PowerShell module.
@@ -91,7 +91,7 @@ export function CloudEnvironmentSelector({
                   className="inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
                 >
                   View IntuneHydrationKit PowerShell module
-                  <ExternalLink className="h-3.5 w-3.5" />
+                  <ExternalLink className="size-3.5" />
                 </a>
               </div>
             </div>
@@ -103,7 +103,7 @@ export function CloudEnvironmentSelector({
             Cancel
           </Button>
           <Button onClick={handleContinue} className="text-white">
-            <svg className="mr-2 h-4 w-4" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <svg className="mr-2 size-4" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
               <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
               <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>

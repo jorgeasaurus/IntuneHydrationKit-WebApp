@@ -4,7 +4,7 @@ import { mockOrganization, mockLicenses, mockUser, mockUserRoles } from './mock-
 
 const GRAPH_BASE = 'https://graph.microsoft.com'
 
-export const handlers = [
+const handlers = [
   // Organization info
   http.get(`${GRAPH_BASE}/v1.0/organization`, () => {
     return HttpResponse.json({
@@ -113,12 +113,12 @@ export const handlers = [
 export const server = setupServer(...handlers)
 
 // Helper to add custom handlers for specific tests
-export function addHandler(handler: ReturnType<typeof http.get | typeof http.post>) {
+function addHandler(handler: ReturnType<typeof http.get | typeof http.post>) {
   server.use(handler)
 }
 
 // Common error responses
-export const errorHandlers = {
+const errorHandlers = {
   unauthorized: http.get(`${GRAPH_BASE}/*`, () => {
     return HttpResponse.json(
       { error: { code: 'Unauthorized', message: 'Invalid token' } },

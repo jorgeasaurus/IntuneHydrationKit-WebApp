@@ -20,11 +20,11 @@ interface ActivityLogProps {
 }
 
 const MESSAGE_ICONS: Record<ActivityMessage["type"], React.ReactNode> = {
-  info: <Info className="h-3.5 w-3.5 text-blue-500" />,
-  progress: <Loader2 className="h-3.5 w-3.5 text-blue-500 animate-spin" />,
-  success: <CheckCircle2 className="h-3.5 w-3.5 text-green-500" />,
-  warning: <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />,
-  error: <XCircle className="h-3.5 w-3.5 text-red-500" />,
+  info: <Info className="size-3.5 text-blue-500" />,
+  progress: <Loader2 className="size-3.5 text-blue-500 animate-spin" />,
+  success: <CheckCircle2 className="size-3.5 text-green-500" />,
+  warning: <AlertTriangle className="size-3.5 text-amber-500" />,
+  error: <XCircle className="size-3.5 text-red-500" />,
 };
 
 const MESSAGE_COLORS: Record<ActivityMessage["type"], string> = {
@@ -53,7 +53,7 @@ export function ActivityLog({ messages, className }: ActivityLogProps) {
     <Card className={cn("", className)}>
       <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2 text-sm font-medium">
-          <Terminal className="h-4 w-4" />
+          <Terminal className="size-4" />
           Activity Log
         </CardTitle>
       </CardHeader>

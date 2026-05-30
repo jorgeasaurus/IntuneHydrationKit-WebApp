@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -25,29 +25,23 @@ export function PreFlightValidation() {
   const [validation, setValidation] = useState<ValidationResult | null>(null);
   const [progress, setProgress] = useState(0);
 
-  useEffect(() => {
-    // Auto-start validation when component mounts
-    handleValidate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const handleValidate = async () => {
+  const handleValidate = useCallback(async () => {
     if (!state.tenantConfig) return;
 
     setIsValidating(true);
     setProgress(0);
+    let progressInterval: ReturnType<typeof setInterval> | undefined;
 
     try {
       const client = createGraphClient(state.tenantConfig.cloudEnvironment);
 
       // Simulate progress for better UX
-      const progressInterval = setInterval(() => {
+      progressInterval = setInterval(() => {
         setProgress((prev) => Math.min(prev + 10, 90));
       }, 200);
 
       const result = await validateTenant(client);
 
-      clearInterval(progressInterval);
       setProgress(100);
       setValidation(result);
     } catch (error) {
@@ -82,18 +76,26 @@ export function PreFlightValidation() {
         warnings: [],
       });
     } finally {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
       setIsValidating(false);
     }
-  };
+  }, [state.tenantConfig]);
+
+  useEffect(() => {
+    // Auto-start validation when component mounts
+    void handleValidate();
+  }, [handleValidate]);
 
   const getIconForCheck = (passed: boolean) => {
     if (isValidating) {
-      return <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />;
+      return <Loader2 className="size-5 animate-spin text-blue-600 dark:text-blue-400" />;
     }
     return passed ? (
-      <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400" />
+      <CheckCircle2 className="size-5 text-green-600 dark:text-green-400" />
     ) : (
-      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+      <XCircle className="size-5 text-red-600 dark:text-red-400" />
     );
   };
 
@@ -132,7 +134,7 @@ export function PreFlightValidation() {
         {isValidating && (
           <div className="space-y-2">
             <div className="flex justify-between text-sm">
-              <span>Validating tenant...</span>
+              <span>Validating tenant…</span>
               <span>{progress}%</span>
             </div>
             <Progress value={progress} className="h-2" />
@@ -141,12 +143,12 @@ export function PreFlightValidation() {
 
         {/* Validation Checks */}
         <div className="space-y-3">
-          {checks.map((check, index) => (
+          {checks.map((check) => (
             <div
-              key={index}
+              key={check.title}
               className="flex items-start gap-3 rounded-lg border p-4"
             >
-              <check.icon className="h-5 w-5 text-muted-foreground mt-0.5" />
+              <check.icon className="size-5 text-muted-foreground mt-0.5" />
               <div className="flex-1 space-y-1">
                 <div className="flex items-center justify-between">
                   <p className="font-medium">{check.title}</p>
@@ -175,12 +177,12 @@ export function PreFlightValidation() {
         {/* Warnings */}
         {validation && validation.warnings.length > 0 && (
           <Alert>
-            <AlertTriangle className="h-4 w-4" />
+            <AlertTriangle className="size-4" />
             <AlertTitle>Warnings</AlertTitle>
             <AlertDescription>
               <ul className="list-disc list-inside space-y-1">
-                {validation.warnings.map((warning, index) => (
-                  <li key={index} className="text-sm">
+                {validation.warnings.map((warning) => (
+                  <li key={warning} className="text-sm">
                     {warning}
                   </li>
                 ))}
@@ -192,12 +194,12 @@ export function PreFlightValidation() {
         {/* Errors */}
         {validation && validation.errors.length > 0 && (
           <Alert variant="destructive">
-            <XCircle className="h-4 w-4" />
+            <XCircle className="size-4" />
             <AlertTitle>Validation Failed</AlertTitle>
             <AlertDescription>
               <ul className="list-disc list-inside space-y-1">
-                {validation.errors.map((error, index) => (
-                  <li key={index} className="text-sm">
+                {validation.errors.map((error) => (
+                  <li key={error} className="text-sm">
                     {error}
                   </li>
                 ))}
@@ -220,8 +222,8 @@ export function PreFlightValidation() {
             >
               {isValidating ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Validating...
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Validating…
                 </>
               ) : (
                 "Retry Validation"
@@ -233,7 +235,7 @@ export function PreFlightValidation() {
               disabled={!validation || !validation.isValid || isValidating}
               className="flex-1"
             >
-              Continue
+              Continue to Target Selection
             </Button>
           )}
         </div>

@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/no-multi-comp -- skeleton variants are tiny colocated loading primitives. */
 import { cn } from "@/lib/utils";
 
 interface SkeletonProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -33,7 +34,7 @@ function SkeletonList({ count = 3, className }: { count?: number; className?: st
     <div className={cn("space-y-3", className)}>
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="flex items-center gap-3">
-          <Skeleton variant="circular" className="h-10 w-10" />
+          <Skeleton variant="circular" className="size-10" />
           <div className="flex-1 space-y-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-3 w-1/2" />

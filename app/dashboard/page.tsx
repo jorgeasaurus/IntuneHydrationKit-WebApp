@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
@@ -12,10 +12,12 @@ import { useHydrationExecution } from "@/hooks/useHydrationExecution";
 import { useWizardState } from "@/hooks/useWizardState";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { getEstimatedTaskCount } from "@/lib/hydration/engine";
+import { EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
 
 export default function DashboardPage() {
   const router = useRouter();
   const { state } = useWizardState();
+  const hasStartedRef = useRef(false);
   const {
     tasks,
     isRunning,
@@ -46,29 +48,41 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!state.confirmed) {
       // Redirect to wizard if not confirmed
+      // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- wizard confirmation lives in client context
       router.push("/wizard");
       return;
     }
+
+    if (hasStartedRef.current) {
+      return;
+    }
+
+    hasStartedRef.current = true;
 
     // Start execution
     startExecution().catch((error) => {
       console.error("Failed to start execution:", error);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router, startExecution, state.confirmed]);
 
   // Navigate to results when completed
   useEffect(() => {
     if (isCompleted && summary) {
       // Store summary in sessionStorage for results page
-      sessionStorage.setItem("hydration-summary", JSON.stringify(summary));
-      sessionStorage.setItem("hydration-tasks", JSON.stringify(tasks));
-      sessionStorage.setItem("hydration-isPreview", JSON.stringify(state.isPreview));
+      sessionStorage.setItem(EXECUTION_RESULT_STORAGE_KEYS.summary, JSON.stringify(summary));
+      sessionStorage.setItem(EXECUTION_RESULT_STORAGE_KEYS.tasks, JSON.stringify(tasks));
+      sessionStorage.setItem(
+        EXECUTION_RESULT_STORAGE_KEYS.isPreview,
+        JSON.stringify(state.isPreview)
+      );
 
       // Navigate to results page after a short delay
-      setTimeout(() => {
+      const timeoutId = setTimeout(() => {
+        // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- execution completion is client-only state
         router.push("/results");
       }, 2000);
+
+      return () => clearTimeout(timeoutId);
     }
   }, [isCompleted, summary, tasks, router, state.isPreview]);
 
@@ -110,14 +124,14 @@ export default function DashboardPage() {
     <ProtectedRoute>
       <div className="min-h-screen relative z-10">
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="container mx-auto p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Image
                 src="/IHTLogoClear.png"
                 alt="Intune Hydration Kit"
                 width={40}
                 height={40}
-                className="w-10 h-10"
+                className="size-10"
               />
               <div>
                 <h1 className="text-2xl font-bold">Hydration Dashboard</h1>
@@ -127,7 +141,7 @@ export default function DashboardPage() {
               </div>
             </div>
             <Button variant="outline" onClick={() => router.push("/wizard")}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="size-4 mr-2" />
               Back to Wizard
             </Button>
           </div>
@@ -174,7 +188,7 @@ export default function DashboardPage() {
           {/* Preview mode indicator */}
           {state.isPreview && !isCompleted && (
             <Alert className="border-blue-500 bg-blue-500/10">
-              <Eye className="h-4 w-4 text-blue-500" />
+              <Eye className="size-4 text-blue-500" />
               <AlertTitle className="text-blue-500">Preview Mode</AlertTitle>
               <AlertDescription>
                 No changes will be made to your tenant. This is a dry run to show what would happen.
@@ -185,7 +199,7 @@ export default function DashboardPage() {
           {/* Warning for delete mode */}
           {state.operationMode === "delete" && !state.isPreview && !isCompleted && (
             <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
+              <AlertTriangle className="size-4" />
               <AlertTitle>Delete Mode Active</AlertTitle>
               <AlertDescription>
                 Deleting configurations from your tenant. Only objects created by Intune
@@ -199,7 +213,7 @@ export default function DashboardPage() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                  <Loader2 className="size-5 animate-spin text-blue-500" />
                   Preparing Hydration
                 </CardTitle>
               </CardHeader>
@@ -231,6 +245,7 @@ export default function DashboardPage() {
               isPaused={isPaused}
               isCompleted={isCompleted}
               startTime={startTime}
+              endTime={endTime}
               batchProgress={batchProgress}
               onPause={isRunning && !isPaused ? pause : undefined}
               onResume={isRunning && isPaused ? resume : undefined}

@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from "react";
 import { WizardState, OperationMode, TaskCategory, TenantConfig, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
 import { PrerequisiteCheckResult } from "@/types/prerequisites";
 
@@ -34,77 +34,95 @@ const initialState: WizardState = {
 export function WizardProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WizardState>(initialState);
 
-  const setCurrentStep = (step: number) => {
+  const setCurrentStep = useCallback((step: number) => {
     setState((prev) => ({ ...prev, currentStep: step }));
-  };
+  }, []);
 
-  const setTenantConfig = (config: TenantConfig) => {
+  const setTenantConfig = useCallback((config: TenantConfig) => {
     setState((prev) => ({ ...prev, tenantConfig: config }));
-  };
+  }, []);
 
-  const setOperationMode = (mode: OperationMode) => {
+  const setOperationMode = useCallback((mode: OperationMode) => {
     setState((prev) => ({ ...prev, operationMode: mode }));
-  };
+  }, []);
 
-  const setIsPreview = (isPreview: boolean) => {
+  const setIsPreview = useCallback((isPreview: boolean) => {
     setState((prev) => ({ ...prev, isPreview }));
-  };
+  }, []);
 
-  const setSelectedTargets = (targets: TaskCategory[]) => {
+  const setSelectedTargets = useCallback((targets: TaskCategory[]) => {
     setState((prev) => ({ ...prev, selectedTargets: targets }));
-  };
+  }, []);
 
-  const setSelectedCISCategories = (categories: CISCategoryId[]) => {
+  const setSelectedCISCategories = useCallback((categories: CISCategoryId[]) => {
     setState((prev) => ({ ...prev, selectedCISCategories: categories }));
-  };
+  }, []);
 
-  const setBaselineSelection = (selection: BaselineSelection) => {
+  const setBaselineSelection = useCallback((selection: BaselineSelection) => {
     setState((prev) => ({ ...prev, baselineSelection: selection }));
-  };
+  }, []);
 
-  const setCategorySelections = (selections: CategorySelections) => {
+  const setCategorySelections = useCallback((selections: CategorySelections) => {
     setState((prev) => ({ ...prev, categorySelections: selections }));
-  };
+  }, []);
 
-  const setConfirmed = (confirmed: boolean) => {
+  const setConfirmed = useCallback((confirmed: boolean) => {
     setState((prev) => ({ ...prev, confirmed }));
-  };
+  }, []);
 
-  const setPrerequisiteResult = (result: PrerequisiteCheckResult) => {
+  const setPrerequisiteResult = useCallback((result: PrerequisiteCheckResult) => {
     setState((prev) => ({ ...prev, prerequisiteResult: result }));
-  };
+  }, []);
 
-  const resetWizard = () => {
+  const resetWizard = useCallback(() => {
     setState(initialState);
-  };
+  }, []);
 
-  const nextStep = () => {
+  const nextStep = useCallback(() => {
     setState((prev) => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 4) }));
-  };
+  }, []);
 
-  const previousStep = () => {
+  const previousStep = useCallback(() => {
     setState((prev) => ({ ...prev, currentStep: Math.max(prev.currentStep - 1, 1) }));
-  };
+  }, []);
+
+  const value = useMemo(
+    () => ({
+      state,
+      setCurrentStep,
+      setTenantConfig,
+      setOperationMode,
+      setIsPreview,
+      setSelectedTargets,
+      setSelectedCISCategories,
+      setBaselineSelection,
+      setCategorySelections,
+      setConfirmed,
+      setPrerequisiteResult,
+      resetWizard,
+      nextStep,
+      previousStep,
+    }),
+    [
+      state,
+      setCurrentStep,
+      setTenantConfig,
+      setOperationMode,
+      setIsPreview,
+      setSelectedTargets,
+      setSelectedCISCategories,
+      setBaselineSelection,
+      setCategorySelections,
+      setConfirmed,
+      setPrerequisiteResult,
+      resetWizard,
+      nextStep,
+      previousStep,
+    ]
+  );
 
   return (
-    <WizardContext.Provider
-      value={{
-        state,
-        setCurrentStep,
-        setTenantConfig,
-        setOperationMode,
-        setIsPreview,
-        setSelectedTargets,
-        setSelectedCISCategories,
-        setBaselineSelection,
-        setCategorySelections,
-        setConfirmed,
-        setPrerequisiteResult,
-        resetWizard,
-        nextStep,
-        previousStep,
-      }}
-    >
+    <WizardContext.Provider value={value}>
       {children}
     </WizardContext.Provider>
   );

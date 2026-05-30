@@ -106,7 +106,7 @@ describe('TenantConfig', () => {
 
     const initialValidationCalls = validatePrerequisites.mock.calls.length
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Use Tenant Configuration' }))
 
     expect(await screen.findByRole('button', { name: 'Back to tenant checkpoint' })).toBeInTheDocument()
 
@@ -149,5 +149,21 @@ describe('TenantConfig', () => {
     await waitFor(() => {
       expect(validatePrerequisites.mock.calls.length).toBe(initialValidationCalls)
     })
+  })
+
+  it('keeps the operator identity constrained inside its summary card', async () => {
+    validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    const operatorIdentity = await screen.findByText('operator@contoso.com')
+
+    expect(operatorIdentity).toHaveClass('break-all')
+    expect(operatorIdentity).toHaveClass('max-w-full')
+    expect(operatorIdentity.parentElement).toHaveClass('min-w-0')
   })
 })

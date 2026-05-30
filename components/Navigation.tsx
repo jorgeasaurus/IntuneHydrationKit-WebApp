@@ -74,7 +74,7 @@ export function Navigation() {
                     alt="Intune Hydration Kit"
                     width={36}
                     height={36}
-                    className="w-9 h-9 transition-transform group-hover:scale-105"
+                    className="size-9 transition-transform group-hover:scale-105"
                   />
                   {/* Glow effect on hover */}
                   <div className="absolute inset-0 bg-hydrate/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -109,13 +109,13 @@ export function Navigation() {
                   className="p-2 rounded-md hover:bg-muted transition-colors"
                   aria-label="GitHub Repository"
                 >
-                  <Github className="w-5 h-5" />
+                  <Github className="size-5" />
                 </a>
                 <ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />
 
                 {/* Terminal Status Indicator */}
                 <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
-                  <span className={`w-2 h-2 rounded-full ${isAuthenticated ? 'bg-signal-success' : 'bg-muted-foreground'}`} />
+                  <span className={`size-2 rounded-full ${isAuthenticated ? 'bg-signal-success' : 'bg-muted-foreground'}`} />
                   <span className="text-xs font-mono text-muted-foreground">
                     {isAuthenticated ? 'CONNECTED' : 'OFFLINE'}
                   </span>
@@ -129,13 +129,13 @@ export function Navigation() {
                 >
                   {isAuthenticated ? (
                     <>
-                      <Terminal className="w-4 h-4 mr-2" />
+                      <Terminal className="size-4 mr-2" />
                       Launch Wizard
                     </>
                   ) : (
                     <>
                       <svg
-                        className="mr-2 h-4 w-4"
+                        className="mr-2 size-4"
                         viewBox="0 0 21 21"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"

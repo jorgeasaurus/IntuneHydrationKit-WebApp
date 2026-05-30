@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from "react";
 import { AppSettings } from "@/types/hydration";
+import { APP_SETTINGS_STORAGE_KEY } from "@/lib/storageKeys";
 
 const DEFAULT_SETTINGS: AppSettings = {
   stopOnFirstError: false,
@@ -47,7 +48,7 @@ function readStoredSettings(): AppSettings {
     return DEFAULT_SETTINGS;
   }
 
-  const stored = localStorage.getItem("app-settings");
+  const stored = localStorage.getItem(APP_SETTINGS_STORAGE_KEY);
   if (!stored) {
     return DEFAULT_SETTINGS;
   }
@@ -63,21 +64,26 @@ function readStoredSettings(): AppSettings {
 export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => readStoredSettings());
 
-  const updateSettings = (newSettings: Partial<AppSettings>) => {
+  const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
     setSettings((prev) => {
       const updated = normalizeSettings({ ...prev, ...newSettings });
-      localStorage.setItem("app-settings", JSON.stringify(updated));
+      localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(updated));
       return updated;
     });
-  };
+  }, []);
 
-  const resetSettings = () => {
+  const resetSettings = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
-    localStorage.setItem("app-settings", JSON.stringify(DEFAULT_SETTINGS));
-  };
+    localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(DEFAULT_SETTINGS));
+  }, []);
+
+  const value = useMemo(
+    () => ({ settings, updateSettings, resetSettings }),
+    [settings, updateSettings, resetSettings]
+  );
 
   return (
-    <SettingsContext.Provider value={{ settings, updateSettings, resetSettings }}>
+    <SettingsContext.Provider value={value}>
       {children}
     </SettingsContext.Provider>
   );

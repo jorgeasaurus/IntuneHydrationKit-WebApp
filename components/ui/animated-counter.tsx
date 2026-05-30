@@ -36,7 +36,7 @@ export function AnimatedCounter({
     const unsubscribe = springValue.on("change", (latest) => {
       setDisplayValue(Math.round(latest));
     });
-    return unsubscribe;
+    return () => unsubscribe();
   }, [springValue]);
 
   return (

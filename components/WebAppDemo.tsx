@@ -1,7 +1,9 @@
+/* oxlint-disable react-doctor/no-giant-component -- demo animation is a self-contained visual sequence. */
+/* oxlint-disable react-doctor/no-cascading-set-state -- phase transitions intentionally update the animation state machine together. */
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import {
   CheckCircle2,
   Play,
@@ -93,15 +95,16 @@ export function WebAppDemo() {
   }, [phase]);
 
   return (
-    <div className="relative">
+    <LazyMotion features={domAnimation}>
+      <div className="relative">
       {/* Browser Window Frame */}
       <div className="rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
         {/* Browser Chrome */}
         <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 border-b border-border">
           <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-destructive/80" />
-            <div className="w-3 h-3 rounded-full bg-signal-warning/80" />
-            <div className="w-3 h-3 rounded-full bg-signal-success/80" />
+            <div className="size-3 rounded-full bg-destructive/80" />
+            <div className="size-3 rounded-full bg-signal-warning/80" />
+            <div className="size-3 rounded-full bg-signal-success/80" />
           </div>
           <div className="flex-1 flex justify-center">
             <div className="px-4 py-1 rounded-md bg-background/50 text-xs text-muted-foreground font-mono">
@@ -116,7 +119,7 @@ export function WebAppDemo() {
           <AnimatePresence mode="wait">
             {/* Configure Phase */}
             {phase === "configure" && (
-              <motion.div
+              <m.div
                 key="configure"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -125,7 +128,7 @@ export function WebAppDemo() {
               >
                 {/* Step Header */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                  <div className="flex items-center justify-center size-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
                     2
                   </div>
                   <div>
@@ -141,7 +144,7 @@ export function WebAppDemo() {
                   {CATEGORIES.map((cat) => {
                     const isSelected = selectedCategories.includes(cat.id);
                     return (
-                      <motion.div
+                      <m.div
                         key={cat.id}
                         initial={{ scale: 1 }}
                         animate={{
@@ -158,7 +161,7 @@ export function WebAppDemo() {
                       >
                         <div
                           className={`
-                          w-5 h-5 rounded border-2 flex items-center justify-center transition-all
+                          size-5 rounded border-2 flex items-center justify-center transition-all
                           ${
                             isSelected
                               ? "border-primary bg-primary"
@@ -167,15 +170,15 @@ export function WebAppDemo() {
                         `}
                         >
                           {isSelected && (
-                            <motion.div
-                              initial={{ scale: 0 }}
+                            <m.div
+                              initial={{ scale: 0.95 }}
                               animate={{ scale: 1 }}
                             >
-                              <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
-                            </motion.div>
+                              <CheckCircle2 className="size-3 text-primary-foreground" />
+                            </m.div>
                           )}
                         </div>
-                        <cat.icon className="w-4 h-4 text-muted-foreground" />
+                        <cat.icon className="size-4 text-muted-foreground" />
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-medium truncate">
                             {cat.label}
@@ -184,13 +187,13 @@ export function WebAppDemo() {
                             {cat.count} items
                           </div>
                         </div>
-                      </motion.div>
+                      </m.div>
                     );
                   })}
                 </div>
 
                 {/* Deploy Button */}
-                <motion.button
+                <m.button
                   className={`
                     w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all
                     ${
@@ -207,15 +210,15 @@ export function WebAppDemo() {
                   }}
                   transition={{ delay: 0.3 }}
                 >
-                  <Play className="w-4 h-4" />
+                  <Play className="size-4" />
                   Start Deployment
-                </motion.button>
-              </motion.div>
+                </m.button>
+              </m.div>
             )}
 
             {/* Deploying Phase */}
             {phase === "deploying" && (
-              <motion.div
+              <m.div
                 key="deploying"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -224,13 +227,13 @@ export function WebAppDemo() {
               >
                 {/* Step Header */}
                 <div className="flex items-center gap-3">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
+                  <div className="flex items-center justify-center size-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
                     3
                   </div>
                   <div>
                     <h3 className="font-semibold text-sm">Deploying</h3>
                     <p className="text-xs text-muted-foreground">
-                      Creating configurations...
+                      Creating configurations…
                     </p>
                   </div>
                 </div>
@@ -242,7 +245,7 @@ export function WebAppDemo() {
                     <span className="font-mono font-medium">{progress}%</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <motion.div
+                    <m.div
                       className="h-full bg-gradient-to-r from-primary to-accent rounded-full"
                       style={{ width: `${progress}%` }}
                     />
@@ -251,7 +254,7 @@ export function WebAppDemo() {
 
                 {/* Current Task */}
                 <div className="flex items-center gap-3 p-3 rounded-lg bg-muted/50 border border-border">
-                  <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                  <Loader2 className="size-4 text-primary animate-spin" />
                   <span className="text-sm text-muted-foreground">
                     {DEPLOYMENT_TASKS[currentTask]}
                   </span>
@@ -284,26 +287,26 @@ export function WebAppDemo() {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
             {/* Complete Phase */}
             {phase === "complete" && (
-              <motion.div
+              <m.div
                 key="complete"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="flex flex-col items-center justify-center h-[280px] text-center space-y-5"
+                className="flex h-[280px] flex-col items-center justify-center gap-y-5 text-center"
               >
-                <motion.div
-                  initial={{ scale: 0 }}
+                <m.div
+                  initial={{ scale: 0.95 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", delay: 0.2 }}
                   className="p-4 rounded-full bg-signal-success/10 border border-signal-success/30"
                 >
-                  <CheckCircle2 className="h-10 w-10 text-signal-success" />
-                </motion.div>
+                  <CheckCircle2 className="size-10 text-signal-success" />
+                </m.div>
 
                 <div className="space-y-1">
                   <h3 className="text-lg font-bold">Deployment Complete</h3>
@@ -347,7 +350,7 @@ export function WebAppDemo() {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
@@ -355,7 +358,7 @@ export function WebAppDemo() {
         {/* Progress Bar at Bottom */}
         {phase === "deploying" && (
           <div className="h-1 bg-muted">
-            <motion.div
+            <m.div
               className="h-full bg-gradient-to-r from-primary to-accent"
               style={{ width: `${progress}%` }}
             />
@@ -365,6 +368,7 @@ export function WebAppDemo() {
 
       {/* Glow Effect */}
       <div className="absolute -inset-4 bg-primary/5 rounded-2xl blur-2xl -z-10" />
-    </div>
+      </div>
+    </LazyMotion>
   );
 }

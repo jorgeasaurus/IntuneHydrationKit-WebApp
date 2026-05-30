@@ -13,6 +13,7 @@ interface ExecutionControlsProps {
   isPaused: boolean;
   isCompleted: boolean;
   startTime: Date;
+  endTime?: Date | null;
   batchProgress?: BatchProgress | null;
   onPause?: () => void;
   onResume?: () => void;
@@ -20,11 +21,26 @@ interface ExecutionControlsProps {
   onDownloadLog?: () => void;
 }
 
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
 export function ExecutionControls({
   tasks,
   isPaused,
   isCompleted,
   startTime,
+  endTime,
   batchProgress,
   onPause,
   onResume,
@@ -43,20 +59,6 @@ export function ExecutionControls({
 
     return () => clearInterval(interval);
   }, [startTime, isCompleted, isPaused]);
-
-  const formatDuration = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
-    } else {
-      return `${seconds}s`;
-    }
-  };
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(
@@ -86,7 +88,7 @@ export function ExecutionControls({
         {batchProgress && batchProgress.isActive && (
           <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
             <div className="flex items-center gap-2 mb-2">
-              <Layers className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-pulse" />
+              <Layers className="size-4 text-blue-600 dark:text-blue-400 animate-pulse" />
               <span className="font-medium text-blue-700 dark:text-blue-300">
                 Batch Processing Active
               </span>
@@ -136,7 +138,7 @@ export function ExecutionControls({
           {isCompleted && (
             <div>
               <p className="text-muted-foreground">Completed</p>
-              <p className="font-medium">{format(new Date(), "PPp")}</p>
+              <p className="font-medium">{endTime ? format(endTime, "PPp") : "Completed"}</p>
             </div>
           )}
         </div>
@@ -152,7 +154,7 @@ export function ExecutionControls({
                 disabled={!onPause}
                 className="flex-1"
               >
-                <Pause className="h-4 w-4 mr-2" />
+                <Pause className="size-4 mr-2" />
                 Pause
               </Button>
             ) : (
@@ -163,7 +165,7 @@ export function ExecutionControls({
                 disabled={!onResume}
                 className="flex-1"
               >
-                <Play className="h-4 w-4 mr-2" />
+                <Play className="size-4 mr-2" />
                 Resume
               </Button>
             )}
@@ -174,7 +176,7 @@ export function ExecutionControls({
               disabled={!onCancel}
               className="flex-1"
             >
-              <Square className="h-4 w-4 mr-2" />
+              <Square className="size-4 mr-2" />
               Cancel
             </Button>
           </div>
@@ -189,7 +191,7 @@ export function ExecutionControls({
             disabled={!onDownloadLog}
             className="w-full"
           >
-            <Download className="h-4 w-4 mr-2" />
+            <Download className="size-4 mr-2" />
             Download Execution Log
           </Button>
         )}

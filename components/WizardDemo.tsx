@@ -1,7 +1,8 @@
+/* oxlint-disable react-doctor/no-cascading-set-state -- demo timeline intentionally resets step, task, and progress state together. */
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { CheckCircle2, Circle, Settings, Play, FileCheck } from "lucide-react";
 
 const steps = [
@@ -60,15 +61,16 @@ export function WizardDemo() {
   }, [currentStep]);
 
   return (
-    <div className="relative w-full max-w-lg mx-auto">
+    <LazyMotion features={domAnimation}>
+      <div className="relative w-full max-w-lg mx-auto">
       {/* Browser Frame */}
       <div className="rounded-xl border border-border/50 bg-card/80 backdrop-blur-sm shadow-2xl overflow-hidden">
         {/* Title Bar */}
         <div className="flex items-center gap-2 px-4 py-3 bg-muted/50 border-b border-border/50">
           <div className="flex gap-1.5">
-            <div className="w-3 h-3 rounded-full bg-red-500/80" />
-            <div className="w-3 h-3 rounded-full bg-yellow-500/80" />
-            <div className="w-3 h-3 rounded-full bg-green-500/80" />
+            <div className="size-3 rounded-full bg-red-500/80" />
+            <div className="size-3 rounded-full bg-yellow-500/80" />
+            <div className="size-3 rounded-full bg-green-500/80" />
           </div>
           <div className="flex-1 text-center">
             <span className="text-xs text-muted-foreground font-mono">
@@ -83,8 +85,8 @@ export function WizardDemo() {
           <div className="flex justify-between mb-8">
             {steps.map((step) => (
               <div key={step.id} className="flex flex-col items-center gap-2">
-                <motion.div
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-colors ${
+                <m.div
+                  className={`size-10 rounded-full flex items-center justify-center transition-colors ${
                     currentStep >= step.id
                       ? "bg-primary text-primary-foreground"
                       : "bg-muted text-muted-foreground"
@@ -95,11 +97,11 @@ export function WizardDemo() {
                   transition={{ duration: 0.3 }}
                 >
                   {currentStep > step.id ? (
-                    <CheckCircle2 className="w-5 h-5" />
+                    <CheckCircle2 className="size-5" />
                   ) : (
-                    <step.icon className="w-5 h-5" />
+                    <step.icon className="size-5" />
                   )}
-                </motion.div>
+                </m.div>
                 <span
                   className={`text-xs font-medium ${
                     currentStep >= step.id
@@ -116,7 +118,7 @@ export function WizardDemo() {
           {/* Step Content */}
           <AnimatePresence mode="wait">
             {currentStep === 1 && (
-              <motion.div
+              <m.div
                 key="step1"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -131,11 +133,11 @@ export function WizardDemo() {
                 <div className="flex gap-2">
                   <div className="h-10 flex-1 bg-primary/20 rounded-md animate-pulse" />
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
             {currentStep === 2 && (
-              <motion.div
+              <m.div
                 key="step2"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -144,25 +146,25 @@ export function WizardDemo() {
               >
                 {["Configuration Profiles", "Compliance Policies", "Security Baselines", "Dynamic Groups"].map(
                   (item, i) => (
-                    <motion.div
+                    <m.div
                       key={item}
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.1 }}
                       className="flex items-center gap-3"
                     >
-                      <div className="w-5 h-5 rounded border-2 border-primary bg-primary flex items-center justify-center">
-                        <CheckCircle2 className="w-3 h-3 text-primary-foreground" />
+                      <div className="size-5 rounded border-2 border-primary bg-primary flex items-center justify-center">
+                        <CheckCircle2 className="size-3 text-primary-foreground" />
                       </div>
                       <span className="text-sm">{item}</span>
-                    </motion.div>
+                    </m.div>
                   )
                 )}
-              </motion.div>
+              </m.div>
             )}
 
             {currentStep === 3 && (
-              <motion.div
+              <m.div
                 key="step3"
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -175,43 +177,43 @@ export function WizardDemo() {
                     <span className="font-medium">{progress}%</span>
                   </div>
                   <div className="h-2 bg-muted rounded-full overflow-hidden">
-                    <motion.div
+                    <m.div
                       className="h-full bg-primary rounded-full"
                       style={{ width: `${progress}%` }}
                     />
                   </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm">
-                  <Circle className="w-3 h-3 text-primary animate-pulse" />
+                  <Circle className="size-3 text-primary animate-pulse" />
                   <span className="text-muted-foreground">
                     {mockTasks[taskIndex]}
                   </span>
                 </div>
-              </motion.div>
+              </m.div>
             )}
 
             {currentStep === 4 && (
-              <motion.div
+              <m.div
                 key="step4"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
                 className="text-center space-y-4"
               >
-                <motion.div
-                  initial={{ scale: 0 }}
+                <m.div
+                  initial={{ scale: 0.95 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", delay: 0.2 }}
                 >
-                  <CheckCircle2 className="w-16 h-16 text-green-500 mx-auto" />
-                </motion.div>
+                  <CheckCircle2 className="size-16 text-green-500 mx-auto" />
+                </m.div>
                 <div>
                   <p className="font-semibold">Deployment Complete</p>
                   <p className="text-sm text-muted-foreground">
                     927 objects created successfully
                   </p>
                 </div>
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
@@ -219,6 +221,7 @@ export function WizardDemo() {
 
       {/* Decorative glow */}
       <div className="absolute -inset-4 bg-primary/10 rounded-2xl blur-2xl -z-10" />
-    </div>
+      </div>
+    </LazyMotion>
   );
 }

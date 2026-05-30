@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { CheckCircle2, Circle, AlertCircle, Terminal } from "lucide-react";
 
 interface LogEntry {
@@ -38,21 +38,47 @@ const FINAL_STATS = {
   duration: "8m 42s",
 };
 
+function getTimestamp() {
+  const now = new Date();
+  return now.toLocaleTimeString("en-US", {
+    hour12: false,
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function getLogIcon(type: LogEntry["type"]) {
+  switch (type) {
+    case "success":
+      return <CheckCircle2 className="size-3.5 text-signal-success" />;
+    case "warning":
+      return <AlertCircle className="size-3.5 text-signal-warning" />;
+    case "command":
+      return <Terminal className="size-3.5 text-electric" />;
+    default:
+      return <Circle className="size-3.5 text-muted-foreground" />;
+  }
+}
+
+function getLogColor(type: LogEntry["type"]) {
+  switch (type) {
+    case "success":
+      return "text-signal-success";
+    case "warning":
+      return "text-signal-warning";
+    case "command":
+      return "text-electric font-semibold";
+    default:
+      return "text-muted-foreground";
+  }
+}
+
 export function TerminalDemo() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [phase, setPhase] = useState<"running" | "complete">("running");
   const [progress, setProgress] = useState(0);
   const logsContainerRef = useRef<HTMLDivElement>(null);
-
-  const getTimestamp = () => {
-    const now = new Date();
-    return now.toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  };
 
   useEffect(() => {
     let logIndex = 0;
@@ -100,34 +126,9 @@ export function TerminalDemo() {
     }
   }, [logs]);
 
-  const getLogIcon = (type: LogEntry["type"]) => {
-    switch (type) {
-      case "success":
-        return <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />;
-      case "warning":
-        return <AlertCircle className="h-3.5 w-3.5 text-signal-warning" />;
-      case "command":
-        return <Terminal className="h-3.5 w-3.5 text-electric" />;
-      default:
-        return <Circle className="h-3.5 w-3.5 text-muted-foreground" />;
-    }
-  };
-
-  const getLogColor = (type: LogEntry["type"]) => {
-    switch (type) {
-      case "success":
-        return "text-signal-success";
-      case "warning":
-        return "text-signal-warning";
-      case "command":
-        return "text-electric font-semibold";
-      default:
-        return "text-muted-foreground";
-    }
-  };
-
   return (
-    <div className="relative">
+    <LazyMotion features={domAnimation}>
+      <div className="relative">
       {/* Terminal Window */}
       <div className="terminal-block rounded-lg overflow-hidden shadow-2xl">
         {/* Terminal Header */}
@@ -152,7 +153,7 @@ export function TerminalDemo() {
         >
           <AnimatePresence mode="wait">
             {phase === "running" ? (
-              <motion.div
+              <m.div
                 key="running"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -160,7 +161,7 @@ export function TerminalDemo() {
                 className="space-y-1 font-mono text-xs"
               >
                 {logs.map((log) => (
-                  <motion.div
+                  <m.div
                     key={log.id}
                     initial={{ opacity: 0, x: -10 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -171,7 +172,7 @@ export function TerminalDemo() {
                     </span>
                     {getLogIcon(log.type)}
                     <span className={getLogColor(log.type)}>{log.message}</span>
-                  </motion.div>
+                  </m.div>
                 ))}
 
                 {/* Blinking cursor line */}
@@ -179,27 +180,27 @@ export function TerminalDemo() {
                   <span className="text-muted-foreground/50 w-16 shrink-0">
                     {getTimestamp()}
                   </span>
-                  <Circle className="h-3.5 w-3.5 text-muted-foreground animate-pulse" />
-                  <span className="text-muted-foreground">Processing...</span>
+                  <Circle className="size-3.5 text-muted-foreground animate-pulse" />
+                  <span className="text-muted-foreground">Processing…</span>
                   <span className="terminal-cursor" />
                 </div>
-              </motion.div>
+              </m.div>
             ) : (
-              <motion.div
+              <m.div
                 key="complete"
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.95 }}
-                className="h-full flex flex-col items-center justify-center text-center space-y-6"
+                className="h-full flex flex-col items-center justify-center gap-y-6 text-center"
               >
-                <motion.div
-                  initial={{ scale: 0 }}
+                <m.div
+                  initial={{ scale: 0.95 }}
                   animate={{ scale: 1 }}
                   transition={{ type: "spring", delay: 0.2 }}
                   className="p-4 rounded-full bg-signal-success/10 border border-signal-success/30"
                 >
-                  <CheckCircle2 className="h-12 w-12 text-signal-success" />
-                </motion.div>
+                  <CheckCircle2 className="size-12 text-signal-success" />
+                </m.div>
 
                 <div className="space-y-2">
                   <h3 className="text-xl font-bold">Hydration Complete</h3>
@@ -243,14 +244,14 @@ export function TerminalDemo() {
                     </div>
                   </div>
                 </div>
-              </motion.div>
+              </m.div>
             )}
           </AnimatePresence>
         </div>
 
         {/* Progress Bar */}
         <div className="h-1 bg-muted">
-          <motion.div
+          <m.div
             className="h-full bg-gradient-to-r from-electric to-primary"
             initial={{ width: 0 }}
             animate={{ width: `${progress}%` }}
@@ -261,6 +262,7 @@ export function TerminalDemo() {
 
       {/* Glow Effect */}
       <div className="absolute -inset-4 bg-electric/5 rounded-2xl blur-2xl -z-10" />
-    </div>
+      </div>
+    </LazyMotion>
   );
 }

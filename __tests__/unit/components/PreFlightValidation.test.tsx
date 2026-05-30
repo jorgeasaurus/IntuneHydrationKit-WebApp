@@ -89,9 +89,9 @@ describe('PreFlightValidation', () => {
     expect(await screen.findByText('Connected to Graph')).toBeInTheDocument()
     expect(screen.getByText('Driver update profiles require Windows E3 or higher')).toBeInTheDocument()
     expect(screen.getByText('Group.ReadWrite.All')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Continue to Target Selection' })).toBeEnabled()
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Continue to Target Selection' }))
     expect(nextStep).toHaveBeenCalledTimes(1)
 
     await user.click(screen.getByRole('button', { name: 'Back' }))

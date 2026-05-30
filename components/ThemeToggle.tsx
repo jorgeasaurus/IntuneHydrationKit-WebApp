@@ -1,7 +1,7 @@
 "use client";
 
 import { useTheme } from "next-themes";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
 import { Moon, Sun, TableProperties } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSettings } from "@/hooks/useSettings";
@@ -14,6 +14,18 @@ const LIGHT_DARK_THEME_CYCLE: readonly SelectableTheme[] = ["light", "dark"];
 
 interface ThemeToggleProps {
   themes?: readonly SelectableTheme[];
+}
+
+function subscribeToClientMount() {
+  return () => {};
+}
+
+function getClientMountSnapshot() {
+  return true;
+}
+
+function getServerMountSnapshot() {
+  return false;
 }
 
 function getActiveTheme(
@@ -49,11 +61,11 @@ function getNextTheme(
 function getThemeActionIcon(nextTheme: SelectableTheme): React.JSX.Element {
   switch (nextTheme) {
     case "light":
-      return <Sun className="h-4 w-4" />;
+      return <Sun className="size-4" />;
     case "dark":
-      return <Moon className="h-4 w-4" />;
+      return <Moon className="size-4" />;
     case "corporate-1999":
-      return <TableProperties className="h-4 w-4" />;
+      return <TableProperties className="size-4" />;
   }
 }
 
@@ -62,16 +74,15 @@ export function ThemeToggle({
 }: ThemeToggleProps): React.JSX.Element {
   const { theme, resolvedTheme, setTheme } = useTheme();
   const { settings, updateSettings } = useSettings();
-  const [mounted, setMounted] = useState(false);
-
-  // Prevent hydration mismatch
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useSyncExternalStore(
+    subscribeToClientMount,
+    getClientMountSnapshot,
+    getServerMountSnapshot
+  );
 
   if (!mounted) {
     return (
-      <Button variant="ghost" size="icon" className="rounded-full w-9 h-9">
+      <Button variant="ghost" size="icon" className="rounded-full size-9">
         <span className="sr-only">Toggle theme</span>
       </Button>
     );
@@ -88,7 +99,7 @@ export function ThemeToggle({
     <Button
       variant="ghost"
       size="icon"
-      className="rounded-full w-9 h-9"
+      className="rounded-full size-9"
       onClick={() => {
         setTheme(nextTheme);
         updateSettings({ theme: nextTheme });

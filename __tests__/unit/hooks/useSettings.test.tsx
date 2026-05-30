@@ -48,7 +48,7 @@ describe("useSettings", () => {
 
   it("loads stored settings synchronously and normalizes unsupported themes", () => {
     window.localStorage.setItem(
-      "app-settings",
+      "app-settings:v1",
       JSON.stringify({
         stopOnFirstError: false,
         theme: "retro-terminal",
@@ -64,7 +64,7 @@ describe("useSettings", () => {
   });
 
   it("keeps defaults and logs when stored settings are invalid JSON", () => {
-    window.localStorage.setItem("app-settings", "{");
+    window.localStorage.setItem("app-settings:v1", "{");
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { result } = renderHook(() => useSettings(), { wrapper });
@@ -89,7 +89,7 @@ describe("useSettings", () => {
       stopOnFirstError: false,
       theme: "dark",
     });
-    expect(JSON.parse(window.localStorage.getItem("app-settings") ?? "{}")).toEqual({
+    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual({
       stopOnFirstError: false,
       theme: "dark",
     });
@@ -103,7 +103,7 @@ describe("useSettings", () => {
     });
 
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
-    expect(JSON.parse(window.localStorage.getItem("app-settings") ?? "{}")).toEqual(DEFAULT_SETTINGS);
+    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual(DEFAULT_SETTINGS);
   });
 
   it("resets settings to defaults and persists the reset", () => {
@@ -115,7 +115,7 @@ describe("useSettings", () => {
     });
 
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
-    expect(JSON.parse(window.localStorage.getItem("app-settings") ?? "{}")).toEqual(DEFAULT_SETTINGS);
+    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual(DEFAULT_SETTINGS);
   });
 
   it("throws when used outside the provider", () => {
