@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/no-giant-component -- summary sections are kept together to preserve report workflow context. */
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -43,6 +44,20 @@ function getTaskStatusClassName(status: HydrationTask["status"]): string {
   }
 }
 
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+  } else if (minutes > 0) {
+    return `${minutes}m ${seconds % 60}s`;
+  } else {
+    return `${seconds}s`;
+  }
+}
+
 export function ResultsSummary({
   summary,
   tasks,
@@ -75,20 +90,6 @@ export function ResultsSummary({
       ? Math.round(((summary.stats.created + summary.stats.deleted) / summary.stats.total) * 100)
       : 0;
 
-  const formatDuration = (ms: number): string => {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-
-    if (hours > 0) {
-      return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds % 60}s`;
-    } else {
-      return `${seconds}s`;
-    }
-  };
-
   // Get appropriate labels based on mode and preview state
   function getActionLabel(): string {
     if (isPreview) {
@@ -108,7 +109,7 @@ export function ResultsSummary({
       {/* Preview Mode Banner */}
       {isPreview && (
         <Alert className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30">
-          <Eye className="h-4 w-4" />
+          <Eye className="size-4" />
           <AlertTitle>Preview Mode</AlertTitle>
           <AlertDescription>
             This is a preview of what would happen. No changes were made to your tenant.
@@ -207,15 +208,15 @@ export function ResultsSummary({
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1">
-                          <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                          <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
                           <span className="text-sm font-medium">{stats.success}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <MinusCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          <MinusCircle className="size-4 text-amber-600 dark:text-amber-400" />
                           <span className="text-sm font-medium">{stats.skipped}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                          <XCircle className="size-4 text-red-600 dark:text-red-400" />
                           <span className="text-sm font-medium">{stats.failed}</span>
                         </div>
                       </div>
@@ -230,11 +231,11 @@ export function ResultsSummary({
                           className={`flex items-start gap-2 rounded p-2 text-sm ${getTaskStatusClassName(task.status)}`}
                         >
                           {task.status === "success" ? (
-                            <CheckCircle2 className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                            <CheckCircle2 className="mt-0.5 size-3 flex-shrink-0" />
                           ) : task.status === "skipped" ? (
-                            <MinusCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                            <MinusCircle className="mt-0.5 size-3 flex-shrink-0" />
                           ) : task.status === "failed" ? (
-                            <XCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                            <XCircle className="mt-0.5 size-3 flex-shrink-0" />
                           ) : null}
                           <div className="min-w-0 flex-1">
                             <span className="block truncate">{task.itemName}</span>
@@ -294,7 +295,7 @@ export function ResultsSummary({
                           key={task.id}
                           className="flex items-center gap-2 p-2 rounded border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20"
                         >
-                          <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400 flex-shrink-0" />
+                          <CheckCircle2 className="size-3 text-green-600 dark:text-green-400 flex-shrink-0" />
                           <span className="text-sm text-green-900 dark:text-green-100">
                             {task.itemName}
                           </span>
@@ -320,8 +321,8 @@ export function ResultsSummary({
           </CardHeader>
           <CardContent>
             <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {summary.errors.map((error, index) => (
-                <div key={index} className="p-3 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20">
+              {summary.errors.map((error) => (
+                <div key={`${error.task}-${error.timestamp.toISOString()}`} className="p-3 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20">
                   <p className="text-sm font-medium text-red-900 dark:text-red-100">
                     {error.task}
                   </p>
@@ -349,15 +350,15 @@ export function ResultsSummary({
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button variant="outline" onClick={() => handleDownload("md")} className="w-full">
-              <FileText className="h-4 w-4 mr-2" />
+              <FileText className="size-4 mr-2" />
               Markdown
             </Button>
             <Button variant="outline" onClick={() => handleDownload("json")} className="w-full">
-              <FileJson className="h-4 w-4 mr-2" />
+              <FileJson className="size-4 mr-2" />
               JSON
             </Button>
             <Button variant="outline" onClick={() => handleDownload("csv")} className="w-full">
-              <FileSpreadsheet className="h-4 w-4 mr-2" />
+              <FileSpreadsheet className="size-4 mr-2" />
               CSV
             </Button>
           </div>

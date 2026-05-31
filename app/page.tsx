@@ -1,3 +1,5 @@
+/* oxlint-disable react-doctor/nextjs-missing-metadata -- route metadata is defined in app/layout.tsx for this client page. */
+/* oxlint-disable react-doctor/no-giant-component -- landing-page sections stay colocated; splitting the visual composition is a separate UI refactor. */
 "use client";
 
 import { ReactNode, useState } from "react";
@@ -46,7 +48,7 @@ import { useWizardState } from "@/hooks/useWizardState";
 function MicrosoftLogo() {
   return (
     <svg
-      className="mr-2 h-5 w-5"
+      className="mr-2 size-5"
       viewBox="0 0 21 21"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -187,7 +189,7 @@ export default function Home() {
               <div className="space-y-8">
                 {/* Status Badge */}
                 <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-hydrate/10 border border-hydrate/30">
-                  <span className="w-2 h-2 rounded-full bg-hydrate animate-pulse" />
+                  <span className="size-2 rounded-full bg-hydrate animate-pulse" />
                   <span className="text-xs font-mono text-hydrate uppercase tracking-wider">
                     v2.2
                   </span>
@@ -227,7 +229,7 @@ export default function Home() {
                       size="lg"
                       className="h-12 px-8 text-base font-semibold border-2"
                     >
-                      <Terminal className="mr-2 h-5 w-5" />
+                      <Terminal className="mr-2 size-5" />
                       Launch Wizard
                     </Button>
                   )}
@@ -242,7 +244,7 @@ export default function Home() {
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <GitBranch className="mr-2 h-5 w-5" />
+                      <GitBranch className="mr-2 size-5" />
                       PowerShell Module
                     </a>
                   </Button>
@@ -321,15 +323,15 @@ export default function Home() {
                       "Validates Intune license, Premium P2 for risk policies, and Windows E3/E5 for driver updates.",
                     status: "ACTIVE",
                   },
-                ].map((feature, index) => (
+                ].map((feature) => (
                   <Card
-                    key={index}
+                    key={feature.title}
                     className="data-card group overflow-hidden"
                   >
                     <CardHeader className="space-y-4">
                       <div className="flex items-start justify-between">
                         <div className="p-2.5 rounded-md bg-hydrate/10 border border-hydrate/20">
-                          <feature.icon className="h-5 w-5 text-hydrate" />
+                          <feature.icon className="size-5 text-hydrate" />
                         </div>
                         <span className="badge-status badge-success text-[10px]">
                           <span className="status-dot status-dot-success" />
@@ -393,8 +395,8 @@ export default function Home() {
                     title: "Export",
                     description: "Download detailed reports and review deployed configurations",
                   },
-                ].map((item, index) => (
-                  <div key={index} className="relative">
+                ].map((item) => (
+                  <div key={item.step} className="relative">
                     <Card className="data-card h-full">
                       <CardHeader className="space-y-4">
                         {/* Step Number */}
@@ -403,7 +405,7 @@ export default function Home() {
                             {item.step}
                           </span>
                           <div className="p-2 rounded-md bg-muted">
-                            <item.icon className="h-5 w-5 text-foreground" />
+                            <item.icon className="size-5 text-foreground" />
                           </div>
                         </div>
                         <div>
@@ -417,9 +419,9 @@ export default function Home() {
                       </CardHeader>
                     </Card>
                     {/* Connector Arrow */}
-                    {index < 3 && (
+                    {item.step !== "04" && (
                       <div className="hidden lg:flex absolute top-1/2 -right-3 transform -translate-y-1/2 z-10">
-                        <ChevronRight className="h-6 w-6 text-border" />
+                        <ChevronRight className="size-6 text-border" />
                       </div>
                     )}
                   </div>
@@ -449,7 +451,7 @@ export default function Home() {
                   <CardHeader className="h-full flex flex-col">
                     <div className="flex items-start justify-between mb-4">
                       <div className="p-3 rounded-md bg-hydrate/10 border border-hydrate/20">
-                        <Layers className="h-6 w-6 text-hydrate" />
+                        <Layers className="size-6 text-hydrate" />
                       </div>
                       <span className="font-mono text-xs text-muted-foreground">
                         PRIMARY
@@ -460,7 +462,7 @@ export default function Home() {
                     </CardTitle>
                     <ul className="space-y-3 text-sm text-muted-foreground flex-1">
                       <li className="flex items-center gap-3">
-                        <CheckCircle2 className="h-4 w-4 text-signal-success shrink-0" />
+                        <CheckCircle2 className="size-4 text-signal-success shrink-0" />
                         <span>
                           <span className="font-mono font-semibold text-foreground">
                             <AnimatedCounter value={798} />
@@ -469,7 +471,7 @@ export default function Home() {
                         </span>
                       </li>
                       <li className="flex items-center gap-3">
-                        <CheckCircle2 className="h-4 w-4 text-signal-success shrink-0" />
+                        <CheckCircle2 className="size-4 text-signal-success shrink-0" />
                         <span>
                           <span className="font-mono font-semibold text-foreground">
                             <AnimatedCounter value={3} />
@@ -478,7 +480,7 @@ export default function Home() {
                         </span>
                       </li>
                       <li className="flex items-center gap-3">
-                        <CheckCircle2 className="h-4 w-4 text-signal-success shrink-0" />
+                        <CheckCircle2 className="size-4 text-signal-success shrink-0" />
                         <span>
                           <span className="font-mono font-semibold text-foreground">
                             <AnimatedCounter value={3} />
@@ -487,7 +489,7 @@ export default function Home() {
                         </span>
                       </li>
                       <li className="flex items-center gap-3">
-                        <CheckCircle2 className="h-4 w-4 text-signal-success shrink-0" />
+                        <CheckCircle2 className="size-4 text-signal-success shrink-0" />
                         <span>CIS and OpenIntuneBaseline Sourced</span>
                       </li>
                     </ul>
@@ -509,7 +511,7 @@ export default function Home() {
                   <CardHeader>
                     <div className="flex items-start gap-4">
                       <div className="p-2 rounded-md bg-muted">
-                        <Shield className="h-5 w-5 text-foreground" />
+                        <Shield className="size-5 text-foreground" />
                       </div>
                       <div>
                         <CardTitle className="text-base mb-3">
@@ -517,21 +519,21 @@ export default function Home() {
                         </CardTitle>
                         <ul className="space-y-2 text-sm text-muted-foreground">
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             <span className="font-mono text-foreground">
-                              <AnimatedCounter value={21} />
+                              <AnimatedCounter value={20} />
                             </span>{" "}
                             Conditional Access
                           </li>
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             <span className="font-mono text-foreground">
                               <AnimatedCounter value={16} />
                             </span>{" "}
                             Compliance policies
                           </li>
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             <span className="font-mono text-foreground">
                               <AnimatedCounter value={10} />
                             </span>{" "}
@@ -548,7 +550,7 @@ export default function Home() {
                   <CardHeader>
                     <div className="flex items-start gap-4">
                       <div className="p-2 rounded-md bg-muted">
-                        <Users className="h-5 w-5 text-foreground" />
+                        <Users className="size-5 text-foreground" />
                       </div>
                       <div>
                         <CardTitle className="text-base mb-3">
@@ -556,21 +558,21 @@ export default function Home() {
                         </CardTitle>
                         <ul className="space-y-2 text-sm text-muted-foreground">
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             <span className="font-mono text-foreground">
                               <AnimatedCounter value={47} />
                             </span>{" "}
                             Device groups
                           </li>
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             <span className="font-mono text-foreground">
                               <AnimatedCounter value={24} />
                             </span>{" "}
                             Assignment filters
                           </li>
                           <li className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             <span className="font-mono text-foreground">
                               <AnimatedCounter value={3} />
                             </span>{" "}
@@ -587,7 +589,7 @@ export default function Home() {
                   <CardHeader>
                     <div className="flex items-start gap-4">
                       <div className="p-2 rounded-md bg-muted">
-                        <Box className="h-5 w-5 text-foreground" />
+                        <Box className="size-5 text-foreground" />
                       </div>
                       <div className="flex-1">
                         <CardTitle className="text-base mb-3">
@@ -595,19 +597,19 @@ export default function Home() {
                         </CardTitle>
                         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm text-muted-foreground">
                           <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             Select specific categories
                           </div>
                           <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             Custom baseline repository
                           </div>
                           <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             Preview before deployment
                           </div>
                           <div className="flex items-center gap-2">
-                            <CheckCircle2 className="h-3.5 w-3.5 text-signal-success" />
+                            <CheckCircle2 className="size-3.5 text-signal-success" />
                             Detailed execution reports
                           </div>
                         </div>
@@ -629,7 +631,7 @@ export default function Home() {
                 <CardHeader>
                   <div className="flex items-start gap-4">
                     <div className="p-3 rounded-md bg-hydrate/10 border border-hydrate/20">
-                      <Lock className="h-6 w-6 text-hydrate" />
+                      <Lock className="size-6 text-hydrate" />
                     </div>
                     <div className="flex-1">
                       <CardTitle className="text-xl mb-2">
@@ -694,10 +696,10 @@ export default function Home() {
               </div>
 
               <Accordion type="single" collapsible className="w-full space-y-2">
-                {FAQ_ITEMS.map((item, index) => (
+                {FAQ_ITEMS.map((item) => (
                   <AccordionItem
-                    key={index}
-                    value={`item-${index}`}
+                    key={item.question}
+                    value={item.question}
                     className="data-card px-6 border"
                   >
                     <AccordionTrigger className="text-left font-semibold hover:no-underline py-4">
@@ -746,7 +748,7 @@ export default function Home() {
                         size="lg"
                         className="h-12 px-8 text-base font-semibold border-2"
                       >
-                        <Terminal className="mr-2 h-5 w-5" />
+                        <Terminal className="mr-2 size-5" />
                         Continue to Wizard
                       </Button>
                     )}
@@ -762,7 +764,7 @@ export default function Home() {
           <div className="container mx-auto px-4 sm:px-6">
             <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="flex items-center gap-4">
-                <span className="text-sm text-muted-foreground">
+                <span className="text-sm text-muted-foreground" suppressHydrationWarning>
                   {new Date().getFullYear()} IntuneHydrationKit
                 </span>
                 <span className="badge-status badge-info text-[10px]">

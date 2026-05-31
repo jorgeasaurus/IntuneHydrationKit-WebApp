@@ -67,7 +67,7 @@ describe('SettingsModal', () => {
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
-    expect(JSON.parse(window.localStorage.getItem('app-settings') ?? 'null')).toEqual({
+    expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual({
       stopOnFirstError: true,
       theme: 'dark',
     })
@@ -77,7 +77,7 @@ describe('SettingsModal', () => {
     const user = userEvent.setup()
     const onOpenChange = vi.fn()
 
-    window.localStorage.setItem('app-settings', JSON.stringify(DEFAULT_SETTINGS))
+    window.localStorage.setItem('app-settings:v1', JSON.stringify(DEFAULT_SETTINGS))
 
     render(
       <SettingsProvider>
@@ -89,14 +89,14 @@ describe('SettingsModal', () => {
     await user.click(screen.getByRole('button', { name: /cancel/i }))
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
-    expect(JSON.parse(window.localStorage.getItem('app-settings') ?? 'null')).toEqual(DEFAULT_SETTINGS)
+    expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual(DEFAULT_SETTINGS)
   })
 
   it('resets settings back to defaults immediately', async () => {
     const user = userEvent.setup()
 
     window.localStorage.setItem(
-      'app-settings',
+      'app-settings:v1',
       JSON.stringify({
         stopOnFirstError: false,
         theme: 'dark',
@@ -112,7 +112,7 @@ describe('SettingsModal', () => {
     await user.click(screen.getByRole('button', { name: /reset to defaults/i }))
 
     await waitFor(() => {
-      expect(JSON.parse(window.localStorage.getItem('app-settings') ?? 'null')).toEqual(DEFAULT_SETTINGS)
+      expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual(DEFAULT_SETTINGS)
     })
   })
 })

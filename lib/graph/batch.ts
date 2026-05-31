@@ -48,6 +48,7 @@ export interface BatchResponseError {
   status: number;
   code?: string;
   message: string;
+  innerMessage?: string;
 }
 
 /**
@@ -110,6 +111,7 @@ export function extractBatchError(response: BatchResponse): BatchResponseError {
 
   let code: string | undefined;
   let message = `HTTP ${response.status}`;
+  let innerMessage: string | undefined;
 
   if (body) {
     // Standard Graph error format
@@ -117,6 +119,8 @@ export function extractBatchError(response: BatchResponse): BatchResponseError {
     if (error) {
       code = error.code as string | undefined;
       message = (error.message as string) || message;
+      const innerError = (error.innerError || error.innererror) as Record<string, unknown> | undefined;
+      innerMessage = innerError?.message as string | undefined;
     }
     // Intune-specific format
     else if (body.Message) {
@@ -129,6 +133,7 @@ export function extractBatchError(response: BatchResponse): BatchResponseError {
     status: response.status,
     code,
     message,
+    innerMessage,
   };
 }
 

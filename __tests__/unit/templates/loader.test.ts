@@ -72,6 +72,10 @@ describe("template loader", () => {
 
     const policies = await fetchConditionalAccessPolicies();
 
+    expect(policies).toHaveLength(20);
+    expect(fetchMock).not.toHaveBeenCalledWith(
+      expect.stringContaining("Secure account recovery with identity verification")
+    );
     expect(policies).toContainEqual(
       expect.objectContaining({
         displayName: "[IHD] Block all agent identities from accessing resources",

@@ -75,7 +75,7 @@ describe('SettingsThemeSync', () => {
 
   it('applies the persisted theme first instead of flashing the default theme', async () => {
     window.localStorage.setItem(
-      'app-settings',
+      'app-settings:v1',
       JSON.stringify({
         stopOnFirstError: false,
         theme: 'dark',

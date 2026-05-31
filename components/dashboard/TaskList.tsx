@@ -19,11 +19,11 @@ interface TaskListProps {
 }
 
 const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
-  success: <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />,
-  failed: <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />,
-  running: <Loader2 className="h-4 w-4 text-blue-600 dark:text-blue-400 animate-spin" />,
-  pending: <Circle className="h-4 w-4 text-gray-400" />,
-  skipped: <Ban className="h-4 w-4 text-amber-600 dark:text-amber-400" />,
+  success: <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />,
+  failed: <XCircle className="size-4 text-red-600 dark:text-red-400" />,
+  running: <Loader2 className="size-4 text-blue-600 dark:text-blue-400 animate-spin" />,
+  pending: <Circle className="size-4 text-gray-400" />,
+  skipped: <Ban className="size-4 text-amber-600 dark:text-amber-400" />,
 };
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -104,7 +104,7 @@ export function TaskList({ tasks }: TaskListProps) {
         <div className="space-y-2 max-h-[600px] overflow-y-auto">
           {filteredTasks.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-8 text-center">
-              <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
+              <AlertCircle className="size-8 text-muted-foreground mb-2" />
               <p className="text-sm text-muted-foreground">No tasks match your filters</p>
             </div>
           ) : (
@@ -136,9 +136,9 @@ export function TaskList({ tasks }: TaskListProps) {
                         : "bg-red-100 dark:bg-red-900/20"
                     )}>
                       {task.status === "skipped" ? (
-                        <AlertCircle className="h-3 w-3 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                        <AlertCircle className="size-3 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
                       ) : (
-                        <XCircle className="h-3 w-3 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                        <XCircle className="size-3 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
                       )}
                       <p className={cn(
                         "text-xs",

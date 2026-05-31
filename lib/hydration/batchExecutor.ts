@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- batch execution loops preserve retry, pause, cancellation, and cooldown semantics. */
 /**
  * Batch Executor for Hydration Tasks
  * Executes CREATE operations using Microsoft Graph $batch endpoint
@@ -39,7 +40,18 @@ import {
   CISBaselinePolicy,
   BaselinePolicy,
 } from "@/lib/templates/loader";
-import { conditionalAccessPolicyExists } from "@/lib/graph/conditionalAccess";
+import {
+  CONDITIONAL_ACCESS_POLICIES_ENDPOINT,
+  buildConditionalAccessCreatePlan,
+  conditionalAccessPolicyExists,
+} from "@/lib/graph/conditionalAccess";
+import {
+  getPrivatePreviewFeatureName,
+  getPrivatePreviewSkipReason,
+  logConditionalAccessBatchRequestFailureDiagnostics,
+  logConditionalAccessCreateFailureDiagnostics,
+  shouldLogConditionalAccessCreateFailure,
+} from "./conditionalAccessBatch";
 import * as Templates from "@/templates";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
 
@@ -101,7 +113,7 @@ const CATEGORY_ENDPOINTS: Record<string, string> = {
   groups: "/groups",
   filters: "/deviceManagement/assignmentFilters",
   compliance: "/deviceManagement/deviceCompliancePolicies",
-  conditionalAccess: "/identity/conditionalAccess/policies",
+  conditionalAccess: CONDITIONAL_ACCESS_POLICIES_ENDPOINT,
   appProtection_ios: "/deviceAppManagement/iosManagedAppProtections",
   appProtection_android: "/deviceAppManagement/androidManagedAppProtections",
   enrollment_autopilot: "/deviceManagement/windowsAutopilotDeploymentProfiles",
@@ -156,9 +168,14 @@ async function verifyCompliancePolicyCreated(
       const response = await Promise.race([fetchPromise, timeoutPromise]);
 
       if (response?.value) {
-        const foundPolicy = response.value.find(
-          (p) => p.displayName?.toLowerCase() === policyName.toLowerCase()
-        );
+        let foundPolicy: { id: string; displayName: string; description?: string } | undefined;
+        const normalizedPolicyName = policyName.toLowerCase();
+        for (const policy of response.value) {
+          if (policy.displayName?.toLowerCase() === normalizedPolicyName) {
+            foundPolicy = policy;
+            break;
+          }
+        }
 
         if (foundPolicy) {
           console.log(`[BatchExecutor] Compliance policy "${policyName}" was created successfully (ID: ${foundPolicy.id}) despite 504 timeout`);
@@ -190,7 +207,7 @@ async function verifyCompliancePolicyCreated(
  * Build result type for request body builders
  */
 type BuildBodyResult =
-  | { type: "body"; body: Record<string, unknown> }
+  | { type: "body"; body: Record<string, unknown>; apiVersion?: ApiVersion; endpoint?: string }
   | { type: "skip"; reason: string }
   | { type: "error"; reason: string };
 
@@ -357,13 +374,12 @@ function buildConditionalAccessRequestBody(task: HydrationTask): BuildBodyResult
   if (!template) return { type: "error", reason: "Template not found" };
 
   // CA policies must be created in disabled state
+  const plan = buildConditionalAccessCreatePlan(template as Record<string, unknown>);
   return {
     type: "body",
-    body: {
-      ...template,
-      state: "disabled",
-      displayName: `${template.displayName} [Intune Hydration Kit]`,
-    },
+    body: plan.payload,
+    endpoint: plan.endpoint,
+    apiVersion: plan.apiVersion,
   };
 }
 
@@ -529,24 +545,31 @@ async function buildCISBaselineRequestBody(
 
   const allKeys = getAllTemplateCacheKeys();
   const cacheKeys = allKeys.filter(k => k.startsWith("intune-hydration-templates-cisBaseline"));
-  console.log(`[BatchExecutor] CIS lookup for "${task.itemName}" - found ${cacheKeys.length} cache keys:`, cacheKeys);
+  const cisLookupKey = task.templatePath || task.itemName;
+  console.log(`[BatchExecutor] CIS lookup for "${cisLookupKey}" - found ${cacheKeys.length} cache keys:`, cacheKeys);
 
   for (const key of cacheKeys) {
     const cacheKey = key.replace("intune-hydration-templates-", "");
     const cached = getCachedTemplates(cacheKey);
     if (cached && Array.isArray(cached)) {
-      template = (cached as CISBaselinePolicy[]).find(
-        (p) => (p.name || p.displayName) === task.itemName
-      );
+      for (const policy of cached as CISBaselinePolicy[]) {
+        if (
+          policy._cisFilePath === cisLookupKey ||
+          (policy.name || policy.displayName) === cisLookupKey
+        ) {
+          template = policy;
+          break;
+        }
+      }
       if (template) {
-        console.log(`[BatchExecutor] Found template for "${task.itemName}" in cache key: ${cacheKey}`);
+        console.log(`[BatchExecutor] Found template for "${cisLookupKey}" in cache key: ${cacheKey}`);
         break;
       }
     }
   }
 
   if (!template) {
-    console.log(`[BatchExecutor] No template found for CIS task: "${task.itemName}"`);
+    console.log(`[BatchExecutor] No template found for CIS task: "${cisLookupKey}"`);
     return null;
   }
 
@@ -658,8 +681,8 @@ async function prepareTaskForBatch(
       if (result.type === "skip") return { type: "skip", reason: result.reason };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
-      endpoint = CATEGORY_ENDPOINTS.conditionalAccess;
-      apiVersion = "v1.0";
+      endpoint = result.endpoint || CATEGORY_ENDPOINTS.conditionalAccess;
+      apiVersion = result.apiVersion || "v1.0";
       break;
     }
 
@@ -1021,6 +1044,19 @@ async function executeBatchGroup(
             console.log(`[BatchExecutor] Response ${response.status} for "${task.itemName}" -- queued for retry`);
           } else {
             const error = extractBatchError(response);
+            if (shouldLogConditionalAccessCreateFailure(item, response, error)) {
+              logConditionalAccessCreateFailureDiagnostics(item, response, error, version);
+            }
+            const privatePreviewFeatureName = getPrivatePreviewFeatureName(error);
+            if (privatePreviewFeatureName) {
+              const skipReason = getPrivatePreviewSkipReason(privatePreviewFeatureName);
+              task.status = "skipped";
+              task.error = skipReason;
+              task.endTime = new Date();
+              results.push({ task, success: false, skipped: true, error: skipReason });
+              context.onTaskComplete?.(task);
+              continue;
+            }
             task.status = "failed";
             task.error = error.message;
             task.endTime = new Date();
@@ -1054,6 +1090,7 @@ async function executeBatchGroup(
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.error(`[BatchExecutor] Batch ${i + 1} request failed; not retrying create batch:`, errorMessage);
+        logConditionalAccessBatchRequestFailureDiagnostics(currentItems, errorMessage, version);
 
         // Entire batch HTTP call failed before per-request responses were available.
         // Re-submitting POST batches can create duplicates if Graph processed the
@@ -2457,8 +2494,8 @@ export async function executeDeletesInParallel(
             }
 
             // Check if it's a 429 (throttled) or 400 error (transient backend issue) but NOT ResourceNotFound
-            const is429Error = lastError.includes("[429]") || lastError.includes("TooManyRequests");
-            const is400Error = lastError.includes("[400]") || lastError.includes("400");
+            const is429Error = /\[429\]|TooManyRequests/.test(lastError);
+            const is400Error = /\[400\]|400/.test(lastError);
             const isRetryable = (is429Error || is400Error) && attempt < maxRetries - 1;
 
             if (isRetryable) {
@@ -2499,7 +2536,8 @@ export async function executeDeletesInParallel(
 
     // Check if any results in this batch had throttling errors - add extra cooldown
     const hadThrottling = batchResults.some(
-      (r) => r.error?.includes("[429]") || r.error?.includes("TooManyRequests")
+      (r) =>
+        Boolean(r.error && /\[429\]|TooManyRequests/.test(r.error))
     );
 
     // Update progress

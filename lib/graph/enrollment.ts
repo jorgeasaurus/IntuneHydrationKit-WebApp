@@ -125,13 +125,13 @@ interface DevicePreparationPolicySummary {
   description?: string;
 }
 
-export async function getAllAutopilotProfiles(
+async function getAllAutopilotProfiles(
   client: GraphClient
 ): Promise<AutopilotDeploymentProfile[]> {
   return client.getCollection<AutopilotDeploymentProfile>(AUTOPILOT_PATH);
 }
 
-export async function getAutopilotProfileByName(
+async function getAutopilotProfileByName(
   client: GraphClient,
   displayName: string
 ): Promise<AutopilotDeploymentProfile | null> {
@@ -142,7 +142,7 @@ export async function getAutopilotProfileByName(
   ) || null;
 }
 
-export async function autopilotProfileExists(
+async function autopilotProfileExists(
   client: GraphClient,
   displayName: string
 ): Promise<boolean> {
@@ -163,7 +163,7 @@ function cleanAutopilotProfile(profile: AutopilotDeploymentProfile): Record<stri
   return cleaned;
 }
 
-export async function createAutopilotProfile(
+async function createAutopilotProfile(
   client: GraphClient,
   profile: AutopilotDeploymentProfile
 ): Promise<AutopilotDeploymentProfile> {
@@ -198,7 +198,7 @@ export async function deleteAutopilotProfileByName(
   await deleteAutopilotProfile(client, profile.id);
 }
 
-export async function getAllEnrollmentConfigurations(
+async function getAllEnrollmentConfigurations(
   client: GraphClient
 ): Promise<EnrollmentStatusPageConfiguration[]> {
   const configs = await client.getCollection<EnrollmentStatusPageConfiguration>(ESP_PATH);
@@ -207,7 +207,7 @@ export async function getAllEnrollmentConfigurations(
   );
 }
 
-export async function getESPConfigurationByName(
+async function getESPConfigurationByName(
   client: GraphClient,
   displayName: string
 ): Promise<EnrollmentStatusPageConfiguration | null> {
@@ -218,7 +218,7 @@ export async function getESPConfigurationByName(
   ) || null;
 }
 
-export async function espConfigurationExists(
+async function espConfigurationExists(
   client: GraphClient,
   displayName: string
 ): Promise<boolean> {
@@ -226,7 +226,7 @@ export async function espConfigurationExists(
   return config !== null;
 }
 
-export async function createESPConfiguration(
+async function createESPConfiguration(
   client: GraphClient,
   config: EnrollmentStatusPageConfiguration
 ): Promise<EnrollmentStatusPageConfiguration> {
@@ -286,7 +286,7 @@ export async function devicePreparationExists(
   return policy !== null;
 }
 
-export async function createDevicePreparationProfile(
+async function createDevicePreparationProfile(
   client: GraphClient,
   profile: DevicePreparationProfile
 ): Promise<DevicePreparationProfile> {

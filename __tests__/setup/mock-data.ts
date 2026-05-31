@@ -25,7 +25,7 @@ export const mockLicenses = [
   },
 ]
 
-export const mockLicensesNoIntune = [
+const mockLicensesNoIntune = [
   {
     skuId: '00000000-0000-0000-0000-000000000004',
     skuPartNumber: 'EXCHANGESTANDARD',
@@ -33,7 +33,7 @@ export const mockLicensesNoIntune = [
   },
 ]
 
-export const mockLicensesWithPremiumP2 = [
+const mockLicensesWithPremiumP2 = [
   ...mockLicenses,
   {
     skuId: '00000000-0000-0000-0000-000000000005',
@@ -60,7 +60,7 @@ export const mockUserRoles = [
   },
 ]
 
-export const mockUserRolesIntuneAdmin = [
+const mockUserRolesIntuneAdmin = [
   {
     '@odata.type': '#microsoft.graph.directoryRole',
     id: '00000000-0000-0000-0000-000000000021',
@@ -69,7 +69,7 @@ export const mockUserRolesIntuneAdmin = [
   },
 ]
 
-export const mockUserRolesNoAdmin = [
+const mockUserRolesNoAdmin = [
   {
     '@odata.type': '#microsoft.graph.directoryRole',
     id: '00000000-0000-0000-0000-000000000022',
@@ -79,14 +79,14 @@ export const mockUserRolesNoAdmin = [
 ]
 
 // Tenant config mock
-export const mockTenantConfig: TenantConfig = {
+const mockTenantConfig: TenantConfig = {
   tenantId: '00000000-0000-0000-0000-000000000001',
   tenantName: 'Contoso',
   cloudEnvironment: 'global',
 }
 
 // Task mocks
-export const createMockTask = (overrides: Partial<HydrationTask> = {}): HydrationTask => ({
+const createMockTask = (overrides: Partial<HydrationTask> = {}): HydrationTask => ({
   id: crypto.randomUUID(),
   category: 'groups',
   operation: 'create',
@@ -95,7 +95,7 @@ export const createMockTask = (overrides: Partial<HydrationTask> = {}): Hydratio
   ...overrides,
 })
 
-export const createMockTaskList = (count: number, category: TaskCategory = 'groups'): HydrationTask[] => {
+const createMockTaskList = (count: number, category: TaskCategory = 'groups'): HydrationTask[] => {
   return Array.from({ length: count }, (_, i) => createMockTask({
     id: `task-${i}`,
     category,
@@ -103,7 +103,7 @@ export const createMockTaskList = (count: number, category: TaskCategory = 'grou
   }))
 }
 
-export const mockCompletedTask: HydrationTask = {
+const mockCompletedTask: HydrationTask = {
   id: 'task-completed-1',
   category: 'groups',
   operation: 'create',
@@ -113,7 +113,7 @@ export const mockCompletedTask: HydrationTask = {
   endTime: new Date('2024-01-01T10:00:02Z'),
 }
 
-export const mockFailedTask: HydrationTask = {
+const mockFailedTask: HydrationTask = {
   id: 'task-failed-1',
   category: 'filters',
   operation: 'create',
@@ -124,7 +124,7 @@ export const mockFailedTask: HydrationTask = {
   endTime: new Date('2024-01-01T10:00:04Z'),
 }
 
-export const mockSkippedTask: HydrationTask = {
+const mockSkippedTask: HydrationTask = {
   id: 'task-skipped-1',
   category: 'compliance',
   operation: 'create',
@@ -135,7 +135,7 @@ export const mockSkippedTask: HydrationTask = {
 }
 
 // Summary mock
-export const mockSummary: HydrationSummary = {
+const mockSummary: HydrationSummary = {
   tenantId: '00000000-0000-0000-0000-000000000001',
   tenantName: 'Contoso',
   operationMode: 'create',
@@ -170,7 +170,7 @@ export const mockSummary: HydrationSummary = {
 }
 
 // Template mocks
-export const mockGroupTemplate = {
+const mockGroupTemplate = {
   displayName: 'Intune - All Windows Devices',
   description: 'Dynamic group for all Windows devices. Imported by Intune Hydration Kit',
   groupTypes: ['DynamicMembership'],
@@ -181,14 +181,14 @@ export const mockGroupTemplate = {
   securityEnabled: true,
 }
 
-export const mockFilterTemplate = {
+const mockFilterTemplate = {
   displayName: 'Windows 11 Corporate Devices',
   description: 'Filter for Windows 11 corporate devices. Imported by Intune Hydration Kit',
   platform: 'windows10AndLater',
   rule: '(device.operatingSystemVersion -startsWith "10.0.22000")',
 }
 
-export const mockComplianceTemplate = {
+const mockComplianceTemplate = {
   '@odata.type': '#microsoft.graph.windows10CompliancePolicy',
   displayName: 'Windows 11 - Security Baseline',
   description: 'Windows 11 compliance policy. Imported by Intune Hydration Kit',
@@ -196,7 +196,7 @@ export const mockComplianceTemplate = {
   passwordMinimumLength: 14,
 }
 
-export const mockConditionalAccessTemplate = {
+const mockConditionalAccessTemplate = {
   displayName: 'CA001 - Require MFA for Admins',
   description: 'Require MFA for admin roles. Imported by Intune Hydration Kit',
   state: 'disabled',

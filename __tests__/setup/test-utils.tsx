@@ -41,17 +41,17 @@ export * from '@testing-library/react'
 export { customRender as render }
 
 // Utility to wait for async operations
-export const waitForAsync = () => new Promise((resolve) => setTimeout(resolve, 0))
+const waitForAsync = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 // Utility to create a mock function that resolves after a delay
-export const createDelayedMock = <T,>(value: T, delay = 100) => {
+const createDelayedMock = <T,>(value: T, delay = 100) => {
   return vi.fn().mockImplementation(() =>
     new Promise((resolve) => setTimeout(() => resolve(value), delay))
   )
 }
 
 // Utility to create a mock function that rejects after a delay
-export const createDelayedRejectMock = (error: Error, delay = 100) => {
+const createDelayedRejectMock = (error: Error, delay = 100) => {
   return vi.fn().mockImplementation(() =>
     new Promise((_, reject) => setTimeout(() => reject(error), delay))
   )

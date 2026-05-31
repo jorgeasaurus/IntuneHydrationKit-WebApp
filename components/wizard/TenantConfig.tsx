@@ -1,6 +1,7 @@
+/* oxlint-disable react-doctor/no-giant-component -- tenant readiness UI keeps auth, prerequisite status, and cloud selection in one step. */
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import { useMsal } from "@azure/msal-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -107,9 +108,10 @@ export function TenantConfig(): React.JSX.Element {
     useState<PrerequisiteCheckResult | null>(state.prerequisiteResult ?? null);
 
   const tenantId = accounts.length > 0 ? accounts[0].tenantId : "";
+  const operatorUsername = accounts[0]?.username || "Not signed in";
   const tenantName = prerequisiteResult?.organization?.displayName || "";
 
-  async function runPrerequisiteValidation(showLoadingState: boolean): Promise<void> {
+  const runPrerequisiteValidation = useCallback(async (showLoadingState: boolean): Promise<void> => {
     try {
       if (showLoadingState) {
         setIsLoading(true);
@@ -133,14 +135,13 @@ export function TenantConfig(): React.JSX.Element {
         setIsLoading(false);
       }
     }
-  }
+  }, [setWizardPrerequisiteResult]);
 
   useEffect(() => {
     if (accounts.length > 0 && !state.prerequisiteResult) {
       void runPrerequisiteValidation(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accounts, state.prerequisiteResult]);
+  }, [accounts.length, runPrerequisiteValidation, state.prerequisiteResult]);
 
   useEffect(() => {
     if (!state.prerequisiteResult) {
@@ -320,12 +321,12 @@ export function TenantConfig(): React.JSX.Element {
             </p>
           </div>
 
-          <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
+          <div className="min-w-0 rounded-2xl border border-border/80 bg-background/60 p-4">
             <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
               Operator
             </p>
-            <p className="mt-3 text-base font-semibold">
-              {accounts[0]?.username || "Not signed in"}
+            <p className="mt-3 max-w-full break-all text-sm font-semibold leading-6" title={operatorUsername}>
+              {operatorUsername}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Delegated permissions are evaluated through the active user session.
@@ -351,9 +352,9 @@ export function TenantConfig(): React.JSX.Element {
               disabled={prerequisiteStatus === "checking"}
             >
               {prerequisiteStatus === "checking" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
               ) : (
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="size-4" />
               )}
               <span className="ml-2">Recheck readiness</span>
             </Button>
@@ -374,13 +375,13 @@ export function TenantConfig(): React.JSX.Element {
                       className={`rounded-xl border border-current/20 bg-background/70 p-2 ${style.icon}`}
                     >
                       {check.status === "checking" ? (
-                        <Loader2 className="h-5 w-5 animate-spin" />
+                        <Loader2 className="size-5 animate-spin" />
                       ) : check.status === "error" ? (
-                        <XCircle className="h-5 w-5" />
+                        <XCircle className="size-5" />
                       ) : check.status === "warning" ? (
-                        <AlertTriangle className="h-5 w-5" />
+                        <AlertTriangle className="size-5" />
                       ) : (
-                        <Icon className="h-5 w-5" />
+                        <Icon className="size-5" />
                       )}
                     </div>
                     <span className="rounded-full border border-current/20 bg-background/70 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] text-muted-foreground">
@@ -402,16 +403,16 @@ export function TenantConfig(): React.JSX.Element {
           <div className="space-y-3 border-t border-border/70 pt-4">
             {prerequisiteStatus === "checking" && (
               <Alert className="border-blue-500/30 bg-blue-500/10">
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="size-4 animate-spin" />
                 <AlertDescription>
-                  Validating tenant prerequisites and live license signals...
+                  Validating tenant prerequisites and live license signals…
                 </AlertDescription>
               </Alert>
             )}
 
             {prerequisiteStatus === "success" && prerequisiteResult && (
               <Alert className="border-green-500/30 bg-green-500/10">
-                <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
                 <AlertTitle className="text-green-800 dark:text-green-200">
                   All prerequisites met
                 </AlertTitle>
@@ -424,15 +425,15 @@ export function TenantConfig(): React.JSX.Element {
 
             {prerequisiteStatus === "warning" && prerequisiteResult && (
               <Alert className="border-amber-500/30 bg-amber-500/10">
-                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
                 <AlertTitle className="text-amber-900 dark:text-amber-100">
                   Prerequisites met with warnings
                 </AlertTitle>
                 <AlertDescription className="text-amber-800 dark:text-amber-200">
                   <div className="mt-2 space-y-2 text-sm">
-                    {prerequisiteResult.warnings.map((warning, index) => (
-                      <div key={index} className="flex items-start gap-2">
-                        <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                    {prerequisiteResult.warnings.map((warning) => (
+                      <div key={warning} className="flex items-start gap-2">
+                        <AlertTriangle className="mt-0.5 size-3 flex-shrink-0 text-amber-600 dark:text-amber-400" />
                         <span>{warning}</span>
                       </div>
                     ))}
@@ -443,23 +444,23 @@ export function TenantConfig(): React.JSX.Element {
 
             {prerequisiteStatus === "error" && prerequisiteResult && (
               <Alert className="border-red-500/30 bg-red-500/10">
-                <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+                <XCircle className="size-4 text-red-600 dark:text-red-400" />
                 <AlertTitle className="text-red-800 dark:text-red-200">
                   Prerequisite check failed
                 </AlertTitle>
                 <AlertDescription className="text-red-700 dark:text-red-300">
                   <div className="mt-2 space-y-2 text-sm">
-                    {prerequisiteResult.errors.map((error, index) => (
-                      <div key={index} className="flex items-start gap-2">
-                        <XCircle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                    {prerequisiteResult.errors.map((error) => (
+                      <div key={error} className="flex items-start gap-2">
+                        <XCircle className="mt-0.5 size-3 flex-shrink-0" />
                         <span>{error}</span>
                       </div>
                     ))}
                     {prerequisiteResult.warnings.length > 0 && (
                       <div className="mt-3 border-t border-red-200 pt-3 dark:border-red-800">
-                        {prerequisiteResult.warnings.map((warning, index) => (
-                          <div key={index} className="flex items-start gap-2">
-                            <AlertTriangle className="mt-0.5 h-3 w-3 flex-shrink-0" />
+                        {prerequisiteResult.warnings.map((warning) => (
+                          <div key={warning} className="flex items-start gap-2">
+                            <AlertTriangle className="mt-0.5 size-3 flex-shrink-0" />
                             <span>{warning}</span>
                           </div>
                         ))}
@@ -474,7 +475,7 @@ export function TenantConfig(): React.JSX.Element {
 
         <div className="pt-4">
           <Button onClick={handleContinue} disabled={!isValid} className="w-full">
-            Continue
+            Use Tenant Configuration
           </Button>
         </div>
       </CardContent>

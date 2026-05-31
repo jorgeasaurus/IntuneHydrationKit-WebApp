@@ -51,7 +51,7 @@ describe('OperationModeSelection', () => {
     expect(screen.getByText(/Conditional Access policies must be disabled/i)).toBeInTheDocument()
     expect(screen.getByText('Delete requires hydration markers and CA disablement.')).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Choose Operation Mode' }))
 
     expect(setOperationMode).toHaveBeenCalledWith('delete')
     expect(setIsPreview).toHaveBeenCalledWith(false)

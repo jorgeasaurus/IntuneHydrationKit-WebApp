@@ -48,7 +48,7 @@ vi.mock("@/templates", () => ({
     compliance: { count: 10 },
     appProtection: { count: 8 },
     enrollment: { count: 4 },
-    conditionalAccess: { count: 21 },
+    conditionalAccess: { count: 20 },
     cisBaseline: { count: 717 },
   },
   getDynamicGroups: mockGetDynamicGroups,
@@ -285,6 +285,7 @@ describe("taskQueue", () => {
     expect(mockFetchCISBaselinePoliciesByCategories).not.toHaveBeenCalled();
     expect(tasks).toHaveLength(1);
     expect(tasks[0].itemName).toBe("Fetched CIS Policy");
+    expect(tasks[0].templatePath).toBe("cis/fetched.json");
   });
 
   it("returns zero for categories without metadata or explicit selections", () => {
@@ -294,7 +295,7 @@ describe("taskQueue", () => {
   });
 
   it("maps selected CIS delete paths back to display names when building async delete tasks", async () => {
-    mockFetchCISBaselinePoliciesByCategories.mockResolvedValue([
+    mockFetchCISBaselinePolicies.mockResolvedValue([
       {
         displayName: "Known CIS Policy",
         name: "Known CIS Policy",
@@ -316,11 +317,50 @@ describe("taskQueue", () => {
       },
     });
 
-    expect(mockClearCategoryCache).toHaveBeenCalledWith("cisBaseline-cis-android");
+    expect(mockFetchCISBaselinePolicies).toHaveBeenCalledTimes(1);
+    expect(mockFetchCISBaselinePoliciesByCategories).not.toHaveBeenCalled();
+    expect(mockClearCategoryCache).toHaveBeenCalledWith("cisBaseline");
     expect(tasks).toHaveLength(2);
     expect(tasks.map((task) => task.itemName)).toEqual([
       "Known CIS Policy",
       "missing-name",
+    ]);
+    expect(tasks.map((task) => task.templatePath)).toEqual([
+      "cis/path-known.json",
+      "cis/missing-name.json",
+    ]);
+  });
+
+  it("keeps selected CIS paths distinct when policies share a display name", async () => {
+    mockFetchCISBaselinePolicies.mockResolvedValue([
+      {
+        displayName: "Duplicate CIS Policy",
+        name: "Duplicate CIS Policy",
+        _cisFilePath: "cis/path-a.json",
+      },
+      {
+        displayName: "Duplicate CIS Policy",
+        name: "Duplicate CIS Policy",
+        _cisFilePath: "cis/path-b.json",
+      },
+    ]);
+
+    const tasks = await buildTaskQueueAsync(["cisBaseline"], "create", {
+      categorySelections: {
+        cisBaseline: {
+          selectedItems: ["cis/path-a.json", "cis/path-b.json"],
+        },
+      },
+    });
+
+    expect(tasks).toHaveLength(2);
+    expect(tasks.map((task) => task.itemName)).toEqual([
+      "Duplicate CIS Policy",
+      "Duplicate CIS Policy",
+    ]);
+    expect(tasks.map((task) => task.templatePath)).toEqual([
+      "cis/path-a.json",
+      "cis/path-b.json",
     ]);
   });
 });

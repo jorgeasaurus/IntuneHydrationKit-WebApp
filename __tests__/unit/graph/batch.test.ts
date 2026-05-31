@@ -48,6 +48,29 @@ describe("batch graph utilities", () => {
       status: 403,
       code: "Forbidden",
       message: "Access denied",
+      innerMessage: undefined,
+    });
+
+    expect(
+      extractBatchError({
+        id: "graph-inner",
+        status: 400,
+        body: {
+          error: {
+            code: "BadRequest",
+            message: "The server could not process the request because it is malformed or incorrect.",
+            innerError: {
+              message: "1101: The tenant must be explicitly authorized to use the private preview feature: AccountRecovery.",
+            },
+          },
+        },
+      })
+    ).toEqual({
+      id: "graph-inner",
+      status: 400,
+      code: "BadRequest",
+      message: "The server could not process the request because it is malformed or incorrect.",
+      innerMessage: "1101: The tenant must be explicitly authorized to use the private preview feature: AccountRecovery.",
     });
 
     expect(
@@ -63,6 +86,7 @@ describe("batch graph utilities", () => {
       status: 400,
       code: undefined,
       message: "Template validation failed",
+      innerMessage: undefined,
     });
 
     expect(
@@ -75,6 +99,7 @@ describe("batch graph utilities", () => {
       status: 502,
       code: undefined,
       message: "HTTP 502",
+      innerMessage: undefined,
     });
   });
 

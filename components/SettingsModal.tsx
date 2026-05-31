@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -28,15 +28,14 @@ interface SettingsModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+const DEFAULT_LOCAL_SETTINGS: AppSettings = {
+  stopOnFirstError: false,
+  theme: "system",
+};
+
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { settings, updateSettings, resetSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState(settings);
-
-  useEffect(() => {
-    if (open) {
-      setLocalSettings(settings);
-    }
-  }, [open, settings]);
 
   const handleSave = () => {
     updateSettings(localSettings);
@@ -45,7 +44,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   const handleReset = () => {
     resetSettings();
-    setLocalSettings(settings);
+    setLocalSettings(DEFAULT_LOCAL_SETTINGS);
   };
 
   const handleCancel = () => {
@@ -109,7 +108,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
         <DialogFooter className="gap-2">
           <Button variant="outline" onClick={handleReset}>
-            <RotateCcw className="h-4 w-4 mr-2" />
+            <RotateCcw className="size-4 mr-2" />
             Reset to Defaults
           </Button>
           <div className="flex-1" />

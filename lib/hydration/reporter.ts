@@ -220,22 +220,28 @@ export function createSummary(
   }
 
   // Collect errors
-  const errors = tasks
-    .filter((t) => t.status === "failed" && t.error)
-    .map((t) => ({
-      task: t.itemName,
-      message: t.error || "Unknown error",
-      timestamp: t.endTime || new Date(),
-    }));
+  const errors = tasks.reduce<HydrationSummary["errors"]>((items, task) => {
+    if (task.status === "failed" && task.error) {
+      items.push({
+        task: task.itemName,
+        message: task.error || "Unknown error",
+        timestamp: task.endTime || new Date(),
+      });
+    }
+    return items;
+  }, []);
 
   // Collect warnings (tasks that succeeded but have warnings)
-  const warnings = tasks
-    .filter((t) => t.status === "success" && t.warning)
-    .map((t) => ({
-      task: t.itemName,
-      message: t.warning || "",
-      timestamp: t.endTime || new Date(),
-    }));
+  const warnings = tasks.reduce<HydrationSummary["warnings"]>((items, task) => {
+    if (task.status === "success" && task.warning) {
+      items.push({
+        task: task.itemName,
+        message: task.warning || "",
+        timestamp: task.endTime || new Date(),
+      });
+    }
+    return items;
+  }, []);
 
   return {
     tenantId,

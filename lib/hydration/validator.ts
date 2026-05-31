@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- validation probes are sequenced to keep status reporting deterministic. */
 /**
  * Pre-flight validation for Intune Hydration Kit
  * Validates tenant health, licenses, and permissions before operations

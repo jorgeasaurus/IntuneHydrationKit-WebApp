@@ -79,51 +79,52 @@ function getExecutionSummary(isPreview: boolean): string {
   return "This run will actively create or delete tenant objects.";
 }
 
+const EXECUTION_OPTIONS = [
+  {
+    id: "preview" as const,
+    title: "Preview",
+    description: "Read-only validation mode. No Graph mutations will be sent.",
+    eyebrow: "Dry run",
+    accent: "border-blue-500/30 bg-blue-500/10",
+    badge: "border-blue-500/40 bg-blue-500/15 text-blue-500",
+    marker: "bg-blue-500 shadow-[0_0_18px_rgba(59,130,246,0.75)]",
+  },
+  {
+    id: "live" as const,
+    title: "Live",
+    description: "Apply changes to the selected tenant when the run starts.",
+    eyebrow: "Mutating",
+    accent: "border-amber-500/35 bg-amber-500/10",
+    badge: "border-amber-500/40 bg-amber-500/15 text-amber-500",
+    marker: "bg-amber-500 shadow-[0_0_18px_rgba(245,158,11,0.75)]",
+  },
+];
+
+const MODE_OPTIONS = [
+  {
+    id: "create" as const,
+    label: "Create",
+    description:
+      "Deploy new configurations into the tenant and safely skip objects that already exist.",
+    icon: PlusCircle,
+    accent: "border-hydrate/50 bg-hydrate/10",
+  },
+  {
+    id: "delete" as const,
+    label: "Delete",
+    description:
+      "Remove only configurations created by this kit, subject to marker and state safety checks.",
+    icon: Trash2,
+    accent: "border-red-500/40 bg-red-500/10",
+  },
+];
+
 export function OperationModeSelection(): React.JSX.Element {
   const { state, setOperationMode, setIsPreview, nextStep, previousStep } =
     useWizardState();
   const [mode, setMode] = useState<OperationMode>(state.operationMode || "create");
   const [isPreview, setIsPreviewLocal] = useState(state.isPreview ?? true);
   const executionTone = getExecutionTone(isPreview);
-  const executionOptions = [
-    {
-      id: "preview" as const,
-      title: "Preview",
-      description: "Read-only validation mode. No Graph mutations will be sent.",
-      eyebrow: "Dry run",
-      accent: "border-blue-500/30 bg-blue-500/10",
-      badge: "border-blue-500/40 bg-blue-500/15 text-blue-500",
-      marker: "bg-blue-500 shadow-[0_0_18px_rgba(59,130,246,0.75)]",
-    },
-    {
-      id: "live" as const,
-      title: "Live",
-      description: "Apply changes to the selected tenant when the run starts.",
-      eyebrow: "Mutating",
-      accent: "border-amber-500/35 bg-amber-500/10",
-      badge: "border-amber-500/40 bg-amber-500/15 text-amber-500",
-      marker: "bg-amber-500 shadow-[0_0_18px_rgba(245,158,11,0.75)]",
-    },
-  ];
-
-  const modeOptions = [
-    {
-      id: "create" as const,
-      label: "Create",
-      description:
-        "Deploy new configurations into the tenant and safely skip objects that already exist.",
-      icon: PlusCircle,
-      accent: "border-hydrate/50 bg-hydrate/10",
-    },
-    {
-      id: "delete" as const,
-      label: "Delete",
-      description:
-        "Remove only configurations created by this kit, subject to marker and state safety checks.",
-      icon: Trash2,
-      accent: "border-red-500/40 bg-red-500/10",
-    },
-  ];
 
   function handleContinue(): void {
     setOperationMode(mode);
@@ -146,7 +147,7 @@ export function OperationModeSelection(): React.JSX.Element {
 
       <CardContent className="space-y-6">
         <div className="grid gap-4 md:grid-cols-2">
-          {modeOptions.map((option) => {
+          {MODE_OPTIONS.map((option) => {
             const Icon = option.icon;
             const selected = mode === option.id;
 
@@ -163,7 +164,7 @@ export function OperationModeSelection(): React.JSX.Element {
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="rounded-xl border border-current/15 bg-background/70 p-2 text-foreground">
-                    <Icon className="h-5 w-5" />
+                    <Icon className="size-5" />
                   </div>
                   {selected && (
                     <span className="rounded-full border border-hydrate/40 bg-hydrate/10 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] text-hydrate">
@@ -195,13 +196,13 @@ export function OperationModeSelection(): React.JSX.Element {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className={`h-2.5 w-2.5 rounded-full ${executionTone.marker}`} />
+                <span className={`size-2.5 rounded-full ${executionTone.marker}`} />
                 <span className={`text-xs font-medium uppercase tracking-[0.22em] ${executionTone.label}`}>
                   {isPreview ? "Safe mode" : "Mutating mode"}
                 </span>
               </div>
               <div className="flex items-center gap-2 text-base font-semibold">
-                <Eye className="h-4 w-4" />
+                <Eye className="size-4" />
                 {getPreviewLabel(isPreview)}
               </div>
               <p className="text-sm leading-relaxed text-muted-foreground">
@@ -210,7 +211,7 @@ export function OperationModeSelection(): React.JSX.Element {
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
-              {executionOptions.map((option) => {
+              {EXECUTION_OPTIONS.map((option) => {
                 const selected =
                   (option.id === "preview" && isPreview) ||
                   (option.id === "live" && !isPreview);
@@ -228,7 +229,7 @@ export function OperationModeSelection(): React.JSX.Element {
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="rounded-xl border border-current/15 bg-background/70 p-2 text-foreground">
-                        <Radio className="h-5 w-5" />
+                        <Radio className="size-5" />
                       </div>
                       {selected && (
                         <span className={`rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] ${option.badge}`}>
@@ -238,7 +239,7 @@ export function OperationModeSelection(): React.JSX.Element {
                     </div>
 
                     <div className="mt-4 flex items-center gap-2">
-                      <span className={`h-2.5 w-2.5 rounded-full ${option.marker}`} />
+                      <span className={`size-2.5 rounded-full ${option.marker}`} />
                       <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
                         {option.eyebrow}
                       </p>
@@ -274,7 +275,7 @@ export function OperationModeSelection(): React.JSX.Element {
               </span>
             </div>
             <div className="mt-2 flex items-center gap-2">
-              <span className={`h-2.5 w-2.5 rounded-full ${executionTone.marker}`} />
+              <span className={`size-2.5 rounded-full ${executionTone.marker}`} />
               <p className="text-base font-semibold">
                 {isPreview ? "WhatIf preview" : "Live change"}
               </p>
@@ -297,7 +298,7 @@ export function OperationModeSelection(): React.JSX.Element {
 
         {mode === "delete" && !isPreview && (
           <Alert variant="destructive" className="border-red-500/30 bg-red-500/10">
-            <ShieldAlert className="h-4 w-4" />
+            <ShieldAlert className="size-4" />
             <AlertTitle>Delete mode is live</AlertTitle>
             <AlertDescription>
               Delete mode will remove configurations created by this tool. Only objects with
@@ -309,7 +310,7 @@ export function OperationModeSelection(): React.JSX.Element {
 
         {mode === "delete" && isPreview && (
           <Alert className="border-amber-500/30 bg-amber-500/10">
-            <AlertTriangle className="h-4 w-4" />
+            <AlertTriangle className="size-4" />
             <AlertTitle>Delete flow in preview</AlertTitle>
             <AlertDescription>
               This dry run will show exactly which hydration-tagged objects qualify for removal
@@ -323,7 +324,7 @@ export function OperationModeSelection(): React.JSX.Element {
             Back
           </Button>
           <Button onClick={handleContinue} className="flex-1">
-            Continue
+            Choose Operation Mode
           </Button>
         </div>
       </CardContent>

@@ -318,7 +318,7 @@ describe('TargetSelection', () => {
 
     render(<TargetSelection />)
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
 
     expect(setSelectedTargets).toHaveBeenCalledWith(['groups'])
     expect(setSelectedCISCategories).toHaveBeenCalledWith([])
@@ -341,16 +341,16 @@ describe('TargetSelection', () => {
 
     await user.click(within(baselineRegion).getByRole('button', { name: 'None' }))
     expect(await screen.findByText('Please select at least one baseline policy')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
 
     await user.click(within(baselineRegion).getByRole('button', { name: 'All' }))
 
     await waitFor(() => {
       expect(screen.queryByText('Please select at least one baseline policy')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+      expect(screen.getByRole('button', { name: 'Review Selection' })).toBeEnabled()
     })
 
-    await user.click(screen.getByRole('button', { name: 'Continue' }))
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
 
     expect(setSelectedTargets).toHaveBeenCalledWith(['baseline'])
     expect(setBaselineSelection).toHaveBeenCalledWith({
@@ -460,13 +460,13 @@ describe('TargetSelection', () => {
     })
 
     expect(screen.getByText('Total: 8 categories (13 items)')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeEnabled()
+    expect(screen.getByRole('button', { name: 'Review Selection' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Deselect All' }))
 
     await waitFor(() => {
       expect(screen.queryByText('Total: 8 categories (13 items)')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+      expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
     })
   })
 
@@ -487,7 +487,7 @@ describe('TargetSelection', () => {
     dynamicGroupsDeferred.resolve([])
 
     expect(await screen.findByText('No items available.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Continue' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
 
     await user.type(screen.getByPlaceholderText('Search categories and policies...'), 'no-match-value')
     expect(await screen.findByText('No categories or policies match "no-match-value"')).toBeInTheDocument()
@@ -511,8 +511,8 @@ describe('TargetSelection', () => {
     await user.click(screen.getByLabelText('OpenIntuneBaseline'))
     await user.click(screen.getByLabelText('CIS Intune Baselines'))
 
-    expect(await screen.findByText('Loading baseline policies...')).toBeInTheDocument()
-    expect(await screen.findByText('Loading CIS policies...')).toBeInTheDocument()
+    expect(await screen.findByText('Loading baseline policies…')).toBeInTheDocument()
+    expect(await screen.findByText('Loading CIS policies…')).toBeInTheDocument()
 
     await act(async () => {
       baselineDeferred.resolve(createOIBManifest())
@@ -677,6 +677,30 @@ describe('TargetSelection', () => {
     expect(screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 1`)).not.toBeChecked()
     expect(screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 2`)).not.toBeChecked()
     expect(screen.getByText('0 of 2 policies selected')).toBeInTheDocument()
+  })
+
+  it('derives selected CIS category ids from selected policy paths on continue', async () => {
+    const user = userEvent.setup()
+
+    render(<TargetSelection />)
+
+    await user.click(screen.getByLabelText('CIS Intune Baselines'))
+    await waitFor(() => expect(fetchCISBaselineManifestMock).toHaveBeenCalled())
+
+    const appleCategoryCheckbox = document.getElementById('cis-cat-Apple Benchmarks')
+
+    if (!(appleCategoryCheckbox instanceof HTMLElement)) {
+      throw new Error('Expected Apple CIS category checkbox to be rendered')
+    }
+
+    await user.click(appleCategoryCheckbox)
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+
+    expect(setSelectedTargets).toHaveBeenCalledWith(['cisBaseline'])
+    expect(setSelectedCISCategories).toHaveBeenCalledWith(['cis-windows-11'])
+    expect(setCategorySelections).toHaveBeenCalledWith({
+      cisBaseline: { selectedItems: ['cis/windows/policy-1.json'] },
+    })
   })
 
   it('removes only the deselected platform filter matches while keeping remaining platform selections', async () => {

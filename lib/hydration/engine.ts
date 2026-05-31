@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- execution loops preserve task order, pause, cancellation, and Graph throttling semantics. */
 /**
  * Hydration Execution Engine
  * Manages task queue and executes operations against Microsoft Graph API
@@ -27,16 +28,14 @@ import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
 import { sleep, sleepWithExecutionControl, waitWhilePaused } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage } from "./types";
-import {
-  executeGroupTask,
-  executeFilterTask,
-  executeComplianceTask,
-  executeConditionalAccessTask,
-  executeAppProtectionTask,
-  executeEnrollmentTask,
-  executeBaselineTask,
-  executeCISBaselineTask,
-} from "./taskExecutors";
+import { executeGroupTask } from "./taskExecutors/groupTask";
+import { executeFilterTask } from "./taskExecutors/filterTask";
+import { executeComplianceTask } from "./taskExecutors/complianceTask";
+import { executeConditionalAccessTask } from "./taskExecutors/conditionalAccessTask";
+import { executeAppProtectionTask } from "./taskExecutors/appProtectionTask";
+import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
+import { executeBaselineTask } from "./taskExecutors/baselineTask";
+import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
 
 /**
  * Helper to emit status updates to UI
@@ -463,7 +462,9 @@ export async function executeTasks(
     }
 
     // Execute non-batchable tasks sequentially
-    for (const task of nonBatchableTasks) {
+    for (let taskIndex = 0; taskIndex < nonBatchableTasks.length; taskIndex++) {
+      const task = nonBatchableTasks[taskIndex];
+
       // Check for cancellation before starting task
       if (context.shouldCancel?.()) {
         console.log("[Execute Tasks] Execution cancelled by user");
@@ -490,7 +491,7 @@ export async function executeTasks(
       }
 
       // Add delay between tasks to avoid API throttling
-      if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
+      if (taskIndex < nonBatchableTasks.length - 1) {
         await sleepWithExecutionControl(TASK_DELAY_MS, context);
       }
     }
@@ -525,7 +526,9 @@ export async function executeTasks(
     }
 
     // Execute non-batchable tasks sequentially
-    for (const task of nonBatchableTasks) {
+    for (let taskIndex = 0; taskIndex < nonBatchableTasks.length; taskIndex++) {
+      const task = nonBatchableTasks[taskIndex];
+
       // Check for cancellation before starting task
       if (context.shouldCancel?.()) {
         console.log("[Execute Tasks] Execution cancelled by user");
@@ -552,7 +555,7 @@ export async function executeTasks(
       }
 
       // Add delay between tasks to avoid API throttling
-      if (nonBatchableTasks.indexOf(task) < nonBatchableTasks.length - 1) {
+      if (taskIndex < nonBatchableTasks.length - 1) {
         await sleepWithExecutionControl(TASK_DELAY_MS, context);
       }
     }
@@ -566,12 +569,14 @@ export async function executeTasks(
     console.log(`[Execute Tasks] Preview mode - sequential execution, no Graph mutations`);
   }
 
-  for (const task of tasks) {
+  for (let taskIndex = 0; taskIndex < tasks.length; taskIndex++) {
+    const task = tasks[taskIndex];
+
     // Check for cancellation before starting task
     if (context.shouldCancel?.()) {
       console.log("[Execute Tasks] Execution cancelled by user");
       // Mark remaining tasks as skipped
-      for (let i = tasks.indexOf(task); i < tasks.length; i++) {
+      for (let i = taskIndex; i < tasks.length; i++) {
         tasks[i].status = "skipped";
         tasks[i].error = "Cancelled by user";
       }
@@ -582,7 +587,7 @@ export async function executeTasks(
     const pauseResult = await waitWhilePaused(context);
     if (pauseResult === "cancelled") {
       console.log("[Execute Tasks] Execution cancelled while paused");
-      cancelRemainingTasks(tasks, tasks.indexOf(task), results);
+      cancelRemainingTasks(tasks, taskIndex, results);
       break;
     }
 
@@ -595,7 +600,7 @@ export async function executeTasks(
     }
 
     // Add delay between tasks to avoid API throttling
-    if (tasks.indexOf(task) < tasks.length - 1) {
+    if (taskIndex < tasks.length - 1) {
       await sleepWithExecutionControl(TASK_DELAY_MS, context);
     }
   }

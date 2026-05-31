@@ -17,6 +17,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
 
   useEffect(() => {
     if (!isAuthenticated) {
+      // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- MSAL authentication state is client-only
       router.push("/");
     }
   }, [isAuthenticated, router]);

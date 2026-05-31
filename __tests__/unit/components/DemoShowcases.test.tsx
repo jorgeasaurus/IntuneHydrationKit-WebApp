@@ -40,6 +40,9 @@ vi.mock('framer-motion', async () => {
 
   return {
     AnimatePresence: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    LazyMotion: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    domAnimation: {},
+    m: motion,
     motion,
   }
 })
@@ -59,7 +62,7 @@ describe('demo showcase components', () => {
   it('cycles TerminalDemo from running logs to the completion summary and back to running', () => {
     render(<TerminalDemo />)
 
-    expect(screen.getByText('Processing...')).toBeInTheDocument()
+    expect(screen.getByText('Processing…')).toBeInTheDocument()
 
     act(() => {
       vi.advanceTimersByTime(400)

@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- retry attempts must remain sequential for backoff semantics. */
 /**
  * Exponential backoff retry utility for Graph API requests
  */

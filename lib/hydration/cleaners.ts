@@ -10,7 +10,7 @@ import { isActualSecretField } from "./utils";
  * Recursively clean a setting instance for Settings Catalog policies
  * Handles nested children and password type conversion
  */
-export function cleanSettingInstance(obj: unknown): unknown {
+function cleanSettingInstance(obj: unknown): unknown {
   if (obj === null || obj === undefined) return obj;
 
   if (Array.isArray(obj)) {
@@ -24,7 +24,7 @@ export function cleanSettingInstance(obj: unknown): unknown {
     for (const [key, value] of Object.entries(record)) {
       // Skip id and @odata metadata except @odata.type
       if (key === "id") continue;
-      if (key.includes("@odata.") && key !== "@odata.type") continue;
+      if (/@odata\./.test(key) && key !== "@odata.type") continue;
       if (key === "settingDefinitions") continue;
 
       // Check if this is an actual secret/password VALUE field that needs type conversion
@@ -36,7 +36,7 @@ export function cleanSettingInstance(obj: unknown): unknown {
         const odataType = simpleValue["@odata.type"] as string || "";
 
         // Convert StringSettingValue to SecretSettingValue for actual credential fields
-        if (odataType.includes("StringSettingValue")) {
+        if (/StringSettingValue/.test(odataType)) {
           cleaned[key] = {
             "@odata.type": "#microsoft.graph.deviceManagementConfigurationSecretSettingValue",
             value: simpleValue.value,
@@ -110,7 +110,7 @@ export function cleanPolicyRecursively(obj: unknown): unknown {
 
   if (typeof obj === "object") {
     const cleaned: Record<string, unknown> = {};
-    const excludeFields = [
+    const excludeFields = new Set([
       // OData metadata
       "@odata.context", "@odata.id", "@odata.editLink",
       // Timestamps and version
@@ -140,16 +140,16 @@ export function cleanPolicyRecursively(obj: unknown): unknown {
       "updateWeeks",
       // ID should always be removed when creating new resources
       "id",
-    ];
+    ]);
 
     for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       // Skip excluded fields
-      if (excludeFields.includes(key)) {
+      if (excludeFields.has(key)) {
         continue;
       }
 
       // Skip any property containing @odata. (except @odata.type)
-      if (key.includes("@odata.") && key !== "@odata.type") {
+      if (/@odata\./.test(key) && key !== "@odata.type") {
         continue;
       }
 

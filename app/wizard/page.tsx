@@ -1,3 +1,5 @@
+/* oxlint-disable react-doctor/nextjs-missing-metadata -- route metadata is defined in app/layout.tsx for this client page. */
+/* oxlint-disable react-doctor/no-giant-component -- wizard shell stays colocated around shared step state; splitting it is a separate UI refactor. */
 "use client";
 
 import { useMemo, useState } from "react";
@@ -109,32 +111,28 @@ function WizardContent() {
     state.tenantConfig,
   ]);
 
-  const renderStep = () => {
-    switch (state.currentStep) {
-      case 1:
-        return <TenantConfig />;
-      case 2:
-        return <OperationModeSelection />;
-      case 3:
-        return <TargetSelection />;
-      case 4:
-        return <ReviewConfirm />;
-      default:
-        return null;
-    }
-  };
+  const stepContent =
+    state.currentStep === 1 ? (
+      <TenantConfig />
+    ) : state.currentStep === 2 ? (
+      <OperationModeSelection />
+    ) : state.currentStep === 3 ? (
+      <TargetSelection />
+    ) : state.currentStep === 4 ? (
+      <ReviewConfirm />
+    ) : null;
 
   return (
     <div className="min-h-screen relative z-10">
       <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container mx-auto flex items-center justify-between gap-4 px-4 py-4">
+        <div className="container mx-auto flex items-center justify-between gap-4 p-4">
           <div className="flex items-center gap-4">
             <Image
               src="/IHTLogoClear.png"
               alt="Intune Hydration Kit Logo"
               width={48}
               height={48}
-              className="h-12 w-12"
+              className="size-12"
             />
             <div>
               <div className="flex items-center gap-2">
@@ -154,17 +152,17 @@ function WizardContent() {
 
           <div className="flex items-center gap-2">
             <Button variant="outline" onClick={() => setShowSettings(true)}>
-              <Settings2 className="mr-2 h-4 w-4" />
+              <Settings2 className="mr-2 size-4" />
               Settings
             </Button>
             <Button variant="outline" asChild>
               <Link href="/">
-                <Home className="mr-2 h-4 w-4" />
+                <Home className="mr-2 size-4" />
                 Home
               </Link>
             </Button>
             <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="mr-2 h-4 w-4" />
+              <LogOut className="mr-2 size-4" />
               Sign Out
             </Button>
           </div>
@@ -214,7 +212,7 @@ function WizardContent() {
                   >
                     <div className="flex items-start gap-3">
                       <div
-                        className={`mt-0.5 flex h-10 w-10 items-center justify-center rounded-xl border ${
+                        className={`mt-0.5 flex size-10 items-center justify-center rounded-xl border ${
                           step.current
                             ? "border-hydrate/60 bg-hydrate text-hydrate-foreground"
                             : step.complete
@@ -223,9 +221,9 @@ function WizardContent() {
                         }`}
                       >
                         {step.complete && !step.current ? (
-                          <CheckCircle2 className="h-5 w-5" />
+                          <CheckCircle2 className="size-5" />
                         ) : (
-                          <Icon className="h-5 w-5" />
+                          <Icon className="size-5" />
                         )}
                       </div>
 
@@ -247,7 +245,7 @@ function WizardContent() {
                       </div>
 
                       {step.accessible && (
-                        <ChevronRight className="mt-2 h-4 w-4 text-muted-foreground" />
+                        <ChevronRight className="mt-2 size-4 text-muted-foreground" />
                       )}
                     </div>
                   </button>
@@ -362,11 +360,15 @@ function WizardContent() {
             </div>
           </div>
 
-          {renderStep()}
+          {stepContent}
         </section>
       </main>
 
-      <SettingsModal open={showSettings} onOpenChange={setShowSettings} />
+      <SettingsModal
+        key={showSettings ? "settings-open" : "settings-closed"}
+        open={showSettings}
+        onOpenChange={setShowSettings}
+      />
     </div>
   );
 }

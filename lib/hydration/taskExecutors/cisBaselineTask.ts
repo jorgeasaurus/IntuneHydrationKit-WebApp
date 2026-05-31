@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- polling waits for Graph propagation and must remain sequential. */
 /**
  * CIS Baseline Task Executor
  * Handles create and delete operations for CIS Intune Baseline policies
@@ -49,23 +50,29 @@ export async function executeCISBaselineTask(
   let template: CISBaselinePolicy | undefined;
 
   // Try to find in any CIS baseline cache (includes both sessionStorage and in-memory fallback)
-  // Task itemName can be displayName, name, or _cisFilePath (file path), so check all three
+  // Task identity is the manifest file path when available; fall back to legacy display names.
+  const cisLookupKey = task.templatePath || task.itemName;
   const cacheKeys = getAllTemplateCacheKeys().filter(k => k.startsWith("intune-hydration-templates-cisBaseline"));
   for (const key of cacheKeys) {
     const cacheKey = key.replace("intune-hydration-templates-", "");
     const cached = getCachedTemplates(cacheKey);
     if (cached && Array.isArray(cached)) {
-      template = (cached as CISBaselinePolicy[]).find(
-        (b) => b.displayName === task.itemName ||
-               (b as Record<string, unknown>).name === task.itemName ||
-               b._cisFilePath === task.itemName
-      );
+      for (const baseline of cached as CISBaselinePolicy[]) {
+        if (
+          baseline._cisFilePath === cisLookupKey ||
+          baseline.displayName === cisLookupKey ||
+          (baseline as Record<string, unknown>).name === cisLookupKey
+        ) {
+          template = baseline;
+          break;
+        }
+      }
       if (template) break;
     }
   }
 
   if (!template) {
-    console.error(`[CIS Baseline Task] Template not found for: "${task.itemName}"`);
+    console.error(`[CIS Baseline Task] Template not found for: "${cisLookupKey}"`);
     return { task, success: false, skipped: false, error: "Template not found" };
   }
 

@@ -1,3 +1,4 @@
+/* oxlint-disable react-doctor/async-await-in-loop -- task queue assembly preserves category ordering and cache side effects. */
 /**
  * Task Queue Builder
  * Functions for building the hydration task queue from selected categories
@@ -44,6 +45,10 @@ const CATEGORY_LABELS: Partial<Record<TaskCategory, string>> = {
   baseline: "OpenIntuneBaseline Policies",
   cisBaseline: "CIS Baseline Policies",
 };
+
+function getTaskDedupKey(task: HydrationTask): string {
+  return task.templatePath || task.itemName;
+}
 
 /**
  * Build task queue from selected categories and templates
@@ -146,17 +151,24 @@ export async function buildTaskQueueAsync(
     const label = CATEGORY_LABELS[category] || category;
     emit?.(`[${categoryIndex + 1}/${selectedCategories.length}] Loading templates for ${label}...`);
     let items: Array<{ displayName: string }> = [];
+    const categorySelections = options?.categorySelections;
+    const selectionKey = category as keyof CategorySelections;
+    const selection = categorySelections?.[selectionKey];
+    const cisSelection = categorySelections?.cisBaseline;
+    const hasSelectedCISPolicyPaths =
+      category === "cisBaseline" &&
+      !!cisSelection?.selectedItems &&
+      cisSelection.selectedItems.length > 0;
+    const selectedCISCategories = options?.selectedCISCategories?.length
+      ? options.selectedCISCategories
+      : undefined;
 
-    // CIS baselines use a special cache key that includes selected categories
-    const cacheKey = category === "cisBaseline" && options?.selectedCISCategories
-      ? `${category}-${options.selectedCISCategories.sort().join(",")}`
+    const cacheKey = category === "cisBaseline" && selectedCISCategories && !hasSelectedCISPolicyPaths
+      ? `${category}-${selectedCISCategories.toSorted().join(",")}`
       : category;
 
     // Clear cache if categorySelections has selections for this category
     // This ensures we fetch fresh templates and don't use stale filtered cache
-    const categorySelections = options?.categorySelections;
-    const selectionKey = category as keyof CategorySelections;
-    const selection = categorySelections?.[selectionKey];
     if (selection && 'selectedItems' in selection && selection.selectedItems && selection.selectedItems.length > 0) {
       console.log(`[Task Queue] Clearing cache for ${cacheKey} - specific items selected`);
       clearCategoryCache(cacheKey);
@@ -305,8 +317,9 @@ export async function buildTaskQueueAsync(
             emit?.(`Found ${baselinePolicies.length} baseline policies`, "info");
 
             // Filter by selected policies if baselineSelection is provided
-            if (options?.baselineSelection?.selectedPolicies && options.baselineSelection.selectedPolicies.length > 0) {
-              const selectedPaths = new Set(options.baselineSelection.selectedPolicies);
+            const selectedPolicies = options?.baselineSelection?.selectedPolicies;
+            if (selectedPolicies && selectedPolicies.length > 0) {
+              const selectedPaths = new Set(selectedPolicies);
               const totalCount = baselinePolicies.length;
               baselinePolicies = baselinePolicies.filter(p => selectedPaths.has(p._oibFilePath));
               console.log(`[Task Queue] Filtered to ${baselinePolicies.length} selected baseline policies`);
@@ -333,12 +346,15 @@ export async function buildTaskQueueAsync(
             console.log(`[Task Queue] Fetching CIS Intune Baselines...`);
             let cisItems: CISBaselinePolicy[];
 
-            // Use filtered fetch if specific categories are selected (legacy approach)
-            if (options?.selectedCISCategories && options.selectedCISCategories.length > 0) {
-              console.log(`[Task Queue] Fetching CIS baselines for selected categories:`, options.selectedCISCategories);
-              emit?.(`Fetching CIS baselines for ${options.selectedCISCategories.length} sub-categories...`);
-              cisItems = await fetchCISBaselinePoliciesByCategories(options.selectedCISCategories);
-              emit?.(`Found ${cisItems.length} CIS policies across ${options.selectedCISCategories.length} sub-categories`, "info");
+            if (hasSelectedCISPolicyPaths) {
+              emit?.("Fetching all CIS Intune Baseline policies for selected policy paths...");
+              cisItems = await fetchCISBaselinePolicies();
+              emit?.(`Found ${cisItems.length} CIS baseline policies`, "info");
+            } else if (selectedCISCategories) {
+              console.log(`[Task Queue] Fetching CIS baselines for selected categories:`, selectedCISCategories);
+              emit?.(`Fetching CIS baselines for ${selectedCISCategories.length} sub-categories...`);
+              cisItems = await fetchCISBaselinePoliciesByCategories(selectedCISCategories);
+              emit?.(`Found ${cisItems.length} CIS policies across ${selectedCISCategories.length} sub-categories`, "info");
             } else {
               emit?.("Fetching all CIS Intune Baseline policies...");
               // Fetch all if no specific categories selected
@@ -347,7 +363,6 @@ export async function buildTaskQueueAsync(
             }
 
             // Filter by selected policy paths if categorySelections is provided (new approach)
-            const cisSelection = options?.categorySelections?.cisBaseline;
             if (cisSelection?.selectedItems && cisSelection.selectedItems.length > 0) {
               const selectedPaths = new Set(cisSelection.selectedItems);
               const totalCount = cisItems.length;
@@ -384,7 +399,6 @@ export async function buildTaskQueueAsync(
 
       // For cisBaseline, selectedItems contains file paths - need to look up displayNames
       if (category === "cisBaseline" && items.length > 0) {
-        // Build a map from file path to displayName
         const pathToDisplayName = new Map<string, string>();
         for (const item of items) {
           const itemRecord = item as Record<string, unknown>;
@@ -405,6 +419,7 @@ export async function buildTaskQueueAsync(
             category,
             operation: operationMode,
             itemName: displayName,
+            templatePath: selectedPath,
             status: "pending",
           });
         }
@@ -454,6 +469,7 @@ export async function buildTaskQueueAsync(
           category,
           operation: operationMode,
           itemName,
+          templatePath: category === "cisBaseline" ? filePath : undefined,
           status: "pending",
         });
       }
@@ -469,9 +485,9 @@ export async function buildTaskQueueAsync(
       seenItems.set(task.category, new Set());
     }
     const categoryItems = seenItems.get(task.category)!;
-    const lowerName = task.itemName.toLowerCase();
+    const lowerName = getTaskDedupKey(task).toLowerCase();
     if (categoryItems.has(lowerName)) {
-      console.log(`[Task Queue] Removed duplicate: "${task.itemName}" (${task.category})`);
+      console.log(`[Task Queue] Removed duplicate: "${getTaskDedupKey(task)}" (${task.category})`);
       return false;
     }
     categoryItems.add(lowerName);

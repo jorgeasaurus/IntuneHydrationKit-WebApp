@@ -1,4 +1,3 @@
-import { Client } from "@microsoft/microsoft-graph-client";
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { getGraphEndpoint } from "@/lib/auth/msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
@@ -8,7 +7,6 @@ import { BatchRequest, BatchResult } from "./batch";
 
 /**
  * Microsoft Graph API client with retry logic
- * Uses Microsoft Graph Client SDK for reliable pagination through Intune proxies
  */
 export class GraphClient {
   private baseUrl: string;
@@ -17,19 +15,6 @@ export class GraphClient {
   constructor(environment: CloudEnvironment = "global") {
     this.environment = environment;
     this.baseUrl = getGraphEndpoint(environment);
-  }
-
-  /**
-   * Get a Microsoft Graph Client SDK instance
-   * Used for operations that need reliable pagination through Intune proxies
-   */
-  private async getSdkClient(): Promise<Client> {
-    const accessToken = await getAccessToken();
-    return Client.init({
-      authProvider: (done) => {
-        done(null, accessToken);
-      },
-    });
   }
 
   /**
@@ -141,51 +126,45 @@ export class GraphClient {
     }
   }
 
-  /**
-   * GET request to Graph API
-   */
-  async get<T>(endpoint: string, version: "v1.0" | "beta" = "beta"): Promise<T> {
-    const url = `${this.baseUrl}/${version}${endpoint}`;
-
+  private async fetchJson<T>(url: string, init: RequestInit): Promise<T> {
     return retryWithBackoff(async () => {
       const headers = await this.getHeaders();
       const response = await fetch(url, {
-        method: "GET",
-        headers,
+        ...init,
+        headers: {
+          ...headers,
+          ...init.headers,
+        },
       });
       return this.handleResponse<T>(response);
     });
   }
 
   /**
+   * GET request to Graph API
+   */
+  async get<T>(endpoint: string, version: "v1.0" | "beta" = "beta"): Promise<T> {
+    const url = `${this.baseUrl}/${version}${endpoint}`;
+
+    return this.fetchJson<T>(url, { method: "GET" });
+  }
+
+  /**
    * GET request that returns a collection with automatic pagination
-   * Uses Microsoft Graph Client SDK for reliable pagination through Intune proxies
-   * (like NukeTune does - fixes 401 errors on Settings Catalog pagination)
    */
   async getCollection<T>(
     endpoint: string,
     version: "v1.0" | "beta" = "beta"
   ): Promise<T[]> {
     const results: T[] = [];
-    const client = await this.getSdkClient();
-    const url = `${this.baseUrl}/${version}${endpoint}`;
+    let url: string | undefined = `${this.baseUrl}/${version}${endpoint}`;
 
-    // First request
-    let response = await client.api(url).get() as GraphResponse<T>;
-    if (response.value && Array.isArray(response.value)) {
-      results.push(...response.value);
-    }
-
-    // Follow pagination using @odata.nextLink
-    let nextLink = response["@odata.nextLink"];
-    while (nextLink) {
-      // Get fresh token for each page (in case of long pagination)
-      const freshClient = await this.getSdkClient();
-      response = await freshClient.api(nextLink).get() as GraphResponse<T>;
+    while (url) {
+      const response: GraphResponse<T> = await this.fetchJson<GraphResponse<T>>(url, { method: "GET" });
       if (response.value && Array.isArray(response.value)) {
         results.push(...response.value);
       }
-      nextLink = response["@odata.nextLink"];
+      url = response["@odata.nextLink"];
     }
 
     return results;

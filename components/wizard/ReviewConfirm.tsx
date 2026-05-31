@@ -130,7 +130,7 @@ export function ReviewConfirm(): React.JSX.Element {
           <div className="space-y-6">
             <div className="rounded-2xl border border-border/80 bg-background/60 p-5">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-hydrate" />
+                <Sparkles className="size-4 text-hydrate" />
                 <p className="text-sm font-semibold">Execution brief</p>
               </div>
 
@@ -177,7 +177,7 @@ export function ReviewConfirm(): React.JSX.Element {
 
             <div className="rounded-2xl border border-border/80 bg-background/60 p-5">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-4 w-4 text-hydrate" />
+                <CheckCircle2 className="size-4 text-hydrate" />
                 <p className="text-sm font-semibold">Selected targets</p>
               </div>
 
@@ -217,7 +217,7 @@ export function ReviewConfirm(): React.JSX.Element {
           <div className="space-y-6">
             <div className="rounded-2xl border border-border/80 bg-background/60 p-5">
               <div className="flex items-center gap-2">
-                <ShieldAlert className="h-4 w-4 text-hydrate" />
+                <ShieldAlert className="size-4 text-hydrate" />
                 <p className="text-sm font-semibold">Safety rails</p>
               </div>
 
@@ -241,7 +241,7 @@ export function ReviewConfirm(): React.JSX.Element {
 
             {showConditionalAccessReminder && (
               <Alert className="border-amber-500/30 bg-amber-500/10">
-                <AlertTriangle className="h-4 w-4" />
+                <AlertTriangle className="size-4" />
                 <AlertTitle>Conditional Access reminder</AlertTitle>
                 <AlertDescription>
                   The run can create Conditional Access templates, but you should review and
@@ -255,17 +255,17 @@ export function ReviewConfirm(): React.JSX.Element {
                 state.prerequisiteResult.errors.length > 0) && (
                 <Alert className="border-blue-500/30 bg-blue-500/10">
                   {state.prerequisiteResult.errors.length > 0 ? (
-                    <AlertTriangle className="h-4 w-4" />
+                    <AlertTriangle className="size-4" />
                   ) : (
-                    <Eye className="h-4 w-4" />
+                    <Eye className="size-4" />
                   )}
                   <AlertTitle>Readiness notices</AlertTitle>
                   <AlertDescription className="space-y-2">
-                    {state.prerequisiteResult.errors.map((error, index) => (
-                      <p key={`error-${index}`}>{error}</p>
+                    {state.prerequisiteResult.errors.map((error) => (
+                      <p key={`error-${error}`}>{error}</p>
                     ))}
-                    {state.prerequisiteResult.warnings.map((warning, index) => (
-                      <p key={`warning-${index}`}>{warning}</p>
+                    {state.prerequisiteResult.warnings.map((warning) => (
+                      <p key={`warning-${warning}`}>{warning}</p>
                     ))}
                   </AlertDescription>
                 </Alert>
@@ -275,7 +275,7 @@ export function ReviewConfirm(): React.JSX.Element {
 
         {!state.isPreview && (
           <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-5">
-            <div className="flex items-start space-x-3 space-y-0">
+            <div className="flex items-start gap-x-3">
               <Checkbox
                 id="acknowledge"
                 checked={acknowledged}
