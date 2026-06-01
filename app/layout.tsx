@@ -8,7 +8,7 @@ import { SettingsThemeSync } from "@/components/providers/SettingsThemeSync";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
-import { DynamicWallpaper } from "@/components/DynamicWallpaper";
+import { RouteWallpaper } from "@/components/RouteWallpaper";
 import { Analytics } from "@vercel/analytics/next";
 
 // DM Sans - Geometric, bold display font
@@ -84,7 +84,7 @@ export default function RootLayout({
             <SettingsProvider>
               <SettingsThemeSync />
               <WizardProvider>
-                <DynamicWallpaper />
+                <RouteWallpaper />
                 {children}
                 <Toaster />
                 <Analytics />

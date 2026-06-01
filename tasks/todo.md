@@ -442,3 +442,17 @@
 - Copilot feedback was present, so merge was deferred.
 - Replaced the hardcoded Playwright localStorage key with `APP_SETTINGS_STORAGE_KEY`.
 - Checks passed: `npm run test:e2e -- --grep Theme`, `git diff --check`.
+
+# Copilot Follow-up PR
+
+- [x] Add Vercel Analytics ingestion to the CSP `connect-src`.
+- [x] Move Vanta wallpaper loading out of `RootLayout` into a route-aware lazy client layer.
+- [x] Add focused regression coverage.
+- [x] Run checks.
+- [ ] Open a follow-up PR.
+
+## Review
+
+- Added Vercel Analytics ingestion to CSP `connect-src`.
+- `RouteWallpaper` lazy-loads Vanta/Three client-only; `routeWallpaperRules` keeps route matching out of the component export.
+- Checks passed: focused wallpaper tests, `npm run type-check`, `npm run test:run`, `npm run build`, `npm run test:e2e -- --grep "Landing Page|Protected Routes"`, `npm run doctor -- --verbose --diff --fail-on warning`, `git diff --check`.
