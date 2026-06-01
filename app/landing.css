@@ -1,0 +1,274 @@
+/* ============================================
+   VANTA WATER WALLPAPER
+   ============================================ */
+
+.dynamic-wallpaper {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #005588;
+}
+
+.dynamic-wallpaper__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    linear-gradient(
+      180deg,
+      hsl(205 80% 98% / 0.34) 0%,
+      hsl(204 72% 92% / 0.36) 45%,
+      hsl(211 35% 89% / 0.42) 100%
+    );
+}
+
+.dark .dynamic-wallpaper__scrim {
+  background:
+    linear-gradient(
+      180deg,
+      hsl(213 58% 7% / 0.18) 0%,
+      hsl(211 70% 5% / 0.28) 58%,
+      hsl(212 78% 4% / 0.38) 100%
+    );
+}
+
+.corporate-1999 .dynamic-wallpaper__scrim {
+  background:
+    linear-gradient(180deg, hsl(0 0% 100% / 0.74), hsl(210 24% 88% / 0.7)),
+    repeating-linear-gradient(
+      0deg,
+      hsl(220 70% 45% / 0.08),
+      hsl(220 70% 45% / 0.08) 1px,
+      transparent 1px,
+      transparent 5px
+    );
+}
+
+/* ============================================
+   LANDING COLOR SYSTEM - Backdrop-aware surfaces
+   ============================================ */
+
+.landing-shell {
+  --landing-text: 215 52% 11%;
+  --landing-muted: 214 28% 29%;
+  --landing-muted-strong: 214 34% 22%;
+  --landing-card: 205 52% 95%;
+  --landing-card-strong: 205 60% 98%;
+  --landing-border: 205 42% 70%;
+  --landing-control: 206 50% 96%;
+  --landing-control-hover: 204 62% 99%;
+  --landing-control-text: 215 54% 11%;
+  --landing-action-top: 213 38% 14%;
+  --landing-action-bottom: 216 48% 9%;
+  --landing-action-hover: 213 42% 16%;
+  --landing-action-text: 205 42% 96%;
+  --landing-action-border: 202 48% 34%;
+  --landing-shadow: 210 44% 18%;
+  color: hsl(var(--landing-text));
+}
+
+.dark .landing-shell {
+  --landing-text: 205 38% 97%;
+  --landing-muted: 207 28% 78%;
+  --landing-muted-strong: 207 38% 88%;
+  --landing-card: 212 48% 10%;
+  --landing-card-strong: 212 46% 13%;
+  --landing-border: 202 52% 34%;
+  --landing-control: 213 45% 11%;
+  --landing-control-hover: 211 42% 15%;
+  --landing-control-text: 205 38% 96%;
+  --landing-action-top: 213 42% 13%;
+  --landing-action-bottom: 216 54% 8%;
+  --landing-action-hover: 212 44% 16%;
+  --landing-action-text: 205 42% 96%;
+  --landing-action-border: 202 54% 36%;
+  --landing-shadow: 210 80% 4%;
+}
+
+.landing-shell .hero-title {
+  color: hsl(var(--landing-text));
+  text-shadow: 0 2px 18px hsl(var(--landing-shadow) / 0.16);
+}
+
+.dark .landing-shell .hero-title {
+  text-shadow: 0 3px 26px hsl(var(--landing-shadow) / 0.42);
+}
+
+.landing-shell .text-muted-foreground,
+.landing-shell .landing-lead {
+  color: hsl(var(--landing-muted));
+}
+
+.landing-shell .landing-lead {
+  font-weight: 500;
+  text-shadow: 0 1px 14px hsl(var(--landing-shadow) / 0.12);
+}
+
+.dark .landing-shell .landing-lead {
+  text-shadow: 0 2px 18px hsl(var(--landing-shadow) / 0.38);
+}
+
+.landing-shell .nav-industrial {
+  background: hsl(var(--landing-card-strong) / 0.88);
+  border-color: hsl(var(--landing-border) / 0.74);
+  box-shadow:
+    0 10px 30px hsl(var(--landing-shadow) / 0.1),
+    inset 0 1px 0 hsl(0 0% 100% / 0.36);
+}
+
+.dark .landing-shell .nav-industrial {
+  background: hsl(var(--background) / 0.88);
+  border-color: hsl(var(--landing-border) / 0.45);
+  box-shadow:
+    0 12px 34px hsl(var(--landing-shadow) / 0.45),
+    inset 0 1px 0 hsl(0 0% 100% / 0.06);
+}
+
+.landing-shell .nav-link {
+  color: hsl(var(--landing-muted-strong));
+}
+
+.dark .landing-shell .nav-link {
+  color: hsl(var(--landing-muted));
+}
+
+.landing-shell .nav-link:hover {
+  color: hsl(var(--landing-text));
+}
+
+.landing-shell .theme-button:not(.landing-primary-action):not(.landing-secondary-action):not(.landing-tertiary-action):not(.landing-nav-action) {
+  background: hsl(var(--landing-control) / 0.76);
+  border-color: hsl(var(--landing-border) / 0.78);
+  color: hsl(var(--landing-control-text));
+  box-shadow:
+    0 8px 20px hsl(var(--landing-shadow) / 0.08),
+    inset 0 1px 0 hsl(0 0% 100% / 0.32);
+}
+
+.landing-shell .theme-button:not(.landing-primary-action):not(.landing-secondary-action):not(.landing-tertiary-action):not(.landing-nav-action):hover {
+  background: hsl(var(--landing-control-hover) / 0.92);
+  border-color: hsl(var(--hydrate) / 0.55);
+  color: hsl(var(--landing-text));
+}
+
+.landing-shell .landing-nav-action,
+.landing-shell .landing-primary-action,
+.landing-shell .landing-secondary-action,
+.landing-shell .landing-tertiary-action {
+  border-color: hsl(var(--landing-action-border) / 0.72);
+  background:
+    linear-gradient(
+      180deg,
+      hsl(var(--landing-action-top)),
+      hsl(var(--landing-action-bottom))
+    );
+  color: hsl(var(--landing-action-text));
+  box-shadow:
+    0 14px 30px hsl(var(--landing-shadow) / 0.24),
+    inset 0 1px 0 hsl(0 0% 100% / 0.08);
+}
+
+.landing-shell .landing-nav-action:hover,
+.landing-shell .landing-primary-action:hover,
+.landing-shell .landing-secondary-action:hover,
+.landing-shell .landing-tertiary-action:hover {
+  border-color: hsl(var(--hydrate) / 0.72);
+  background:
+    linear-gradient(
+      180deg,
+      hsl(var(--landing-action-hover)),
+      hsl(var(--landing-action-bottom))
+    );
+  color: hsl(var(--landing-action-text));
+  box-shadow:
+    0 18px 36px hsl(var(--landing-shadow) / 0.3),
+    inset 0 1px 0 hsl(0 0% 100% / 0.1);
+}
+
+.landing-shell .landing-demo-action {
+  border: 1px solid hsl(var(--landing-action-border) / 0.72);
+  background:
+    linear-gradient(
+      180deg,
+      hsl(var(--landing-action-top)),
+      hsl(var(--landing-action-bottom))
+    );
+  color: hsl(var(--landing-action-text));
+  box-shadow:
+    0 14px 30px hsl(var(--landing-shadow) / 0.24),
+    inset 0 1px 0 hsl(0 0% 100% / 0.08);
+}
+
+.landing-shell .landing-version-badge {
+  border-color: hsl(var(--landing-action-border) / 0.74);
+  background:
+    linear-gradient(
+      180deg,
+      hsl(var(--landing-action-top)),
+      hsl(var(--landing-action-bottom))
+    );
+  color: hsl(var(--landing-action-text));
+  box-shadow:
+    0 10px 24px hsl(var(--landing-shadow) / 0.2),
+    inset 0 1px 0 hsl(0 0% 100% / 0.08);
+}
+
+.landing-shell .landing-version-badge > span {
+  background: hsl(var(--hydrate));
+  box-shadow: 0 0 0 3px hsl(var(--hydrate) / 0.16);
+}
+
+@media (max-width: 430px) {
+  .landing-shell .landing-secondary-action,
+  .landing-shell .landing-tertiary-action {
+    padding-inline: 0.75rem;
+    font-size: 0.875rem;
+  }
+}
+
+.landing-shell .landing-mobile-preview,
+.landing-shell .landing-preview-bar,
+.landing-shell .landing-stat-rail,
+.landing-shell .data-card,
+.landing-shell .theme-card {
+  background: hsl(var(--landing-card) / 0.86);
+  border-color: hsl(var(--landing-border) / 0.78);
+  box-shadow:
+    0 18px 42px hsl(var(--landing-shadow) / 0.12),
+    inset 0 1px 0 hsl(0 0% 100% / 0.24);
+}
+
+.dark .landing-shell .landing-mobile-preview,
+.dark .landing-shell .landing-preview-bar,
+.dark .landing-shell .landing-stat-rail,
+.dark .landing-shell .data-card,
+.dark .landing-shell .theme-card {
+  background: hsl(var(--landing-card) / 0.9);
+  border-color: hsl(var(--landing-border) / 0.58);
+  box-shadow:
+    0 18px 42px hsl(var(--landing-shadow) / 0.42),
+    inset 0 1px 0 hsl(0 0% 100% / 0.06);
+}
+
+.landing-shell .landing-stat-cell {
+  background: hsl(var(--landing-card-strong) / 0.72);
+  border-color: hsl(var(--landing-border) / 0.6);
+}
+
+.dark .landing-shell .landing-stat-cell {
+  background: hsl(var(--background) / 0.72);
+}
+
+.landing-shell .badge-info {
+  background: hsl(var(--hydrate) / 0.14);
+  color: hsl(var(--landing-muted-strong));
+  border-color: hsl(var(--hydrate) / 0.36);
+}
+
+.dark .landing-shell .badge-info {
+  color: hsl(196 100% 79%);
+  border-color: hsl(var(--hydrate) / 0.42);
+}

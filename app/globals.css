@@ -168,127 +168,13 @@
 
   /* Typography hierarchy */
   h1, h2, h3, h4, h5, h6 {
-    @apply font-display tracking-tight;
+    @apply font-display;
   }
 
   /* Monospace elements get terminal styling */
   code, pre, kbd {
     @apply font-mono;
   }
-}
-
-/* ============================================
-   INDUSTRIAL BACKGROUND - Animated Grid
-   ============================================ */
-
-.industrial-bg {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-
-/* Base grid pattern */
-.industrial-bg::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(hsl(var(--border) / 0.4) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--border) / 0.4) 1px, transparent 1px);
-  background-size: 40px 40px;
-  -webkit-mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 70%);
-  mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 20%, transparent 70%);
-}
-
-.corporate-1999 .industrial-bg::before {
-  opacity: 0.55;
-  background-image:
-    linear-gradient(hsl(0 0% 100% / 0.45) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(0 0% 100% / 0.45) 1px, transparent 1px);
-  background-size: 36px 36px;
-  -webkit-mask-image: linear-gradient(180deg, black 40%, transparent 100%);
-  mask-image: linear-gradient(180deg, black 40%, transparent 100%);
-}
-
-/* Animated flowing grid lines */
-.grid-flow-container {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  opacity: 0.3;
-}
-
-.grid-flow-line {
-  position: absolute;
-  width: 1px;
-  height: 200%;
-  background: linear-gradient(
-    180deg,
-    transparent 0%,
-    hsl(var(--hydrate) / 0.6) 50%,
-    transparent 100%
-  );
-  animation: grid-flow 8s linear infinite;
-}
-
-/* Scan line effect */
-.scan-line {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    hsl(var(--hydrate) / 0.15) 20%,
-    hsl(var(--hydrate) / 0.4) 50%,
-    hsl(var(--hydrate) / 0.15) 80%,
-    transparent 100%
-  );
-  animation: scan-line 8s linear infinite;
-  opacity: 0.5;
-}
-
-.dark .scan-line {
-  opacity: 0.8;
-}
-
-/* Corner brackets decoration */
-.corner-brackets {
-  position: relative;
-}
-
-.corner-brackets::before,
-.corner-brackets::after {
-  content: '';
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  border-color: hsl(var(--hydrate) / 0.5);
-  transition: all 0.3s ease;
-}
-
-.corner-brackets::before {
-  top: -1px;
-  left: -1px;
-  border-top: 2px solid;
-  border-left: 2px solid;
-}
-
-.corner-brackets::after {
-  bottom: -1px;
-  right: -1px;
-  border-bottom: 2px solid;
-  border-right: 2px solid;
-}
-
-.corner-brackets:hover::before,
-.corner-brackets:hover::after {
-  border-color: hsl(var(--hydrate));
-  width: 30px;
-  height: 30px;
 }
 
 /* ============================================
@@ -728,7 +614,7 @@
 .data-value {
   font-family: var(--font-jetbrains-mono), monospace;
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .data-label {
@@ -745,7 +631,7 @@
   font-size: 3rem;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
   background: linear-gradient(
     135deg,
     hsl(var(--foreground)),
@@ -762,7 +648,7 @@
 
 .hero-title {
   font-weight: 900;
-  letter-spacing: -0.03em;
+  letter-spacing: 0;
   line-height: 0.95;
 }
 

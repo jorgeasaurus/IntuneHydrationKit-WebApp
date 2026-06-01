@@ -198,10 +198,10 @@ export default function DashboardPage() {
 
           {/* Warning for delete mode */}
           {state.operationMode === "delete" && !state.isPreview && !isCompleted && (
-            <Alert variant="destructive">
+            <Alert className="border-red-500/70 bg-slate-950/90 text-slate-50 shadow-2xl shadow-slate-950/25 backdrop-blur-md [&>svg]:text-red-400">
               <AlertTriangle className="size-4" />
-              <AlertTitle>Delete Mode Active</AlertTitle>
-              <AlertDescription>
+              <AlertTitle className="text-red-200">Delete Mode Active</AlertTitle>
+              <AlertDescription className="text-slate-200">
                 Deleting configurations from your tenant. Only objects created by Intune
                 Hydration Kit will be removed.
               </AlertDescription>

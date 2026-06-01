@@ -81,10 +81,6 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "scan-line": {
-          "0%": { transform: "translateY(-100%)" },
-          "100%": { transform: "translateY(100vh)" },
-        },
         "terminal-blink": {
           "0%, 50%": { opacity: "1" },
           "51%, 100%": { opacity: "0" },
@@ -92,10 +88,6 @@ const config: Config = {
         "data-pulse": {
           "0%, 100%": { opacity: "0.4" },
           "50%": { opacity: "1" },
-        },
-        "grid-flow": {
-          "0%": { transform: "translateY(0)" },
-          "100%": { transform: "translateY(40px)" },
         },
         "slide-up": {
           "0%": { transform: "translateY(20px)", opacity: "0" },
@@ -117,10 +109,8 @@ const config: Config = {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "scan-line": "scan-line 8s linear infinite",
         "terminal-blink": "terminal-blink 1s step-end infinite",
         "data-pulse": "data-pulse 2s ease-in-out infinite",
-        "grid-flow": "grid-flow 20s linear infinite",
         "slide-up": "slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
         "fade-in": "fade-in 0.4s ease-out",
         "counter-increment": "counter-increment 0.4s cubic-bezier(0.16, 1, 0.3, 1)",

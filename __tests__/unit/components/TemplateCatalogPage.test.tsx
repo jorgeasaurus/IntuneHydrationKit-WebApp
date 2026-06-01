@@ -47,6 +47,12 @@ describe('TemplateCatalogPage', () => {
           description: 'OpenIntuneBaseline payloads.',
           count: 1,
         },
+        {
+          id: 'cisBaseline',
+          label: 'CIS Baselines',
+          description: 'CIS benchmark payloads indexed from the local CIS manifest.',
+          count: 0,
+        },
       ],
       items: [
         {
@@ -99,6 +105,18 @@ describe('TemplateCatalogPage', () => {
 
     expect(await screen.findByText(/Inspect every payload before you import it/i)).toBeInTheDocument()
     expect(await screen.findByText(/\[IHD\] Intune - Windows Devices/i)).toBeInTheDocument()
+    screen
+      .getAllByRole('button', { name: /OpenIntuneBaseline payloads/i })
+      .forEach((button) => {
+        expect(button).not.toHaveTextContent(/\d+\s*\/\s*\d+/)
+      })
+    screen.getAllByRole('button', { name: /^All$/i }).forEach((button) => {
+      expect(button).toHaveClass('bg-black')
+      expect(button).not.toHaveClass('bg-primary')
+    })
+    expect(
+      screen.getByRole('button', { name: /CIS Baselines CIS benchmark/i })
+    ).toHaveClass('flex', 'items-start', 'justify-start')
 
     await user.type(screen.getByLabelText(/Search template catalog/i), 'Windows Devices')
 

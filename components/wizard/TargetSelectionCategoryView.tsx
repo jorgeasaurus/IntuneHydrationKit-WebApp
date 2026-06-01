@@ -108,6 +108,7 @@ function CategoryHeader({
   const { targets } = model.selection;
   const { toggleTarget, toggleCategoryExpanded } = model.actions;
   const isSelected = targets.includes(target.id);
+  const isCategoryExpanded = isSelected && isExpanded;
   const categoryButtonLabel = isLoading
     ? `Loading ${target.label}`
     : isSelected
@@ -142,7 +143,7 @@ function CategoryHeader({
       <button
         type="button"
         aria-label={categoryButtonLabel}
-        aria-expanded={isSelected ? isExpanded : undefined}
+        aria-expanded={isCategoryExpanded}
         className="text-muted-foreground hover:text-foreground transition-colors p-1"
         onClick={e => {
           e.preventDefault();

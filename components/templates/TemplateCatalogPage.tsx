@@ -60,20 +60,11 @@ const CATEGORY_ORDER: TaskCategory[] = [
   "cisBaseline",
 ];
 
-const CATEGORY_ACCENTS: Record<TaskCategory, string> = {
-  groups: "from-cyan-500/20 via-cyan-500/5 to-transparent",
-  filters: "from-violet-500/20 via-violet-500/5 to-transparent",
-  compliance: "from-emerald-500/20 via-emerald-500/5 to-transparent",
-  appProtection: "from-fuchsia-500/20 via-fuchsia-500/5 to-transparent",
-  conditionalAccess: "from-amber-500/20 via-amber-500/5 to-transparent",
-  enrollment: "from-sky-500/20 via-sky-500/5 to-transparent",
-  notification: "from-orange-500/20 via-orange-500/5 to-transparent",
-  baseline: "from-indigo-500/20 via-indigo-500/5 to-transparent",
-  cisBaseline: "from-rose-500/20 via-rose-500/5 to-transparent",
-};
-
 const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_INCREMENT = 120;
+const ACTIVE_FILTER_BUTTON_CLASSNAME =
+  "border-black bg-black text-white hover:bg-neutral-900 hover:text-white focus-visible:ring-black dark:border-white/20 dark:bg-black dark:text-white dark:hover:bg-neutral-900 dark:focus-visible:ring-white/40";
+
 function formatSummaryLabel(key: string): string {
   return key
     .replace(/^@/, "")
@@ -377,10 +368,10 @@ export function TemplateCatalogPage() {
             <div className="mx-auto max-w-7xl space-y-10">
               <div className="overflow-hidden rounded-[32px] border border-border/70 bg-background/80 shadow-2xl shadow-black/20 backdrop-blur-xl">
                 <div className="relative border-b border-border/70 px-6 py-8 sm:px-10">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.18),transparent_30%),radial-gradient(circle_at_top_right,rgba(244,114,182,0.16),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.04),transparent)]" />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,hsl(var(--foreground)/0.04),transparent)]" />
                   <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
                     <div className="max-w-3xl space-y-5">
-                      <div className="inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-cyan-500/10 px-3 py-1 text-xs font-mono uppercase tracking-[0.32em] text-cyan-300">
+                      <div className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-background/70 px-3 py-1 text-xs font-mono uppercase tracking-[0.32em] text-muted-foreground">
                         <Boxes className="size-3.5" />
                         Template Atlas
                       </div>
@@ -414,7 +405,7 @@ export function TemplateCatalogPage() {
                           Raw JSON
                         </div>
                         <div className="mt-3 flex items-center gap-2 text-lg font-semibold text-foreground">
-                          <Sparkles className="size-4 text-cyan-300" />
+                          <Sparkles className="size-4 text-muted-foreground" />
                           On-demand loading
                         </div>
                         <div className="mt-2 text-sm text-muted-foreground">
@@ -430,7 +421,7 @@ export function TemplateCatalogPage() {
                     <Card className="border-border/70 bg-background/70 shadow-xl shadow-black/10">
                       <CardHeader className="pb-4">
                         <CardTitle className="flex items-center gap-2 text-lg">
-                          <Search className="size-4 text-cyan-300" />
+                          <Search className="size-4 text-muted-foreground" />
                           Filter the catalog
                         </CardTitle>
                         <CardDescription>
@@ -464,8 +455,13 @@ export function TemplateCatalogPage() {
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Button
-                              variant={activeCategory === "all" ? "default" : "outline"}
+                              variant="outline"
                               size="sm"
+                              className={
+                                activeCategory === "all"
+                                  ? ACTIVE_FILTER_BUTTON_CLASSNAME
+                                  : undefined
+                              }
                               onClick={() => setActiveCategory("all")}
                             >
                               All
@@ -473,10 +469,13 @@ export function TemplateCatalogPage() {
                             {catalog?.categories.map((category) => (
                               <Button
                                 key={category.id}
-                                variant={
-                                  activeCategory === category.id ? "default" : "outline"
-                                }
+                                variant="outline"
                                 size="sm"
+                                className={
+                                  activeCategory === category.id
+                                    ? ACTIVE_FILTER_BUTTON_CLASSNAME
+                                    : undefined
+                                }
                                 onClick={() => {
                                   setActiveCategory(category.id);
                                   setOpenCategories((previous) => {
@@ -498,8 +497,13 @@ export function TemplateCatalogPage() {
                           </div>
                           <div className="flex flex-wrap gap-2">
                             <Button
-                              variant={activePlatform === "all" ? "default" : "outline"}
+                              variant="outline"
                               size="sm"
+                              className={
+                                activePlatform === "all"
+                                  ? ACTIVE_FILTER_BUTTON_CLASSNAME
+                                  : undefined
+                              }
                               onClick={() => setActivePlatform("all")}
                             >
                               All
@@ -507,8 +511,13 @@ export function TemplateCatalogPage() {
                             {platforms.map((platform) => (
                               <Button
                                 key={platform}
-                                variant={activePlatform === platform ? "default" : "outline"}
+                                variant="outline"
                                 size="sm"
+                                className={
+                                  activePlatform === platform
+                                    ? ACTIVE_FILTER_BUTTON_CLASSNAME
+                                    : undefined
+                                }
                                 onClick={() => setActivePlatform(platform)}
                               >
                                 {platform}
@@ -522,7 +531,7 @@ export function TemplateCatalogPage() {
                     <Card className="border-border/70 bg-background/70 shadow-xl shadow-black/10">
                       <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-lg">
-                          <Filter className="size-4 text-cyan-300" />
+                          <Filter className="size-4 text-muted-foreground" />
                           Result snapshot
                         </CardTitle>
                         <CardDescription>
@@ -562,7 +571,7 @@ export function TemplateCatalogPage() {
                     {loading ? (
                       <Card className="border-border/70 bg-background/70 shadow-xl shadow-black/10">
                         <CardContent className="flex min-h-[360px] items-center justify-center gap-3">
-                          <Loader2 className="size-5 animate-spin text-cyan-300" />
+                          <Loader2 className="size-5 animate-spin text-muted-foreground" />
                           <span className="text-sm text-muted-foreground">
                             Indexing the template catalog…
                           </span>
@@ -580,46 +589,32 @@ export function TemplateCatalogPage() {
                     ) : (
                       <>
                         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                          {catalog?.categories.map((category) => {
-                            const visibleCount = filteredItems.filter(
-                              (item) => item.category === category.id
-                            ).length;
-
-                            return (
-                              <button
-                                key={category.id}
-                                type="button"
-                                onClick={() => {
-                                  setActiveCategory(category.id);
-                                  setOpenCategories((previous) => {
-                                    const next = new Set(previous);
-                                    next.add(category.id);
-                                    return next;
-                                  });
-                                }}
-                                className={`group relative overflow-hidden rounded-2xl border border-border/70 bg-background/70 p-5 text-left shadow-xl shadow-black/10 transition-transform hover:-translate-y-0.5 ${
-                                  activeCategory === category.id ? "ring-1 ring-cyan-400/50" : ""
-                                }`}
-                              >
-                                <div
-                                  className={`absolute inset-0 bg-gradient-to-br ${CATEGORY_ACCENTS[category.id]} opacity-80`}
-                                />
-                                <div className="relative space-y-3">
-                                  <div className="flex items-center justify-between gap-4">
-                                    <div className="text-lg font-semibold text-foreground">
-                                      {category.label}
-                                    </div>
-                                    <div className="rounded-full border border-border/70 bg-black/20 px-3 py-1 text-xs font-mono text-muted-foreground">
-                                      {visibleCount}/{category.count}
-                                    </div>
-                                  </div>
-                                  <p className="text-sm leading-6 text-muted-foreground">
-                                    {category.description}
-                                  </p>
+                          {catalog?.categories.map((category) => (
+                            <button
+                              key={category.id}
+                              type="button"
+                              onClick={() => {
+                                setActiveCategory(category.id);
+                                setOpenCategories((previous) => {
+                                  const next = new Set(previous);
+                                  next.add(category.id);
+                                  return next;
+                                });
+                              }}
+                              className={`group relative flex h-full flex-col items-start justify-start rounded-2xl border border-border/70 bg-background/75 p-5 text-left shadow-xl shadow-black/10 transition-colors hover:border-foreground/30 hover:bg-background/90 ${
+                                activeCategory === category.id ? "border-foreground/50 bg-background/95 ring-1 ring-foreground/20" : ""
+                              }`}
+                            >
+                              <div className="relative w-full space-y-3">
+                                <div className="text-lg font-semibold text-foreground">
+                                  {category.label}
                                 </div>
-                              </button>
-                            );
-                          })}
+                                <p className="text-sm leading-6 text-muted-foreground">
+                                  {category.description}
+                                </p>
+                              </div>
+                            </button>
+                          ))}
                         </div>
 
                         <div className="flex flex-col gap-3 rounded-2xl border border-border/70 bg-background/70 px-5 py-4 shadow-xl shadow-black/10 md:flex-row md:items-center md:justify-between">
@@ -729,7 +724,7 @@ export function TemplateCatalogPage() {
                                                       {item.itemType}
                                                     </span>
                                                     {item.platform ? (
-                                                      <span className="rounded-full border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-cyan-200">
+                                                      <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
                                                         {item.platform}
                                                       </span>
                                                     ) : null}
@@ -787,7 +782,7 @@ export function TemplateCatalogPage() {
 
                                                 {payloadState?.status === "loading" ? (
                                                   <div className="flex items-center gap-3 rounded-2xl border border-border/60 bg-black/20 p-4 text-sm text-muted-foreground">
-                                                    <Loader2 className="size-4 animate-spin text-cyan-300" />
+                                                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
                                                     Loading raw JSON for this template…
                                                   </div>
                                                 ) : null}
@@ -845,7 +840,7 @@ export function TemplateCatalogPage() {
                                                           </span>
                                                           <span>{item.itemType}</span>
                                                         </div>
-                                                        <pre className="max-h-[480px] overflow-auto p-4 text-xs leading-6 text-white selection:bg-cyan-400/20">
+                                                        <pre className="max-h-[480px] overflow-auto p-4 text-xs leading-6 text-white selection:bg-white/20">
                                                           <code className="font-mono">
                                                             <HighlightedJson payload={payloadState.data} />
                                                           </code>

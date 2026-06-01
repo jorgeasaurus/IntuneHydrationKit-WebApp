@@ -195,7 +195,7 @@ export function WebAppDemo() {
                 {/* Deploy Button */}
                 <m.button
                   className={`
-                    w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all
+                    landing-demo-action w-full py-2.5 rounded-lg font-medium text-sm flex items-center justify-center gap-2 transition-all
                     ${
                       selectedCategories.length === CATEGORIES.length
                         ? "bg-primary text-primary-foreground"
