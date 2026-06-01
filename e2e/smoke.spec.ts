@@ -170,8 +170,11 @@ test.describe("Theme", () => {
 
     await expect(html).toHaveClass(/\blight\b/);
     await expect(html).toHaveAttribute("style", /color-scheme:\s*light/);
-    expect(await page.evaluate(() => localStorage.getItem("app-settings:v1"))).toContain(
-      '"theme":"light"'
-    );
+    expect(
+      await page.evaluate(
+        (storageKey) => localStorage.getItem(storageKey),
+        APP_SETTINGS_STORAGE_KEY
+      )
+    ).toContain('"theme":"light"');
   });
 });

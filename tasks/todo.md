@@ -430,3 +430,15 @@
 
 - Footer now includes `Made By Jorgeasaurus` next to the existing product/year and license text.
 - Checks passed: focused HomeLanding test, `npm run type-check`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Copilot Feedback Before Merge
+
+- [x] Check PR #6 for Copilot feedback before merging.
+- [x] Fix Copilot's hardcoded Playwright storage key finding.
+- [x] Push the fix, recheck feedback/checks, and merge only if clear.
+
+## Review
+
+- Copilot feedback was present, so merge was deferred.
+- Replaced the hardcoded Playwright localStorage key with `APP_SETTINGS_STORAGE_KEY`.
+- Checks passed: `npm run test:e2e -- --grep Theme`, `git diff --check`.
