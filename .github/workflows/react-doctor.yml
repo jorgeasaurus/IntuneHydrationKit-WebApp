@@ -6,8 +6,7 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
+  pull-requests: read
 
 concurrency:
   group: react-doctor-${{ github.event.pull_request.number || github.ref }}
@@ -18,4 +17,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      - uses: millionco/react-doctor@main
+      - uses: millionco/react-doctor@09fe1ff55f5efa4d069c3c57c9d3134c46a9cfb3
+        with:
+          comment: false

@@ -94,6 +94,8 @@ describe('background canvas components', () => {
     const canvas = container.querySelector('canvas')
 
     expect(canvas).toBeTruthy()
+    expect(canvas).toHaveAttribute('aria-hidden', 'true')
+    expect(canvas).toHaveAttribute('tabindex', '-1')
     expect(canvas?.width).toBe(1280)
     expect(canvas?.height).toBe(720)
     expect(getContextSpy).toHaveBeenCalledWith('2d')
@@ -130,6 +132,8 @@ describe('background canvas components', () => {
     const canvas = container.querySelector('canvas')
 
     expect(canvas).toBeTruthy()
+    expect(canvas).toHaveAttribute('aria-hidden', 'true')
+    expect(canvas).toHaveAttribute('tabindex', '-1')
     expect(canvas?.width).toBe(1280)
     expect(canvas?.height).toBe(720)
     expect(context.clearRect).toHaveBeenCalledWith(0, 0, 1280, 720)

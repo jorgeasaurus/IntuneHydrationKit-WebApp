@@ -298,7 +298,7 @@ describe('TargetSelection', () => {
     expect(await screen.findByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark`)).toBeChecked()
   })
 
-  it('persists non-baseline selections and skips the baseline step on continue', async () => {
+  it('persists non-baseline selections and advances to review on continue', async () => {
     const user = userEvent.setup()
 
     useWizardStateMock.mockReturnValue({
@@ -326,7 +326,25 @@ describe('TargetSelection', () => {
       groups: { selectedItems: [`${IMPORT_PREFIX}Windows Devices`] },
     })
     expect(setBaselineSelection).not.toHaveBeenCalled()
-    expect(nextStep).toHaveBeenCalledTimes(2)
+    expect(nextStep).toHaveBeenCalledTimes(1)
+  })
+
+  it('labels category icon buttons and exposes expansion state', async () => {
+    const user = userEvent.setup()
+
+    render(<TargetSelection />)
+
+    const selectButton = screen.getByRole('button', { name: 'Select Entra Groups' })
+    expect(selectButton).not.toHaveAttribute('aria-expanded')
+
+    await user.click(selectButton)
+
+    const collapseButton = await screen.findByRole('button', { name: 'Collapse Entra Groups' })
+    expect(collapseButton).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(collapseButton)
+
+    expect(screen.getByRole('button', { name: 'Expand Entra Groups' })).toHaveAttribute('aria-expanded', 'false')
   })
 
   it('loads baseline policies, validates empty selections, and saves baseline choices on continue', async () => {
