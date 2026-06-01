@@ -15,3 +15,4 @@
 - Category-card buttons in stretched CSS grids need explicit top alignment; short descriptions can otherwise appear vertically centered next to taller cards.
 - Playwright e2e should use a dedicated local port by default; reusing any existing localhost server can accidentally validate the wrong app.
 - Theme toggles must prefer a persisted non-system app setting over `next-themes` reporting `system`; otherwise dark settings on a light OS can never cycle back to light.
+- For theme regressions, verify the visible screen state with Playwright screenshots and computed styles; HTML class/storage assertions alone can miss a dark-looking light mode.

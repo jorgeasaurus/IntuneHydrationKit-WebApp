@@ -28,20 +28,13 @@ function getServerMountSnapshot() {
   return false;
 }
 
-function getActiveTheme(
-  theme: AppSettings["theme"] | undefined,
-  resolvedTheme: string | undefined,
-  themes: readonly SelectableTheme[]
-): SelectableTheme {
-  if (
-    (theme === "light" ||
-      theme === "dark" ||
-      theme === "corporate-1999") &&
-    themes.includes(theme)
-  ) {
-    return theme;
-  }
+function isSelectableTheme(theme: AppSettings["theme"] | undefined): theme is SelectableTheme {
+  return theme === "light" || theme === "dark" || theme === "corporate-1999";
+}
 
+function getResolvedActiveTheme(
+  resolvedTheme: string | undefined
+): SelectableTheme {
   return resolvedTheme === "dark" ? "dark" : "light";
 }
 
@@ -56,6 +49,22 @@ function getNextTheme(
   }
 
   return themes[(currentIndex + 1) % themes.length];
+}
+
+function getNextThemeForState(
+  theme: AppSettings["theme"] | undefined,
+  resolvedTheme: string | undefined,
+  themes: readonly SelectableTheme[]
+): SelectableTheme {
+  if (isSelectableTheme(theme)) {
+    if (!themes.includes(theme)) {
+      return themes[0];
+    }
+
+    return getNextTheme(theme, themes);
+  }
+
+  return getNextTheme(getResolvedActiveTheme(resolvedTheme), themes);
 }
 
 function getThemeActionIcon(nextTheme: SelectableTheme): React.JSX.Element {
@@ -92,8 +101,7 @@ export function ThemeToggle({
     settings.theme === "system"
       ? (theme as AppSettings["theme"] | undefined)
       : settings.theme;
-  const activeTheme = getActiveTheme(configuredTheme, resolvedTheme, themes);
-  const nextTheme = getNextTheme(activeTheme, themes);
+  const nextTheme = getNextThemeForState(configuredTheme, resolvedTheme, themes);
 
   return (
     <Button

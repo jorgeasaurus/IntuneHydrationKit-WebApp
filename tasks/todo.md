@@ -406,3 +406,16 @@
 - Root cause: the toggle trusted `next-themes` reporting `system` over the persisted dark app setting, so dark-on-light-OS sessions could cycle back to dark instead of light.
 - Fixed by making persisted non-system settings authoritative for active-theme calculation.
 - Checks passed: focused theme tests, `npm run test:e2e -- --grep Theme`, `npm run type-check`, `npm run test:run`, `npm run build`, `npm run doctor -- --verbose --diff`, `git diff --check`, and manual Playwright dark-to-light verification.
+
+# Light Mode Visual Regression Follow-up
+
+- [x] Reproduce the user's still-dark visual behavior with Playwright screenshots/computed styles.
+- [x] Patch the actual light-mode visual/functionality issue.
+- [x] Add regression coverage that checks visible light-mode styling, not just the HTML class.
+- [x] Run focused browser checks, project checks, Doctor, and push the PR update.
+
+## Review
+
+- Playwright found the missed path: a persisted `corporate-1999` setting was outside the landing nav's light/dark cycle, and the first click went to dark instead of light.
+- Out-of-cycle persisted themes now reset to the first supported cycle option, so the landing toggle sends `corporate-1999` directly to light.
+- Checks passed: focused theme tests, `npm run test:e2e -- --grep Theme`, manual Playwright corporate-to-light screenshot/computed-style check, `npm run type-check`, `npm run test:run`, `npm run build`, `npm run doctor -- --verbose --diff`, `git diff --check`.

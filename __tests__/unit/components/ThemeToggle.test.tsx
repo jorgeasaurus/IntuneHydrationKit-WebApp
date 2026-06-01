@@ -84,4 +84,18 @@ describe('ThemeToggle', () => {
     expect(setTheme).toHaveBeenCalledWith('light')
     expect(updateSettings).toHaveBeenCalledWith({ theme: 'light' })
   })
+
+  it('falls back to light when the persisted theme is outside a restricted cycle', async () => {
+    const user = userEvent.setup()
+    themeState.theme = 'corporate-1999'
+    themeState.resolvedTheme = undefined
+    settingsState.theme = 'corporate-1999'
+
+    render(<ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />)
+
+    await user.click(await screen.findByRole('button', { name: /cycle theme/i }))
+
+    expect(setTheme).toHaveBeenCalledWith('light')
+    expect(updateSettings).toHaveBeenCalledWith({ theme: 'light' })
+  })
 })

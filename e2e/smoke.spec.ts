@@ -147,5 +147,31 @@ test.describe("Theme", () => {
 
     await expect(html).toHaveClass(/\blight\b/);
     await expect(html).toHaveAttribute("style", /color-scheme:\s*light/);
+    await expect(page.getByRole("heading", { name: /intune hydration kit/i })).toHaveCSS(
+      "color",
+      "rgb(13, 26, 43)"
+    );
+  });
+
+  test("resets an out-of-cycle corporate theme to light from the landing toggle", async ({ page }) => {
+    await page.addInitScript((storageKey) => {
+      localStorage.setItem("theme", "corporate-1999");
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ stopOnFirstError: false, theme: "corporate-1999" })
+      );
+    }, APP_SETTINGS_STORAGE_KEY);
+
+    await page.goto("/");
+    const html = page.locator("html");
+    await expect(html).toHaveClass(/\bcorporate-1999\b/);
+
+    await page.getByRole("button", { name: /cycle theme/i }).click();
+
+    await expect(html).toHaveClass(/\blight\b/);
+    await expect(html).toHaveAttribute("style", /color-scheme:\s*light/);
+    expect(await page.evaluate(() => localStorage.getItem("app-settings:v1"))).toContain(
+      '"theme":"light"'
+    );
   });
 });
