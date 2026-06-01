@@ -335,7 +335,7 @@ describe('TargetSelection', () => {
     render(<TargetSelection />)
 
     const selectButton = screen.getByRole('button', { name: 'Select Entra Groups' })
-    expect(selectButton).not.toHaveAttribute('aria-expanded')
+    expect(selectButton).toHaveAttribute('aria-expanded', 'false')
 
     await user.click(selectButton)
 

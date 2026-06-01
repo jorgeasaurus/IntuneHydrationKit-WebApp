@@ -34,7 +34,7 @@ test.describe("Graph API Error Handling", () => {
 
       // Verify the app still renders (Graph errors during page load don't crash it)
       await expect(
-        page.getByRole("heading", { name: /bootstrap your intune tenant/i })
+        page.getByRole("heading", { name: /intune hydration kit/i })
       ).toBeVisible();
     });
   });
@@ -56,7 +56,7 @@ test.describe("Graph API Error Handling", () => {
 
       await page.goto("/");
       await expect(
-        page.getByRole("heading", { name: /bootstrap your intune tenant/i })
+        page.getByRole("heading", { name: /intune hydration kit/i })
       ).toBeVisible();
     });
 
@@ -76,7 +76,7 @@ test.describe("Graph API Error Handling", () => {
 
       await page.goto("/");
       await expect(
-        page.getByRole("heading", { name: /bootstrap your intune tenant/i })
+        page.getByRole("heading", { name: /intune hydration kit/i })
       ).toBeVisible();
     });
   });
@@ -102,7 +102,7 @@ test.describe("Graph API Error Handling", () => {
 
       await page.goto("/");
       await expect(
-        page.getByRole("heading", { name: /bootstrap your intune tenant/i })
+        page.getByRole("heading", { name: /intune hydration kit/i })
       ).toBeVisible();
     });
   });
@@ -120,7 +120,7 @@ test.describe("Graph API Error Handling", () => {
       // Templates are lazy-loaded, so we just verify the page loads
       // Template fetches happen during wizard execution, not on landing
       await expect(
-        page.getByRole("heading", { name: /bootstrap your intune tenant/i })
+        page.getByRole("heading", { name: /intune hydration kit/i })
       ).toBeVisible();
     });
 

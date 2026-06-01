@@ -48,4 +48,19 @@ describe('CloudEnvironmentSelector', () => {
     await user.click(screen.getByRole('button', { name: /cancel/i }))
     expect(onCancel).toHaveBeenCalledTimes(1)
   })
+
+  it('uses neutral black action buttons instead of primary blue buttons', () => {
+    render(
+      <CloudEnvironmentSelector
+        open
+        onSelect={vi.fn()}
+        onCancel={vi.fn()}
+      />
+    )
+
+    expect(screen.getByRole('button', { name: /continue to sign in/i })).toHaveClass(
+      'bg-slate-950'
+    )
+    expect(screen.getByRole('button', { name: /cancel/i })).toHaveClass('bg-slate-950')
+  })
 })

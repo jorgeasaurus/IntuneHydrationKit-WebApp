@@ -1,10 +1,11 @@
 import { test, expect } from "@playwright/test";
+import { APP_SETTINGS_STORAGE_KEY } from "../lib/storageKeys";
 
 test.describe("Landing Page", () => {
   test("renders hero section", async ({ page }) => {
     await page.goto("/");
     await expect(
-      page.getByRole("heading", { name: /bootstrap your intune tenant/i })
+      page.getByRole("heading", { name: /intune hydration kit/i })
     ).toBeVisible();
   });
 
@@ -17,7 +18,7 @@ test.describe("Landing Page", () => {
 
   test("shows version badge", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("v2.2")).toBeVisible();
+    await expect(page.getByText("v2.5", { exact: true })).toBeVisible();
   });
 
   test("has no unexpected console errors on load", async ({ page }) => {
@@ -42,7 +43,7 @@ test.describe("Landing Page", () => {
 
   test("renders feature cards", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText(/safety first/i)).toBeVisible();
+    await expect(page.getByText(/guarded by default/i)).toBeVisible();
   });
 
   test("links to PowerShell module on GitHub", async ({ page }) => {
@@ -62,7 +63,7 @@ test.describe("Landing Page", () => {
 
     await page.getByRole("link", { name: "Features" }).click();
     await page.waitForURL(/\/#features$/);
-    await expect(page.getByText(/core features/i)).toBeVisible();
+    await expect(page.getByText(/built for repeatable tenant work/i)).toBeVisible();
 
     await page.goto("/templates");
     await page.getByRole("link", { name: "Configurations" }).click();
@@ -103,15 +104,28 @@ test.describe("Protected Routes", () => {
 });
 
 test.describe("Theme", () => {
-  test("defaults to dark mode", async ({ page }) => {
+  test("applies a concrete light or dark color scheme", async ({ page }) => {
     await page.goto("/");
     const html = page.locator("html");
-    await expect(html).toHaveClass(/dark/);
+    await expect(html).toHaveClass(/light|dark/);
+    await expect(html).toHaveAttribute("style", /color-scheme:\s*(light|dark)/);
   });
 
-  test("applies dark color scheme", async ({ page }) => {
+  test("cycles between light and dark mode", async ({ page }) => {
+    await page.addInitScript((storageKey) => {
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ stopOnFirstError: false, theme: "light" })
+      );
+    }, APP_SETTINGS_STORAGE_KEY);
+
     await page.goto("/");
     const html = page.locator("html");
+    await expect(html).toHaveClass(/\blight\b/);
+
+    await page.getByRole("button", { name: /cycle theme/i }).click();
+
+    await expect(html).toHaveClass(/\bdark\b/);
     await expect(html).toHaveAttribute("style", /color-scheme:\s*dark/);
   });
 });

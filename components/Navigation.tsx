@@ -125,17 +125,17 @@ export function Navigation() {
                 <Button
                   onClick={handleGetStarted}
                   variant="outline"
-                  className="rounded-md px-4 h-9 text-sm font-semibold border-2"
+                  className="landing-nav-action h-9 rounded-md border-2 px-4 text-sm font-semibold"
                 >
                   {isAuthenticated ? (
                     <>
-                      <Terminal className="size-4 mr-2" />
+                      <Terminal className="size-4" />
                       Launch Wizard
                     </>
                   ) : (
                     <>
                       <svg
-                        className="mr-2 size-4"
+                        className="size-4"
                         viewBox="0 0 21 21"
                         fill="none"
                         xmlns="http://www.w3.org/2000/svg"

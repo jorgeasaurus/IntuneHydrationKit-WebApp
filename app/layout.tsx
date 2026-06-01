@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
+import "./landing.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { SettingsThemeSync } from "@/components/providers/SettingsThemeSync";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
-import { IndustrialBackground } from "@/components/IndustrialBackground";
+import { DynamicWallpaper } from "@/components/DynamicWallpaper";
 import { Analytics } from "@vercel/analytics/next";
 
 // DM Sans - Geometric, bold display font
@@ -83,7 +84,7 @@ export default function RootLayout({
             <SettingsProvider>
               <SettingsThemeSync />
               <WizardProvider>
-                <IndustrialBackground />
+                <DynamicWallpaper />
                 {children}
                 <Toaster />
                 <Analytics />

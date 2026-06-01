@@ -58,7 +58,7 @@ export function CloudEnvironmentSelector({
         </DialogHeader>
 
         <div className="py-4 space-y-3">
-          <div className="flex items-start gap-4 rounded-lg border border-primary bg-primary/5 p-4 transition-colors">
+          <div className="flex items-start gap-4 rounded-lg border border-border bg-muted/35 p-4 transition-colors dark:border-slate-700 dark:bg-slate-950/45">
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2">
                 {COMMERCIAL_CLOUD.icon}
@@ -99,10 +99,17 @@ export function CloudEnvironmentSelector({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onCancel}>
+          <Button
+            variant="outline"
+            onClick={onCancel}
+            className="border-slate-700 bg-slate-950 text-slate-50 hover:bg-slate-900 hover:text-white focus-visible:ring-slate-400/70"
+          >
             Cancel
           </Button>
-          <Button onClick={handleContinue} className="text-white">
+          <Button
+            onClick={handleContinue}
+            className="border border-slate-700 bg-slate-950 text-slate-50 shadow-lg shadow-slate-950/25 hover:bg-slate-900 hover:text-white focus-visible:ring-slate-400/70"
+          >
             <svg className="mr-2 size-4" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
               <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>

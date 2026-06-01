@@ -94,14 +94,14 @@ interface LicenseCheck {
 
 **Step 3: Target Selection**
 - Checkbox group for configuration types:
-  - [ ] OpenIntuneBaseline (70+ policies)
-  - [ ] Compliance Templates (10 policies)
-  - [ ] App Protection (4 policies)
-  - [ ] Notification Templates
-  - [ ] Enrollment Profiles (2 profiles)
-  - [ ] Dynamic Groups (12 groups)
-  - [ ] Device Filters (12 filters)
-  - [ ] Conditional Access (13 policies)
+  - OpenIntuneBaseline policies
+  - Compliance templates
+  - App protection policies
+  - Notification templates
+  - Enrollment profiles
+  - Dynamic groups
+  - Device filters
+  - Conditional Access policies
 - "Select All" / "Deselect All" buttons
 - Display estimated object count for each category
 
@@ -570,13 +570,13 @@ src/
 - Preview mode (no mutations)
 - Error scenarios (network failure, permission denied)
 
-**Manual Testing Checklist**:
-- [ ] Test in dev tenant before production use
-- [ ] Verify all 127 objects created successfully
-- [ ] Confirm delete mode only removes kit-created objects
-- [ ] Test with different cloud environments (Global, USGov)
-- [ ] Validate CA policies are created disabled
-- [ ] Check report accuracy (counts match actual objects)
+**Manual Tenant Validation**:
+- Requires a real dev tenant before any production-impacting release.
+- Verify expected objects are created successfully.
+- Confirm delete mode only removes kit-created objects.
+- Validate Conditional Access policies are created disabled.
+- Check report accuracy against actual tenant objects.
+- Use the PowerShell module for sovereign cloud validation.
 
 ## Deployment
 

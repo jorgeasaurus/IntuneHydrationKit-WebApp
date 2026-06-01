@@ -213,10 +213,10 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 - [x] TypeScript strict mode compliance
 - [x] Build optimization
-- [x] Deployment documentation (see [DEPLOYMENT.md](DEPLOYMENT.md))
-- [ ] End-to-end testing
-- [ ] Production deployment
-- [ ] Final documentation review
+- [x] Deployment documentation in this README
+- [x] End-to-end testing
+- [x] Production deployment to [intunehydrationkit.com](https://www.intunehydrationkit.com/)
+- [x] Final documentation review
 
 ## Wizard Workflow
 
@@ -323,8 +323,6 @@ This application requires a platform that supports Next.js SSR/SSG and cannot be
    - On-premises deployment
    - Air-gapped environments
    - Infrastructure costs only
-
-**📖 See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed deployment instructions and configuration.**
 
 ### Quick Deploy to Vercel
 

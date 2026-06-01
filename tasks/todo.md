@@ -174,3 +174,222 @@
 
 - Addressed all 5 unresolved Copilot review threads from merged PR #4.
 - Checks passed: targeted component tests, `npm run type-check`, `npm run test:run`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`.
+
+# Axe ARIA Diagnostic
+
+- [x] Change TargetSelection category button `aria-expanded` to an explicit boolean.
+- [x] Update regression coverage.
+- [x] Run focused checks.
+
+## Review
+
+- Fixed Edge/axe `aria-expanded="{expression}"` by avoiding an undefined-returning ARIA expression.
+- Checks passed: TargetSelection test, `npm run type-check`, `npx react-doctor@latest --verbose --diff`, `git diff --check`.
+
+# v2.5 Landing UI Upgrade Plan
+
+## Skills
+
+- `frontend-design`: visual direction, responsive layout, interaction polish.
+- `make-plan`: phased implementation and verification structure.
+- `react-doctor`: final React/accessibility regression scan.
+- `playwright-testing`: viewport screenshots and smoke verification after implementation.
+
+## Phase 0: Discovery
+
+- [x] Current landing page: `app/page.tsx` uses a split hero, repeated `data-card` grids, `WebAppDemo`, and `v2.2` badge.
+- [x] Current identity: `--hydrate` blue is the trademark accent in `app/globals.css`; keep it as signature blue, not the dominant palette.
+- [x] Existing APIs/patterns: Tailwind tokens, shadcn-style `Button/Card/Accordion`, lucide icons, `framer-motion` via `LazyMotion`, Next `Image/Link`.
+- [x] Guardrails: no new UI library, no all-blue palette, no nested card stacks, no decorative text explaining the UI, preserve auth/cloud selector behavior.
+
+## Phase 1: Design System Refresh
+
+- [x] Update version surface to v2.5 and move repeated landing copy/data into small local arrays.
+- [x] Add v2.5 landing utilities for editorial sections, metric rails, and app-preview framing.
+- [x] Keep `--hydrate` blue for focus rings, active rails, status pulse, primary CTA accent, and one hero highlight.
+
+## Phase 2: Hero Modernization
+
+- [x] Replace the split hero/card layout with a full-bleed operational console hero.
+- [x] Make the first viewport signal the product name/offer, v2.5 status, primary CTA, and live deployment proof.
+- [x] Reuse `WebAppDemo` as an integrated product scene, not a detached card.
+- [x] Keep the next section visible below the fold on desktop and mobile.
+
+## Phase 3: Content Section Upgrade
+
+- [x] Convert feature cards into denser operational rows: safety, deployment intelligence, cloud support, validation.
+- [x] Rework "How It Works" into a compact timeline/process rail.
+- [x] Keep "Available Configurations" as the main evidence section with stronger metrics and clearer grouping.
+- [x] Make permissions/FAQ/CTA quieter and more scannable.
+
+## Phase 4: Responsiveness And Accessibility
+
+- [x] Verify no text overflow at mobile/tablet/desktop widths.
+- [x] Keep icon-only controls named and decorative visuals `aria-hidden`.
+- [x] Respect reduced motion and avoid layout shifts from counters/demo animation.
+
+## Phase 5: Verification
+
+- [x] Run `npm run type-check`.
+- [x] Run focused landing component tests.
+- [x] Run `npm run test:run`, `npm run build`, `npx react-doctor@latest --verbose --diff`, and `git diff --check`.
+- [x] Use browser/Playwright screenshots at mobile and desktop before calling the UI done.
+
+## Review
+
+- v2.5 landing extracted to `HomeLanding` plus typed content data; `app/page.tsx` now only owns auth/cloud routing.
+- Mobile and desktop browser checks passed with no horizontal overflow and next-section hint visible.
+- Checks passed: `npm run type-check`, `npm run test:run`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`.
+
+# Dynamic Wallpaper Refresh
+
+- [x] Locate the mounted dynamic wallpaper component.
+- [x] Replace the industrial scan grid with a different dynamic visual treatment.
+- [x] Preserve accessibility, pointer transparency, and reduced-motion behavior.
+- [x] Verify with type/build/doctor checks and browser smoke.
+
+## Review
+
+- Replaced the industrial canvas with Vanta.js Waves using the requested options from the shared Vanta URL.
+- Removed unused scan/grid wallpaper CSS and Tailwind animation entries.
+- Checks passed: focused wallpaper tests, `npm run type-check`, `npm run build`, `npx react-doctor@latest --verbose --diff`.
+- Browser smoke passed on desktop and mobile: Vanta effect present, configured, animating, `aria-hidden`, no horizontal overflow.
+
+# Vanta Waves Visibility Regression
+
+- [x] Fix light-mode landing contrast over the dynamic wallpaper.
+- [x] Match the visible Vanta Waves reference color.
+- [x] Keep the wallpaper visible behind landing content without burying the UI.
+- [x] Verify light and dark mode in browser plus project checks.
+
+## Review
+
+- Aligned `three` to Vanta's r134 reference runtime so the wave facets render like the Vanta demo.
+- Added a theme-aware wallpaper scrim and fixed the signed-out hero CTA so it does not shrink/clip.
+- Checks passed: focused landing/wallpaper tests, `npm run type-check`, `npm run test:run`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`.
+- Browser smoke passed on desktop/mobile in light and dark mode: Vanta canvas visible, no horizontal overflow, CTA text fits, no console errors or warnings.
+
+# Dark Mode Wave Contrast
+
+- [x] Darken the dark-mode Vanta wallpaper overlay without changing light mode.
+- [x] Verify text contrast and wave visibility in dark mode.
+
+## Review
+
+- Increased only the dark-mode Vanta scrim opacity; light mode and the Vanta wave color stay unchanged.
+- Checks passed: focused landing/wallpaper tests, `npm run type-check`, browser dark-mode smoke, no console warnings, `git diff --check`.
+
+# Landing Color Readability Optimization
+
+- [x] Tune landing text, muted text, panels, and buttons for the Vanta backdrop.
+- [x] Verify desktop and mobile in light and dark mode.
+- [x] Run focused tests, type-check, React Doctor diff, and `git diff --check`.
+
+## Review
+
+- Added a landing-scoped color system for readable text, softer buttons, calmer panels, and better glass contrast over the wave backdrop.
+- Desktop and mobile browser checks passed in light and dark mode: Vanta visible, no horizontal overflow, hero buttons fit.
+- Checks passed: focused landing/wallpaper tests, `npm run type-check`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`.
+
+# Landing Black Action Buttons
+
+- [x] Make landing action buttons black: Launch Wizard, Sign In with Microsoft, PowerShell Module, Template Docs, and active demo deployment action.
+- [x] Include the navigation CTA without changing icon-only controls.
+- [x] Verify desktop and mobile button fit.
+
+## Review
+
+- Landing action buttons now share the same black gradient treatment with light text.
+- Navigation CTA uses the same landing action class while icon-only controls keep their existing styling.
+- Checks passed: focused landing/navigation/demo tests, `npm run type-check`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`, and browser desktop/mobile smoke.
+
+# Landing Version Badge Contrast
+
+- [x] Give the v2.5 badge a higher-contrast surface over the Vanta backdrop.
+- [x] Verify desktop and mobile readability.
+- [x] Run focused checks.
+
+## Review
+
+- The v2.5 badge now uses the landing black action surface with light text and keeps the hydrate dot as the brand accent.
+- Browser checks passed in light and dark mode on desktop and mobile: badge text fits, Vanta remains visible, no horizontal overflow, no console warnings.
+- Checks passed: focused landing test, `npm run type-check`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`.
+
+# Cloud Modal Black Actions
+
+- [x] Replace the cloud modal primary blue action with a black action treatment.
+- [x] Reduce blue-heavy selectable surfaces in the modal.
+- [x] Verify modal rendering and focused checks.
+
+## Review
+
+- Cloud modal footer buttons now use black neutral surfaces instead of default primary-blue styling.
+- The commercial cloud row now uses neutral muted panel styling instead of a primary-blue selected treatment.
+- Checks passed: focused cloud selector test, `npm run type-check`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`, and browser desktop/mobile smoke.
+
+# Todo Completion Audit
+
+- [x] Inventory unchecked todos in `tasks/`, `README.md`, `claude.md`, e2e specs, and source comments.
+- [x] Update stale e2e assertions for the v2.5 landing page.
+- [x] Gate the manual real-tenant import test behind `RUN_MANUAL_E2E=1`.
+- [x] Run the automated e2e suite and mark README end-to-end testing complete.
+- [x] Verify production homepage availability and mark README production deployment complete.
+- [x] Remove the stale `DEPLOYMENT.md` reference and mark README documentation review complete.
+- [x] Resolve or explicitly retire the remaining `claude.md` manual tenant validation checklist.
+
+## Review
+
+- Automated todos are complete: `npm run test:e2e` passes with 26 automated tests and 1 manual MSAL import test skipped by default.
+- Production homepage check passed: `https://www.intunehydrationkit.com/` returned HTTP 200 from Vercel.
+- Retired false-positive checkbox syntax in `claude.md`; category options remain spec prose, and manual tenant checks are documented as external release validation.
+- Thermonuclear review after the e2e/doc changes found no structural issues after replacing the hard-coded settings storage key with the canonical constant.
+- Final searches found no unchecked todo boxes in `tasks/`, `README.md`, `claude.md`, e2e specs, or source files; the only `TODO` string left is an intentional placeholder sentinel in `lib/hydration/utils.ts`.
+- Checks passed: `npm run test:run`, `npm run test:e2e`, `npm run build`, `npm run type-check`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Dashboard Delete Warning Contrast
+
+- [x] Replace the transparent destructive delete-mode banner with a filled high-contrast warning panel.
+- [x] Verify the dashboard banner renders clearly against the Vanta backdrop.
+- [x] Run focused checks and Doctor.
+
+## Review
+
+- Live delete mode now renders a dark filled warning panel with red accent text and light body copy instead of transparent destructive styling.
+- Added focused dashboard render coverage for the high-contrast banner classes.
+- Checks passed: dashboard test, `npm run type-check`, `npm run build`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Template Docs Category Card Cleanup
+
+- [x] Remove counts from Template Docs category cards.
+- [x] Remove the category-card color accents and neutralize the Template Docs chrome.
+- [x] Update regression coverage.
+- [x] Run focused checks and Doctor.
+
+## Review
+
+- Template Docs category cards now show only label and description with neutral panel styling.
+- Active Template Docs filter buttons use black instead of the primary blue state.
+- Checks passed: focused TemplateCatalogPage test, `npm run type-check`, `npm run build`, `npm run doctor -- --verbose --diff`, `git diff --check`, and desktop/mobile browser smoke on `/templates`.
+
+# CIS Baselines Card Alignment
+
+- [x] Make Template Docs category cards top-align content when grid rows stretch.
+- [x] Add regression coverage for the CIS Baselines card alignment.
+- [x] Run focused checks and browser smoke.
+
+## Review
+
+- CIS Baselines now uses the same top-aligned card content layout as the other Template Docs category cards.
+- Checks passed: focused TemplateCatalogPage test, `npm run type-check`, `npm run build`, `npm run doctor -- --verbose --diff`, `git diff --check`, and desktop/mobile browser geometry checks on `/templates`.
+
+# PR Readiness Thermo Review
+
+- [x] Audit current branch/worktree for structural PR blockers.
+- [x] Decompose landing/wallpaper CSS out of `app/globals.css` to keep shared globals below 1k lines.
+- [x] Run final PR readiness checks.
+
+## Review
+
+- Initial blocker found and fixed: `app/globals.css` crossed 1k lines; landing/wallpaper rules now live in `app/landing.css`.
+- Initial e2e blocker found and fixed: Playwright reused an unrelated `localhost:3000`; e2e now starts this app on `127.0.0.1:3100` unless `PLAYWRIGHT_BASE_URL` is set.
+- Checks passed: `npm run test:run`, `npm run type-check`, `npm run build`, `npm run test:e2e`, `npm run doctor -- --verbose --diff`, `npm audit --json`, `npm ls next postcss three vanta`, and `git diff --check`.
