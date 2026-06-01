@@ -128,4 +128,24 @@ test.describe("Theme", () => {
     await expect(html).toHaveClass(/\bdark\b/);
     await expect(html).toHaveAttribute("style", /color-scheme:\s*dark/);
   });
+
+  test("cycles from a stored dark setting back to light on a light OS", async ({ page }) => {
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.addInitScript((storageKey) => {
+      localStorage.setItem("theme", "system");
+      localStorage.setItem(
+        storageKey,
+        JSON.stringify({ stopOnFirstError: false, theme: "dark" })
+      );
+    }, APP_SETTINGS_STORAGE_KEY);
+
+    await page.goto("/");
+    const html = page.locator("html");
+    await expect(html).toHaveClass(/\bdark\b/);
+
+    await page.getByRole("button", { name: /cycle theme/i }).click();
+
+    await expect(html).toHaveClass(/\blight\b/);
+    await expect(html).toHaveAttribute("style", /color-scheme:\s*light/);
+  });
 });

@@ -393,3 +393,16 @@
 - Initial blocker found and fixed: `app/globals.css` crossed 1k lines; landing/wallpaper rules now live in `app/landing.css`.
 - Initial e2e blocker found and fixed: Playwright reused an unrelated `localhost:3000`; e2e now starts this app on `127.0.0.1:3100` unless `PLAYWRIGHT_BASE_URL` is set.
 - Checks passed: `npm run test:run`, `npm run type-check`, `npm run build`, `npm run test:e2e`, `npm run doctor -- --verbose --diff`, `npm audit --json`, `npm ls next postcss three vanta`, and `git diff --check`.
+
+# Light Mode Toggle Regression
+
+- [x] Reproduce the dark-to-light theme toggle failure.
+- [x] Patch theme active-state calculation without changing the supported theme model.
+- [x] Add regression coverage.
+- [x] Run focused checks, e2e theme checks, build, and Doctor.
+
+## Review
+
+- Root cause: the toggle trusted `next-themes` reporting `system` over the persisted dark app setting, so dark-on-light-OS sessions could cycle back to dark instead of light.
+- Fixed by making persisted non-system settings authoritative for active-theme calculation.
+- Checks passed: focused theme tests, `npm run test:e2e -- --grep Theme`, `npm run type-check`, `npm run test:run`, `npm run build`, `npm run doctor -- --verbose --diff`, `git diff --check`, and manual Playwright dark-to-light verification.

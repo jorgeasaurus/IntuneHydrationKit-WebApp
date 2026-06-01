@@ -14,3 +14,4 @@
 - Template documentation category cards should not display live fraction counts; stale manifest counts create visual noise and make category quality look broken.
 - Category-card buttons in stretched CSS grids need explicit top alignment; short descriptions can otherwise appear vertically centered next to taller cards.
 - Playwright e2e should use a dedicated local port by default; reusing any existing localhost server can accidentally validate the wrong app.
+- Theme toggles must prefer a persisted non-system app setting over `next-themes` reporting `system`; otherwise dark settings on a light OS can never cycle back to light.

@@ -88,11 +88,11 @@ export function ThemeToggle({
     );
   }
 
-  const activeTheme = getActiveTheme(
-    (theme as AppSettings["theme"] | undefined) ?? settings.theme,
-    resolvedTheme,
-    themes
-  );
+  const configuredTheme =
+    settings.theme === "system"
+      ? (theme as AppSettings["theme"] | undefined)
+      : settings.theme;
+  const activeTheme = getActiveTheme(configuredTheme, resolvedTheme, themes);
   const nextTheme = getNextTheme(activeTheme, themes);
 
   return (

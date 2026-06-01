@@ -70,4 +70,18 @@ describe('ThemeToggle', () => {
     expect(setTheme).toHaveBeenCalledWith('dark')
     expect(updateSettings).toHaveBeenCalledWith({ theme: 'dark' })
   })
+
+  it('uses the persisted dark setting when next-themes still reports system on a light OS', async () => {
+    const user = userEvent.setup()
+    themeState.theme = 'system'
+    themeState.resolvedTheme = 'light'
+    settingsState.theme = 'dark'
+
+    render(<ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />)
+
+    await user.click(await screen.findByRole('button', { name: /cycle theme/i }))
+
+    expect(setTheme).toHaveBeenCalledWith('light')
+    expect(updateSettings).toHaveBeenCalledWith({ theme: 'light' })
+  })
 })
