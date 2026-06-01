@@ -160,3 +160,17 @@
 - [x] Group changes by tooling/deps, frontend cleanup, Graph/hydration reliability, Conditional Access, TargetSelection/CIS identity, and task docs.
 - [x] Commit each group separately.
 - [x] Verify final worktree status.
+
+# Copilot PR Follow-up
+
+- [x] Fetch and classify Copilot comments from merged PR #4.
+- [x] Fix wizard target-selection navigation so Review stays reachable.
+- [x] Add accessible names/state to TargetSelection category icon buttons.
+- [x] Pin/reduce permissions for the React Doctor workflow.
+- [x] Restore `aria-hidden` on decorative background canvases.
+- [x] Run focused and project checks.
+
+## Review
+
+- Addressed all 5 unresolved Copilot review threads from merged PR #4.
+- Checks passed: targeted component tests, `npm run type-check`, `npm run test:run`, `npm run build`, `npx react-doctor@latest --verbose --diff`, `git diff --check`.

@@ -107,16 +107,22 @@ function CategoryHeader({
 }) {
   const { targets } = model.selection;
   const { toggleTarget, toggleCategoryExpanded } = model.actions;
+  const isSelected = targets.includes(target.id);
+  const categoryButtonLabel = isLoading
+    ? `Loading ${target.label}`
+    : isSelected
+      ? `${isExpanded ? "Collapse" : "Expand"} ${target.label}`
+      : `Select ${target.label}`;
 
   return (
     <div
       className={`flex items-start space-x-3 space-y-0 rounded-md border p-4 ${
-        targets.includes(target.id) && isExpanded ? "rounded-b-none border-b-0" : ""
+        isSelected && isExpanded ? "rounded-b-none border-b-0" : ""
       }`}
       >
       <Checkbox
         id={target.id}
-        checked={targets.includes(target.id)}
+        checked={isSelected}
         onCheckedChange={() => toggleTarget(target.id)}
       />
       <div className="min-w-0 flex-1 space-y-2">
@@ -135,10 +141,12 @@ function CategoryHeader({
       </div>
       <button
         type="button"
+        aria-label={categoryButtonLabel}
+        aria-expanded={isSelected ? isExpanded : undefined}
         className="text-muted-foreground hover:text-foreground transition-colors p-1"
         onClick={e => {
           e.preventDefault();
-          if (!targets.includes(target.id)) {
+          if (!isSelected) {
             toggleTarget(target.id);
           } else {
             toggleCategoryExpanded(target.id);
@@ -147,7 +155,7 @@ function CategoryHeader({
       >
         {isLoading ? (
           <Loader2 className="size-5 animate-spin" />
-        ) : targets.includes(target.id) && isExpanded ? (
+        ) : isSelected && isExpanded ? (
           <ChevronDown className="size-5" />
         ) : (
           <ChevronRight className="size-5" />

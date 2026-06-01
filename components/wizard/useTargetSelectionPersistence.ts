@@ -76,8 +76,5 @@ export function useTargetSelectionPersistence({
     );
 
     nextStep();
-    if (!targets.includes("baseline")) {
-      nextStep();
-    }
   };
 }
