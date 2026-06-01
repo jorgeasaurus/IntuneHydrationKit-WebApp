@@ -80,6 +80,7 @@ describe('HomeLanding', () => {
     expect(screen.getByText('Operating Model')).toBeInTheDocument()
     expect(screen.getByText('Available Configurations')).toBeInTheDocument()
     expect(screen.getByText('Required Microsoft Graph Permissions')).toBeInTheDocument()
+    expect(screen.getByText('Made By Jorgeasaurus')).toBeInTheDocument()
   })
 
   it('starts sign-in or continues to the wizard from the primary CTA', async () => {

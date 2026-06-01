@@ -419,3 +419,14 @@
 - Playwright found the missed path: a persisted `corporate-1999` setting was outside the landing nav's light/dark cycle, and the first click went to dark instead of light.
 - Out-of-cycle persisted themes now reset to the first supported cycle option, so the landing toggle sends `corporate-1999` directly to light.
 - Checks passed: focused theme tests, `npm run test:e2e -- --grep Theme`, manual Playwright corporate-to-light screenshot/computed-style check, `npm run type-check`, `npm run test:run`, `npm run build`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Footer Credit
+
+- [x] Add the requested `Made By Jorgeasaurus` footer text.
+- [x] Add focused render coverage.
+- [x] Run focused checks and push the PR update.
+
+## Review
+
+- Footer now includes `Made By Jorgeasaurus` next to the existing product/year and license text.
+- Checks passed: focused HomeLanding test, `npm run type-check`, `npm run doctor -- --verbose --diff`, `git diff --check`.

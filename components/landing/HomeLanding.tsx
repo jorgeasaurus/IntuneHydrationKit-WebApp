@@ -578,6 +578,9 @@ function Footer() {
             <span className="text-sm text-muted-foreground" suppressHydrationWarning>
               {new Date().getFullYear()} IntuneHydrationKit
             </span>
+            <span className="text-sm font-medium text-muted-foreground">
+              Made By Jorgeasaurus
+            </span>
             <span className="badge-status badge-info text-[10px]">
               MIT License
             </span>
