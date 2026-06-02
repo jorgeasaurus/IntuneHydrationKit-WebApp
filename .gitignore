@@ -53,3 +53,4 @@ VERCEL_MIGRATION.md
 teaser-video/
 playwright-report/index.html
 test-results/.last-run.json
+tasks/todo.md

@@ -457,3 +457,16 @@
 - `RouteWallpaper` lazy-loads Vanta/Three client-only; `routeWallpaperRules` keeps route matching out of the component export.
 - Opened PR #7 from `fix/copilot-pr-feedback` to `main`.
 - Checks passed: focused wallpaper tests, `npm run type-check`, `npm run test:run`, `npm run build`, `npm run test:e2e -- --grep "Landing Page|Protected Routes"`, `npm run doctor -- --verbose --diff --fail-on warning`, `git diff --check`.
+
+# Turbopack HMR Ping Error
+
+- [x] Reproduce the `unrecognized HMR message {"event":"ping"}` dev-server error.
+- [x] Identify whether the source is app config/headers or a Turbopack dev-server issue.
+- [x] Apply the smallest fix that keeps local development stable.
+- [x] Verify dev logs and project checks.
+
+## Review
+
+- Root cause: Turbopack rejects legacy HMR `ping` messages; webpack dev mode accepts them.
+- `npm run dev` now uses `next dev`; `npm run dev:turbo` keeps Turbopack opt-in.
+- Checks passed: forced HMR ping repro/diff, `npm run dev:turbo -- -p 3023`, `npm run type-check`, `npm run build`, `npm run test:run`, `npm run test:e2e`, `npm run doctor -- --verbose --diff`, `git diff --check`.

@@ -247,6 +247,29 @@
   height: 80%;
 }
 
+.wizard-progress-fill {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, hsl(var(--hydrate)), rgb(34 211 238));
+  transition: width 0.5s ease-out;
+}
+
+.wizard-progress-fill-step-1 {
+  width: 25%;
+}
+
+.wizard-progress-fill-step-2 {
+  width: 50%;
+}
+
+.wizard-progress-fill-step-3 {
+  width: 75%;
+}
+
+.wizard-progress-fill-step-4 {
+  width: 100%;
+}
+
 /* ============================================
    TERMINAL DISPLAY - Code/Data Blocks
    ============================================ */
