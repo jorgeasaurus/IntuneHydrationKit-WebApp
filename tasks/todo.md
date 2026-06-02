@@ -470,3 +470,40 @@
 - Root cause: Turbopack rejects legacy HMR `ping` messages; webpack dev mode accepts them.
 - `npm run dev` now uses `next dev`; `npm run dev:turbo` keeps Turbopack opt-in.
 - Checks passed: forced HMR ping repro/diff, `npm run dev:turbo -- -p 3023`, `npm run type-check`, `npm run build`, `npm run test:run`, `npm run test:e2e`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Wizard Animated Wallpaper
+
+- [x] Add the landing animated wallpaper to the wizard route.
+- [x] Preserve other route wallpaper behavior during the wizard-only change.
+- [x] Update route wallpaper regression coverage.
+- [x] Verify route tests, browser rendering, type/build, Doctor, and diff hygiene.
+
+## Review
+
+- `/wizard` now renders the same Vanta wallpaper layer as the landing/templates routes.
+- The wizard-only pass left dashboard and results unchanged until the console follow-up below.
+- Checks passed: focused wallpaper tests, browser `/wizard` load check with wallpaper canvas present, `npm run type-check`, `npm run build`, landing/protected-route e2e smoke, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Console Routes Animated Wallpaper
+
+- [x] Add the landing animated wallpaper to dashboard and results routes.
+- [x] Keep template/landing/wizard wallpaper behavior unchanged.
+- [x] Update route wallpaper regression coverage.
+- [x] Verify focused tests, browser route loads, type/build, Doctor, and diff hygiene.
+
+## Review
+
+- `/dashboard` and `/results` now render through the same route-level Vanta wallpaper as landing/templates/wizard.
+- Exact route matching keeps `/templates-old` excluded while `/templates/*` still works.
+- Checks passed: focused wallpaper tests, protected-route browser load checks, `npm run type-check`, `npm run build`, landing/protected-route e2e smoke, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Publish Console Wallpaper
+
+- [ ] Confirm changed-file scope before commit.
+- [ ] Commit and push the branch.
+- [ ] Deploy the pushed changes to Vercel production.
+- [ ] Record commit, push, and production deployment result.
+
+## Review
+
+- Pending.
