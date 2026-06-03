@@ -544,3 +544,14 @@
 - Wizard progress now uses a native `progress` element backed by the computed `progress` value and stylesheet pseudo-elements.
 - Category action buttons render literal `aria-expanded` values.
 - Checks passed: focused TargetSelection tests, `npm run type-check`, `npm run build`, `npm run test:e2e -- --grep "Protected Routes"`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Merge PR #8 And Prod Deploy
+
+- [ ] Confirm PR #8 is mergeable and checks are green.
+- [ ] Merge PR #8 into `main`.
+- [ ] Deploy merged `main` to Vercel production.
+- [ ] Verify production status and HTTP response.
+
+## Review
+
+- Pending.
