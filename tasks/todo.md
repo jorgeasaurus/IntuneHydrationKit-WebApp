@@ -547,11 +547,13 @@
 
 # Merge PR #8 And Prod Deploy
 
-- [ ] Confirm PR #8 is mergeable and checks are green.
-- [ ] Merge PR #8 into `main`.
-- [ ] Deploy merged `main` to Vercel production.
-- [ ] Verify production status and HTTP response.
+- [x] Confirm PR #8 is mergeable and checks are green.
+- [x] Merge PR #8 into `main`.
+- [x] Deploy merged `main` to Vercel production.
+- [x] Verify production status and HTTP response.
 
 ## Review
 
-- Pending.
+- PR #8 merged into `main` at merge commit `4c3f1ba`.
+- Vercel production deployment `dpl_CS9c7SQ2nnAQbcrzp1daeXH4av3d` is ready and aliased to `https://www.intunehydrationkit.com`.
+- Production HTTP check returned `200`.
