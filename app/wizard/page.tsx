@@ -185,9 +185,11 @@ function WizardContent() {
                 </div>
               </div>
               <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-secondary">
-                <div
-                  className="h-full rounded-full bg-gradient-to-r from-hydrate to-cyan-400 transition-all duration-500 ease-out"
-                  style={{ width: `${progress}%` }}
+                <progress
+                  aria-label="Hydration progress"
+                  className="wizard-progress-fill"
+                  max={100}
+                  value={progress}
                 />
               </div>
             </div>

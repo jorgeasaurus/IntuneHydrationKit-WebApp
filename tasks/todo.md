@@ -457,3 +457,101 @@
 - `RouteWallpaper` lazy-loads Vanta/Three client-only; `routeWallpaperRules` keeps route matching out of the component export.
 - Opened PR #7 from `fix/copilot-pr-feedback` to `main`.
 - Checks passed: focused wallpaper tests, `npm run type-check`, `npm run test:run`, `npm run build`, `npm run test:e2e -- --grep "Landing Page|Protected Routes"`, `npm run doctor -- --verbose --diff --fail-on warning`, `git diff --check`.
+
+# Turbopack HMR Ping Error
+
+- [x] Reproduce the `unrecognized HMR message {"event":"ping"}` dev-server error.
+- [x] Identify whether the source is app config/headers or a Turbopack dev-server issue.
+- [x] Apply the smallest fix that keeps local development stable.
+- [x] Verify dev logs and project checks.
+
+## Review
+
+- Root cause: Turbopack rejects legacy HMR `ping` messages; webpack dev mode accepts them.
+- `npm run dev` now uses `next dev`; `npm run dev:turbo` keeps Turbopack opt-in.
+- Checks passed: forced HMR ping repro/diff, `npm run dev:turbo -- -p 3023`, `npm run type-check`, `npm run build`, `npm run test:run`, `npm run test:e2e`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Wizard Animated Wallpaper
+
+- [x] Add the landing animated wallpaper to the wizard route.
+- [x] Preserve other route wallpaper behavior during the wizard-only change.
+- [x] Update route wallpaper regression coverage.
+- [x] Verify route tests, browser rendering, type/build, Doctor, and diff hygiene.
+
+## Review
+
+- `/wizard` now renders the same Vanta wallpaper layer as the landing/templates routes.
+- The wizard-only pass left dashboard and results unchanged until the console follow-up below.
+- Checks passed: focused wallpaper tests, browser `/wizard` load check with wallpaper canvas present, `npm run type-check`, `npm run build`, landing/protected-route e2e smoke, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Console Routes Animated Wallpaper
+
+- [x] Add the landing animated wallpaper to dashboard and results routes.
+- [x] Keep template/landing/wizard wallpaper behavior unchanged.
+- [x] Update route wallpaper regression coverage.
+- [x] Verify focused tests, browser route loads, type/build, Doctor, and diff hygiene.
+
+## Review
+
+- `/dashboard` and `/results` now render through the same route-level Vanta wallpaper as landing/templates/wizard.
+- Exact route matching keeps `/templates-old` excluded while `/templates/*` still works.
+- Checks passed: focused wallpaper tests, protected-route browser load checks, `npm run type-check`, `npm run build`, landing/protected-route e2e smoke, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Publish Console Wallpaper
+
+- [x] Confirm changed-file scope before commit.
+- [x] Commit and push the branch.
+- [x] Deploy the pushed changes to Vercel production.
+- [x] Record commit, push, and production deployment result.
+
+## Review
+
+- Committed console wallpaper changes as `2f1151b` and pushed `fix/copilot-pr-feedback` to origin.
+- Vercel production deploy completed and aliased to `https://www.intunehydrationkit.com`.
+
+# Console Wallpaper PR
+
+- [x] Confirm no existing PR for `fix/copilot-pr-feedback`.
+- [x] Commit and push the PR task log.
+- [x] Open a PR from `fix/copilot-pr-feedback` to `main`.
+- [x] Record the PR URL.
+
+## Review
+
+- Opened draft PR #8 from `fix/copilot-pr-feedback` to `main`: `https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp/pull/8`.
+
+# PR #8 Progress Review
+
+- [x] Inspect Copilot discussion `discussion_r3347541451`.
+- [x] Restore the wizard progress fill to the computed `progress` value.
+- [x] Remove now-unused step-specific progress CSS.
+- [x] Verify, commit, and push the review fix.
+
+## Review
+
+- Restored the wizard progress bar to the existing `progress` calculation and removed hard-coded `wizard-progress-fill-step-*` classes.
+- Checks passed: `npm run type-check`, `npm run build`, `npm run test:e2e -- --grep "Protected Routes"`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Edge Diagnostics Cleanup
+
+- [x] Replace the wizard progress inline style without reintroducing hard-coded step widths.
+- [x] Fix the category action button ARIA value diagnostic.
+- [x] Update lessons for the correction pattern.
+- [x] Verify, commit, and push the PR update.
+
+## Review
+
+- Wizard progress now uses a native `progress` element backed by the computed `progress` value and stylesheet pseudo-elements.
+- Category action buttons render literal `aria-expanded` values.
+- Checks passed: focused TargetSelection tests, `npm run type-check`, `npm run build`, `npm run test:e2e -- --grep "Protected Routes"`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Merge PR #8 And Prod Deploy
+
+- [ ] Confirm PR #8 is mergeable and checks are green.
+- [ ] Merge PR #8 into `main`.
+- [ ] Deploy merged `main` to Vercel production.
+- [ ] Verify production status and HTTP response.
+
+## Review
+
+- Pending.

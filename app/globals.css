@@ -247,6 +247,34 @@
   height: 80%;
 }
 
+.wizard-progress-fill {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  appearance: none;
+  border: 0;
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.wizard-progress-fill::-webkit-progress-bar {
+  border-radius: 9999px;
+  background: transparent;
+}
+
+.wizard-progress-fill::-webkit-progress-value {
+  background: linear-gradient(90deg, hsl(var(--hydrate)), rgb(34 211 238));
+  border-radius: 9999px;
+  transition: width 0.5s ease-out;
+}
+
+.wizard-progress-fill::-moz-progress-bar {
+  background: linear-gradient(90deg, hsl(var(--hydrate)), rgb(34 211 238));
+  border-radius: 9999px;
+  transition: width 0.5s ease-out;
+}
+
 /* ============================================
    TERMINAL DISPLAY - Code/Data Blocks
    ============================================ */
