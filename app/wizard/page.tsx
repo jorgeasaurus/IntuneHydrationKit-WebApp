@@ -186,7 +186,8 @@ function WizardContent() {
               </div>
               <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-secondary">
                 <div
-                  className={`wizard-progress-fill wizard-progress-fill-step-${state.currentStep}`}
+                  className="wizard-progress-fill"
+                  style={{ width: `${progress}%` }}
                 />
               </div>
             </div>

@@ -519,3 +519,15 @@
 ## Review
 
 - Opened draft PR #8 from `fix/copilot-pr-feedback` to `main`: `https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp/pull/8`.
+
+# PR #8 Progress Review
+
+- [x] Inspect Copilot discussion `discussion_r3347541451`.
+- [x] Restore the wizard progress fill to the computed `progress` value.
+- [x] Remove now-unused step-specific progress CSS.
+- [x] Verify, commit, and push the review fix.
+
+## Review
+
+- Restored the wizard progress bar to the existing `progress` calculation and removed hard-coded `wizard-progress-fill-step-*` classes.
+- Checks passed: `npm run type-check`, `npm run build`, `npm run test:e2e -- --grep "Protected Routes"`, `npm run doctor -- --verbose --diff`, `git diff --check`.
