@@ -3,6 +3,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import type { OIBPlatformId } from "@/types/hydration";
 import type { TargetSelectionViewModel } from "@/components/wizard/targetSelectionTypes";
+import type { MouseEvent } from "react";
 import { IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import {
@@ -108,12 +109,26 @@ function CategoryHeader({
   const { targets } = model.selection;
   const { toggleTarget, toggleCategoryExpanded } = model.actions;
   const isSelected = targets.includes(target.id);
-  const isCategoryExpanded = isSelected && isExpanded;
   const categoryButtonLabel = isLoading
     ? `Loading ${target.label}`
     : isSelected
       ? `${isExpanded ? "Collapse" : "Expand"} ${target.label}`
       : `Select ${target.label}`;
+  const categoryButtonContent = isLoading ? (
+    <Loader2 className="size-5 animate-spin" />
+  ) : isSelected && isExpanded ? (
+    <ChevronDown className="size-5" />
+  ) : (
+    <ChevronRight className="size-5" />
+  );
+  const handleCategoryButtonClick = (event: MouseEvent<HTMLButtonElement>) => {
+    event.preventDefault();
+    if (!isSelected) {
+      toggleTarget(target.id);
+    } else {
+      toggleCategoryExpanded(target.id);
+    }
+  };
 
   return (
     <div
@@ -140,28 +155,37 @@ function CategoryHeader({
         </div>
         <p className="text-sm text-muted-foreground">{target.description}</p>
       </div>
-      <button
-        type="button"
-        aria-label={categoryButtonLabel}
-        aria-expanded={isCategoryExpanded}
-        className="text-muted-foreground hover:text-foreground transition-colors p-1"
-        onClick={e => {
-          e.preventDefault();
-          if (!isSelected) {
-            toggleTarget(target.id);
-          } else {
-            toggleCategoryExpanded(target.id);
-          }
-        }}
-      >
-        {isLoading ? (
-          <Loader2 className="size-5 animate-spin" />
-        ) : isSelected && isExpanded ? (
-          <ChevronDown className="size-5" />
-        ) : (
-          <ChevronRight className="size-5" />
-        )}
-      </button>
+      {isSelected && isExpanded ? (
+        <button
+          type="button"
+          aria-label={categoryButtonLabel}
+          aria-expanded="true"
+          className="text-muted-foreground hover:text-foreground transition-colors p-1"
+          onClick={handleCategoryButtonClick}
+        >
+          {categoryButtonContent}
+        </button>
+      ) : isSelected ? (
+        <button
+          type="button"
+          aria-label={categoryButtonLabel}
+          aria-expanded="false"
+          className="text-muted-foreground hover:text-foreground transition-colors p-1"
+          onClick={handleCategoryButtonClick}
+        >
+          {categoryButtonContent}
+        </button>
+      ) : (
+        <button
+          type="button"
+          aria-label={categoryButtonLabel}
+          aria-expanded="false"
+          className="text-muted-foreground hover:text-foreground transition-colors p-1"
+          onClick={handleCategoryButtonClick}
+        >
+          {categoryButtonContent}
+        </button>
+      )}
     </div>
   );
 }

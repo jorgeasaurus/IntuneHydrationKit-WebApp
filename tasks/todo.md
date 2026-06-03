@@ -531,3 +531,16 @@
 
 - Restored the wizard progress bar to the existing `progress` calculation and removed hard-coded `wizard-progress-fill-step-*` classes.
 - Checks passed: `npm run type-check`, `npm run build`, `npm run test:e2e -- --grep "Protected Routes"`, `npm run doctor -- --verbose --diff`, `git diff --check`.
+
+# Edge Diagnostics Cleanup
+
+- [x] Replace the wizard progress inline style without reintroducing hard-coded step widths.
+- [x] Fix the category action button ARIA value diagnostic.
+- [x] Update lessons for the correction pattern.
+- [x] Verify, commit, and push the PR update.
+
+## Review
+
+- Wizard progress now uses a native `progress` element backed by the computed `progress` value and stylesheet pseudo-elements.
+- Category action buttons render literal `aria-expanded` values.
+- Checks passed: focused TargetSelection tests, `npm run type-check`, `npm run build`, `npm run test:e2e -- --grep "Protected Routes"`, `npm run doctor -- --verbose --diff`, `git diff --check`.

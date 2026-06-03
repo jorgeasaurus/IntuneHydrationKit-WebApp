@@ -17,3 +17,5 @@
 - Theme toggles must prefer a persisted non-system app setting over `next-themes` reporting `system`; otherwise dark settings on a light OS can never cycle back to light.
 - For theme regressions, verify the visible screen state with Playwright screenshots and computed styles; HTML class/storage assertions alone can miss a dark-looking light mode.
 - If a UI already computes progress from source-of-truth data, use that computed value for the visual indicator; step-specific width classes drift when the step list changes.
+- For Edge/webhint diagnostics, avoid JSX `style` props for progress widths; prefer native progress elements or stylesheet-driven rendering tied to the computed value.
+- If static accessibility tooling flags JSX expressions in ARIA attributes, render literal `aria-*` values in explicit branches and omit irrelevant ARIA attributes.
