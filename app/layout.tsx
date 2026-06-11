@@ -29,11 +29,17 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://intunehydrationkit.com"
+    process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.intunehydrationkit.com"
   ),
-  title: "Intune Hydration Kit",
+  title: {
+    default: "Intune Hydration Kit",
+    template: "%s | Intune Hydration Kit",
+  },
   description:
     "Bootstrap Microsoft Intune tenants with best-practice configurations",
+  alternates: {
+    canonical: "/",
+  },
   icons: {
     icon: "/IHTLogoClear.png",
     apple: "/IHTLogoClear.png",
