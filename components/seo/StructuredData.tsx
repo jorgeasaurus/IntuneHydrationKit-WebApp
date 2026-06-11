@@ -16,7 +16,7 @@ const schema = {
   url: siteUrl,
   description:
     "Bootstrap Microsoft Intune tenants with OpenIntuneBaseline policies, compliance, and conditional access — deployed via Microsoft Graph with preview mode and safety checks.",
-  image: `${siteUrl}/SocialCard.png`,
+  image: `${siteUrl}/SocialCard.jpg`,
   offers: {
     "@type": "Offer",
     price: "0",

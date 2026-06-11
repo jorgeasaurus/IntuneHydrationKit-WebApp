@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "./landing.css";
@@ -51,10 +51,8 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
-  icons: {
-    icon: "/IHTLogoClear.png",
-    apple: "/IHTLogoClear.png",
-  },
+  // Favicon and apple-touch icon are provided by the app/icon.png and
+  // app/apple-icon.png file conventions; the web app manifest by app/manifest.ts.
   openGraph: {
     type: "website",
     url: "/",
@@ -64,9 +62,9 @@ export const metadata: Metadata = {
       "Bootstrap Microsoft Intune tenants with OpenIntuneBaseline policies, compliance, and conditional access — deployed via Microsoft Graph with preview mode and safety checks.",
     images: [
       {
-        url: "/SocialCard.png",
-        width: 1211,
-        height: 636,
+        url: "/SocialCard.jpg",
+        width: 1200,
+        height: 630,
         alt: "Intune Hydration Kit social preview card",
       },
     ],
@@ -76,8 +74,12 @@ export const metadata: Metadata = {
     title: "Intune Hydration Kit — Bootstrap Microsoft Intune Tenants Fast",
     description:
       "Bootstrap Microsoft Intune tenants with OpenIntuneBaseline policies, compliance, and conditional access — deployed via Microsoft Graph with preview mode and safety checks.",
-    images: ["/SocialCard.png"],
+    images: ["/SocialCard.jpg"],
   },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#005588",
 };
 
 export default function RootLayout({

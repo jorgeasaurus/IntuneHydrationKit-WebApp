@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { act } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@/__tests__/setup/test-utils'
 import { RouteWallpaper } from '@/components/RouteWallpaper'
@@ -16,9 +17,36 @@ vi.mock('next/dynamic', () => ({
   },
 }))
 
+const stubMatchMedia = (matches: boolean) => {
+  vi.stubGlobal(
+    'matchMedia',
+    vi.fn(() => ({
+      matches,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }))
+  )
+}
+
 describe('RouteWallpaper', () => {
   beforeEach(() => {
     pathname.mockReturnValue('/')
+    // Run the deferred (idle) load synchronously so the animated wallpaper
+    // mounts within the test instead of waiting for browser idle time.
+    vi.stubGlobal('requestIdleCallback', vi.fn((cb: () => void) => {
+      cb()
+      return 1
+    }))
+    vi.stubGlobal('cancelIdleCallback', vi.fn())
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('matches only routes that use the animated wallpaper surface', () => {
@@ -32,15 +60,17 @@ describe('RouteWallpaper', () => {
     expect(shouldRenderWallpaper(null)).toBe(false)
   })
 
-  it('renders the lazy wallpaper on the landing page', () => {
+  it('lazily mounts the animated wallpaper once the browser is idle', () => {
     pathname.mockReturnValue('/')
 
     render(<RouteWallpaper />)
 
+    // The deferred (idle) load has resolved, swapping the static surface for
+    // the animated wallpaper.
     expect(screen.getByTestId('dynamic-wallpaper')).toBeInTheDocument()
   })
 
-  it('renders the lazy wallpaper on the wizard route', () => {
+  it('mounts the animated wallpaper on the wizard route', () => {
     pathname.mockReturnValue('/wizard')
 
     render(<RouteWallpaper />)
@@ -48,7 +78,7 @@ describe('RouteWallpaper', () => {
     expect(screen.getByTestId('dynamic-wallpaper')).toBeInTheDocument()
   })
 
-  it('renders the lazy wallpaper on dashboard and results routes', () => {
+  it('mounts the animated wallpaper on dashboard and results routes', () => {
     pathname.mockReturnValue('/dashboard')
 
     const { rerender } = render(<RouteWallpaper />)
@@ -59,5 +89,25 @@ describe('RouteWallpaper', () => {
     rerender(<RouteWallpaper />)
 
     expect(screen.getByTestId('dynamic-wallpaper')).toBeInTheDocument()
+  })
+
+  it('renders nothing on routes without a wallpaper surface', () => {
+    pathname.mockReturnValue('/some-other-route')
+
+    const { container } = render(<RouteWallpaper />)
+
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('never loads three.js/Vanta when the user prefers reduced motion', () => {
+    stubMatchMedia(true)
+    pathname.mockReturnValue('/')
+
+    const { container } = render(<RouteWallpaper />)
+
+    // The static gradient surface is the permanent state — the heavy animated
+    // wallpaper chunk is never mounted.
+    expect(container.querySelector('.dynamic-wallpaper')).toBeTruthy()
+    expect(screen.queryByTestId('dynamic-wallpaper')).not.toBeInTheDocument()
   })
 })
