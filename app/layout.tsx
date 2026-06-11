@@ -9,6 +9,7 @@ import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
 import { RouteWallpaper } from "@/components/RouteWallpaper";
+import { StructuredData } from "@/components/seo/StructuredData";
 import { Analytics } from "@vercel/analytics/next";
 
 // DM Sans - Geometric, bold display font
@@ -32,11 +33,21 @@ export const metadata: Metadata = {
     process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.intunehydrationkit.com"
   ),
   title: {
-    default: "Intune Hydration Kit",
+    default: "Intune Hydration Kit — Bootstrap Microsoft Intune Tenants Fast",
     template: "%s | Intune Hydration Kit",
   },
   description:
-    "Bootstrap Microsoft Intune tenants with best-practice configurations",
+    "Bootstrap Microsoft Intune tenants with OpenIntuneBaseline policies, compliance, and conditional access — deployed via Microsoft Graph with preview mode and safety checks.",
+  keywords: [
+    "Microsoft Intune",
+    "Intune setup",
+    "OpenIntuneBaseline",
+    "Intune compliance policies",
+    "conditional access",
+    "Microsoft Graph",
+    "Intune tenant bootstrap",
+    "device management",
+  ],
   alternates: {
     canonical: "/",
   },
@@ -48,9 +59,9 @@ export const metadata: Metadata = {
     type: "website",
     url: "/",
     siteName: "Intune Hydration Kit",
-    title: "Intune Hydration Kit",
+    title: "Intune Hydration Kit — Bootstrap Microsoft Intune Tenants Fast",
     description:
-      "Bootstrap Microsoft Intune tenants with best-practice configurations",
+      "Bootstrap Microsoft Intune tenants with OpenIntuneBaseline policies, compliance, and conditional access — deployed via Microsoft Graph with preview mode and safety checks.",
     images: [
       {
         url: "/SocialCard.png",
@@ -62,9 +73,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Intune Hydration Kit",
+    title: "Intune Hydration Kit — Bootstrap Microsoft Intune Tenants Fast",
     description:
-      "Bootstrap Microsoft Intune tenants with best-practice configurations",
+      "Bootstrap Microsoft Intune tenants with OpenIntuneBaseline policies, compliance, and conditional access — deployed via Microsoft Graph with preview mode and safety checks.",
     images: ["/SocialCard.png"],
   },
 };
@@ -79,6 +90,9 @@ export default function RootLayout({
       <body
         className={`${dmSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
+        {/* Rendered outside MsalProvider (which gates SSR) so the JSON-LD is
+            always present in the server HTML for crawlers. */}
+        <StructuredData />
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"
