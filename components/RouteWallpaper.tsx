@@ -49,13 +49,18 @@ export function RouteWallpaper(): React.JSX.Element | null {
 
     // Defer the heavy three.js + Vanta wallpaper until the browser is idle so
     // it never competes with LCP/INP during initial render and hydration.
-    // Reduced-motion users never download it at all.
-    const schedule =
-      window.requestIdleCallback?.bind(window) ??
-      ((cb: () => void) => window.setTimeout(cb, 200));
-    const cancel =
-      window.cancelIdleCallback?.bind(window) ??
-      ((handle: number) => window.clearTimeout(handle));
+    // Reduced-motion users never download it at all. Pair schedule+cancel from
+    // the same API so we never queue with requestIdleCallback and cancel with
+    // clearTimeout (or vice versa) if only one half is polyfilled.
+    const hasIdleCallback =
+      typeof window.requestIdleCallback === "function" &&
+      typeof window.cancelIdleCallback === "function";
+    const schedule = hasIdleCallback
+      ? window.requestIdleCallback.bind(window)
+      : (cb: () => void) => window.setTimeout(cb, 200);
+    const cancel = hasIdleCallback
+      ? window.cancelIdleCallback.bind(window)
+      : (handle: number) => window.clearTimeout(handle);
 
     let idleHandle: number | undefined;
 
