@@ -79,14 +79,25 @@ export function RouteWallpaper(): React.JSX.Element | null {
       }
     };
 
+    // Older Safari (<14) exposes addListener/removeListener instead of the
+    // standard add/removeEventListener on MediaQueryList.
+    const subscribe = (query: MediaQueryList): (() => void) => {
+      if (typeof query.addEventListener === "function") {
+        query.addEventListener("change", handleMotionChange);
+        return () => query.removeEventListener("change", handleMotionChange);
+      }
+      query.addListener(handleMotionChange);
+      return () => query.removeListener(handleMotionChange);
+    };
+
     load();
-    motionQuery?.addEventListener("change", handleMotionChange);
+    const unsubscribe = motionQuery ? subscribe(motionQuery) : undefined;
 
     return () => {
       if (idleHandle !== undefined) {
         cancel(idleHandle);
       }
-      motionQuery?.removeEventListener("change", handleMotionChange);
+      unsubscribe?.();
     };
   }, [pathname]);
 
