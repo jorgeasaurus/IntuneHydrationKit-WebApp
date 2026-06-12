@@ -79,7 +79,6 @@ export function RouteWallpaper(): React.JSX.Element | null {
       }
     };
 
-    // react-doctor-disable-next-line react-doctor/no-initialize-state -- deferred mount by design; see useState comment above
     load();
     motionQuery?.addEventListener("change", handleMotionChange);
 
