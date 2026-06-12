@@ -1,6 +1,7 @@
 /* oxlint-disable react-doctor/no-danger -- JSON-LD requires raw script
-   content; `schemaJson` is JSON.stringify of a static, hardcoded object with no
-   user or dynamic input, so there is no XSS vector. */
+   content. The schema is hardcoded except for `siteUrl`, which is env-derived,
+   so `schemaJson` escapes every `<` into a unicode escape to make a
+   `</script>` breakout impossible regardless of the configured value. */
 const siteUrl =
   process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.intunehydrationkit.com";
 
@@ -30,7 +31,9 @@ const schema = {
   sameAs: ["https://github.com/jorgeasaurus/IntuneHydrationKit"],
 };
 
-const schemaJson = JSON.stringify(schema);
+// Escape `<` so a stray `</script>` in any value cannot terminate the script
+// tag early. The unicode escape is still valid JSON-LD.
+const schemaJson = JSON.stringify(schema).replace(/</g, "\\u003c");
 
 /**
  * SoftwareApplication JSON-LD for the site. Rendered into the initial server
