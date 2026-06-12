@@ -10,6 +10,7 @@ import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
 import { RouteWallpaper } from "@/components/RouteWallpaper";
 import { StructuredData } from "@/components/seo/StructuredData";
+import { SITE_URL } from "@/lib/siteUrl";
 import { Analytics } from "@vercel/analytics/next";
 
 // DM Sans - Geometric, bold display font
@@ -29,9 +30,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.intunehydrationkit.com"
-  ),
+  metadataBase: new URL(SITE_URL),
   title: {
     default: "Intune Hydration Kit — Bootstrap Microsoft Intune Tenants Fast",
     template: "%s | Intune Hydration Kit",

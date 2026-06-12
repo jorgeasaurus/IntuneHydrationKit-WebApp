@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.intunehydrationkit.com";
+import { SITE_URL } from "@/lib/siteUrl";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   // Intentionally omit `lastModified`: generating `new Date()` per request would
@@ -9,12 +8,12 @@ export default function sitemap(): MetadataRoute.Sitemap {
   // engines rely on their own crawl heuristics instead.
   return [
     {
-      url: `${siteUrl}/`,
+      url: `${SITE_URL}/`,
       changeFrequency: "monthly",
       priority: 1,
     },
     {
-      url: `${siteUrl}/templates`,
+      url: `${SITE_URL}/templates`,
       changeFrequency: "weekly",
       priority: 0.8,
     },

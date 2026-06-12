@@ -2,8 +2,7 @@
    content. The schema is hardcoded except for `siteUrl`, which is env-derived,
    so `schemaJson` escapes every `<` into a unicode escape to make a
    `</script>` breakout impossible regardless of the configured value. */
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.intunehydrationkit.com";
+import { SITE_URL as siteUrl } from "@/lib/siteUrl";
 
 // Static SoftwareApplication schema, built once at module load. Keep values
 // aligned with the homepage metadata in app/layout.tsx.

@@ -35,6 +35,12 @@ export function RouteWallpaper(): React.JSX.Element | null {
       return;
     }
 
+    // Reset to the static surface on every route change so that re-entering a
+    // wallpaper route always pays the idle-callback deferral again. Without
+    // this, `animated` would stay `true` after the user leaves and returns,
+    // and DynamicWallpaper would mount synchronously and contend with LCP/INP.
+    setAnimated(false);
+
     // Only defer-mount the heavy wallpaper on routes that actually render it.
     // On non-wallpaper routes the component returns null, so scheduling an idle
     // callback + state update there is wasted work.
