@@ -1,4 +1,3 @@
-import { act } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@/__tests__/setup/test-utils'
