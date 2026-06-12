@@ -12,6 +12,7 @@ export default function robots(): MetadataRoute.Robots {
       disallow: ["/wizard", "/dashboard", "/results"],
     },
     sitemap: `${siteUrl}/sitemap.xml`,
-    host: siteUrl,
+    // The `host` directive expects a bare hostname (no scheme).
+    host: new URL(siteUrl).host,
   };
 }
