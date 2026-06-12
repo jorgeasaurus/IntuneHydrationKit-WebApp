@@ -371,11 +371,7 @@ function WorkflowSection() {
 
 function ConfigurationCard({ group }: { group: ConfigurationGroup }) {
   return (
-    <Card
-      className={`data-card overflow-hidden ${
-        group.featured ? "md:row-span-2" : ""
-      }`}
-    >
+    <Card className="data-card h-full overflow-hidden">
       <CardHeader className="flex h-full flex-col">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div className="rounded-md border border-hydrate/25 bg-hydrate/10 p-3">
@@ -430,7 +426,7 @@ function ConfigurationsSection() {
               customization.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-3 md:grid-rows-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {CONFIGURATION_GROUPS.map((group) => (
               <ConfigurationCard key={group.title} group={group} />
             ))}

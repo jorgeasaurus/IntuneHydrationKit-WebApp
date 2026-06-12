@@ -44,7 +44,6 @@ export type ConfigurationGroup = {
   total: number;
   unit: string;
   items: Array<{ value: number | string; label: string }>;
-  featured?: boolean;
 };
 
 export const HERO_STATS = [
@@ -125,7 +124,6 @@ export const CONFIGURATION_GROUPS: readonly ConfigurationGroup[] = [
     label: "Primary",
     total: 805,
     unit: "profiles",
-    featured: true,
     items: [
       { value: 798, label: "Settings Catalog policies" },
       { value: 3, label: "Driver Update profiles" },
