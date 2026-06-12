@@ -35,6 +35,13 @@ export function RouteWallpaper(): React.JSX.Element | null {
       return;
     }
 
+    // Only defer-mount the heavy wallpaper on routes that actually render it.
+    // On non-wallpaper routes the component returns null, so scheduling an idle
+    // callback + state update there is wasted work.
+    if (!shouldRenderWallpaper(pathname)) {
+      return;
+    }
+
     const motionQuery =
       typeof window.matchMedia === "function"
         ? window.matchMedia("(prefers-reduced-motion: reduce)")
@@ -82,7 +89,7 @@ export function RouteWallpaper(): React.JSX.Element | null {
       }
       motionQuery?.removeEventListener("change", handleMotionChange);
     };
-  }, []);
+  }, [pathname]);
 
   if (!shouldRenderWallpaper(pathname)) {
     return null;
