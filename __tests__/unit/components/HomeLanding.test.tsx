@@ -67,11 +67,11 @@ describe('HomeLanding', () => {
     vi.clearAllMocks()
   })
 
-  it('renders the v2.5 landing surface with product proof and core sections', () => {
+  it('renders the v2.6 landing surface with product proof and core sections', () => {
     renderLanding()
 
     expect(screen.getByRole('heading', { name: 'Intune Hydration Kit' })).toBeInTheDocument()
-    expect(screen.getByText('v2.5')).toBeInTheDocument()
+    expect(screen.getByText('v2.6')).toBeInTheDocument()
     expect(screen.getByTestId('web-app-demo')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /PowerShell Module/i })[0]).toHaveAttribute(
       'href',

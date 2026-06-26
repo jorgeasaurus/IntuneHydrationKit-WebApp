@@ -1,3 +1,14 @@
+# Version 2.6 Bump
+
+- [x] Update package metadata and visible landing version text from 2.5 to 2.6.
+- [x] Update version assertions in unit and e2e tests.
+- [x] Run focused checks.
+
+## Review
+
+- Package metadata and visible landing version text now use 2.6.
+- Checks passed: focused HomeLanding test, `npm run type-check`, `npm run build`, `git diff --check`.
+
 # Device Filter Architecture Templates
 
 - [x] Add Windows and macOS architecture filter templates from the PowerShell module.

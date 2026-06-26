@@ -15,7 +15,7 @@ import {
   Zap,
 } from "lucide-react";
 
-export const APP_VERSION = "v2.5";
+export const APP_VERSION = "v2.6";
 export const FAQ_LINK_CLASS_NAME = "text-hydrate hover:underline";
 
 export type FaqItem = {
