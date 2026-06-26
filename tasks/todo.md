@@ -1,3 +1,14 @@
+# PR Comment Follow-up: Manifest Test
+
+- [x] Validate each device filter manifest entry's per-file count.
+- [x] Validate one sentinel filter display name per manifest path to catch swapped JSON sources.
+- [x] Run checks, commit, push, and verify PR checks.
+
+## Review
+
+- The manifest alignment test now checks every path's fallback source count and sentinel filter display name.
+- Checks passed: focused filters test, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
 # PR Comment Follow-up
 
 - [x] Split device filter template paths/counts into a lightweight manifest.
