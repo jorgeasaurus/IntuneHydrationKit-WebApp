@@ -20,3 +20,4 @@
 - For Edge/webhint diagnostics, avoid JSX `style` props for progress widths; prefer native progress elements or stylesheet-driven rendering tied to the computed value.
 - If static accessibility tooling flags JSX expressions in ARIA attributes, render literal `aria-*` values in explicit branches and omit irrelevant ARIA attributes.
 - When bundled template files change, bump the template cache version so existing browser caches cannot hide newly shipped templates.
+- When a review calls out source-of-truth drift, remove the duplicated model before opening the PR instead of relying only on sync tests.

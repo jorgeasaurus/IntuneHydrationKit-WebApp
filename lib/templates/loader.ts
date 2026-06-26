@@ -5,6 +5,7 @@
  */
 
 import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hydrationMarker";
+import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filters";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
@@ -129,19 +130,9 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
  * Fetch device filters from local templates
  */
 export async function fetchFilters(): Promise<FilterTemplate[]> {
-  const filterFiles = [
-    "Filters/Android-Filters.json",
-    "Filters/Windows-Architecture-Filters.json",
-    "Filters/Windows-Manufacturer-Filters.json",
-    "Filters/Windows-VM-Filters.json",
-    "Filters/iOS-Filters.json",
-    "Filters/macOS-Architecture-Filters.json",
-    "Filters/macOS-Filters.json",
-  ];
-
   const allFilters: FilterTemplate[] = [];
 
-  for (const file of filterFiles) {
+  for (const file of DEVICE_FILTER_TEMPLATE_PATHS) {
     try {
       const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
       if (!response.ok) {

@@ -2,6 +2,8 @@
  * Central export for all Intune Hydration Kit templates
  */
 
+import { DEVICE_FILTERS } from "./filters";
+
 export * from "./groups";
 export * from "./filters";
 export * from "./compliance";
@@ -23,7 +25,7 @@ export const TEMPLATE_METADATA = {
   filters: {
     displayName: "Device Filters",
     description: "Assignment filters for granular policy targeting",
-    count: 29,
+    count: DEVICE_FILTERS.length,
     icon: "Filter",
   },
   baseline: {

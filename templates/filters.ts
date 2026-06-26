@@ -1,263 +1,90 @@
 /**
  * Device Filter Templates for Intune Hydration Kit
  *
- * 29 filters matching the PowerShell project exactly.
- * PS "androidForWork" is mapped to "android" per the web app's DeviceFilter type.
+ * Generated from the bundled JSON filter templates so the static fallback and
+ * browser-loaded templates share one source of truth.
  */
 
-import { DeviceFilter } from "@/types/graph";
+import androidFilterTemplates from "@/public/IntuneTemplates/Filters/Android-Filters.json";
+import windowsArchitectureFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-Architecture-Filters.json";
+import windowsManufacturerFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-Manufacturer-Filters.json";
+import windowsVmFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-VM-Filters.json";
+import iosFilterTemplates from "@/public/IntuneTemplates/Filters/iOS-Filters.json";
+import macosArchitectureFilterTemplates from "@/public/IntuneTemplates/Filters/macOS-Architecture-Filters.json";
+import macosFilterTemplates from "@/public/IntuneTemplates/Filters/macOS-Filters.json";
+import type { DeviceFilter } from "@/types/graph";
 
 const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
+const FILTER_ODATA_TYPE = "#microsoft.graph.deviceAndAppManagementAssignmentFilter";
 
-// ── Windows - Manufacturer Filters (3) ──────────────────────────────────────
+type DeviceFilterTemplate = {
+  displayName: string;
+  description: string;
+  platform: string;
+  rule: string;
+};
 
-const WINDOWS_MANUFACTURER_FILTERS: DeviceFilter[] = [
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Dell Devices",
-    description: `Filter for Dell Windows devices. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -eq "Dell Inc.")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - HP Devices",
-    description: `Filter for HP Windows devices. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -eq "HP") or (device.manufacturer -eq "Hewlett-Packard")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Lenovo Devices",
-    description: `Filter for Lenovo Windows devices. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -eq "LENOVO")',
-  },
-];
+type DeviceFilterTemplateFile = {
+  path: string;
+  source: { filters: DeviceFilterTemplate[] };
+};
 
-// -- Windows - Architecture Filters (3) --------------------------------------
+export const DEVICE_FILTER_TEMPLATE_FILES = [
+  { path: "Filters/Android-Filters.json", source: androidFilterTemplates },
+  {
+    path: "Filters/Windows-Architecture-Filters.json",
+    source: windowsArchitectureFilterTemplates,
+  },
+  {
+    path: "Filters/Windows-Manufacturer-Filters.json",
+    source: windowsManufacturerFilterTemplates,
+  },
+  { path: "Filters/Windows-VM-Filters.json", source: windowsVmFilterTemplates },
+  { path: "Filters/iOS-Filters.json", source: iosFilterTemplates },
+  {
+    path: "Filters/macOS-Architecture-Filters.json",
+    source: macosArchitectureFilterTemplates,
+  },
+  { path: "Filters/macOS-Filters.json", source: macosFilterTemplates },
+] satisfies DeviceFilterTemplateFile[];
 
-const WINDOWS_ARCHITECTURE_FILTERS: DeviceFilter[] = [
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - x64 Devices",
-    description: `Filter for Windows devices reporting amd64 CPU architecture. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.cpuArchitecture -eq "amd64")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - ARM64 Devices",
-    description: `Filter for Windows devices reporting ARM64 CPU architecture. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.cpuArchitecture -eq "arm64")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - x86 Devices",
-    description: `Filter for Windows devices reporting x86 CPU architecture. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.cpuArchitecture -eq "x86")',
-  },
-];
+export const DEVICE_FILTER_TEMPLATE_PATHS = DEVICE_FILTER_TEMPLATE_FILES.map(
+  (file) => file.path
+);
 
-// ── Windows - VM Filters (12) ───────────────────────────────────────────────
+function normalizePlatform(platform: string): DeviceFilter["platform"] {
+  switch (platform) {
+    case "android":
+    case "androidForWork":
+      return "android";
+    case "iOS":
+    case "macOS":
+    case "windows10AndLater":
+      return platform;
+    default:
+      throw new Error(`Unsupported device filter platform: ${platform}`);
+  }
+}
 
-const WINDOWS_VM_FILTERS: DeviceFilter[] = [
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Azure Virtual Desktop (AVD)",
-    description: `Filter for Azure Virtual Desktop VMs. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.model -contains "Virtual Machine")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Azure Virtual Desktop (AVD) Named",
-    description: `Filter for AVD VMs with AVD- naming convention. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.model -contains "Virtual Machine") and (device.deviceName -startsWith "AVD-")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Azure IaaS VMs",
-    description: `Filter for Azure IaaS Virtual Machines. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -eq "Microsoft Corporation") and (device.model -contains "Virtual Machine")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Windows 365 Cloud PC",
-    description: `Filter for Windows 365 Cloud PC devices. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.model -contains "Cloud PC")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Microsoft Dev Box",
-    description: `Filter for Microsoft Dev Box devices. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -contains "Microsoft") and (device.model -contains "Cloud")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Hyper-V VMs",
-    description: `Filter for Hyper-V VMs (may overlap with Azure). ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -eq "Microsoft Corporation") and (device.model -contains "Virtual")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - VMware VMs",
-    description: `Filter for VMware VMs (ESXi, Horizon, Workstation, Fusion). ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -contains "VMware")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - VirtualBox VMs",
-    description: `Filter for Oracle VirtualBox VMs. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.model -contains "VirtualBox")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Parallels VMs",
-    description: `Filter for Parallels Desktop VMs. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -contains "Parallels")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - QEMU KVM VMs",
-    description: `Filter for QEMU/KVM VMs. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.manufacturer -contains "QEMU") or (device.model -contains "KVM")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - All Virtual Machines",
-    description: `Filter for all VMs - use for reporting only. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.model -contains "Virtual") or (device.model -contains "Cloud PC") or (device.manufacturer -contains "VMware") or (device.manufacturer -contains "Parallels") or (device.manufacturer -contains "QEMU")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Windows - Physical Devices Only",
-    description: `Filter excluding all known VMs. ${HYDRATION_MARKER}`,
-    platform: "windows10AndLater",
-    rule: '(device.model -notContains "Virtual") and (device.model -notContains "Cloud PC") and (device.manufacturer -notContains "VMware") and (device.manufacturer -notContains "Parallels") and (device.manufacturer -notContains "QEMU")',
-  },
-];
+function addHydrationMarker(description: string): string {
+  return description.includes(HYDRATION_MARKER)
+    ? description
+    : `${description} ${HYDRATION_MARKER}`;
+}
 
-// ── iOS Filters (3) ─────────────────────────────────────────────────────────
+function toDeviceFilter(template: DeviceFilterTemplate): DeviceFilter {
+  return {
+    "@odata.type": FILTER_ODATA_TYPE,
+    displayName: template.displayName,
+    description: addHydrationMarker(template.description),
+    platform: normalizePlatform(template.platform),
+    rule: template.rule,
+  };
+}
 
-const IOS_FILTERS: DeviceFilter[] = [
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "iOS - iPhone Devices",
-    description: `Filter for iPhone devices. ${HYDRATION_MARKER}`,
-    platform: "iOS",
-    rule: '(device.model -startsWith "iPhone")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "iOS - iPad Devices",
-    description: `Filter for iPad devices. ${HYDRATION_MARKER}`,
-    platform: "iOS",
-    rule: '(device.model -startsWith "iPad")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "iOS - Corporate Owned",
-    description: `Filter for corporate-owned iOS/iPadOS devices. ${HYDRATION_MARKER}`,
-    platform: "iOS",
-    rule: '(device.deviceOwnership -eq "Corporate")',
-  },
-];
-
-// ── Android Filters (3) - PS "androidForWork" mapped to "android" ───────────
-
-const ANDROID_FILTERS: DeviceFilter[] = [
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Android - Samsung Devices",
-    description: `Filter for Samsung Android devices. ${HYDRATION_MARKER}`,
-    platform: "android",
-    rule: '(device.manufacturer -eq "samsung")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Android - Google Pixel Devices",
-    description: `Filter for Google Pixel Android devices. ${HYDRATION_MARKER}`,
-    platform: "android",
-    rule: '(device.manufacturer -eq "Google")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "Android - Corporate Owned",
-    description: `Filter for corporate-owned Android devices. ${HYDRATION_MARKER}`,
-    platform: "android",
-    rule: '(device.deviceOwnership -eq "Corporate")',
-  },
-];
-
-// ── macOS Filters (3) ───────────────────────────────────────────────────────
-
-const MACOS_FILTERS: DeviceFilter[] = [
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "macOS - Apple Devices",
-    description: `Filter for Apple macOS devices. ${HYDRATION_MARKER}`,
-    platform: "macOS",
-    rule: '(device.manufacturer -eq "Apple")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "macOS - MacBook Devices",
-    description: `Filter for MacBook devices. ${HYDRATION_MARKER}`,
-    platform: "macOS",
-    rule: '(device.model -startsWith "MacBook")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "macOS - iMac Devices",
-    description: `Filter for iMac devices. ${HYDRATION_MARKER}`,
-    platform: "macOS",
-    rule: '(device.model -startsWith "iMac")',
-  },
-];
-
-// -- macOS - Architecture Filters (2) ----------------------------------------
-
-const MACOS_ARCHITECTURE_FILTERS: DeviceFilter[] = [
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "macOS - Apple Silicon Devices",
-    description: `Filter for macOS devices reporting ARM64 CPU architecture. ${HYDRATION_MARKER}`,
-    platform: "macOS",
-    rule: '(device.cpuArchitecture -eq "arm64")',
-  },
-  {
-    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-    displayName: "macOS - Intel Devices",
-    description: `Filter for macOS devices reporting x64 CPU architecture. ${HYDRATION_MARKER}`,
-    platform: "macOS",
-    rule: '(device.cpuArchitecture -eq "x64")',
-  },
-];
-
-// ── Combined export (29 filters) ────────────────────────────────────────────
-
-export const DEVICE_FILTERS: DeviceFilter[] = [
-  ...WINDOWS_MANUFACTURER_FILTERS,
-  ...WINDOWS_ARCHITECTURE_FILTERS,
-  ...WINDOWS_VM_FILTERS,
-  ...IOS_FILTERS,
-  ...ANDROID_FILTERS,
-  ...MACOS_FILTERS,
-  ...MACOS_ARCHITECTURE_FILTERS,
-];
+export const DEVICE_FILTERS: DeviceFilter[] = DEVICE_FILTER_TEMPLATE_FILES.flatMap(
+  (file) => file.source.filters.map(toDeviceFilter)
+);
 
 /**
  * Get all device filter templates

@@ -15,6 +15,10 @@ describe("device filter template offering", () => {
     expect(displayNames.size).toBe(29);
     expect(getDeviceFiltersByPlatform("windows10AndLater")).toHaveLength(18);
     expect(getDeviceFiltersByPlatform("macOS")).toHaveLength(5);
+    expect(getDeviceFilterByName("Android - Samsung Devices")).toMatchObject({
+      platform: "android",
+      rule: '(device.manufacturer -eq "samsung")',
+    });
     expect(getDeviceFilterByName("Windows - x64 Devices")).toMatchObject({
       platform: "windows10AndLater",
       rule: '(device.cpuArchitecture -eq "amd64")',

@@ -9,6 +9,19 @@
 - Package metadata and visible landing version text now use 2.6.
 - Checks passed: focused HomeLanding test, `npm run type-check`, `npm run build`, `git diff --check`.
 
+# Device Filter Source Of Truth
+
+- [x] Replace hand-copied static filter fallback definitions with an adapter over bundled JSON templates.
+- [x] Reuse the same filter template path list for runtime fetching.
+- [x] Derive Device Filters metadata count from the fallback template array.
+- [x] Run focused checks, commit, push, and redeploy preview.
+
+## Review
+
+- Static filter fallback, runtime fetch paths, and UI metadata now derive from the bundled filter JSON files.
+- Android PowerShell platform values are normalized from `androidForWork` to the web app's `android` Graph type.
+- Checks passed: focused filter/loader/task queue tests, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
 # Device Filter Architecture Templates
 
 - [x] Add Windows and macOS architecture filter templates from the PowerShell module.
