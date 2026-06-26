@@ -282,7 +282,7 @@ function FeaturesSection() {
                 Built for repeatable tenant work, not a one-off wizard.
               </h2>
               <p className="text-base leading-7 text-muted-foreground">
-                v2.5 presents the app as an operator console: predictable,
+                v2.6 presents the app as an operator console: predictable,
                 scannable, and explicit about the safeguards behind every
                 deployment.
               </p>

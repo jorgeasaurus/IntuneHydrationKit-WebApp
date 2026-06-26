@@ -1,3 +1,66 @@
+# PR Comment Follow-up: Manifest Test
+
+- [x] Validate each device filter manifest entry's per-file count.
+- [x] Validate one sentinel filter display name per manifest path to catch swapped JSON sources.
+- [x] Run checks, commit, push, and verify PR checks.
+
+## Review
+
+- The manifest alignment test now checks every path's fallback source count and sentinel filter display name.
+- Checks passed: focused filters test, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
+# PR Comment Follow-up
+
+- [x] Split device filter template paths/counts into a lightweight manifest.
+- [x] Keep JSON imports isolated to the static filter fallback module.
+- [x] Add consistency coverage so the manifest stays aligned with bundled JSON templates.
+- [x] Run focused checks, commit, push, and verify PR checks.
+
+## Review
+
+- `lib/templates/loader.ts` now imports filter fetch paths from a lightweight manifest with no JSON imports.
+- `templates/index.ts` uses the manifest count instead of importing the JSON-backed fallback for metadata.
+- Checks passed: focused filter/loader/task queue tests, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
+# Version 2.6 Bump
+
+- [x] Update package metadata and visible landing version text from 2.5 to 2.6.
+- [x] Update version assertions in unit and e2e tests.
+- [x] Run focused checks.
+
+## Review
+
+- Package metadata and visible landing version text now use 2.6.
+- Checks passed: focused HomeLanding test, `npm run type-check`, `npm run build`, `git diff --check`.
+
+# Device Filter Source Of Truth
+
+- [x] Replace hand-copied static filter fallback definitions with an adapter over bundled JSON templates.
+- [x] Reuse the same filter template path list for runtime fetching.
+- [x] Derive Device Filters metadata count from the fallback template array.
+- [x] Run focused checks, commit, push, and redeploy preview.
+
+## Review
+
+- Static filter fallback, runtime fetch paths, and UI metadata now derive from the bundled filter JSON files.
+- Android PowerShell platform values are normalized from `androidForWork` to the web app's `android` Graph type.
+- Checks passed: focused filter/loader/task queue tests, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
+# Device Filter Architecture Templates
+
+- [x] Add Windows and macOS architecture filter templates from the PowerShell module.
+- [x] Include the new filter files in the web template loader.
+- [x] Update the static TypeScript fallback and visible filter counts from 24 to 29.
+- [x] Add/adjust focused regression coverage for the new filter set.
+- [x] Run targeted checks and document results.
+
+## Review
+
+- Added Windows x64/ARM64/x86 and macOS Apple Silicon/Intel assignment filters.
+- Bumped the template cache version so older browser filter caches cannot hide the new architecture filters.
+- Web filter JSON now matches the PowerShell module filter templates: 29 filters, no missing/extra definitions.
+- Checks passed: focused filter tests, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
 # React Doctor 100
 
 - [x] Run `npx react-doctor@latest` (baseline: 70, 456 issues).

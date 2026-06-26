@@ -14,13 +14,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - **Device Preparation profile** - Windows Autopilot Device Preparation (user-driven) profile using Settings Catalog format.
 - **VM device filters** (12) - Filters for Hyper-V, VMware, VirtualBox, Parallels, QEMU, Citrix, Nutanix, Azure VM, AWS, GCP, Oracle Cloud, and Generic Virtual Machine.
 - **Platform-specific filters** - iOS (3), Android (3), and macOS (3) device filters.
+- **Architecture device filters** - Windows x64/ARM64/x86 and macOS Apple Silicon/Intel filters using `device.cpuArchitecture`.
 - **Enterprise Data Protection policies** - Level 1, 2, and 3 app protection policies for both Android and iOS.
 - **Microsoft starter pack CA policies** (20) - Replaced generic CA001–CA013 policies with Microsoft-recommended conditional access policies including agent identity blocking, insider risk blocking, and phishing-resistant MFA.
 
 ### Changed
 
 - **Dynamic groups expanded** - 12 → 50 groups across 6 categories: OS (20), Autopilot (2), Ownership (2), Manufacturer (5), User (9), VM (12).
-- **Device filters expanded** - 12 → 24 filters covering Windows, iOS, Android, and macOS platforms.
+- **Device filters expanded** - 12 → 29 filters covering Windows, iOS, Android, macOS, and CPU architecture targeting.
 - **Compliance policies replaced** - 10 generic policies → 8 platform-aligned policies matching PS project (Android FullyManaged basic/strict, Windows standard/custom, iOS basic/strict, macOS basic/strict). Linux excluded (Settings Catalog format).
 - **App protection policies replaced** - 4 corporate/BYOD policies → 8 policies (basic Android/iOS + Level 1–3 Enterprise Data Protection for each platform).
 - **Enrollment profiles replaced** - Removed Apple DEP profiles (not in PS project), updated Autopilot profiles to use `outOfBoxExperienceSetting` (singular), added `preprovisioningAllowed` and `hardwareHashExtractionEnabled` fields.

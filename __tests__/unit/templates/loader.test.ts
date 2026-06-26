@@ -256,6 +256,111 @@ describe("template loader", () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
+  it("loads architecture filter templates with import metadata", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.includes("Windows-Architecture-Filters.json")) {
+        return {
+          ok: true,
+          statusText: "OK",
+          json: async () => ({
+            filters: [
+              {
+                displayName: "Windows - x64 Devices",
+                description: "Filter for Windows devices reporting amd64 CPU architecture",
+                platform: "windows10AndLater",
+                rule: '(device.cpuArchitecture -eq "amd64")',
+              },
+              {
+                displayName: "Windows - ARM64 Devices",
+                description: "Filter for Windows devices reporting ARM64 CPU architecture",
+                platform: "windows10AndLater",
+                rule: '(device.cpuArchitecture -eq "arm64")',
+              },
+              {
+                displayName: "Windows - x86 Devices",
+                description: "Filter for Windows devices reporting x86 CPU architecture",
+                platform: "windows10AndLater",
+                rule: '(device.cpuArchitecture -eq "x86")',
+              },
+            ],
+          }),
+        };
+      }
+
+      if (url.includes("macOS-Architecture-Filters.json")) {
+        return {
+          ok: true,
+          statusText: "OK",
+          json: async () => ({
+            filters: [
+              {
+                displayName: "macOS - Apple Silicon Devices",
+                description: "Filter for macOS devices reporting ARM64 CPU architecture",
+                platform: "macOS",
+                rule: '(device.cpuArchitecture -eq "arm64")',
+              },
+              {
+                displayName: "macOS - Intel Devices",
+                description: "Filter for macOS devices reporting x64 CPU architecture",
+                platform: "macOS",
+                rule: '(device.cpuArchitecture -eq "x64")',
+              },
+            ],
+          }),
+        };
+      }
+
+      return {
+        ok: true,
+        statusText: "OK",
+        json: async () => ({ filters: [] }),
+      };
+    });
+
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchFilters()).resolves.toEqual([
+      {
+        displayName: "[IHD] Windows - x64 Devices",
+        description: "Filter for Windows devices reporting amd64 CPU architecture Imported by Intune Hydration Kit",
+        platform: "windows10AndLater",
+        rule: '(device.cpuArchitecture -eq "amd64")',
+      },
+      {
+        displayName: "[IHD] Windows - ARM64 Devices",
+        description: "Filter for Windows devices reporting ARM64 CPU architecture Imported by Intune Hydration Kit",
+        platform: "windows10AndLater",
+        rule: '(device.cpuArchitecture -eq "arm64")',
+      },
+      {
+        displayName: "[IHD] Windows - x86 Devices",
+        description: "Filter for Windows devices reporting x86 CPU architecture Imported by Intune Hydration Kit",
+        platform: "windows10AndLater",
+        rule: '(device.cpuArchitecture -eq "x86")',
+      },
+      {
+        displayName: "[IHD] macOS - Apple Silicon Devices",
+        description: "Filter for macOS devices reporting ARM64 CPU architecture Imported by Intune Hydration Kit",
+        platform: "macOS",
+        rule: '(device.cpuArchitecture -eq "arm64")',
+      },
+      {
+        displayName: "[IHD] macOS - Intel Devices",
+        description: "Filter for macOS devices reporting x64 CPU architecture Imported by Intune Hydration Kit",
+        platform: "macOS",
+        rule: '(device.cpuArchitecture -eq "x64")',
+      },
+    ]);
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("Filters/Windows-Architecture-Filters.json")
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("Filters/macOS-Architecture-Filters.json")
+    );
+  });
+
   it("keeps only valid app protection templates", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
@@ -327,7 +432,7 @@ describe("template loader", () => {
       JSON.stringify({
         templates: [{ displayName: "Old Policy" }],
         timestamp: Date.now() - (2 * 60 * 60 * 1000),
-        version: 19,
+        version: 20,
       })
     );
 
@@ -340,11 +445,23 @@ describe("template loader", () => {
       })
     );
 
+    sessionStorage.setItem(
+      "intune-hydration-templates-filters",
+      JSON.stringify({
+        templates: [{ displayName: "[IHD] Windows - Dell Devices" }],
+        timestamp: Date.now(),
+        version: 19,
+      })
+    );
+
     expect(getCachedTemplates("expired-test")).toBeNull();
     expect(sessionStorage.getItem("intune-hydration-templates-expired-test")).toBeNull();
 
     expect(getCachedTemplates("version-test")).toBeNull();
     expect(sessionStorage.getItem("intune-hydration-templates-version-test")).toBeNull();
+
+    expect(getCachedTemplates("filters")).toBeNull();
+    expect(sessionStorage.getItem("intune-hydration-templates-filters")).toBeNull();
   });
 
   it("transforms OIB manifest files using the policy name and manifest metadata", async () => {
