@@ -9,6 +9,7 @@
 ## Review
 
 - Added Windows x64/ARM64/x86 and macOS Apple Silicon/Intel assignment filters.
+- Bumped the template cache version so older browser filter caches cannot hide the new architecture filters.
 - Web filter JSON now matches the PowerShell module filter templates: 29 filters, no missing/extra definitions.
 - Checks passed: focused filter tests, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
 

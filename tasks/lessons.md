@@ -19,3 +19,4 @@
 - If a UI already computes progress from source-of-truth data, use that computed value for the visual indicator; step-specific width classes drift when the step list changes.
 - For Edge/webhint diagnostics, avoid JSX `style` props for progress widths; prefer native progress elements or stylesheet-driven rendering tied to the computed value.
 - If static accessibility tooling flags JSX expressions in ARIA attributes, render literal `aria-*` values in explicit branches and omit irrelevant ARIA attributes.
+- When bundled template files change, bump the template cache version so existing browser caches cannot hide newly shipped templates.

@@ -432,7 +432,7 @@ describe("template loader", () => {
       JSON.stringify({
         templates: [{ displayName: "Old Policy" }],
         timestamp: Date.now() - (2 * 60 * 60 * 1000),
-        version: 19,
+        version: 20,
       })
     );
 
@@ -445,11 +445,23 @@ describe("template loader", () => {
       })
     );
 
+    sessionStorage.setItem(
+      "intune-hydration-templates-filters",
+      JSON.stringify({
+        templates: [{ displayName: "[IHD] Windows - Dell Devices" }],
+        timestamp: Date.now(),
+        version: 19,
+      })
+    );
+
     expect(getCachedTemplates("expired-test")).toBeNull();
     expect(sessionStorage.getItem("intune-hydration-templates-expired-test")).toBeNull();
 
     expect(getCachedTemplates("version-test")).toBeNull();
     expect(sessionStorage.getItem("intune-hydration-templates-version-test")).toBeNull();
+
+    expect(getCachedTemplates("filters")).toBeNull();
+    expect(sessionStorage.getItem("intune-hydration-templates-filters")).toBeNull();
   });
 
   it("transforms OIB manifest files using the policy name and manifest metadata", async () => {

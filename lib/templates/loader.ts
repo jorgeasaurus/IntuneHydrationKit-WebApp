@@ -9,7 +9,7 @@ import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hy
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 19; // Include Linux compliance templates in the cached compliance set
+const CACHE_VERSION = 20; // Include architecture device filter templates in the cached filter set
 
 export interface GroupTemplate {
   displayName: string;
