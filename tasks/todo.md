@@ -1,3 +1,16 @@
+# PR Comment Follow-up
+
+- [x] Split device filter template paths/counts into a lightweight manifest.
+- [x] Keep JSON imports isolated to the static filter fallback module.
+- [x] Add consistency coverage so the manifest stays aligned with bundled JSON templates.
+- [x] Run focused checks, commit, push, and verify PR checks.
+
+## Review
+
+- `lib/templates/loader.ts` now imports filter fetch paths from a lightweight manifest with no JSON imports.
+- `templates/index.ts` uses the manifest count instead of importing the JSON-backed fallback for metadata.
+- Checks passed: focused filter/loader/task queue tests, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
 # Version 2.6 Bump
 
 - [x] Update package metadata and visible landing version text from 2.5 to 2.6.

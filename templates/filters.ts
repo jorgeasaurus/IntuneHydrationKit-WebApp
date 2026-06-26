@@ -13,6 +13,7 @@ import iosFilterTemplates from "@/public/IntuneTemplates/Filters/iOS-Filters.jso
 import macosArchitectureFilterTemplates from "@/public/IntuneTemplates/Filters/macOS-Architecture-Filters.json";
 import macosFilterTemplates from "@/public/IntuneTemplates/Filters/macOS-Filters.json";
 import type { DeviceFilter } from "@/types/graph";
+import { DEVICE_FILTER_TEMPLATE_PATHS } from "./filterManifest";
 
 const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 const FILTER_ODATA_TYPE = "#microsoft.graph.deviceAndAppManagementAssignmentFilter";
@@ -29,28 +30,34 @@ type DeviceFilterTemplateFile = {
   source: { filters: DeviceFilterTemplate[] };
 };
 
+const [
+  ANDROID_FILTERS_PATH,
+  WINDOWS_ARCHITECTURE_FILTERS_PATH,
+  WINDOWS_MANUFACTURER_FILTERS_PATH,
+  WINDOWS_VM_FILTERS_PATH,
+  IOS_FILTERS_PATH,
+  MACOS_ARCHITECTURE_FILTERS_PATH,
+  MACOS_FILTERS_PATH,
+] = DEVICE_FILTER_TEMPLATE_PATHS;
+
 export const DEVICE_FILTER_TEMPLATE_FILES = [
-  { path: "Filters/Android-Filters.json", source: androidFilterTemplates },
+  { path: ANDROID_FILTERS_PATH, source: androidFilterTemplates },
   {
-    path: "Filters/Windows-Architecture-Filters.json",
+    path: WINDOWS_ARCHITECTURE_FILTERS_PATH,
     source: windowsArchitectureFilterTemplates,
   },
   {
-    path: "Filters/Windows-Manufacturer-Filters.json",
+    path: WINDOWS_MANUFACTURER_FILTERS_PATH,
     source: windowsManufacturerFilterTemplates,
   },
-  { path: "Filters/Windows-VM-Filters.json", source: windowsVmFilterTemplates },
-  { path: "Filters/iOS-Filters.json", source: iosFilterTemplates },
+  { path: WINDOWS_VM_FILTERS_PATH, source: windowsVmFilterTemplates },
+  { path: IOS_FILTERS_PATH, source: iosFilterTemplates },
   {
-    path: "Filters/macOS-Architecture-Filters.json",
+    path: MACOS_ARCHITECTURE_FILTERS_PATH,
     source: macosArchitectureFilterTemplates,
   },
-  { path: "Filters/macOS-Filters.json", source: macosFilterTemplates },
+  { path: MACOS_FILTERS_PATH, source: macosFilterTemplates },
 ] satisfies DeviceFilterTemplateFile[];
-
-export const DEVICE_FILTER_TEMPLATE_PATHS = DEVICE_FILTER_TEMPLATE_FILES.map(
-  (file) => file.path
-);
 
 function normalizePlatform(platform: string): DeviceFilter["platform"] {
   switch (platform) {

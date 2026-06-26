@@ -5,7 +5,7 @@
  */
 
 import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hydrationMarker";
-import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filters";
+import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filterManifest";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 

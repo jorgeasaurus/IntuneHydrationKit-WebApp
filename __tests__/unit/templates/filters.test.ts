@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DEVICE_FILTER_TEMPLATE_COUNT,
+  DEVICE_FILTER_TEMPLATE_PATHS,
+} from "@/templates/filterManifest";
+import {
+  DEVICE_FILTER_TEMPLATE_FILES,
   getDeviceFilterByName,
   getDeviceFilters,
   getDeviceFiltersByPlatform,
@@ -11,7 +16,8 @@ describe("device filter template offering", () => {
     const filters = getDeviceFilters();
     const displayNames = new Set(filters.map((filter) => filter.displayName));
 
-    expect(filters).toHaveLength(29);
+    expect(filters).toHaveLength(DEVICE_FILTER_TEMPLATE_COUNT);
+    expect(DEVICE_FILTER_TEMPLATE_COUNT).toBe(29);
     expect(displayNames.size).toBe(29);
     expect(getDeviceFiltersByPlatform("windows10AndLater")).toHaveLength(18);
     expect(getDeviceFiltersByPlatform("macOS")).toHaveLength(5);
@@ -39,5 +45,17 @@ describe("device filter template offering", () => {
       platform: "macOS",
       rule: '(device.cpuArchitecture -eq "x64")',
     });
+  });
+
+  it("keeps the lightweight manifest aligned with the static fallback files", () => {
+    expect(DEVICE_FILTER_TEMPLATE_FILES.map((file) => file.path)).toEqual(
+      DEVICE_FILTER_TEMPLATE_PATHS
+    );
+    expect(
+      DEVICE_FILTER_TEMPLATE_FILES.reduce(
+        (total, file) => total + file.source.filters.length,
+        0
+      )
+    ).toBe(DEVICE_FILTER_TEMPLATE_COUNT);
   });
 });
