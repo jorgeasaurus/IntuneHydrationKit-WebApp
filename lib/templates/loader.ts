@@ -131,9 +131,11 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
 export async function fetchFilters(): Promise<FilterTemplate[]> {
   const filterFiles = [
     "Filters/Android-Filters.json",
+    "Filters/Windows-Architecture-Filters.json",
     "Filters/Windows-Manufacturer-Filters.json",
     "Filters/Windows-VM-Filters.json",
     "Filters/iOS-Filters.json",
+    "Filters/macOS-Architecture-Filters.json",
     "Filters/macOS-Filters.json",
   ];
 

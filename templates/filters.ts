@@ -1,7 +1,7 @@
 /**
  * Device Filter Templates for Intune Hydration Kit
  *
- * 24 filters matching the PowerShell project exactly.
+ * 29 filters matching the PowerShell project exactly.
  * PS "androidForWork" is mapped to "android" per the web app's DeviceFilter type.
  */
 
@@ -32,6 +32,32 @@ const WINDOWS_MANUFACTURER_FILTERS: DeviceFilter[] = [
     description: `Filter for Lenovo Windows devices. ${HYDRATION_MARKER}`,
     platform: "windows10AndLater",
     rule: '(device.manufacturer -eq "LENOVO")',
+  },
+];
+
+// -- Windows - Architecture Filters (3) --------------------------------------
+
+const WINDOWS_ARCHITECTURE_FILTERS: DeviceFilter[] = [
+  {
+    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
+    displayName: "Windows - x64 Devices",
+    description: `Filter for Windows devices reporting amd64 CPU architecture. ${HYDRATION_MARKER}`,
+    platform: "windows10AndLater",
+    rule: '(device.cpuArchitecture -eq "amd64")',
+  },
+  {
+    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
+    displayName: "Windows - ARM64 Devices",
+    description: `Filter for Windows devices reporting ARM64 CPU architecture. ${HYDRATION_MARKER}`,
+    platform: "windows10AndLater",
+    rule: '(device.cpuArchitecture -eq "arm64")',
+  },
+  {
+    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
+    displayName: "Windows - x86 Devices",
+    description: `Filter for Windows devices reporting x86 CPU architecture. ${HYDRATION_MARKER}`,
+    platform: "windows10AndLater",
+    rule: '(device.cpuArchitecture -eq "x86")',
   },
 ];
 
@@ -202,14 +228,35 @@ const MACOS_FILTERS: DeviceFilter[] = [
   },
 ];
 
-// ── Combined export (24 filters) ────────────────────────────────────────────
+// -- macOS - Architecture Filters (2) ----------------------------------------
+
+const MACOS_ARCHITECTURE_FILTERS: DeviceFilter[] = [
+  {
+    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
+    displayName: "macOS - Apple Silicon Devices",
+    description: `Filter for macOS devices reporting ARM64 CPU architecture. ${HYDRATION_MARKER}`,
+    platform: "macOS",
+    rule: '(device.cpuArchitecture -eq "arm64")',
+  },
+  {
+    "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
+    displayName: "macOS - Intel Devices",
+    description: `Filter for macOS devices reporting x64 CPU architecture. ${HYDRATION_MARKER}`,
+    platform: "macOS",
+    rule: '(device.cpuArchitecture -eq "x64")',
+  },
+];
+
+// ── Combined export (29 filters) ────────────────────────────────────────────
 
 export const DEVICE_FILTERS: DeviceFilter[] = [
   ...WINDOWS_MANUFACTURER_FILTERS,
+  ...WINDOWS_ARCHITECTURE_FILTERS,
   ...WINDOWS_VM_FILTERS,
   ...IOS_FILTERS,
   ...ANDROID_FILTERS,
   ...MACOS_FILTERS,
+  ...MACOS_ARCHITECTURE_FILTERS,
 ];
 
 /**

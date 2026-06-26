@@ -23,7 +23,7 @@ export const TEMPLATE_METADATA = {
   filters: {
     displayName: "Device Filters",
     description: "Assignment filters for granular policy targeting",
-    count: 24,
+    count: 29,
     icon: "Filter",
   },
   baseline: {

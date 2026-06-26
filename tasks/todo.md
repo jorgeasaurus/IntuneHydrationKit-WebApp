@@ -1,3 +1,17 @@
+# Device Filter Architecture Templates
+
+- [x] Add Windows and macOS architecture filter templates from the PowerShell module.
+- [x] Include the new filter files in the web template loader.
+- [x] Update the static TypeScript fallback and visible filter counts from 24 to 29.
+- [x] Add/adjust focused regression coverage for the new filter set.
+- [x] Run targeted checks and document results.
+
+## Review
+
+- Added Windows x64/ARM64/x86 and macOS Apple Silicon/Intel assignment filters.
+- Web filter JSON now matches the PowerShell module filter templates: 29 filters, no missing/extra definitions.
+- Checks passed: focused filter tests, `npm run type-check`, `npm run test:run`, `npm run build`, `git diff --check`.
+
 # React Doctor 100
 
 - [x] Run `npx react-doctor@latest` (baseline: 70, 456 issues).

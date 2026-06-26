@@ -43,7 +43,7 @@ const {
 vi.mock("@/templates", () => ({
   TEMPLATE_METADATA: {
     groups: { count: 55 },
-    filters: { count: 24 },
+    filters: { count: 29 },
     baseline: { count: 93 },
     compliance: { count: 10 },
     appProtection: { count: 8 },

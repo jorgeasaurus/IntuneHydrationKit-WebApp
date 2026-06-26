@@ -18,7 +18,7 @@ type Phase = "configure" | "deploying" | "complete";
 
 const CATEGORIES = [
   { id: "groups", label: "Dynamic Groups", icon: Users, count: 47 },
-  { id: "filters", label: "Device Filters", icon: Filter, count: 24 },
+  { id: "filters", label: "Device Filters", icon: Filter, count: 29 },
   { id: "compliance", label: "Compliance Policies", icon: Shield, count: 16 },
   { id: "baseline", label: "Security Baselines", icon: FileCheck, count: 795 },
 ];
