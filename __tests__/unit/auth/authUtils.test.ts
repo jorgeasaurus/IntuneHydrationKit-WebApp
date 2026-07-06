@@ -69,10 +69,18 @@ describe("authUtils", () => {
     expect(getSelectedCloudEnvironment()).toBe("usgov");
     expect(window.sessionStorage.getItem("cloudEnvironment")).toBe("usgov");
 
+    window.sessionStorage.setItem("cloudEnvironment", "global");
+
+    expect(loadCloudEnvironmentFromSession()).toBe("global");
+    expect(getSelectedCloudEnvironment()).toBe("global");
+  });
+
+  it("ignores sovereign cloud environments from session storage (web app is commercial-only)", () => {
+    setSelectedCloudEnvironment("global");
     window.sessionStorage.setItem("cloudEnvironment", "china");
 
-    expect(loadCloudEnvironmentFromSession()).toBe("china");
-    expect(getSelectedCloudEnvironment()).toBe("china");
+    expect(loadCloudEnvironmentFromSession()).toBe("global");
+    expect(getSelectedCloudEnvironment()).toBe("global");
   });
 
   it("ignores invalid cloud environments from session storage", () => {

@@ -1,5 +1,6 @@
 "use client";
 
+import type * as React from "react";
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import WAVES from "vanta/dist/vanta.waves.min";
@@ -56,7 +57,7 @@ function markVantaCanvas(container: HTMLElement): void {
   });
 }
 
-export function DynamicWallpaper(): JSX.Element {
+export function DynamicWallpaper(): React.ReactNode {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {

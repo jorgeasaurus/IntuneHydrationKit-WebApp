@@ -159,8 +159,10 @@ export async function getConditionalAccessPolicyByName(
 ): Promise<ConditionalAccessPolicy | null> {
   const policies = await getAllConditionalAccessPolicies(client);
   const lowerName = displayName.toLowerCase();
+  // Legacy short-form suffix used by older releases
   const suffixedLowerName = `${lowerName} [intune hydration kit]`;
-  const fullMarkerLowerName = `${lowerName} [imported by intune hydration kit]`;
+  // Derived from HYDRATION_MARKER so lookup stays in sync with creation format
+  const fullMarkerLowerName = `${lowerName} [${HYDRATION_MARKER.toLowerCase()}]`;
 
   const found = policies.find((policy) => {
     const policyLower = policy.displayName.toLowerCase();

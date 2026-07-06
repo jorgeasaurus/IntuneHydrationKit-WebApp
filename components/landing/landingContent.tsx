@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 export const APP_VERSION = "v2.6";
-export const FAQ_LINK_CLASS_NAME = "text-hydrate hover:underline";
+const FAQ_LINK_CLASS_NAME = "text-hydrate hover:underline";
 
 export type FaqItem = {
   question: string;

@@ -129,9 +129,10 @@ export default function DashboardPage() {
               <Image
                 src="/IHTLogoClear.png"
                 alt="Intune Hydration Kit"
-                width={40}
-                height={40}
-                className="size-10"
+                width={144}
+                height={169}
+                className="h-10 w-auto"
+                style={{ width: "auto" }}
               />
               <div>
                 <h1 className="text-2xl font-bold">Hydration Dashboard</h1>

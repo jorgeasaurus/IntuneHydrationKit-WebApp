@@ -151,7 +151,7 @@ async function autopilotProfileExists(
 }
 
 function cleanAutopilotProfile(profile: AutopilotDeploymentProfile): Record<string, unknown> {
-  const cleaned = JSON.parse(JSON.stringify(profile)) as Record<string, unknown>;
+  const cleaned = structuredClone(profile) as unknown as Record<string, unknown>;
 
   delete cleaned.id;
   cleaned.description = addEnrollmentHydrationMarker(profile.description);
@@ -230,7 +230,7 @@ async function createESPConfiguration(
   client: GraphClient,
   config: EnrollmentStatusPageConfiguration
 ): Promise<EnrollmentStatusPageConfiguration> {
-  const configBody = JSON.parse(JSON.stringify(config)) as EnrollmentStatusPageConfiguration;
+  const configBody = structuredClone(config) as EnrollmentStatusPageConfiguration;
   delete configBody.id;
   configBody.description = addEnrollmentHydrationMarker(configBody.description);
 

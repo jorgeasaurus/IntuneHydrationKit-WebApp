@@ -1,5 +1,6 @@
 "use client";
 
+import type * as React from "react";
 import { useEffect, useRef } from "react";
 
 const GRID_COLOR = "59, 130, 246";
@@ -8,7 +9,7 @@ const HORIZON_POSITION = 0.35;
 const HORIZONTAL_LINE_COUNT = 25;
 const VERTICAL_LINE_STEPS = 50;
 
-export function AnimatedGridBackground(): JSX.Element {
+export function AnimatedGridBackground(): React.ReactNode {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {

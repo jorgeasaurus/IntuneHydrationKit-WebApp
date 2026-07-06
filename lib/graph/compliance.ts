@@ -154,7 +154,7 @@ export async function createCompliancePolicy(
   policy: CompliancePolicy
 ): Promise<CompliancePolicy> {
   // Deep clone to avoid mutating original
-  const policyBody = JSON.parse(JSON.stringify(policy)) as CompliancePolicy & {
+  const policyBody = structuredClone(policy) as CompliancePolicy & {
     deviceCompliancePolicyScript?: {
       displayName?: string;
       deviceComplianceScriptId?: string;

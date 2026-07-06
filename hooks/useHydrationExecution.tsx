@@ -117,6 +117,21 @@ export function useHydrationExecution() {
         onProgress: emitQueueProgress,
       }
     );
+    if (tasks.length === 0) {
+      emitQueueProgress(
+        "No tasks were queued. Check that templates are available and your selections are valid.",
+        "error"
+      );
+      setExecutionState((prev) => ({
+        ...prev,
+        isBuildingQueue: false,
+      }));
+      executionLockRef.current = false;
+      throw new Error(
+        "Task queue is empty. No tasks were queued for execution — templates may have failed to load."
+      );
+    }
+
     const startTime = new Date();
 
     emitQueueProgress(`Task queue ready: ${tasks.length} tasks queued`, "success");

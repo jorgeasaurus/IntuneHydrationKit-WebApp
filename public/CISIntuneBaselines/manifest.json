@@ -633,7 +633,7 @@
       "displayName": "Baseline - Edge - Allow software WebGL fallback using SwiftShader_2025-09-01T08_16_19.767Z"
     },
     {
-      "path": "3.0 - Browser Benchmarks/Microsoft Edge/Baseline - Edge - Configuration policy for Microsoft Edge for Business Reporting Connectors_2025-09-01T08_16_22.439Z.json",
+      "path": "3.0 - Browser Benchmarks/Microsoft Edge/Baseline - Edge - Configuration policy for Microsoft Edge for Business Telemetry Connectors_2025-09-01T08_16_22.439Z.json",
       "category": "3.0 - Browser Benchmarks",
       "subcategory": "Microsoft Edge",
       "displayName": "Baseline - Edge - Configuration policy for Microsoft Edge for Business Reporting Connectors_2025-09-01T08_16_22.439Z"
@@ -1245,7 +1245,7 @@
       "displayName": "CISv4 - WIN - L1 - Config refresh"
     },
     {
-      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L1 - Configure local setting override for  reporting to Microsoft MAPS.json",
+      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L1 - Configure local setting override for Microsoft MAPS telemetry.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "Intune Win11",
       "displayName": "CISv4 - WIN - L1 - Configure local setting override for  reporting to Microsoft MAPS"
@@ -1389,7 +1389,7 @@
       "displayName": "CISv4 - WIN - L1 - Days Until Aggressive Catchup Quick Scan"
     },
     {
-      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L1 - Debug Programs.json",
+      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L1 - Program Diagnostics Privilege.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "Intune Win11",
       "displayName": "CISv4 - WIN - L1 - Debug Programs"
@@ -1911,7 +1911,7 @@
       "displayName": "CISv4 - WIN - L1 - Limit Diagnostic Log Collection"
     },
     {
-      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L1 - Limit Dump Collection.json",
+      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L1 - Limit Memory Collection.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "Intune Win11",
       "displayName": "CISv4 - WIN - L1 - Limit Dump Collection"
@@ -2955,7 +2955,7 @@
       "displayName": "CISv4 - WIN - L2 - Turn off Windows Customer Experience  Improvement Program"
     },
     {
-      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L2 - Turn off Windows Error Reporting.json",
+      "path": "4.0 - CIS Benchmarks/Intune Win11/CISv4 - WIN - L2 - Turn off Windows Error Submission.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "Intune Win11",
       "displayName": "CISv4 - WIN - L2 - Turn off Windows Error Reporting"
@@ -3075,7 +3075,7 @@
       "displayName": "CISv3 - EDGE - L1 - Allow queries to a Browser Network Time service"
     },
     {
-      "path": "4.0 - CIS Benchmarks/Microsoft Edge/Level1/CISv3 - EDGE - L1 - Allow remote debugging.json",
+      "path": "4.0 - CIS Benchmarks/Microsoft Edge/Level1/CISv3 - EDGE - L1 - Allow remote inspection.json",
       "category": "4.0 - CIS Benchmarks",
       "subcategory": "Microsoft Edge",
       "displayName": "CISv3 - EDGE - L1 - Allow remote debugging"

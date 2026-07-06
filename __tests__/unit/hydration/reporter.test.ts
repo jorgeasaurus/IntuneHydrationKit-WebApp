@@ -242,7 +242,7 @@ describe('reporter', () => {
       const lines = csv.split('\n')
 
       expect(lines[0]).toBe(
-        'Category,Item Name,Operation,Status,Error,Warning,Start Time,End Time,Duration (ms)'
+        '"Category","Item Name","Operation","Status","Error","Warning","Start Time","End Time","Duration (ms)"'
       )
     })
 
@@ -286,7 +286,7 @@ describe('reporter', () => {
 
     it('includes duration in milliseconds', () => {
       const csv = generateCSVReport(mockTasks)
-      expect(csv).toContain(',2000') // 2 seconds = 2000ms
+      expect(csv).toContain(',"2000"') // 2 seconds = 2000ms
     })
 
     it('handles tasks without times', () => {
@@ -302,8 +302,8 @@ describe('reporter', () => {
       const lines = csv.split('\n')
       const dataLine = lines[1]
 
-      // Should have empty values for time columns
-      expect(dataLine).toMatch(/,,,\s*$/)
+      // Should have empty (quoted) values for time columns
+      expect(dataLine).toMatch(/"","",""\s*$/)
     })
 
     it('formats dates correctly', () => {

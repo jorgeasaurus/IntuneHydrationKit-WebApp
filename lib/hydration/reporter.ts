@@ -14,7 +14,8 @@ export function generateMarkdownReport(
   tasks: HydrationTask[]
 ): string {
   const duration = formatDuration(summary.duration);
-  const timestamp = format(summary.startTime, "yyyy-MM-dd HH:mm:ss 'UTC'");
+  // Render actual UTC time (toISOString), not local time with a hardcoded UTC label
+  const timestamp = `${summary.startTime.toISOString().replace("T", " ").slice(0, 19)} UTC`;
 
   let markdown = `# Intune Hydration Report
 
@@ -152,6 +153,10 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
     "Duration (ms)",
   ];
 
+  // Quote-escape every field so commas/quotes/newlines in any value can't break the CSV
+  const escapeCSVField = (value: string | number): string =>
+    `"${String(value).replace(/"/g, '""')}"`;
+
   const rows = tasks.map((task) => {
     const duration =
       task.startTime && task.endTime
@@ -160,18 +165,20 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
 
     return [
       task.category,
-      `"${task.itemName.replace(/"/g, '""')}"`, // Escape quotes
+      task.itemName,
       task.operation,
       task.status,
-      task.error ? `"${task.error.replace(/"/g, '""')}"` : "",
-      task.warning ? `"${task.warning.replace(/"/g, '""')}"` : "",
+      task.error ?? "",
+      task.warning ?? "",
       task.startTime ? format(task.startTime, "yyyy-MM-dd HH:mm:ss") : "",
       task.endTime ? format(task.endTime, "yyyy-MM-dd HH:mm:ss") : "",
       duration,
-    ];
+    ].map(escapeCSVField);
   });
 
-  const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+  const csv = [headers.map(escapeCSVField), ...rows]
+    .map((row) => row.join(","))
+    .join("\n");
 
   return csv;
 }
@@ -189,9 +196,9 @@ export function createSummary(
 ): HydrationSummary {
   const stats = {
     total: tasks.length,
-    created: tasks.filter((t) => t.status === "success" && operationMode === "create")
+    created: tasks.filter((t) => t.status === "success" && t.operation === "create")
       .length,
-    deleted: tasks.filter((t) => t.status === "success" && operationMode === "delete")
+    deleted: tasks.filter((t) => t.status === "success" && t.operation === "delete")
       .length,
     skipped: tasks.filter((t) => t.status === "skipped").length,
     failed: tasks.filter((t) => t.status === "failed").length,

@@ -1,6 +1,7 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
+import { EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
 
 // Store the selected cloud environment for the session
 let selectedCloudEnvironment: CloudEnvironment = "global";
@@ -29,8 +30,9 @@ export function setSelectedCloudEnvironment(environment: CloudEnvironment): void
 export function loadCloudEnvironmentFromSession(): CloudEnvironment {
   if (typeof window !== "undefined") {
     const stored = sessionStorage.getItem("cloudEnvironment");
-    if (stored && ["global", "usgov", "usgovdod", "germany", "china"].includes(stored)) {
-      selectedCloudEnvironment = stored as CloudEnvironment;
+    // Web app supports commercial cloud only; sovereign clouds must use the PowerShell module
+    if (stored === "global") {
+      selectedCloudEnvironment = stored;
     }
   }
   return selectedCloudEnvironment;
@@ -120,14 +122,40 @@ export async function signIn(cloudEnvironment: CloudEnvironment = "global"): Pro
 }
 
 /**
+ * Clear all app data from sessionStorage (tenant results, cloud selection, template caches)
+ * Prevents cross-tenant/cross-user data leakage on shared browsers
+ */
+function clearSessionData(): void {
+  if (typeof window === "undefined") return;
+
+  sessionStorage.removeItem("cloudEnvironment");
+  Object.values(EXECUTION_RESULT_STORAGE_KEYS).forEach((key) =>
+    sessionStorage.removeItem(key)
+  );
+
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key?.startsWith("intune-hydration-templates-")) {
+      keysToRemove.push(key);
+    }
+  }
+  keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+}
+
+/**
  * Sign out the user
  */
 export async function signOut(): Promise<void> {
   const account = getActiveAccount();
-  if (account) {
-    await msalInstance.logoutPopup({
-      account,
-    });
+  try {
+    if (account) {
+      await msalInstance.logoutPopup({
+        account,
+      });
+    }
+  } finally {
+    clearSessionData();
   }
 }
 

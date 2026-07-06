@@ -606,7 +606,7 @@
       "displayName": "Win - OIB - SC - Windows Update for Business - D - Delivery Optimisation - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Update for Business - D - Reports and Telemetry - v3.0.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Update for Business - D - Data and Telemetry - v3.0.json",
       "platform": "WINDOWS",
       "policyType": "SettingsCatalog",
       "displayName": "Win - OIB - SC - Windows Update for Business - D - Reports and Telemetry - v3.0"
