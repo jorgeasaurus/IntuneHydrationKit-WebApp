@@ -130,9 +130,10 @@ function WizardContent() {
             <Image
               src="/IHTLogoClear.png"
               alt="Intune Hydration Kit Logo"
-              width={48}
-              height={48}
-              className="size-12"
+              width={144}
+              height={169}
+              className="h-12 w-auto"
+              style={{ width: "auto" }}
             />
             <div>
               <div className="flex items-center gap-2">

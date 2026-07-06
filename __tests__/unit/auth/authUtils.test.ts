@@ -28,6 +28,28 @@ vi.mock("@/lib/auth/msalConfig", () => ({
   loginRequest: {
     scopes: ["User.Read"],
   },
+  CLOUD_ENVIRONMENTS: {
+    global: {
+      authority: "https://login.microsoftonline.com",
+      graphEndpoint: "https://graph.microsoft.com",
+    },
+    usgov: {
+      authority: "https://login.microsoftonline.us",
+      graphEndpoint: "https://graph.microsoft.us",
+    },
+    usgovdod: {
+      authority: "https://login.microsoftonline.us",
+      graphEndpoint: "https://dod-graph.microsoft.us",
+    },
+    germany: {
+      authority: "https://login.microsoftonline.de",
+      graphEndpoint: "https://graph.microsoft.de",
+    },
+    china: {
+      authority: "https://login.chinacloudapi.cn",
+      graphEndpoint: "https://microsoftgraph.chinacloudapi.cn",
+    },
+  },
   getAuthorityUrl: mocks.getAuthorityUrl,
 }));
 
@@ -63,7 +85,7 @@ describe("authUtils", () => {
     mocks.msalInstance.getAllAccounts.mockReturnValue([]);
   });
 
-  it("stores and restores a valid cloud environment from session storage", () => {
+  it("stores and restores supported cloud environments from session storage", () => {
     setSelectedCloudEnvironment("usgov");
 
     expect(getSelectedCloudEnvironment()).toBe("usgov");
@@ -77,7 +99,7 @@ describe("authUtils", () => {
 
   it("ignores invalid cloud environments from session storage", () => {
     setSelectedCloudEnvironment("germany");
-    window.sessionStorage.setItem("cloudEnvironment", "invalid-cloud");
+    window.sessionStorage.setItem("cloudEnvironment", "toString");
 
     expect(loadCloudEnvironmentFromSession()).toBe("germany");
   });

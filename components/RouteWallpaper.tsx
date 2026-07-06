@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useReducer } from "react";
 
 import { shouldRenderWallpaper } from "@/components/routeWallpaperRules";
 
@@ -28,7 +28,7 @@ export function RouteWallpaper(): React.JSX.Element | null {
   // is mounted later via requestIdleCallback so it never blocks LCP/INP, and it
   // depends on browser-only APIs (matchMedia/requestIdleCallback) unavailable
   // during SSR. The false -> true transition is the deferral, not lazy init.
-  const [animated, setAnimated] = useState(false);
+  const [animated, dispatchWallpaper] = useReducer((_: boolean, next: boolean) => next, false);
 
   useEffect(() => {
     if (typeof window === "undefined") {
@@ -39,7 +39,7 @@ export function RouteWallpaper(): React.JSX.Element | null {
     // wallpaper route always pays the idle-callback deferral again. Without
     // this, `animated` would stay `true` after the user leaves and returns,
     // and DynamicWallpaper would mount synchronously and contend with LCP/INP.
-    setAnimated(false);
+    dispatchWallpaper(false);
 
     // Only defer-mount the heavy wallpaper on routes that actually render it.
     // On non-wallpaper routes the component returns null, so scheduling an idle
@@ -72,10 +72,9 @@ export function RouteWallpaper(): React.JSX.Element | null {
 
     const load = (): void => {
       if (motionQuery?.matches) {
-        setAnimated(false);
         return;
       }
-      idleHandle = schedule(() => setAnimated(true)) as number;
+      idleHandle = schedule(() => dispatchWallpaper(true)) as number;
     };
 
     const handleMotionChange = (event: MediaQueryListEvent): void => {
@@ -84,9 +83,9 @@ export function RouteWallpaper(): React.JSX.Element | null {
         idleHandle = undefined;
       }
       if (event.matches) {
-        setAnimated(false);
+        dispatchWallpaper(false);
       } else {
-        idleHandle = schedule(() => setAnimated(true)) as number;
+        idleHandle = schedule(() => dispatchWallpaper(true)) as number;
       }
     };
 

@@ -242,7 +242,7 @@ describe('reporter', () => {
       const lines = csv.split('\n')
 
       expect(lines[0]).toBe(
-        'Category,Item Name,Operation,Status,Error,Warning,Start Time,End Time,Duration (ms)'
+        '"Category","Item Name","Operation","Status","Error","Warning","Start Time (UTC)","End Time (UTC)","Duration (ms)"'
       )
     })
 
@@ -286,7 +286,7 @@ describe('reporter', () => {
 
     it('includes duration in milliseconds', () => {
       const csv = generateCSVReport(mockTasks)
-      expect(csv).toContain(',2000') // 2 seconds = 2000ms
+      expect(csv).toContain(',"2000"') // 2 seconds = 2000ms
     })
 
     it('handles tasks without times', () => {
@@ -302,14 +302,24 @@ describe('reporter', () => {
       const lines = csv.split('\n')
       const dataLine = lines[1]
 
-      // Should have empty values for time columns
-      expect(dataLine).toMatch(/,,,\s*$/)
+      // Should have empty (quoted) values for time columns
+      expect(dataLine).toMatch(/"","",""\s*$/)
     })
 
-    it('formats dates correctly', () => {
-      const csv = generateCSVReport(mockTasks)
-      // Check for date format pattern (timezone-agnostic)
-      expect(csv).toMatch(/\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/)
+    it('formats dates in UTC', () => {
+      const tasksWithOffsetDates: HydrationTask[] = [{
+        id: 'task-offset-date',
+        category: 'groups',
+        operation: 'create',
+        itemName: 'Offset Date Group',
+        status: 'success',
+        startTime: new Date('2024-01-15T10:00:00-05:00'),
+        endTime: new Date('2024-01-15T10:00:01-05:00'),
+      }]
+
+      const csv = generateCSVReport(tasksWithOffsetDates)
+
+      expect(csv).toContain('"2024-01-15 15:00:00","2024-01-15 15:00:01"')
     })
   })
 

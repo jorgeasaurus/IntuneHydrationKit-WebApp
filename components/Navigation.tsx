@@ -72,9 +72,10 @@ export function Navigation() {
                   <Image
                     src="/IHTLogoClear.png"
                     alt="Intune Hydration Kit"
-                    width={36}
-                    height={36}
-                    className="size-9 transition-transform group-hover:scale-105"
+                    width={144}
+                    height={169}
+                    className="h-9 w-auto transition-transform group-hover:scale-105"
+                    style={{ width: "auto" }}
                   />
                   {/* Glow effect on hover */}
                   <div className="absolute inset-0 bg-hydrate/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
