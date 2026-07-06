@@ -650,3 +650,15 @@
 - PR #8 merged into `main` at merge commit `4c3f1ba`.
 - Vercel production deployment `dpl_CS9c7SQ2nnAQbcrzp1daeXH4av3d` is ready and aliased to `https://www.intunehydrationkit.com`.
 - Production HTTP check returned `200`.
+
+# PR #11 Review Comments
+
+- [x] Restore supported sovereign cloud values when loading the session cloud environment.
+- [x] Render CSV start/end timestamps in UTC.
+- [x] Verify and push the PR update.
+
+## Review
+
+- Restored session reload for all supported cloud environments via the MSAL cloud endpoint map.
+- CSV reports now label start/end columns as UTC and render UTC values.
+- Checks passed: focused auth/reporter tests, `npm run test:run`, `npm run type-check`, `npm run build`, `git diff --check`.

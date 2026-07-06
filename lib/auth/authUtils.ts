@@ -1,10 +1,14 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
-import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
+import { msalInstance, loginRequest, getAuthorityUrl, CLOUD_ENVIRONMENTS } from "./msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
 import { EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
 
 // Store the selected cloud environment for the session
 let selectedCloudEnvironment: CloudEnvironment = "global";
+
+function isCloudEnvironment(value: string | null): value is CloudEnvironment {
+  return value !== null && Object.prototype.hasOwnProperty.call(CLOUD_ENVIRONMENTS, value);
+}
 
 /**
  * Get the currently selected cloud environment
@@ -30,8 +34,7 @@ export function setSelectedCloudEnvironment(environment: CloudEnvironment): void
 export function loadCloudEnvironmentFromSession(): CloudEnvironment {
   if (typeof window !== "undefined") {
     const stored = sessionStorage.getItem("cloudEnvironment");
-    // Web app supports commercial cloud only; sovereign clouds must use the PowerShell module
-    if (stored === "global") {
+    if (isCloudEnvironment(stored)) {
       selectedCloudEnvironment = stored;
     }
   }

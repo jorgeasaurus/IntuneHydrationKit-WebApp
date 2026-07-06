@@ -6,6 +6,10 @@
 import { HydrationSummary, HydrationTask, BatchExecutionStats } from "@/types/hydration";
 import { format } from "date-fns";
 
+function formatUtcDateTime(date: Date): string {
+  return date.toISOString().replace("T", " ").slice(0, 19);
+}
+
 /**
  * Generate Markdown report
  */
@@ -15,7 +19,7 @@ export function generateMarkdownReport(
 ): string {
   const duration = formatDuration(summary.duration);
   // Render actual UTC time (toISOString), not local time with a hardcoded UTC label
-  const timestamp = `${summary.startTime.toISOString().replace("T", " ").slice(0, 19)} UTC`;
+  const timestamp = `${formatUtcDateTime(summary.startTime)} UTC`;
 
   let markdown = `# Intune Hydration Report
 
@@ -148,8 +152,8 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
     "Status",
     "Error",
     "Warning",
-    "Start Time",
-    "End Time",
+    "Start Time (UTC)",
+    "End Time (UTC)",
     "Duration (ms)",
   ];
 
@@ -170,8 +174,8 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
       task.status,
       task.error ?? "",
       task.warning ?? "",
-      task.startTime ? format(task.startTime, "yyyy-MM-dd HH:mm:ss") : "",
-      task.endTime ? format(task.endTime, "yyyy-MM-dd HH:mm:ss") : "",
+      task.startTime ? formatUtcDateTime(task.startTime) : "",
+      task.endTime ? formatUtcDateTime(task.endTime) : "",
       duration,
     ].map(escapeCSVField);
   });

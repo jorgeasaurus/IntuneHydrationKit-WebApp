@@ -28,6 +28,28 @@ vi.mock("@/lib/auth/msalConfig", () => ({
   loginRequest: {
     scopes: ["User.Read"],
   },
+  CLOUD_ENVIRONMENTS: {
+    global: {
+      authority: "https://login.microsoftonline.com",
+      graphEndpoint: "https://graph.microsoft.com",
+    },
+    usgov: {
+      authority: "https://login.microsoftonline.us",
+      graphEndpoint: "https://graph.microsoft.us",
+    },
+    usgovdod: {
+      authority: "https://login.microsoftonline.us",
+      graphEndpoint: "https://dod-graph.microsoft.us",
+    },
+    germany: {
+      authority: "https://login.microsoftonline.de",
+      graphEndpoint: "https://graph.microsoft.de",
+    },
+    china: {
+      authority: "https://login.chinacloudapi.cn",
+      graphEndpoint: "https://microsoftgraph.chinacloudapi.cn",
+    },
+  },
   getAuthorityUrl: mocks.getAuthorityUrl,
 }));
 
@@ -63,29 +85,21 @@ describe("authUtils", () => {
     mocks.msalInstance.getAllAccounts.mockReturnValue([]);
   });
 
-  it("stores and restores a valid cloud environment from session storage", () => {
+  it("stores and restores supported cloud environments from session storage", () => {
     setSelectedCloudEnvironment("usgov");
 
     expect(getSelectedCloudEnvironment()).toBe("usgov");
     expect(window.sessionStorage.getItem("cloudEnvironment")).toBe("usgov");
 
-    window.sessionStorage.setItem("cloudEnvironment", "global");
-
-    expect(loadCloudEnvironmentFromSession()).toBe("global");
-    expect(getSelectedCloudEnvironment()).toBe("global");
-  });
-
-  it("ignores sovereign cloud environments from session storage (web app is commercial-only)", () => {
-    setSelectedCloudEnvironment("global");
     window.sessionStorage.setItem("cloudEnvironment", "china");
 
-    expect(loadCloudEnvironmentFromSession()).toBe("global");
-    expect(getSelectedCloudEnvironment()).toBe("global");
+    expect(loadCloudEnvironmentFromSession()).toBe("china");
+    expect(getSelectedCloudEnvironment()).toBe("china");
   });
 
   it("ignores invalid cloud environments from session storage", () => {
     setSelectedCloudEnvironment("germany");
-    window.sessionStorage.setItem("cloudEnvironment", "invalid-cloud");
+    window.sessionStorage.setItem("cloudEnvironment", "toString");
 
     expect(loadCloudEnvironmentFromSession()).toBe("germany");
   });
