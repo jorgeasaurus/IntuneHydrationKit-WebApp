@@ -263,7 +263,7 @@ describe("useHydrationExecution", () => {
       await result.current.startExecution();
     });
 
-    expect(mockCreateGraphClient).toHaveBeenCalledWith("global");
+    expect(mockCreateGraphClient).toHaveBeenCalled();
     expect(mockBuildTaskQueueAsync).toHaveBeenCalledWith(
       ["groups", "enrollment"],
       "create",

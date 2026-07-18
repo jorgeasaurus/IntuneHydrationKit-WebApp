@@ -42,18 +42,13 @@ describe("msalConfig", () => {
     mocks.constructorSpy.mockClear();
   });
 
-  it("returns the correct graph endpoints and authority URLs for supported clouds", async () => {
+  it("returns the correct graph endpoint and authority URL for the global cloud", async () => {
     const { getAuthorityUrl, getGraphEndpoint } = await importModule();
 
     expect(getGraphEndpoint()).toBe("https://graph.microsoft.com");
-    expect(getGraphEndpoint("usgov")).toBe("https://graph.microsoft.us");
-    expect(getGraphEndpoint("usgovdod")).toBe("https://dod-graph.microsoft.us");
-    expect(getGraphEndpoint("germany")).toBe("https://graph.microsoft.de");
-    expect(getGraphEndpoint("china")).toBe("https://microsoftgraph.chinacloudapi.cn");
-
     expect(getAuthorityUrl()).toBe("https://login.microsoftonline.com/common");
-    expect(getAuthorityUrl("germany", "tenant-id")).toBe(
-      "https://login.microsoftonline.de/tenant-id"
+    expect(getAuthorityUrl("tenant-id")).toBe(
+      "https://login.microsoftonline.com/tenant-id"
     );
   });
 

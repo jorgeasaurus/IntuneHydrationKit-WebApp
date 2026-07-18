@@ -9,7 +9,6 @@ import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
-import { CloudEnvironment } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
 import { LIGHT_DARK_THEME_CYCLE, ThemeToggle } from "@/components/ThemeToggle";
 import { Terminal, Github } from "lucide-react";
@@ -27,10 +26,10 @@ export function Navigation() {
     setShowCloudSelector(true);
   };
 
-  const handleCloudSelect = async (environment: CloudEnvironment) => {
+  const handleCloudSelect = async () => {
     setShowCloudSelector(false);
     try {
-      await signIn(environment);
+      await signIn();
       toast.success("Successfully signed in!");
       resetWizard();
       router.push("/wizard");

@@ -56,7 +56,6 @@ vi.mock("@/lib/auth/msalConfig", () => ({
 
 import {
   AuthSessionExpiredError,
-  UnsupportedCloudEnvironmentError,
   getAccessToken,
   getActiveAccount,
   getSelectedCloudEnvironment,
@@ -80,27 +79,19 @@ describe("authUtils", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
-    setSelectedCloudEnvironment("global");
-    mocks.getAuthorityUrl.mockImplementation((environment: string, tenantId: string) =>
-      `https://authority.example/${environment}/${tenantId}`
+    setSelectedCloudEnvironment();
+    mocks.getAuthorityUrl.mockImplementation((tenantId: string) =>
+      `https://authority.example/global/${tenantId}`
     );
     mocks.msalInstance.getAllAccounts.mockReturnValue([]);
     mocks.msalInstance.getActiveAccount.mockReturnValue(null);
   });
 
   it("stores the global cloud environment in session storage", () => {
-    setSelectedCloudEnvironment("global");
+    setSelectedCloudEnvironment();
 
     expect(getSelectedCloudEnvironment()).toBe("global");
     expect(window.sessionStorage.getItem("cloudEnvironment")).toBe("global");
-  });
-
-  it("rejects sovereign cloud environments", () => {
-    expect(() => setSelectedCloudEnvironment("usgov")).toThrow(UnsupportedCloudEnvironmentError);
-    expect(() => setSelectedCloudEnvironment("china")).toThrow(UnsupportedCloudEnvironmentError);
-
-    // Selection remains pinned to global
-    expect(getSelectedCloudEnvironment()).toBe("global");
   });
 
   it("discards stale sovereign cloud values from session storage", () => {
@@ -144,7 +135,7 @@ describe("authUtils", () => {
 
     await expect(getAccessToken()).resolves.toBe("silent-token");
 
-    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("global", "tenant-id");
+    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("tenant-id");
     expect(mocks.msalInstance.acquireTokenSilent).toHaveBeenCalledWith(
       expect.objectContaining({
         account,
@@ -203,21 +194,15 @@ describe("authUtils", () => {
   it("signs in with the global cloud environment and activates the returned account", async () => {
     mocks.msalInstance.loginPopup.mockResolvedValue({ account });
 
-    await expect(signIn("global")).resolves.toEqual(account);
+    await expect(signIn()).resolves.toEqual(account);
 
     expect(getSelectedCloudEnvironment()).toBe("global");
-    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("global", "common");
+    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("common");
     expect(mocks.msalInstance.loginPopup).toHaveBeenCalledWith({
       authority: "https://authority.example/global/common",
       scopes: ["User.Read"],
     });
     expect(mocks.msalInstance.setActiveAccount).toHaveBeenCalledWith(account);
-  });
-
-  it("rejects sign in for sovereign cloud environments", async () => {
-    await expect(signIn("china")).rejects.toBeInstanceOf(UnsupportedCloudEnvironmentError);
-
-    expect(mocks.msalInstance.loginPopup).not.toHaveBeenCalled();
   });
 
   it("throws when sign in completes without an account", async () => {

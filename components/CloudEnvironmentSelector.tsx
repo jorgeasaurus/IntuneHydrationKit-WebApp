@@ -1,6 +1,5 @@
 "use client";
 
-import { CloudEnvironment } from "@/types/hydration";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,23 +15,9 @@ const POWERSHELL_MODULE_URL = "https://github.com/jorgeasaurus/IntuneHydrationKi
 
 interface CloudEnvironmentSelectorProps {
   open: boolean;
-  onSelect: (environment: CloudEnvironment) => void;
+  onSelect: () => void;
   onCancel: () => void;
 }
-
-interface CloudEnvironmentOption {
-  value: CloudEnvironment;
-  label: string;
-  description: string;
-  icon: React.ReactNode;
-}
-
-const COMMERCIAL_CLOUD: CloudEnvironmentOption = {
-  value: "global",
-  label: "Global (Commercial)",
-  description: "Microsoft 365 commercial cloud for worldwide customers",
-  icon: <Globe className="size-5" />,
-};
 
 export function CloudEnvironmentSelector({
   open,
@@ -40,7 +25,7 @@ export function CloudEnvironmentSelector({
   onCancel,
 }: CloudEnvironmentSelectorProps) {
   const handleContinue = () => {
-    onSelect("global");
+    onSelect();
   };
 
   return (
@@ -61,14 +46,14 @@ export function CloudEnvironmentSelector({
           <div className="flex items-start gap-4 rounded-lg border border-border bg-muted/35 p-4 transition-colors dark:border-slate-700 dark:bg-slate-950/45">
             <div className="flex-1 space-y-1">
               <div className="flex items-center gap-2">
-                {COMMERCIAL_CLOUD.icon}
-                <span className="font-medium">{COMMERCIAL_CLOUD.label}</span>
+                <Globe className="size-5" />
+                <span className="font-medium">Global (Commercial)</span>
                 <span className="ml-auto inline-flex items-center rounded-md bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-inset ring-green-600/20 dark:bg-green-500/10 dark:text-green-400 dark:ring-green-500/20">
                   Supported
                 </span>
               </div>
               <p className="text-sm text-muted-foreground">
-                {COMMERCIAL_CLOUD.description}
+                Microsoft 365 commercial cloud for worldwide customers
               </p>
             </div>
           </div>

@@ -1,5 +1,4 @@
 import { Configuration, LogLevel, PublicClientApplication } from "@azure/msal-browser";
-import { CloudEnvironment } from "@/types/hydration";
 
 /**
  * Microsoft Graph API scopes required for Intune Hydration Kit
@@ -20,46 +19,17 @@ export const REQUIRED_SCOPES = [
 ];
 
 /**
- * Cloud environment endpoints for multi-cloud support
+ * Get the Graph API endpoint (global/commercial cloud only)
  */
-export const CLOUD_ENVIRONMENTS = {
-  global: {
-    authority: "https://login.microsoftonline.com",
-    graphEndpoint: "https://graph.microsoft.com",
-  },
-  usgov: {
-    authority: "https://login.microsoftonline.us",
-    graphEndpoint: "https://graph.microsoft.us",
-  },
-  usgovdod: {
-    authority: "https://login.microsoftonline.us",
-    graphEndpoint: "https://dod-graph.microsoft.us",
-  },
-  germany: {
-    authority: "https://login.microsoftonline.de",
-    graphEndpoint: "https://graph.microsoft.de",
-  },
-  china: {
-    authority: "https://login.chinacloudapi.cn",
-    graphEndpoint: "https://microsoftgraph.chinacloudapi.cn",
-  },
-};
-
-/**
- * Get the Graph API endpoint for a cloud environment
- */
-export function getGraphEndpoint(environment: CloudEnvironment = "global"): string {
-  return CLOUD_ENVIRONMENTS[environment].graphEndpoint;
+export function getGraphEndpoint(): string {
+  return "https://graph.microsoft.com";
 }
 
 /**
- * Get the authority URL for a cloud environment
+ * Get the authority URL for a tenant (global/commercial cloud only)
  */
-export function getAuthorityUrl(
-  environment: CloudEnvironment = "global",
-  tenantId: string = "common"
-): string {
-  return `${CLOUD_ENVIRONMENTS[environment].authority}/${tenantId}`;
+export function getAuthorityUrl(tenantId: string = "common"): string {
+  return `https://login.microsoftonline.com/${tenantId}`;
 }
 
 /**

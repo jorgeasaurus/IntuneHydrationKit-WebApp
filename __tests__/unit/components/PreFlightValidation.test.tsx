@@ -85,7 +85,7 @@ describe('PreFlightValidation', () => {
       expect(validateTenant).toHaveBeenCalledWith({ id: 'graph-client' })
     })
 
-    expect(createGraphClient).toHaveBeenCalledWith('global')
+    expect(createGraphClient).toHaveBeenCalled()
     expect(await screen.findByText('Connected to Graph')).toBeInTheDocument()
     expect(screen.getByText('Driver update profiles require Windows E3 or higher')).toBeInTheDocument()
     expect(screen.getByText('Group.ReadWrite.All')).toBeInTheDocument()

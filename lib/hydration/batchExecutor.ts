@@ -1367,7 +1367,13 @@ async function policyExistsInCacheOrApi(
           (p) => p.displayName,
           false
         ) ?? context.cachedConditionalAccessPolicies?.find(
-          (p) => p.displayName?.toLowerCase() === `${lowerName} [intune hydration kit]`
+          (p) => {
+            const policyLower = p.displayName?.toLowerCase();
+            return (
+              policyLower === `${lowerName} [intune hydration kit]` ||
+              policyLower === `${lowerName} [imported by intune hydration kit]`
+            );
+          }
         ),
       apiCheck: () => conditionalAccessPolicyExists(context.client, policyName),
     },

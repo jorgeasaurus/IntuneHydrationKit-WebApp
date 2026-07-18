@@ -33,7 +33,7 @@ export function PreFlightValidation() {
     let progressInterval: ReturnType<typeof setInterval> | undefined;
 
     try {
-      const client = createGraphClient(state.tenantConfig.cloudEnvironment);
+      const client = createGraphClient();
 
       // Simulate progress for better UX
       progressInterval = setInterval(() => {

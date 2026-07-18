@@ -19,7 +19,7 @@ describe('validator', () => {
   let client: GraphClient
 
   beforeEach(() => {
-    client = new GraphClient('global')
+    client = new GraphClient()
     vi.clearAllMocks()
   })
 

@@ -95,8 +95,8 @@ export function normalizeName(name: string | undefined | null): string {
   if (!name) return "";
   return name
     .toLowerCase()
-    .replace(/[:'""`''""]/g, " ")
-    .replace(/\.{2,}/g, " ")
+    .replace(/[:'""`''\u2018\u2019\u201C\u201D]/g, " ")
+    .replace(/\.{2,}|\u2026/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -142,7 +142,8 @@ export function findByNamePrecedence<T>(
   allowPartialMatch = true
 ): T | undefined {
   if (!items) return undefined;
-  const exact = items.find((item) => getName(item)?.toLowerCase() === nameToFind);
+  const lowerNameToFind = nameToFind.toLowerCase();
+  const exact = items.find((item) => getName(item)?.toLowerCase() === lowerNameToFind);
   if (exact) return exact;
   const normalized = items.find(
     (item) => normalizeName(getName(item)) === normalizedNameToFind

@@ -3,29 +3,10 @@ import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
 import { APP_SETTINGS_STORAGE_KEY, EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
 
-/**
- * The web app only supports the commercial (Global) cloud.
- * Sovereign clouds (GCC High, DoD, Germany, China) must use the PowerShell module:
- * https://github.com/jorgeasaurus/IntuneHydrationKit
- */
 const SUPPORTED_CLOUD_ENVIRONMENT: CloudEnvironment = "global";
 
 // Store the selected cloud environment for the session (always "global")
 let selectedCloudEnvironment: CloudEnvironment = SUPPORTED_CLOUD_ENVIRONMENT;
-
-/**
- * Error thrown when a caller requests a cloud environment the web app does not support
- */
-export class UnsupportedCloudEnvironmentError extends Error {
-  constructor(environment: string) {
-    super(
-      `Cloud environment "${environment}" is not supported by the web app. ` +
-        "Only the Global (Commercial) cloud is supported. " +
-        "Use the IntuneHydrationKit PowerShell module for sovereign clouds."
-    );
-    this.name = "UnsupportedCloudEnvironmentError";
-  }
-}
 
 /**
  * Get the currently selected cloud environment
@@ -35,13 +16,9 @@ export function getSelectedCloudEnvironment(): CloudEnvironment {
 }
 
 /**
- * Set the cloud environment for the session.
- * Only "global" is accepted - sovereign clouds must use the PowerShell module.
+ * Set the cloud environment for the session (always "global").
  */
-export function setSelectedCloudEnvironment(environment: CloudEnvironment): void {
-  if (environment !== SUPPORTED_CLOUD_ENVIRONMENT) {
-    throw new UnsupportedCloudEnvironmentError(environment);
-  }
+export function setSelectedCloudEnvironment(): void {
   selectedCloudEnvironment = SUPPORTED_CLOUD_ENVIRONMENT;
   // Also store in sessionStorage for persistence across page reloads
   if (typeof window !== "undefined") {
@@ -83,8 +60,7 @@ export async function getAccessToken(): Promise<string> {
     throw new AuthSessionExpiredError();
   }
 
-  // Get authority for the selected cloud environment
-  const authority = getAuthorityUrl(selectedCloudEnvironment, account.tenantId);
+  const authority = getAuthorityUrl(account.tenantId);
 
   try {
     const response = await msalInstance.acquireTokenSilent({
@@ -123,15 +99,12 @@ export class AuthSessionExpiredError extends Error {
 }
 
 /**
- * Sign in the user. Only the Global (Commercial) cloud is supported;
- * sovereign clouds must use the PowerShell module.
+ * Sign in the user (global/commercial cloud only).
  */
-export async function signIn(cloudEnvironment: CloudEnvironment = "global"): Promise<AccountInfo> {
-  // Store the selected environment (throws for unsupported sovereign clouds)
-  setSelectedCloudEnvironment(cloudEnvironment);
+export async function signIn(): Promise<AccountInfo> {
+  setSelectedCloudEnvironment();
 
-  // Get authority URL for the selected cloud environment
-  const authority = getAuthorityUrl(cloudEnvironment, "common");
+  const authority = getAuthorityUrl("common");
 
   const response = await msalInstance.loginPopup({
     ...loginRequest,
