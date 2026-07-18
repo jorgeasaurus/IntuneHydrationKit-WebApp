@@ -20,13 +20,17 @@ export async function getAllGroups(client: GraphClient): Promise<DeviceGroup[]> 
  */
 export async function getHydrationKitGroups(client: GraphClient): Promise<DeviceGroup[]> {
   // Use contains filter to match both marker variations
-  // Note: Graph API doesn't support OR in filters well, so we do two queries
-  const filter1 = `contains(description,'${HYDRATION_MARKER}')`;
-  const filter2 = `contains(description,'${HYDRATION_MARKER_LEGACY}')`;
+  // Note: Graph API doesn't support OR in filters well, so we do two queries.
+  // Escape single quotes per OData rules and let query failures propagate -
+  // silently returning [] would make delete mode report "nothing to delete".
+  const escapedMarker = HYDRATION_MARKER.replace(/'/g, "''");
+  const escapedLegacyMarker = HYDRATION_MARKER_LEGACY.replace(/'/g, "''");
+  const filter1 = `contains(description,'${escapedMarker}')`;
+  const filter2 = `contains(description,'${escapedLegacyMarker}')`;
 
   const [groups1, groups2] = await Promise.all([
-    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter1)}&$select=id,displayName,description`).catch(() => []),
-    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter2)}&$select=id,displayName,description`).catch(() => [])
+    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter1)}&$select=id,displayName,description`),
+    client.getCollection<DeviceGroup>(`/groups?$filter=${encodeURIComponent(filter2)}&$select=id,displayName,description`)
   ]);
 
   // Combine and deduplicate by id

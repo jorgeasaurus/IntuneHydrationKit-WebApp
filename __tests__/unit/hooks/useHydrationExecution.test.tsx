@@ -55,7 +55,7 @@ vi.mock("@/lib/hydration/batchExecutor", () => ({
   isBatchableCategory: mockIsBatchableCategory,
 }));
 
-import { useHydrationExecution } from "@/hooks/useHydrationExecution";
+import { useHydrationExecution, resetExecutionControlForTests } from "@/hooks/useHydrationExecution";
 
 function createPrerequisiteResult(): PrerequisiteCheckResult {
   return {
@@ -174,6 +174,9 @@ describe("useHydrationExecution", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // The run lock is module-scope and shared across hook instances - reset it
+    // so a leaked run from one test can't block the next
+    resetExecutionControlForTests();
 
     wizardState = createWizardState();
     settings = {
@@ -260,7 +263,7 @@ describe("useHydrationExecution", () => {
       await result.current.startExecution();
     });
 
-    expect(mockCreateGraphClient).toHaveBeenCalledWith("global");
+    expect(mockCreateGraphClient).toHaveBeenCalled();
     expect(mockBuildTaskQueueAsync).toHaveBeenCalledWith(
       ["groups", "enrollment"],
       "create",
@@ -297,7 +300,8 @@ describe("useHydrationExecution", () => {
         batchRequestCount: 1,
         batchedTaskCount: 1,
         sequentialTaskCount: 1,
-      }
+      },
+      "Contoso"
     );
 
     expect(result.current.tasks).toEqual([
@@ -382,8 +386,34 @@ describe("useHydrationExecution", () => {
     expect(result.current.summary).toBeNull();
   });
 
-  it("supports pause, resume, cancel, and reset controls", () => {
+  it("ignores pause and resume when no execution is running", () => {
     const { result } = renderHook(() => useHydrationExecution());
+
+    act(() => {
+      result.current.pause();
+    });
+    expect(result.current.isPaused).toBe(false);
+    expect(result.current.activityLog).toEqual([]);
+
+    act(() => {
+      result.current.resume();
+    });
+    expect(result.current.isPaused).toBe(false);
+    expect(result.current.activityLog).toEqual([]);
+  });
+
+  it("supports pause, resume, cancel, and reset controls during a run", async () => {
+    const tasks = [createTask("task-1", "groups", "Group One")];
+    mockBuildTaskQueueAsync.mockResolvedValue(tasks);
+    // Never resolves - keeps the execution in-flight so controls can be exercised
+    mockExecuteTasks.mockReturnValue(new Promise(() => {}));
+
+    const { result } = renderHook(() => useHydrationExecution());
+
+    await act(async () => {
+      void result.current.startExecution();
+    });
+    expect(result.current.isRunning).toBe(true);
 
     act(() => {
       result.current.pause();
@@ -403,6 +433,8 @@ describe("useHydrationExecution", () => {
     expect(result.current.isCompleted).toBe(true);
     expect(result.current.endTime).toBeInstanceOf(Date);
     expect(result.current.activityLog.map(({ message }) => message)).toEqual([
+      "Building task queue...",
+      "Task queue ready: 1 tasks queued",
       "Pause requested. Execution will stop after the current in-flight work completes.",
       "Execution resumed.",
       "Cancellation requested. Remaining work will be skipped.",

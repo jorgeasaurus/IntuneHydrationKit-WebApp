@@ -28,7 +28,6 @@ import {
 import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { Navigation } from "@/components/Navigation";
 import { WebAppDemo } from "@/components/WebAppDemo";
-import type { CloudEnvironment } from "@/types/hydration";
 import {
   APP_VERSION,
   CONFIGURATION_GROUPS,
@@ -45,7 +44,7 @@ type HomeLandingProps = {
   isAuthenticated: boolean;
   showCloudSelector: boolean;
   onSignInClick: () => void;
-  onCloudSelect: (environment: CloudEnvironment) => void | Promise<void>;
+  onCloudSelect: () => void | Promise<void>;
   onCloudSelectorCancel: () => void;
   onContinue: () => void;
 };

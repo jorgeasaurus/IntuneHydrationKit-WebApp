@@ -22,15 +22,8 @@ import {
 import { createGraphClient } from "@/lib/graph/client";
 import { validatePrerequisites } from "@/lib/graph/prerequisites";
 import { getSelectedCloudEnvironment, AuthSessionExpiredError } from "@/lib/auth/authUtils";
-import { CloudEnvironment } from "@/types/hydration";
 
-const CLOUD_ENVIRONMENT_LABELS: Record<CloudEnvironment, string> = {
-  global: "Global (Commercial)",
-  usgov: "US Government (GCC High)",
-  usgovdod: "US Government (DoD)",
-  germany: "Germany",
-  china: "China (21Vianet)",
-};
+const CLOUD_ENVIRONMENT_LABEL = "Global (Commercial)";
 
 function getStatusFromResult(result: PrerequisiteCheckResult): PrerequisiteCheckStatus {
   if (result.errors.length > 0) return "error";
@@ -118,8 +111,7 @@ export function TenantConfig(): React.JSX.Element {
       }
       setPrerequisiteStatus("checking");
 
-      const cloudEnv = getSelectedCloudEnvironment();
-      const graphClient = createGraphClient(cloudEnv);
+      const graphClient = createGraphClient();
       const result = await validatePrerequisites(graphClient);
       setPrerequisiteResult(result);
       setWizardPrerequisiteResult(result);
@@ -138,10 +130,21 @@ export function TenantConfig(): React.JSX.Element {
   }, [setWizardPrerequisiteResult]);
 
   useEffect(() => {
-    if (accounts.length > 0 && !state.prerequisiteResult) {
+    if (accounts.length === 0) {
+      return;
+    }
+    // Re-run validation when there is no cached result, OR when the cached
+    // result belongs to a DIFFERENT tenant (user signed out and into another
+    // tenant in the same session) - stale results from tenant A must never
+    // gate execution against tenant B.
+    const cachedOrgId = state.prerequisiteResult?.organization?.id;
+    // Single source of truth: `tenantId` derives from the accounts array this
+    // effect depends on, so the staleness check can never read an untracked value.
+    const isStale = Boolean(cachedOrgId && tenantId && cachedOrgId !== tenantId);
+    if (!state.prerequisiteResult || isStale) {
       void runPrerequisiteValidation(true);
     }
-  }, [accounts.length, runPrerequisiteValidation, state.prerequisiteResult]);
+  }, [accounts, tenantId, runPrerequisiteValidation, state.prerequisiteResult]);
 
   useEffect(() => {
     if (!state.prerequisiteResult) {
@@ -168,7 +171,6 @@ export function TenantConfig(): React.JSX.Element {
   }
 
   const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
-  const cloudEnvironment = getSelectedCloudEnvironment();
   const validatedAt = prerequisiteResult?.timestamp
     ? new Date(prerequisiteResult.timestamp).toLocaleTimeString([], {
         hour: "2-digit",
@@ -206,7 +208,7 @@ export function TenantConfig(): React.JSX.Element {
           ? "checking"
           : prerequisiteResult?.licenses?.hasIntuneLicense
             ? "success"
-            : prerequisiteResult?.licenses
+            : prerequisiteResult?.licenses || prerequisiteStatus === "error"
               ? "error"
               : "warning",
       icon: ShieldCheck,
@@ -314,7 +316,7 @@ export function TenantConfig(): React.JSX.Element {
               Cloud environment
             </p>
             <p className="mt-3 text-base font-semibold">
-              {CLOUD_ENVIRONMENT_LABELS[cloudEnvironment]}
+              {CLOUD_ENVIRONMENT_LABEL}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Authentication and Graph routing inherit the environment chosen at sign-in.

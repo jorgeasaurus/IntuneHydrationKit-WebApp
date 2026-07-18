@@ -65,10 +65,14 @@ vi.mock("@/lib/hydration/policyCreators", () => ({
   createCISSecurityIntent: mockCreateCISSecurityIntent,
 }));
 
-vi.mock("@/lib/hydration/utils", () => ({
-  escapeODataString: mockEscapeODataString,
-  hasODataUnsafeChars: mockHasODataUnsafeChars,
-}));
+vi.mock("@/lib/hydration/utils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/hydration/utils")>();
+  return {
+    ...actual,
+    escapeODataString: mockEscapeODataString,
+    hasODataUnsafeChars: mockHasODataUnsafeChars,
+  };
+});
 
 import { executeCISBaselineTask } from "@/lib/hydration/taskExecutors/cisBaselineTask";
 

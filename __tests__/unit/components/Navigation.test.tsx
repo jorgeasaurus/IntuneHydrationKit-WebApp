@@ -54,10 +54,10 @@ vi.mock('@/components/ThemeToggle', () => ({
 }))
 
 vi.mock('@/components/CloudEnvironmentSelector', () => ({
-  CloudEnvironmentSelector: ({ open, onSelect, onCancel }: { open: boolean; onSelect: (env: 'global') => void; onCancel: () => void }) =>
+  CloudEnvironmentSelector: ({ open, onSelect, onCancel }: { open: boolean; onSelect: () => void; onCancel: () => void }) =>
     open ? (
       <div data-testid="cloud-selector">
-        <button onClick={() => onSelect('global')}>Choose Global</button>
+        <button onClick={() => onSelect()}>Choose Global</button>
         <button onClick={onCancel}>Cancel Sign In</button>
       </div>
     ) : null,
@@ -83,7 +83,7 @@ describe('Navigation', () => {
     await user.click(screen.getByRole('button', { name: 'Choose Global' }))
 
     await waitFor(() => {
-      expect(signIn).toHaveBeenCalledWith('global')
+      expect(signIn).toHaveBeenCalled()
     })
 
     expect(toastSuccess).toHaveBeenCalledWith('Successfully signed in!')

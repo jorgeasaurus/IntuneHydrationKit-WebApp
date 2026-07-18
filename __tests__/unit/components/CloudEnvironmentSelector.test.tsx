@@ -43,7 +43,7 @@ describe('CloudEnvironmentSelector', () => {
     )
 
     await user.click(screen.getByRole('button', { name: /continue to sign in/i }))
-    expect(onSelect).toHaveBeenCalledWith('global')
+    expect(onSelect).toHaveBeenCalled()
 
     await user.click(screen.getByRole('button', { name: /cancel/i }))
     expect(onCancel).toHaveBeenCalledTimes(1)

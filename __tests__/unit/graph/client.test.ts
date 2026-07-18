@@ -22,12 +22,6 @@ describe('GraphClient', () => {
       expect(client).toBeDefined()
     })
 
-    it('accepts different cloud environments', () => {
-      const usgov = new GraphClient('usgov')
-      const china = new GraphClient('china')
-      expect(usgov).toBeDefined()
-      expect(china).toBeDefined()
-    })
   })
 
   describe('get', () => {
@@ -413,48 +407,9 @@ describe('GraphClient', () => {
     })
   })
 
-  describe('cloud environments', () => {
-    it('uses US Gov endpoint', async () => {
-      let requestUrl = ''
-
-      server.use(
-        http.get('https://graph.microsoft.us/beta/test', ({ request }) => {
-          requestUrl = request.url
-          return HttpResponse.json({ data: 'usgov' })
-        })
-      )
-
-      const client = new GraphClient('usgov')
-      await client.get('/test')
-
-      expect(requestUrl).toContain('graph.microsoft.us')
-    })
-
-    it('uses China endpoint', async () => {
-      let requestUrl = ''
-
-      server.use(
-        http.get('https://microsoftgraph.chinacloudapi.cn/beta/test', ({ request }) => {
-          requestUrl = request.url
-          return HttpResponse.json({ data: 'china' })
-        })
-      )
-
-      const client = new GraphClient('china')
-      await client.get('/test')
-
-      expect(requestUrl).toContain('microsoftgraph.chinacloudapi.cn')
-    })
-  })
-
   describe('createGraphClient', () => {
     it('creates client with default environment', () => {
       const client = createGraphClient()
-      expect(client).toBeInstanceOf(GraphClient)
-    })
-
-    it('creates client with specified environment', () => {
-      const client = createGraphClient('germany')
       expect(client).toBeInstanceOf(GraphClient)
     })
   })

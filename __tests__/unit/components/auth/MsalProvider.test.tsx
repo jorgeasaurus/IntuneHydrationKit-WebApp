@@ -13,6 +13,12 @@ const { baseMsalProvider, initializeMsal, msalInstance } = vi.hoisted(() => ({
 
 vi.mock('@azure/msal-react', () => ({
   MsalProvider: baseMsalProvider,
+  useMsal: () => ({ accounts: [] }),
+}))
+
+vi.mock('@/lib/auth/authUtils', () => ({
+  loadCloudEnvironmentFromSession: vi.fn(() => 'global'),
+  signOut: vi.fn(),
 }))
 
 vi.mock('@/lib/auth/msalConfig', () => ({
@@ -60,7 +66,7 @@ describe('MsalProvider', () => {
     expect(props.instance).toBe(msalInstance)
   })
 
-  it('renders children even when initialization fails', async () => {
+  it('shows an error panel instead of children when initialization fails', async () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
     initializeMsal.mockRejectedValue(new Error('boom'))
 
@@ -71,9 +77,11 @@ describe('MsalProvider', () => {
     )
 
     await waitFor(() => {
-      expect(screen.getByText('Fallback render')).toBeInTheDocument()
+      expect(screen.getByText('Authentication unavailable')).toBeInTheDocument()
     })
 
+    expect(screen.queryByText('Fallback render')).not.toBeInTheDocument()
+    expect(baseMsalProvider).not.toHaveBeenCalled()
     expect(consoleError).toHaveBeenCalledWith('[MSAL] Failed to initialize:', expect.any(Error))
 
     consoleError.mockRestore()

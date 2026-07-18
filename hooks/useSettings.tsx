@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { AppSettings } from "@/types/hydration";
 import { APP_SETTINGS_STORAGE_KEY } from "@/lib/storageKeys";
 
@@ -57,20 +57,25 @@ function readStoredSettings(): AppSettings {
     return normalizeSettings(JSON.parse(stored));
   } catch (error) {
     console.error("Failed to parse stored settings:", error);
+    // Remove the corrupted entry so it doesn't fail on every load
+    localStorage.removeItem(APP_SETTINGS_STORAGE_KEY);
     return DEFAULT_SETTINGS;
   }
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
+  // Read persisted settings in the initializer so the stored theme applies on
+  // first client render without flashing the default theme.
   const [settings, setSettings] = useState<AppSettings>(() => readStoredSettings());
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
-    setSettings((prev) => {
-      const updated = normalizeSettings({ ...prev, ...newSettings });
-      localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(updated));
-      return updated;
-    });
+    setSettings((prev) => normalizeSettings({ ...prev, ...newSettings }));
   }, []);
+
+  // Persist settings whenever they change; keeps the updater pure
+  useEffect(() => {
+    localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  }, [settings]);
 
   const resetSettings = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);

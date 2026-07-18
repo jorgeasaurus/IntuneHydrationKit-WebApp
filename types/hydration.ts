@@ -4,12 +4,7 @@
 
 import { PrerequisiteCheckResult } from "./prerequisites";
 
-export type CloudEnvironment =
-  | "global"
-  | "usgov"
-  | "usgovdod"
-  | "germany"
-  | "china";
+export type CloudEnvironment = "global";
 
 export type OperationMode = "create" | "delete";
 

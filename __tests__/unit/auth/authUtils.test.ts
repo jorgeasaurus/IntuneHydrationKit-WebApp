@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => {
   const msalInstance = {
     getAllAccounts: vi.fn(),
+    getActiveAccount: vi.fn(),
     acquireTokenSilent: vi.fn(),
     acquireTokenPopup: vi.fn(),
     loginPopup: vi.fn(),
@@ -78,33 +79,43 @@ describe("authUtils", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
-    setSelectedCloudEnvironment("global");
-    mocks.getAuthorityUrl.mockImplementation((environment: string, tenantId: string) =>
-      `https://authority.example/${environment}/${tenantId}`
+    setSelectedCloudEnvironment();
+    mocks.getAuthorityUrl.mockImplementation((tenantId: string) =>
+      `https://authority.example/global/${tenantId}`
     );
     mocks.msalInstance.getAllAccounts.mockReturnValue([]);
+    mocks.msalInstance.getActiveAccount.mockReturnValue(null);
   });
 
-  it("stores and restores supported cloud environments from session storage", () => {
-    setSelectedCloudEnvironment("usgov");
+  it("stores the global cloud environment in session storage", () => {
+    setSelectedCloudEnvironment();
 
-    expect(getSelectedCloudEnvironment()).toBe("usgov");
-    expect(window.sessionStorage.getItem("cloudEnvironment")).toBe("usgov");
+    expect(getSelectedCloudEnvironment()).toBe("global");
+    expect(window.sessionStorage.getItem("cloudEnvironment")).toBe("global");
+  });
 
+  it("discards stale sovereign cloud values from session storage", () => {
     window.sessionStorage.setItem("cloudEnvironment", "china");
 
-    expect(loadCloudEnvironmentFromSession()).toBe("china");
-    expect(getSelectedCloudEnvironment()).toBe("china");
+    expect(loadCloudEnvironmentFromSession()).toBe("global");
+    expect(window.sessionStorage.getItem("cloudEnvironment")).toBeNull();
   });
 
   it("ignores invalid cloud environments from session storage", () => {
-    setSelectedCloudEnvironment("germany");
     window.sessionStorage.setItem("cloudEnvironment", "toString");
 
-    expect(loadCloudEnvironmentFromSession()).toBe("germany");
+    expect(loadCloudEnvironmentFromSession()).toBe("global");
   });
 
-  it("returns the first available active account", () => {
+  it("prefers the MSAL active account over the first cached account", () => {
+    const activeAccount = { ...account, username: "active@contoso.com" };
+    mocks.msalInstance.getActiveAccount.mockReturnValue(activeAccount);
+    mocks.msalInstance.getAllAccounts.mockReturnValue([account, activeAccount]);
+
+    expect(getActiveAccount()).toEqual(activeAccount);
+  });
+
+  it("falls back to the first cached account when no account is marked active", () => {
     mocks.msalInstance.getAllAccounts.mockReturnValue([account, { ...account, username: "other@contoso.com" }]);
 
     expect(getActiveAccount()).toEqual(account);
@@ -118,18 +129,17 @@ describe("authUtils", () => {
     await expect(getAccessToken()).rejects.toBeInstanceOf(AuthSessionExpiredError);
   });
 
-  it("acquires an access token silently using the selected cloud authority", async () => {
-    setSelectedCloudEnvironment("usgovdod");
+  it("acquires an access token silently using the global cloud authority", async () => {
     mocks.msalInstance.getAllAccounts.mockReturnValue([account]);
     mocks.msalInstance.acquireTokenSilent.mockResolvedValue({ accessToken: "silent-token" });
 
     await expect(getAccessToken()).resolves.toBe("silent-token");
 
-    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("usgovdod", "tenant-id");
+    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("tenant-id");
     expect(mocks.msalInstance.acquireTokenSilent).toHaveBeenCalledWith(
       expect.objectContaining({
         account,
-        authority: "https://authority.example/usgovdod/tenant-id",
+        authority: "https://authority.example/global/tenant-id",
         scopes: ["User.Read"],
       })
     );
@@ -181,15 +191,15 @@ describe("authUtils", () => {
     await expect(getAccessToken()).rejects.toBe(silentError);
   });
 
-  it("signs in with the requested cloud environment and activates the returned account", async () => {
+  it("signs in with the global cloud environment and activates the returned account", async () => {
     mocks.msalInstance.loginPopup.mockResolvedValue({ account });
 
-    await expect(signIn("china")).resolves.toEqual(account);
+    await expect(signIn()).resolves.toEqual(account);
 
-    expect(getSelectedCloudEnvironment()).toBe("china");
-    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("china", "common");
+    expect(getSelectedCloudEnvironment()).toBe("global");
+    expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("common");
     expect(mocks.msalInstance.loginPopup).toHaveBeenCalledWith({
-      authority: "https://authority.example/china/common",
+      authority: "https://authority.example/global/common",
       scopes: ["User.Read"],
     });
     expect(mocks.msalInstance.setActiveAccount).toHaveBeenCalledWith(account);

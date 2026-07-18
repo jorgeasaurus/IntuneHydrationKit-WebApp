@@ -23,7 +23,7 @@ import {
   securityIntentExists,
   createCISSecurityIntent,
 } from "../policyCreators";
-import { escapeODataString, hasODataUnsafeChars } from "../utils";
+import { escapeODataString, hasODataUnsafeChars, findUniquePartialMatch, normalizeName } from "../utils";
 import { getCachedTemplates, getAllTemplateCacheKeys, CISBaselinePolicy } from "@/lib/templates/loader";
 
 function findCachedGroupPolicyConfiguration(
@@ -481,13 +481,12 @@ export async function executeCISBaselineTask(
             (p) => p.name?.toLowerCase() === policyName.toLowerCase()
           );
 
-          // If not found by exact name match, try partial match as fallback
+          // If not found by exact name match, fall back to the canonical
+          // unambiguous partial matcher (normalized names, unique match only -
+          // picking the first of several candidates could delete the wrong policy)
           if (!policy) {
             console.log(`[CIS Baseline Task] Policy "${policyName}" not found by exact match, trying partial match...`);
-            policy = allPolicies.find(
-              (p) => p.name?.toLowerCase().includes(policyName.toLowerCase()) ||
-                     policyName.toLowerCase().includes(p.name?.toLowerCase() || "")
-            );
+            policy = findUniquePartialMatch(allPolicies, normalizeName(policyName), (p) => p.name);
             if (policy) {
               console.log(`[CIS Baseline Task] Found partial match: "${policy.name}" for "${policyName}"`);
             }

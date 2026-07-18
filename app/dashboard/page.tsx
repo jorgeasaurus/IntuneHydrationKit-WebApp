@@ -173,7 +173,9 @@ export default function DashboardPage() {
                 Completed
               </p>
               <p className="mt-2 text-lg font-semibold">
-                {completedTaskCount}/{tasks.length || selectedObjectCount || 0}
+                {isBuildingQueue
+                  ? `—/—`
+                  : `${completedTaskCount}/${tasks.length || selectedObjectCount || 0}`}
               </p>
             </div>
             <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">

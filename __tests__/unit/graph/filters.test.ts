@@ -156,7 +156,7 @@ describe("graph/filters", () => {
       rule: '(device.model -eq "Pixel")',
     });
     expect(getCollection).toHaveBeenCalledWith(
-      "/deviceManagement/managedDevices?$filter=platform eq 'android'"
+      "/deviceManagement/managedDevices?$filter=platform%20eq%20'android'"
     );
   });
 

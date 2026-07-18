@@ -1,14 +1,12 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
-import { msalInstance, loginRequest, getAuthorityUrl, CLOUD_ENVIRONMENTS } from "./msalConfig";
+import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
 import { CloudEnvironment } from "@/types/hydration";
-import { EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
+import { APP_SETTINGS_STORAGE_KEY, EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
 
-// Store the selected cloud environment for the session
-let selectedCloudEnvironment: CloudEnvironment = "global";
+const SUPPORTED_CLOUD_ENVIRONMENT: CloudEnvironment = "global";
 
-function isCloudEnvironment(value: string | null): value is CloudEnvironment {
-  return value !== null && Object.prototype.hasOwnProperty.call(CLOUD_ENVIRONMENTS, value);
-}
+// Store the selected cloud environment for the session (always "global")
+let selectedCloudEnvironment: CloudEnvironment = SUPPORTED_CLOUD_ENVIRONMENT;
 
 /**
  * Get the currently selected cloud environment
@@ -18,38 +16,37 @@ export function getSelectedCloudEnvironment(): CloudEnvironment {
 }
 
 /**
- * Set the cloud environment for the session
+ * Set the cloud environment for the session (always "global").
  */
-export function setSelectedCloudEnvironment(environment: CloudEnvironment): void {
-  selectedCloudEnvironment = environment;
+export function setSelectedCloudEnvironment(): void {
+  selectedCloudEnvironment = SUPPORTED_CLOUD_ENVIRONMENT;
   // Also store in sessionStorage for persistence across page reloads
   if (typeof window !== "undefined") {
-    sessionStorage.setItem("cloudEnvironment", environment);
+    sessionStorage.setItem("cloudEnvironment", SUPPORTED_CLOUD_ENVIRONMENT);
   }
 }
 
 /**
- * Load cloud environment from session storage (call on app init)
+ * Load cloud environment from session storage (call on app init).
+ * Discards stale sovereign-cloud values persisted by older builds.
  */
 export function loadCloudEnvironmentFromSession(): CloudEnvironment {
   if (typeof window !== "undefined") {
     const stored = sessionStorage.getItem("cloudEnvironment");
-    if (isCloudEnvironment(stored)) {
-      selectedCloudEnvironment = stored;
+    if (stored !== null && stored !== SUPPORTED_CLOUD_ENVIRONMENT) {
+      sessionStorage.removeItem("cloudEnvironment");
     }
   }
   return selectedCloudEnvironment;
 }
 
 /**
- * Get the active account from MSAL
+ * Get the active account from MSAL.
+ * Honors the account marked active by signIn (msalInstance.setActiveAccount),
+ * falling back to the first cached account when none is marked.
  */
 export function getActiveAccount(): AccountInfo | null {
-  const accounts = msalInstance.getAllAccounts();
-  if (accounts.length > 0) {
-    return accounts[0];
-  }
-  return null;
+  return msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0] ?? null;
 }
 
 /**
@@ -63,8 +60,7 @@ export async function getAccessToken(): Promise<string> {
     throw new AuthSessionExpiredError();
   }
 
-  // Get authority for the selected cloud environment
-  const authority = getAuthorityUrl(selectedCloudEnvironment, account.tenantId);
+  const authority = getAuthorityUrl(account.tenantId);
 
   try {
     const response = await msalInstance.acquireTokenSilent({
@@ -103,14 +99,12 @@ export class AuthSessionExpiredError extends Error {
 }
 
 /**
- * Sign in the user with a specific cloud environment
+ * Sign in the user (global/commercial cloud only).
  */
-export async function signIn(cloudEnvironment: CloudEnvironment = "global"): Promise<AccountInfo> {
-  // Store the selected environment
-  setSelectedCloudEnvironment(cloudEnvironment);
+export async function signIn(): Promise<AccountInfo> {
+  setSelectedCloudEnvironment();
 
-  // Get authority URL for the selected cloud environment
-  const authority = getAuthorityUrl(cloudEnvironment, "common");
+  const authority = getAuthorityUrl("common");
 
   const response = await msalInstance.loginPopup({
     ...loginRequest,
@@ -144,6 +138,11 @@ function clearSessionData(): void {
     }
   }
   keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+
+  // Clear persisted app settings so the next user on a shared browser starts clean
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(APP_SETTINGS_STORAGE_KEY);
+  }
 }
 
 /**

@@ -1,6 +1,5 @@
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { getGraphEndpoint } from "@/lib/auth/msalConfig";
-import { CloudEnvironment } from "@/types/hydration";
 import { GraphResponse } from "@/types/graph";
 import { retryWithBackoff } from "@/lib/utils/retry";
 import { BatchRequest, BatchResult } from "./batch";
@@ -10,11 +9,9 @@ import { BatchRequest, BatchResult } from "./batch";
  */
 export class GraphClient {
   private baseUrl: string;
-  private environment: CloudEnvironment;
 
-  constructor(environment: CloudEnvironment = "global") {
-    this.environment = environment;
-    this.baseUrl = getGraphEndpoint(environment);
+  constructor() {
+    this.baseUrl = getGraphEndpoint();
   }
 
   /**
@@ -305,6 +302,6 @@ export class GraphClient {
 /**
  * Create a new Graph API client instance
  */
-export function createGraphClient(environment: CloudEnvironment = "global"): GraphClient {
-  return new GraphClient(environment);
+export function createGraphClient(): GraphClient {
+  return new GraphClient();
 }

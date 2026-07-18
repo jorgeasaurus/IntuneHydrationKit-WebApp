@@ -86,6 +86,75 @@ export function hasODataUnsafeChars(value: string): boolean {
 }
 
 /**
+ * Normalize a policy/object name for tolerant comparison:
+ * lowercase, punctuation (colons, all quote styles, ellipses) replaced with
+ * spaces, whitespace collapsed. Helps match names that differ only in
+ * punctuation (e.g., "Network security LAN Manager" vs "Network security: LAN Manager").
+ */
+export function normalizeName(name: string | undefined | null): string {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .replace(/[:'""`''\u2018\u2019\u201C\u201D]/g, " ")
+    .replace(/\.{2,}|\u2026/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Find an item by bidirectional partial name match, but ONLY when the match is
+ * unambiguous (exactly one candidate matches). Picking the first of several
+ * partial matches can resolve to the WRONG object (e.g., target "Security"
+ * matching both "Security" variants and "Security Baseline"). Empty names are
+ * excluded because "".includes() / includes("") would match everything.
+ */
+export function findUniquePartialMatch<T>(
+  items: T[] | undefined,
+  normalizedTarget: string,
+  getName: (item: T) => string | undefined
+): T | undefined {
+  if (!items || !normalizedTarget) return undefined;
+  const matches = items.filter((item) => {
+    const normalizedName = normalizeName(getName(item));
+    if (!normalizedName) return false;
+    return (
+      normalizedName.includes(normalizedTarget) ||
+      normalizedTarget.includes(normalizedName)
+    );
+  });
+  if (matches.length > 1) {
+    console.warn(
+      `[Hydration] Ambiguous partial match for "${normalizedTarget}" (${matches.length} candidates) - skipping partial match for safety`
+    );
+  }
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
+/**
+ * Find an item by name with explicit precedence:
+ * exact (case-insensitive) > normalized (punctuation-tolerant) > unique partial match.
+ */
+export function findByNamePrecedence<T>(
+  items: T[] | undefined,
+  nameToFind: string,
+  normalizedNameToFind: string,
+  getName: (item: T) => string | undefined,
+  allowPartialMatch = true
+): T | undefined {
+  if (!items) return undefined;
+  const lowerNameToFind = nameToFind.toLowerCase();
+  const exact = items.find((item) => getName(item)?.toLowerCase() === lowerNameToFind);
+  if (exact) return exact;
+  const normalized = items.find(
+    (item) => normalizeName(getName(item)) === normalizedNameToFind
+  );
+  if (normalized) return normalized;
+  return allowPartialMatch
+    ? findUniquePartialMatch(items, normalizedNameToFind, getName)
+    : undefined;
+}
+
+/**
  * Check if an object contains secret placeholders
  * Used to warn users that secrets need manual configuration
  */

@@ -64,7 +64,9 @@ describe('TenantConfig', () => {
   it('keeps the health checklist state when navigating away and back', async () => {
     const prerequisiteResult: PrerequisiteCheckResult = {
       organization: {
-        id: 'org-1',
+        // Graph's organization id IS the tenant GUID - must match the mocked
+        // account tenantId, otherwise the stale-tenant check re-validates
+        id: 'tenant-123',
         displayName: 'Contoso',
       },
       licenses: {
