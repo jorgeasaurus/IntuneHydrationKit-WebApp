@@ -1290,9 +1290,10 @@ type PolicyExistsPolicyType =
 
 /**
  * Check if a policy already exists using cache-first strategy with API fallback.
- * Cache matching uses the same precedence as findResourceIdForDelete
- * (exact > normalized, no partial - see findByNamePrecedence) so create-skip
- * and delete resolution cannot disagree about which object a name refers to.
+ * Cache matching uses exact > normalized precedence (no partial matching)
+ * via findByNamePrecedence with allowPartialMatch=false. Note that
+ * findResourceIdForDelete additionally allows unique partial matches, so
+ * delete resolution can match a broader set of names than create-skip.
  */
 async function policyExistsInCacheOrApi(
   policyType: PolicyExistsPolicyType,
