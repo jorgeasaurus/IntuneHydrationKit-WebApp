@@ -662,3 +662,29 @@
 - Restored session reload for all supported cloud environments via the MSAL cloud endpoint map.
 - CSV reports now label start/end columns as UTC and render UTC values.
 - Checks passed: focused auth/reporter tests, `npm run test:run`, `npm run type-check`, `npm run build`, `git diff --check`.
+
+# Full-width Execution Summary
+
+- [x] Remove the Intent and Safety rail summary cards from operation mode.
+- [x] Expand the Execution summary card across the available width.
+- [x] Update focused regression coverage and verify the change.
+
+## Review
+
+- Operation mode now shows only the dynamic Execution summary card across the full available width.
+- Focused coverage confirms the removed labels stay absent while preview/live behavior remains intact.
+- Checks passed: focused OperationMode tests, `npm run type-check`, `npm run build`, `git diff --check`.
+
+# Full-width Execution Summary PR
+
+- [x] Create and push a focused feature branch.
+- [x] Open a pull request against `main`.
+- [x] Run Copilot review cycles until the latest functional head receives a clean review.
+- [x] Record the PR and functional review results.
+
+## Review
+
+- Opened PR #15 from `ui/full-width-execution-summary` to `main`: `https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp/pull/15`.
+- Copilot cycles 1 and 2 produced four actionable test-coverage comments; all were fixed, replied to, and resolved.
+- Copilot cycle 3 reviewed functional head `e34450c` and produced no new comments.
+- Checks passed: focused OperationMode tests, `npm run type-check`, Vercel, React Doctor, GitGuardian, and `git diff --check`.

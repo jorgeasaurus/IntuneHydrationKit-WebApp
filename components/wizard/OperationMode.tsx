@@ -256,44 +256,26 @@ export function OperationModeSelection(): React.JSX.Element {
           </div>
         </div>
 
-        <div className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-xl border border-border/80 bg-background/60 p-4">
+        <div className={`w-full rounded-xl border p-4 transition-colors ${executionTone.summary}`}>
+          <div className="flex items-center justify-between gap-3">
             <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-              Intent
+              Execution
             </p>
-            <p className="mt-2 text-base font-semibold capitalize">{mode}</p>
+            <span
+              className={`rounded-full border px-2 py-1 text-[10px] font-mono uppercase tracking-[0.22em] ${executionTone.badge}`}
+            >
+              {isPreview ? "Preview" : "Live"}
+            </span>
           </div>
-          <div className={`rounded-xl border p-4 transition-colors ${executionTone.summary}`}>
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                Execution
-              </p>
-              <span
-                className={`rounded-full border px-2 py-1 text-[10px] font-mono uppercase tracking-[0.22em] ${executionTone.badge}`}
-              >
-                {isPreview ? "Preview" : "Live"}
-              </span>
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <span className={`size-2.5 rounded-full ${executionTone.marker}`} />
-              <p className="text-base font-semibold">
-                {isPreview ? "WhatIf preview" : "Live change"}
-              </p>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {getExecutionSummary(isPreview)}
+          <div className="mt-2 flex items-center gap-2">
+            <span className={`size-2.5 rounded-full ${executionTone.marker}`} />
+            <p className="text-base font-semibold">
+              {isPreview ? "WhatIf preview" : "Live change"}
             </p>
           </div>
-          <div className="rounded-xl border border-border/80 bg-background/60 p-4">
-            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-              Safety rail
-            </p>
-            <p className="mt-2 text-sm text-muted-foreground">
-              {mode === "create"
-                ? "Create skips matching objects instead of clobbering them."
-                : "Delete requires hydration markers and CA disablement."}
-            </p>
-          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {getExecutionSummary(isPreview)}
+          </p>
         </div>
 
         {mode === "delete" && !isPreview && (
