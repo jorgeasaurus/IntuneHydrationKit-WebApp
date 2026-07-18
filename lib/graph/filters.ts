@@ -166,9 +166,10 @@ export async function getDevicesMatchingFilter(
     // Get the filter
     const filter = await getFilterById(client, filterId);
 
-    // Query devices with the filter
+    // Query devices with the filter (escape and URL-encode the OData filter value)
+    const platformFilter = `platform eq '${String(filter.platform).replace(/'/g, "''")}'`;
     const devices = await client.getCollection<unknown>(
-      `/deviceManagement/managedDevices?$filter=platform eq '${filter.platform}'`
+      `/deviceManagement/managedDevices?$filter=${encodeURIComponent(platformFilter)}`
     );
 
     return devices.length;

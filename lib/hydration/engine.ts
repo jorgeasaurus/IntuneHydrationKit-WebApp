@@ -575,11 +575,9 @@ export async function executeTasks(
     // Check for cancellation before starting task
     if (context.shouldCancel?.()) {
       console.log("[Execute Tasks] Execution cancelled by user");
-      // Mark remaining tasks as skipped
-      for (let i = taskIndex; i < tasks.length; i++) {
-        tasks[i].status = "skipped";
-        tasks[i].error = "Cancelled by user";
-      }
+      // Mark remaining tasks as skipped AND record them in results so
+      // the summary/report reflects the cancelled work
+      cancelRemainingTasks(tasks, taskIndex, results);
       break;
     }
 

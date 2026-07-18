@@ -157,9 +157,17 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
     "Duration (ms)",
   ];
 
-  // Quote-escape every field so commas/quotes/newlines in any value can't break the CSV
-  const escapeCSVField = (value: string | number): string =>
-    `"${String(value).replace(/"/g, '""')}"`;
+  // Quote-escape every field so commas/quotes/newlines in any value can't break the CSV.
+  // Values starting with =, +, -, @ (or tab/CR) are prefixed with ' to neutralize
+  // spreadsheet formula injection (a policy named "=cmd|..." must not execute in Excel).
+  // Leading whitespace is checked too - Excel trims it before evaluating formulas.
+  const escapeCSVField = (value: string | number): string => {
+    let str = String(value);
+    if (/^\s*[=+\-@\t\r]/.test(str)) {
+      str = `'${str}`;
+    }
+    return `"${str.replace(/"/g, '""')}"`;
+  };
 
   const rows = tasks.map((task) => {
     const duration =
@@ -196,7 +204,8 @@ export function createSummary(
   startTime: Date,
   endTime: Date,
   tasks: HydrationTask[],
-  batchStats?: BatchExecutionStats
+  batchStats?: BatchExecutionStats,
+  tenantName?: string
 ): HydrationSummary {
   const stats = {
     total: tasks.length,
@@ -256,6 +265,7 @@ export function createSummary(
 
   return {
     tenantId,
+    tenantName,
     operationMode,
     startTime,
     endTime,

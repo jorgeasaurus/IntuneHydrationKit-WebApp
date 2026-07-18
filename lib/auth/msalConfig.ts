@@ -65,15 +65,20 @@ export function getAuthorityUrl(
 /**
  * MSAL configuration for authentication
  */
+// Prefer the configured redirect URI; otherwise fall back to the current origin in the
+// browser so a missing env var doesn't silently point production sign-in at localhost.
+const redirectUri =
+  process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI ||
+  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+
 export const msalConfig: Configuration = {
   auth: {
     clientId: process.env.NEXT_PUBLIC_MSAL_CLIENT_ID || "",
     authority:
       process.env.NEXT_PUBLIC_MSAL_AUTHORITY ||
       "https://login.microsoftonline.com/common",
-    redirectUri: process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI || "http://localhost:3000",
-    postLogoutRedirectUri:
-      process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI || "http://localhost:3000",
+    redirectUri,
+    postLogoutRedirectUri: redirectUri,
   },
   cache: {
     cacheLocation: "sessionStorage", // Use sessionStorage instead of localStorage for security

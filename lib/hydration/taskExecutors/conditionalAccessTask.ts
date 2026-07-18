@@ -13,17 +13,8 @@ import {
 } from "@/lib/graph/conditionalAccess";
 import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
+import { normalizeName } from "../utils";
 import * as Templates from "@/templates";
-
-function normalizeName(name: string | undefined | null): string {
-  if (!name) return "";
-  return name
-    .toLowerCase()
-    .replace(/[:'""`''""]/g, " ")
-    .replace(/\.{2,}/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 function findCachedConditionalAccessPolicy(
   displayName: string,

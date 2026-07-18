@@ -20,7 +20,7 @@ import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
-import { sleep, sleepWithExecutionControl, waitWhilePaused, hasODataUnsafeChars } from "./utils";
+import { sleep, sleepWithExecutionControl, waitWhilePaused, hasODataUnsafeChars, normalizeName, findByNamePrecedence } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   settingsCatalogPolicyExists,
@@ -160,17 +160,20 @@ async function verifyCompliancePolicyCreated(
         setTimeout(() => reject(new Error("Verification timeout")), VERIFICATION_TIMEOUT);
       });
 
-      // Fetch fresh compliance policies from Graph API with timeout
-      const fetchPromise = context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
+      // Fetch fresh compliance policies from Graph API with timeout.
+      // getCollection follows @odata.nextLink so policies beyond the first
+      // page are not missed in large tenants (a get() here caused false
+      // "failed" statuses for policies that were actually created).
+      const fetchPromise = context.client.getCollection<{ id: string; displayName: string; description?: string }>(
         "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
       );
 
-      const response = await Promise.race([fetchPromise, timeoutPromise]);
+      const policies = await Promise.race([fetchPromise, timeoutPromise]);
 
-      if (response?.value) {
+      if (policies) {
         let foundPolicy: { id: string; displayName: string; description?: string } | undefined;
         const normalizedPolicyName = policyName.toLowerCase();
-        for (const policy of response.value) {
+        for (const policy of policies) {
           if (policy.displayName?.toLowerCase() === normalizedPolicyName) {
             foundPolicy = policy;
             break;
@@ -481,7 +484,7 @@ async function buildBaselineRequestBody(
   }
 
   // Check if policy already exists (cache-first with API fallback)
-  if (await policyExistsInCacheOrApi(policyType, policyName, context)) {
+  if (await policyExistsInCacheOrApi(policyType as PolicyExistsPolicyType, policyName, context)) {
     return { skip: true, reason: `${policyType} "${policyName}" already exists` };
   }
 
@@ -1276,162 +1279,112 @@ type BaselineEndpointType =
   | "appProtection_ios"
   | "appProtection_android";
 
-/**
- * Normalize a name for comparison by:
- * - Converting to lowercase
- * - Removing special characters (colons, quotes, smart quotes, etc.)
- * - Collapsing multiple spaces to single space
- * - Trimming whitespace
- * This helps match policy names that differ only in punctuation
- * (e.g., filename "Network security LAN Manager" vs policy name "Network security: LAN Manager")
- */
-function normalizeName(name: string | undefined | null): string {
-  if (!name) return "";
-  return name
-    .toLowerCase()
-    // Replace colons, all types of quotes (straight, curly/smart) with spaces
-    .replace(/[:'""`''""]/g, " ")
-    // Remove ellipsis and trailing dots
-    .replace(/\.{2,}/g, " ")
-    // Remove parentheses content for partial matching (optional)
-    // .replace(/\([^)]*\)/g, " ")
-    // Collapse multiple spaces to single space
-    .replace(/\s+/g, " ")
-    .trim();
-}
+type PolicyExistsPolicyType =
+  | "SettingsCatalog"
+  | "V2Compliance"
+  | "DeviceConfiguration"
+  | "GroupPolicyConfiguration"
+  | "SecurityIntent"
+  | "DriverUpdateProfiles"
+  | "ConditionalAccess";
 
 /**
  * Check if a policy already exists using cache-first strategy with API fallback.
- * Consolidates existence checks for SettingsCatalog, V2Compliance,
- * DeviceConfiguration, and DriverUpdateProfiles.
+ * Cache matching uses the same precedence as findResourceIdForDelete
+ * (exact > normalized, no partial - see findByNamePrecedence) so create-skip
+ * and delete resolution cannot disagree about which object a name refers to.
  */
 async function policyExistsInCacheOrApi(
-  policyType: string,
+  policyType: PolicyExistsPolicyType,
   policyName: string,
   context: ExecutionContext,
   logPrefix = "[BatchExecutor]"
 ): Promise<boolean> {
-  const normalizedPolicyName = normalizeName(policyName);
   const lowerName = policyName.toLowerCase();
+  const normalizedPolicyName = normalizeName(policyName);
+  // Skip the API fallback when the name has chars that break OData $filter (e.g. [IHD] prefix)
+  const canQueryApi = !hasODataUnsafeChars(policyName);
 
-  if (policyType === "SettingsCatalog") {
-    const existing = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === lowerName || normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existing) {
-      console.log(`${logPrefix} SettingsCatalog already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name}")`);
-      return true;
-    }
-    // API fallback - skip if name has chars that break OData $filter (e.g. [IHD] prefix)
-    if (!hasODataUnsafeChars(policyName) && await settingsCatalogPolicyExists(context.client, policyName)) {
-      console.log(`${logPrefix} SettingsCatalog already exists (API fallback), skipping: "${policyName}"`);
-      return true;
-    }
-    return false;
+  const sources: Array<{
+    policyType: PolicyExistsPolicyType;
+    label: string;
+    matches: () => { name?: string; displayName?: string } | undefined;
+    apiCheck?: () => Promise<boolean>;
+  }> = [
+    {
+      policyType: "SettingsCatalog",
+      label: "SettingsCatalog",
+      matches: () =>
+        findByNamePrecedence(context.cachedSettingsCatalogPolicies, lowerName, normalizedPolicyName, (p) => p.name, false),
+      apiCheck: canQueryApi ? () => settingsCatalogPolicyExists(context.client, policyName) : undefined,
+    },
+    {
+      policyType: "V2Compliance",
+      label: "V2Compliance",
+      // V2 policies sometimes appear in the Settings Catalog cache too
+      matches: () =>
+        findByNamePrecedence(context.cachedV2CompliancePolicies, lowerName, normalizedPolicyName, (p) => p.name, false) ??
+        findByNamePrecedence(context.cachedSettingsCatalogPolicies, lowerName, normalizedPolicyName, (p) => p.name, false),
+      apiCheck: canQueryApi ? () => v2CompliancePolicyExists(context.client, policyName) : undefined,
+    },
+    {
+      policyType: "DeviceConfiguration",
+      label: "DeviceConfiguration",
+      matches: () =>
+        findByNamePrecedence(context.cachedDeviceConfigurations, lowerName, normalizedPolicyName, (p) => p.displayName, false),
+      apiCheck: canQueryApi ? () => deviceConfigurationExists(context.client, policyName) : undefined,
+    },
+    {
+      policyType: "GroupPolicyConfiguration",
+      label: "GroupPolicyConfiguration",
+      matches: () =>
+        findByNamePrecedence(context.cachedGroupPolicyConfigurations, lowerName, normalizedPolicyName, (p) => p.displayName, false),
+      apiCheck: canQueryApi ? () => groupPolicyConfigurationExists(context.client, policyName) : undefined,
+    },
+    {
+      policyType: "SecurityIntent",
+      label: "SecurityIntent",
+      matches: () =>
+        findByNamePrecedence(context.cachedSecurityIntents, lowerName, normalizedPolicyName, (p) => p.displayName, false),
+      apiCheck: () => securityIntentExists(context.client, policyName),
+    },
+    {
+      policyType: "DriverUpdateProfiles",
+      label: "DriverUpdateProfile",
+      matches: () =>
+        findByNamePrecedence(context.cachedDriverUpdateProfiles, lowerName, normalizedPolicyName, (p) => p.displayName, false),
+    },
+    {
+      policyType: "ConditionalAccess",
+      label: "ConditionalAccess policy",
+      // CA policies are created with " [Intune Hydration Kit]" suffix - check
+      // both the original and the suffixed name in addition to standard matching
+      matches: () =>
+        findByNamePrecedence(
+          context.cachedConditionalAccessPolicies,
+          lowerName,
+          normalizedPolicyName,
+          (p) => p.displayName,
+          false
+        ) ?? context.cachedConditionalAccessPolicies?.find(
+          (p) => p.displayName?.toLowerCase() === `${lowerName} [intune hydration kit]`
+        ),
+      apiCheck: () => conditionalAccessPolicyExists(context.client, policyName),
+    },
+  ];
+
+  const source = sources.find((s) => s.policyType === policyType);
+  if (!source) return false;
+
+  const existing = source.matches();
+  if (existing) {
+    console.log(`${logPrefix} ${source.label} already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name ?? existing.displayName}")`);
+    return true;
   }
-
-  if (policyType === "V2Compliance") {
-    const existingV2 = context.cachedV2CompliancePolicies?.find(
-      (p) => p.name?.toLowerCase() === lowerName || normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingV2) {
-      console.log(`${logPrefix} V2Compliance already exists (V2 cache hit), skipping: "${policyName}" (matched: "${existingV2.name}")`);
-      return true;
-    }
-    // V2 policies sometimes appear in Settings Catalog cache
-    const existingSC = context.cachedSettingsCatalogPolicies?.find(
-      (p) => p.name?.toLowerCase() === lowerName || normalizeName(p.name) === normalizedPolicyName
-    );
-    if (existingSC) {
-      console.log(`${logPrefix} V2Compliance already exists (SC cache hit), skipping: "${policyName}" (matched: "${existingSC.name}")`);
-      return true;
-    }
-    if (!hasODataUnsafeChars(policyName) && await v2CompliancePolicyExists(context.client, policyName)) {
-      console.log(`${logPrefix} V2Compliance already exists (API fallback), skipping: "${policyName}"`);
-      return true;
-    }
-    return false;
+  if (source.apiCheck && await source.apiCheck()) {
+    console.log(`${logPrefix} ${source.label} already exists (API fallback), skipping: "${policyName}"`);
+    return true;
   }
-
-  if (policyType === "DeviceConfiguration") {
-    const existing = context.cachedDeviceConfigurations?.find(
-      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
-    );
-    if (existing) {
-      console.log(`${logPrefix} DeviceConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
-      return true;
-    }
-    if (!hasODataUnsafeChars(policyName) && await deviceConfigurationExists(context.client, policyName)) {
-      console.log(`${logPrefix} DeviceConfiguration already exists (API fallback), skipping: "${policyName}"`);
-      return true;
-    }
-    return false;
-  }
-
-  if (policyType === "GroupPolicyConfiguration") {
-    const existing = context.cachedGroupPolicyConfigurations?.find(
-      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
-    );
-    if (existing) {
-      console.log(`${logPrefix} GroupPolicyConfiguration already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
-      return true;
-    }
-    if (!hasODataUnsafeChars(policyName) && await groupPolicyConfigurationExists(context.client, policyName)) {
-      console.log(`${logPrefix} GroupPolicyConfiguration already exists (API fallback), skipping: "${policyName}"`);
-      return true;
-    }
-    return false;
-  }
-
-  if (policyType === "SecurityIntent") {
-    const existing = context.cachedSecurityIntents?.find(
-      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
-    );
-    if (existing) {
-      console.log(`${logPrefix} SecurityIntent already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
-      return true;
-    }
-    if (await securityIntentExists(context.client, policyName)) {
-      console.log(`${logPrefix} SecurityIntent already exists (API fallback), skipping: "${policyName}"`);
-      return true;
-    }
-    return false;
-  }
-
-  if (policyType === "DriverUpdateProfiles") {
-    const existing = context.cachedDriverUpdateProfiles?.find(
-      (p) => p.displayName?.toLowerCase() === lowerName || normalizeName(p.displayName) === normalizedPolicyName
-    );
-    if (existing) {
-      console.log(`${logPrefix} DriverUpdateProfile already exists (cache hit), skipping: "${policyName}"`);
-      return true;
-    }
-    return false;
-  }
-
-  if (policyType === "ConditionalAccess") {
-    // CA policies are created with " [Intune Hydration Kit]" suffix
-    // Check for both the original name and the suffixed version
-    const suffixedLowerName = `${lowerName} [intune hydration kit]`;
-    const existing = context.cachedConditionalAccessPolicies?.find(
-      (p) => {
-        const pLower = p.displayName?.toLowerCase();
-        return pLower === lowerName ||
-               pLower === suffixedLowerName ||
-               normalizeName(p.displayName) === normalizedPolicyName;
-      }
-    );
-    if (existing) {
-      console.log(`${logPrefix} ConditionalAccess policy already exists (cache hit), skipping: "${policyName}" (matched: "${existing.displayName}")`);
-      return true;
-    }
-    if (await conditionalAccessPolicyExists(context.client, policyName)) {
-      console.log(`${logPrefix} ConditionalAccess policy already exists (API fallback), skipping: "${policyName}"`);
-      return true;
-    }
-    return false;
-  }
-
   return false;
 }
 
@@ -1473,165 +1426,77 @@ function findResourceIdForDelete(
 
     case "baseline":
     case "cisBaseline": {
-      // First check Settings Catalog policies with exact match
-      let policy = context.cachedSettingsCatalogPolicies?.find(
-        (p) => p.name?.toLowerCase() === nameToFind
-      );
+      // Baseline tasks can resolve to several policy endpoints. Search each
+      // cache in priority order with uniform matching semantics
+      // (exact > normalized > unique partial - see findByNamePrecedence).
+      const baselineSources: Array<{
+        label: string;
+        endpointType: BaselineEndpointType;
+        match: () =>
+          | { id?: string; name?: string; displayName?: string; description?: string }
+          | undefined;
+      }> = [
+        {
+          label: "Settings Catalog policy",
+          endpointType: "settingsCatalog",
+          match: () =>
+            findByNamePrecedence(context.cachedSettingsCatalogPolicies, nameToFind, normalizedNameToFind, (p) => p.name),
+        },
+        {
+          label: "V2 Compliance policy",
+          endpointType: "v2Compliance",
+          match: () =>
+            findByNamePrecedence(context.cachedV2CompliancePolicies, nameToFind, normalizedNameToFind, (p) => p.name),
+        },
+        {
+          label: "V1 Compliance policy",
+          endpointType: "v1Compliance",
+          match: () =>
+            findByNamePrecedence(context.cachedCompliancePolicies, nameToFind, normalizedNameToFind, (p) => p.displayName),
+        },
+        {
+          label: "Device Configuration",
+          endpointType: "deviceConfiguration",
+          match: () =>
+            findByNamePrecedence(context.cachedDeviceConfigurations, nameToFind, normalizedNameToFind, (p) => p.displayName),
+        },
+        {
+          label: "Group Policy Configuration",
+          endpointType: "groupPolicyConfiguration",
+          match: () =>
+            findByNamePrecedence(context.cachedGroupPolicyConfigurations, nameToFind, normalizedNameToFind, (p) => p.displayName),
+        },
+        {
+          label: "Security Intent",
+          endpointType: "securityIntent",
+          match: () =>
+            findByNamePrecedence(context.cachedSecurityIntents, nameToFind, normalizedNameToFind, (p) => p.displayName),
+        },
+        {
+          label: "Driver Update Profile",
+          endpointType: "driverUpdate",
+          match: () =>
+            findByNamePrecedence(context.cachedDriverUpdateProfiles, nameToFind, normalizedNameToFind, (p) => p.displayName),
+        },
+      ];
 
-      if (!policy) {
-        // Try normalized match (handles punctuation differences like colons)
-        policy = context.cachedSettingsCatalogPolicies?.find(
-          (p) => normalizeName(p.name) === normalizedNameToFind
-        );
+      for (const source of baselineSources) {
+        const found = source.match();
+        if (found?.id) {
+          const hasMarker = hasHydrationMarker(found.description);
+          console.log(`[BatchExecutor:DELETE] Found ${source.label} "${found.name ?? found.displayName}" (ID: ${found.id}), hasMarker: ${hasMarker}`);
+          return { id: found.id, hasMarker, endpointType: source.endpointType };
+        }
       }
 
-      if (!policy) {
-        // Try partial match for Settings Catalog (normalized)
-        policy = context.cachedSettingsCatalogPolicies?.find(
-          (p) => {
-            const normalizedPolicyName = normalizeName(p.name);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
-
-      if (policy?.id) {
-        const hasMarker = hasHydrationMarker(policy.description);
-        console.log(`[BatchExecutor:DELETE] Found Settings Catalog policy "${policy.name}" (ID: ${policy.id}), hasMarker: ${hasMarker}`);
-        return { id: policy.id, hasMarker, endpointType: "settingsCatalog" };
-      }
-
-      // If not found in Settings Catalog, check V2 Compliance policies (OIB compliance)
-      let v2Policy = context.cachedV2CompliancePolicies?.find(
-        (p) => p.name?.toLowerCase() === nameToFind || normalizeName(p.name) === normalizedNameToFind
-      );
-
-      if (!v2Policy) {
-        // Try partial match for V2 Compliance (normalized)
-        v2Policy = context.cachedV2CompliancePolicies?.find(
-          (p) => {
-            const normalizedPolicyName = normalizeName(p.name);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
-
-      if (v2Policy?.id) {
-        const hasMarker = hasHydrationMarker(v2Policy.description);
-        console.log(`[BatchExecutor:DELETE] Found V2 Compliance policy "${v2Policy.name}" (ID: ${v2Policy.id}), hasMarker: ${hasMarker}`);
-        return { id: v2Policy.id, hasMarker, endpointType: "v2Compliance" };
-      }
-
-      // If not found in V2 Compliance, check V1 Compliance policies (OIB compliance uses deviceCompliancePolicies endpoint)
-      let v1Policy = context.cachedCompliancePolicies?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
-      );
-
-      if (!v1Policy) {
-        // Try partial match for V1 Compliance (normalized)
-        v1Policy = context.cachedCompliancePolicies?.find(
-          (p) => {
-            const normalizedPolicyName = normalizeName(p.displayName);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
-
-      if (v1Policy?.id) {
-        const hasMarker = hasHydrationMarker(v1Policy.description);
-        console.log(`[BatchExecutor:DELETE] Found V1 Compliance policy "${v1Policy.displayName}" (ID: ${v1Policy.id}), hasMarker: ${hasMarker}`);
-        return { id: v1Policy.id, hasMarker, endpointType: "v1Compliance" };
-      }
-
-      // If not found in V1 Compliance, check Device Configurations (Health Monitoring, etc.)
-      let deviceConfig = context.cachedDeviceConfigurations?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
-      );
-
-      if (!deviceConfig) {
-        // Try partial match for Device Configurations (normalized)
-        deviceConfig = context.cachedDeviceConfigurations?.find(
-          (p) => {
-            const normalizedPolicyName = normalizeName(p.displayName);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
-
-      if (deviceConfig?.id) {
-        const hasMarker = hasHydrationMarker(deviceConfig.description);
-        console.log(`[BatchExecutor:DELETE] Found Device Configuration "${deviceConfig.displayName}" (ID: ${deviceConfig.id}), hasMarker: ${hasMarker}`);
-        return { id: deviceConfig.id, hasMarker, endpointType: "deviceConfiguration" };
-      }
-
-      let groupPolicyConfiguration = context.cachedGroupPolicyConfigurations?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
-      );
-
-      if (!groupPolicyConfiguration) {
-        groupPolicyConfiguration = context.cachedGroupPolicyConfigurations?.find(
-          (p) => {
-            const normalizedPolicyName = normalizeName(p.displayName);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
-
-      if (groupPolicyConfiguration?.id) {
-        const hasMarker = hasHydrationMarker(groupPolicyConfiguration.description);
-        console.log(`[BatchExecutor:DELETE] Found Group Policy Configuration "${groupPolicyConfiguration.displayName}" (ID: ${groupPolicyConfiguration.id}), hasMarker: ${hasMarker}`);
-        return { id: groupPolicyConfiguration.id, hasMarker, endpointType: "groupPolicyConfiguration" };
-      }
-
-      let securityIntent = context.cachedSecurityIntents?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
-      );
-
-      if (!securityIntent) {
-        securityIntent = context.cachedSecurityIntents?.find(
-          (p) => {
-            const normalizedPolicyName = normalizeName(p.displayName);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
-
-      if (securityIntent?.id) {
-        const hasMarker = hasHydrationMarker(securityIntent.description);
-        console.log(`[BatchExecutor:DELETE] Found Security Intent "${securityIntent.displayName}" (ID: ${securityIntent.id}), hasMarker: ${hasMarker}`);
-        return { id: securityIntent.id, hasMarker, endpointType: "securityIntent" };
-      }
-
-      // If not found in Device Configurations, check Driver Update Profiles
-      let driverProfile = context.cachedDriverUpdateProfiles?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
-      );
-
-      if (!driverProfile) {
-        // Try partial match for Driver Update Profiles (normalized)
-        driverProfile = context.cachedDriverUpdateProfiles?.find(
-          (p) => {
-            const normalizedPolicyName = normalizeName(p.displayName);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
-
-      if (driverProfile?.id) {
-        const hasMarker = hasHydrationMarker(driverProfile.description);
-        console.log(`[BatchExecutor:DELETE] Found Driver Update Profile "${driverProfile.displayName}" (ID: ${driverProfile.id}), hasMarker: ${hasMarker}`);
-        return { id: driverProfile.id, hasMarker, endpointType: "driverUpdate" };
-      }
-
-      const appProtectionPolicy = context.cachedAppProtectionPolicies?.find(
-        (p) => p.displayName?.toLowerCase() === nameToFind || normalizeName(p.displayName) === normalizedNameToFind
+      // App Protection is exact/normalized only (no partial match) and derives
+      // its endpoint from the policy platform
+      const appProtectionPolicy = findByNamePrecedence(
+        context.cachedAppProtectionPolicies,
+        nameToFind,
+        normalizedNameToFind,
+        (p) => p.displayName,
+        false
       );
 
       if (appProtectionPolicy?.id) {
@@ -1648,18 +1513,12 @@ function findResourceIdForDelete(
     }
 
     case "compliance": {
-      let v2Compliance = context.cachedV2CompliancePolicies?.find(
-        (c) => c.name?.toLowerCase() === nameToFind || normalizeName(c.name) === normalizedNameToFind
+      const v2Compliance = findByNamePrecedence(
+        context.cachedV2CompliancePolicies,
+        nameToFind,
+        normalizedNameToFind,
+        (c) => c.name
       );
-      if (!v2Compliance) {
-        v2Compliance = context.cachedV2CompliancePolicies?.find(
-          (c) => {
-            const normalizedPolicyName = normalizeName(c.name);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
       if (v2Compliance?.id) {
         return {
           id: v2Compliance.id,
@@ -1668,19 +1527,12 @@ function findResourceIdForDelete(
         };
       }
 
-      let compliance = context.cachedCompliancePolicies?.find(
-        (c) => c.displayName?.toLowerCase() === nameToFind || normalizeName(c.displayName) === normalizedNameToFind
+      const compliance = findByNamePrecedence(
+        context.cachedCompliancePolicies,
+        nameToFind,
+        normalizedNameToFind,
+        (c) => c.displayName
       );
-      if (!compliance) {
-        // Try partial match for compliance (normalized)
-        compliance = context.cachedCompliancePolicies?.find(
-          (c) => {
-            const normalizedPolicyName = normalizeName(c.displayName);
-            return normalizedPolicyName.includes(normalizedNameToFind) ||
-                   normalizedNameToFind.includes(normalizedPolicyName);
-          }
-        );
-      }
       if (compliance?.id) {
         return {
           id: compliance.id,
@@ -2493,9 +2345,11 @@ export async function executeDeletesInParallel(
               return { task, success: true, skipped: false };
             }
 
-            // Check if it's a 429 (throttled) or 400 error (transient backend issue) but NOT ResourceNotFound
+            // Check if it's a 429 (throttled) or 400 error (transient backend issue) but NOT ResourceNotFound.
+            // Match only the bracketed status marker - a bare "400" would match any
+            // error message containing "400" (IDs, counts) and retry non-transient failures.
             const is429Error = /\[429\]|TooManyRequests/.test(lastError);
-            const is400Error = /\[400\]|400/.test(lastError);
+            const is400Error = /\[400\]/.test(lastError);
             const isRetryable = (is429Error || is400Error) && attempt < maxRetries - 1;
 
             if (isRetryable) {

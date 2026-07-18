@@ -138,10 +138,21 @@ export function TenantConfig(): React.JSX.Element {
   }, [setWizardPrerequisiteResult]);
 
   useEffect(() => {
-    if (accounts.length > 0 && !state.prerequisiteResult) {
+    if (accounts.length === 0) {
+      return;
+    }
+    // Re-run validation when there is no cached result, OR when the cached
+    // result belongs to a DIFFERENT tenant (user signed out and into another
+    // tenant in the same session) - stale results from tenant A must never
+    // gate execution against tenant B.
+    const cachedOrgId = state.prerequisiteResult?.organization?.id;
+    // Single source of truth: `tenantId` derives from the accounts array this
+    // effect depends on, so the staleness check can never read an untracked value.
+    const isStale = Boolean(cachedOrgId && tenantId && cachedOrgId !== tenantId);
+    if (!state.prerequisiteResult || isStale) {
       void runPrerequisiteValidation(true);
     }
-  }, [accounts.length, runPrerequisiteValidation, state.prerequisiteResult]);
+  }, [accounts, tenantId, runPrerequisiteValidation, state.prerequisiteResult]);
 
   useEffect(() => {
     if (!state.prerequisiteResult) {
@@ -206,7 +217,7 @@ export function TenantConfig(): React.JSX.Element {
           ? "checking"
           : prerequisiteResult?.licenses?.hasIntuneLicense
             ? "success"
-            : prerequisiteResult?.licenses
+            : prerequisiteResult?.licenses || prerequisiteStatus === "error"
               ? "error"
               : "warning",
       icon: ShieldCheck,
