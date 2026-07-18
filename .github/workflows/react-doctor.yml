@@ -20,3 +20,4 @@ jobs:
       - uses: millionco/react-doctor@09fe1ff55f5efa4d069c3c57c9d3134c46a9cfb3
         with:
           comment: false
+          version: "0.7.4"
