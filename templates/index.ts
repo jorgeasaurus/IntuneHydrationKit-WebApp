@@ -3,6 +3,7 @@
  */
 
 import { DEVICE_FILTER_TEMPLATE_COUNT } from "./filterManifest";
+import { DYNAMIC_GROUPS, STATIC_GROUPS } from "./groups";
 
 export * from "./groups";
 export * from "./filters";
@@ -19,8 +20,8 @@ export * from "./enrollment";
 export const TEMPLATE_METADATA = {
   groups: {
     displayName: "Entra Groups",
-    description: "Dynamic and static groups for device/user categorization (50 dynamic + 5 static)",
-    count: 55,
+    description: `Dynamic and static groups for device/user categorization (${DYNAMIC_GROUPS.length} dynamic + ${STATIC_GROUPS.length} static)`,
+    count: DYNAMIC_GROUPS.length + STATIC_GROUPS.length,
     icon: "Users",
   },
   filters: {

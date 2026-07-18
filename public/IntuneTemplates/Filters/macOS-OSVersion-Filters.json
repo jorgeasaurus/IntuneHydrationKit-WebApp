@@ -1,6 +1,12 @@
 {
     "filters": [
         {
+            "displayName": "macOS - macOS 27 Golden Gate Devices",
+            "description": "Filter for macOS 27 (Golden Gate) devices",
+            "platform": "macOS",
+            "rule": "(device.osVersion -startsWith \"27.\")"
+        },
+        {
             "displayName": "macOS - macOS 26 Tahoe Devices",
             "description": "Filter for macOS 26 (Tahoe) devices",
             "platform": "macOS",

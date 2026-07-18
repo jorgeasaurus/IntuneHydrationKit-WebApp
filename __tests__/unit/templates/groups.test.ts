@@ -40,6 +40,12 @@ describe("dynamic group templates", () => {
         '(device.deviceOSType -eq "MacMDM") and (device.deviceOSVersion -startsWith "26.")',
     });
     expect(
+      getDynamicGroupByName("Intune - macOS 27 Golden Gate Devices")
+    ).toMatchObject({
+      membershipRule:
+        '(device.deviceOSType -eq "MacMDM") and (device.deviceOSVersion -startsWith "27.")',
+    });
+    expect(
       getDynamicGroupByName("Intune - macOS 15 Sequoia Devices")
     ).toMatchObject({
       membershipRule:

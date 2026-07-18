@@ -1,7 +1,7 @@
 /**
  * Dynamic and Static Group Templates for Intune Hydration Kit
  *
- * 58 dynamic groups across 6 categories (OS, Autopilot, Ownership,
+ * 59 dynamic groups across 6 categories (OS, Autopilot, Ownership,
  * Manufacturer, User, VM) plus 5 static assignment-ring groups.
  * Mirrors the PowerShell IntuneHydrationKit group templates.
  */
@@ -15,7 +15,7 @@ const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 // ---------------------------------------------------------------------------
 
 export const DYNAMIC_GROUPS: DeviceGroup[] = [
-  // ── OS Groups (28) ──────────────────────────────────────────────────────
+  // ── OS Groups (29) ──────────────────────────────────────────────────────
 
   {
     "@odata.type": "#microsoft.graph.group",
@@ -110,6 +110,18 @@ export const DYNAMIC_GROUPS: DeviceGroup[] = [
     mailNickname: "intuneMacosDevices",
     securityEnabled: true,
     membershipRule: '(device.deviceOSType -eq "MacMDM")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - macOS 27 Golden Gate Devices",
+    description: `All macOS 27 (Golden Gate) devices managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneMacos27Devices",
+    securityEnabled: true,
+    membershipRule:
+      '(device.deviceOSType -eq "MacMDM") and (device.deviceOSVersion -startsWith "27.")',
     membershipRuleProcessingState: "On",
   },
   {

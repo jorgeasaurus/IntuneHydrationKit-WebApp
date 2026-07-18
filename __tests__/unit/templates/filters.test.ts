@@ -22,7 +22,7 @@ const FILTER_SENTINELS_BY_PATH = {
   "Filters/iOS-OSVersion-Filters.json": "iOS - iOS 26 Devices",
   "Filters/macOS-Architecture-Filters.json": "macOS - Apple Silicon Devices",
   "Filters/macOS-Filters.json": "macOS - Apple Devices",
-  "Filters/macOS-OSVersion-Filters.json": "macOS - macOS 26 Tahoe Devices",
+  "Filters/macOS-OSVersion-Filters.json": "macOS - macOS 27 Golden Gate Devices",
 } satisfies Record<(typeof DEVICE_FILTER_TEMPLATE_PATHS)[number], string>;
 
 describe("device filter template offering", () => {
@@ -31,10 +31,10 @@ describe("device filter template offering", () => {
     const displayNames = new Set(filters.map((filter) => filter.displayName));
 
     expect(filters).toHaveLength(DEVICE_FILTER_TEMPLATE_COUNT);
-    expect(DEVICE_FILTER_TEMPLATE_COUNT).toBe(37);
-    expect(displayNames.size).toBe(37);
+    expect(DEVICE_FILTER_TEMPLATE_COUNT).toBe(38);
+    expect(displayNames.size).toBe(38);
     expect(getDeviceFiltersByPlatform("windows10AndLater")).toHaveLength(21);
-    expect(getDeviceFiltersByPlatform("macOS")).toHaveLength(8);
+    expect(getDeviceFiltersByPlatform("macOS")).toHaveLength(9);
     expect(getDeviceFiltersByPlatform("iOS")).toHaveLength(5);
     expect(getDeviceFilterByName("Android - Samsung Devices")).toMatchObject({
       platform: "android",
@@ -83,6 +83,12 @@ describe("device filter template offering", () => {
     ).toMatchObject({
       platform: "macOS",
       rule: '(device.osVersion -startsWith "26.")',
+    });
+    expect(
+      getDeviceFilterByName("macOS - macOS 27 Golden Gate Devices")
+    ).toMatchObject({
+      platform: "macOS",
+      rule: '(device.osVersion -startsWith "27.")',
     });
     expect(getDeviceFilterByName("iOS - iOS 26 Devices")).toMatchObject({
       platform: "iOS",
