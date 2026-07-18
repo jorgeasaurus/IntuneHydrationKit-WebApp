@@ -272,3 +272,165 @@
   color: hsl(196 100% 79%);
   border-color: hsl(var(--hydrate) / 0.42);
 }
+
+/* ============================================
+   HERO ATMOSPHERE - blueprint grid + glow orbs
+   ============================================ */
+
+.landing-hero-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(hsl(var(--hydrate) / 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, hsl(var(--hydrate) / 0.07) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 85% 62% at 50% 36%, black 25%, transparent 78%);
+}
+
+.landing-hero-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+}
+
+.landing-hero-orb--primary {
+  width: 30rem;
+  height: 30rem;
+  top: -9rem;
+  right: -7rem;
+  background: hsl(var(--hydrate) / 0.22);
+}
+
+.landing-hero-orb--accent {
+  width: 24rem;
+  height: 24rem;
+  top: 10rem;
+  left: -9rem;
+  background: hsl(var(--signal-info) / 0.14);
+}
+
+.dark .landing-hero-orb--primary {
+  background: hsl(var(--hydrate) / 0.17);
+}
+
+.dark .landing-hero-orb--accent {
+  background: hsl(var(--signal-info) / 0.1);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-hero-orb--primary {
+    animation: hero-orb-drift 16s ease-in-out infinite alternate;
+  }
+  .landing-hero-orb--accent {
+    animation: hero-orb-drift 20s ease-in-out infinite alternate-reverse;
+  }
+}
+
+@keyframes hero-orb-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(2.5rem, 1.75rem, 0) scale(1.08);
+  }
+}
+
+.landing-hero-title {
+  font-size: clamp(3.25rem, 7.5vw, 6.75rem);
+  font-weight: 900;
+  line-height: 0.92;
+  letter-spacing: -0.02em;
+}
+
+.landing-hero-title .hero-highlight {
+  background: linear-gradient(
+    100deg,
+    hsl(var(--hydrate)) 15%,
+    hsl(var(--primary)) 55%,
+    hsl(var(--signal-info)) 90%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .landing-hero-fade {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: hero-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+  .landing-hero-fade--1 { animation-delay: 0.05s; }
+  .landing-hero-fade--2 { animation-delay: 0.15s; }
+  .landing-hero-fade--3 { animation-delay: 0.25s; }
+  .landing-hero-fade--4 { animation-delay: 0.35s; }
+  .landing-hero-fade--5 { animation-delay: 0.45s; }
+}
+
+@keyframes hero-rise {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.landing-eyebrow-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.375rem;
+  border: 1px solid hsl(var(--landing-border) / 0.78);
+  background: hsl(var(--landing-card) / 0.6);
+  padding: 0.375rem 0.75rem;
+  font-family: var(--font-jetbrains-mono), monospace;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: hsl(var(--landing-muted));
+  backdrop-filter: blur(6px);
+}
+
+/* ============================================
+   PIPELINE WORKFLOW - connected checkpoints
+   ============================================ */
+
+.landing-pipeline-rail {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .landing-pipeline-rail {
+    display: block;
+    position: absolute;
+    top: 3.75rem;
+    left: 3rem;
+    right: 3rem;
+    height: 1px;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      hsl(var(--hydrate) / 0.5) 12%,
+      hsl(var(--hydrate) / 0.5) 88%,
+      transparent
+    );
+    pointer-events: none;
+  }
+}
+
+.landing-pipeline-step {
+  transition:
+    transform 0.25s ease,
+    border-color 0.25s ease;
+}
+
+.landing-pipeline-step:hover {
+  transform: translateY(-4px);
+  border-color: hsl(var(--hydrate) / 0.55);
+}
+
+.landing-cta-glow {
+  box-shadow:
+    0 0 0 1px hsl(var(--hydrate) / 0.14),
+    0 24px 60px -24px hsl(var(--hydrate) / 0.35);
+}

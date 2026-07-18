@@ -157,28 +157,27 @@ function Hero({
   onContinue,
 }: Pick<HomeLandingProps, "isAuthenticated" | "onSignInClick" | "onContinue">) {
   return (
-    <section className="relative overflow-hidden pt-20 pb-8 sm:pt-24 sm:pb-16">
-      <div
-        className="absolute inset-x-0 top-0 h-72 bg-[linear-gradient(180deg,hsl(var(--hydrate)/0.12),transparent)]"
-        aria-hidden="true"
-      />
+    <section className="relative overflow-hidden pt-20 pb-8 sm:pt-28 sm:pb-16">
+      <div className="landing-hero-grid" aria-hidden="true" />
+      <div className="landing-hero-orb landing-hero-orb--primary" aria-hidden="true" />
+      <div className="landing-hero-orb landing-hero-orb--accent" aria-hidden="true" />
       <div className="container relative mx-auto px-4 sm:px-6">
         <div className="grid items-center gap-6 sm:gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.05fr)]">
           <div className="space-y-5 sm:space-y-8">
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="landing-hero-fade landing-hero-fade--1 flex flex-wrap items-center gap-3">
               <span className="landing-version-badge inline-flex items-center gap-2 rounded-md border border-hydrate/35 bg-hydrate/10 px-3 py-1.5 font-mono text-xs uppercase text-hydrate">
                 <span className="size-2 rounded-full bg-hydrate" />
                 {APP_VERSION}
               </span>
-              <span className="inline-flex items-center gap-2 rounded-md border border-border/80 bg-background/70 px-3 py-1.5 font-mono text-xs uppercase text-muted-foreground">
+              <span className="landing-eyebrow-chip">
                 <ShieldCheck className="size-3.5 text-signal-success" />
                 Commercial tenant console
               </span>
             </div>
 
-            <div className="max-w-3xl space-y-5">
-              <h1 className="hero-title text-4xl sm:text-7xl lg:text-8xl">
-                Intune Hydration Kit
+            <div className="landing-hero-fade landing-hero-fade--2 max-w-3xl space-y-5">
+              <h1 className="landing-hero-title">
+                Intune <span className="hero-highlight">Hydration</span> Kit
               </h1>
               <p className="landing-lead max-w-2xl text-base leading-7 text-muted-foreground sm:text-xl sm:leading-8">
                 A guided Microsoft Graph console for bootstrapping Intune
@@ -187,7 +186,7 @@ function Hero({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-row sm:flex-wrap">
+            <div className="landing-hero-fade landing-hero-fade--3 grid grid-cols-2 gap-3 sm:flex sm:flex-row sm:flex-wrap">
               <PrimaryAction
                 isAuthenticated={isAuthenticated}
                 onSignInClick={onSignInClick}
@@ -223,14 +222,14 @@ function Hero({
 
             <MobileRunPreview />
 
-            <div className="landing-stat-rail hidden gap-2 rounded-lg border border-border/80 bg-card/70 p-2 backdrop-blur sm:grid sm:grid-cols-4">
+            <div className="landing-hero-fade landing-hero-fade--4 landing-stat-rail hidden gap-2 rounded-lg border border-border/80 bg-card/70 p-2 backdrop-blur sm:grid sm:grid-cols-4">
               {HERO_STATS.map((stat) => (
                 <div
                   key={stat.label}
                   className="landing-stat-cell rounded-md border border-border/70 bg-background/55 p-3"
                 >
-                  <div className="font-mono text-2xl font-bold text-foreground">
-                    {stat.value}
+                  <div className="font-mono text-2xl font-bold text-gradient-hydrate">
+                    <AnimatedCounter value={Number(stat.value)} />
                   </div>
                   <div className="mt-1 text-xs uppercase text-muted-foreground">
                     {stat.label}
@@ -336,13 +335,14 @@ function WorkflowSection() {
               scope the work, execute intentionally, then export results.
             </p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="relative grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <div className="landing-pipeline-rail" aria-hidden="true" />
             {STEPS.map((item) => (
               <div key={item.step} className="relative">
-                <Card className="data-card h-full overflow-hidden">
+                <Card className="data-card landing-pipeline-step h-full overflow-hidden">
                   <CardHeader className="space-y-5">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono text-3xl font-bold text-hydrate/35">
+                      <span className="bg-background relative z-10 rounded-md border border-hydrate/30 px-2 py-1 font-mono text-2xl font-bold text-hydrate">
                         {item.step}
                       </span>
                       <div className="rounded-md border border-border bg-background p-2">
@@ -534,7 +534,7 @@ function FinalCta({
     <section className="py-16 sm:py-20">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto max-w-5xl">
-          <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="landing-cta-glow overflow-hidden rounded-lg border border-border bg-card">
             <div className="h-1 bg-gradient-to-r from-hydrate via-primary to-hydrate" />
             <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center">
               <div>
