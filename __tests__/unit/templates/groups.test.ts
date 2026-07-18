@@ -1,11 +1,24 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  DYNAMIC_GROUP_TEMPLATE_COUNT,
+  GROUP_TEMPLATE_COUNT,
+  STATIC_GROUP_TEMPLATE_COUNT,
+} from "@/templates/groupManifest";
+import {
   DYNAMIC_GROUPS,
+  STATIC_GROUPS,
   getDynamicGroupByName,
 } from "@/templates/groups";
 
 describe("dynamic group templates", () => {
+  it("keeps the lightweight manifest in sync with the template arrays", () => {
+    expect(DYNAMIC_GROUPS).toHaveLength(DYNAMIC_GROUP_TEMPLATE_COUNT);
+    expect(STATIC_GROUPS).toHaveLength(STATIC_GROUP_TEMPLATE_COUNT);
+    expect(GROUP_TEMPLATE_COUNT).toBe(
+      DYNAMIC_GROUPS.length + STATIC_GROUPS.length
+    );
+  });
   it("has unique display names and mail nicknames", () => {
     const displayNames = DYNAMIC_GROUPS.map((g) => g.displayName.toLowerCase());
     const nicknames = DYNAMIC_GROUPS.map((g) => g.mailNickname.toLowerCase());
