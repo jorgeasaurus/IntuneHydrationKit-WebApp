@@ -49,7 +49,7 @@ describe('OperationModeSelection', () => {
 
     expect(screen.getByText('Delete mode is live')).toBeInTheDocument()
     expect(screen.getByText(/Conditional Access policies must be disabled/i)).toBeInTheDocument()
-    expect(screen.getByText('Delete requires hydration markers and CA disablement.')).toBeInTheDocument()
+    expect(screen.queryByText('Safety rail')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Choose Operation Mode' }))
 
@@ -64,6 +64,7 @@ describe('OperationModeSelection', () => {
 
     expect(screen.getByText('WhatIf preview')).toBeInTheDocument()
     expect(screen.getByText('This run is safe to review without mutating the tenant.')).toBeInTheDocument()
+    expect(screen.queryByText('Intent')).not.toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Back' }))
 

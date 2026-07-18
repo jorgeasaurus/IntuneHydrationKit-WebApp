@@ -662,3 +662,26 @@
 - Restored session reload for all supported cloud environments via the MSAL cloud endpoint map.
 - CSV reports now label start/end columns as UTC and render UTC values.
 - Checks passed: focused auth/reporter tests, `npm run test:run`, `npm run type-check`, `npm run build`, `git diff --check`.
+
+# Full-width Execution Summary
+
+- [x] Remove the Intent and Safety rail summary cards from operation mode.
+- [x] Expand the Execution summary card across the available width.
+- [x] Update focused regression coverage and verify the change.
+
+## Review
+
+- Operation mode now shows only the dynamic Execution summary card across the full available width.
+- Focused coverage confirms the removed labels stay absent while preview/live behavior remains intact.
+- Checks passed: focused OperationMode tests, `npm run type-check`, `npm run build`, `git diff --check`.
+
+# Full-width Execution Summary PR
+
+- [x] Create and push a focused feature branch.
+- [ ] Open a pull request against `main`.
+- [ ] Run Copilot review cycles until the latest head receives a clean review.
+- [ ] Record the final PR and review results.
+
+## Review
+
+- Pending.
