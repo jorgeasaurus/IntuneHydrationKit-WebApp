@@ -2,121 +2,175 @@
     "groups": [
         {
             "displayName": "Intune - Windows Devices",
-            "description": "All Windows devices managed by Intune",
+            "description": "All Windows devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"Windows\") and (device.managementType -eq \"MDM\")",
             "platform": "Windows"
         },
         {
             "displayName": "Intune - Windows 10 Devices",
-            "description": "All Windows 10 devices managed by Intune",
+            "description": "All Windows 10 devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"Windows\") and (device.deviceOSVersion -startsWith \"10.0.1\") and (device.managementType -eq \"MDM\")",
             "platform": "Windows"
         },
         {
             "displayName": "Intune - Windows 11 Devices",
-            "description": "All Windows 11 devices managed by Intune",
+            "description": "All Windows 11 devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"Windows\") and (device.deviceOSVersion -startsWith \"10.0.2\") and (device.managementType -eq \"MDM\")",
             "platform": "Windows"
         },
         {
+            "displayName": "Intune - Windows 11 24H2 Devices",
+            "description": "All Windows 11 24H2 devices (build 26100) managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "(device.deviceOSType -eq \"Windows\") and (device.deviceOSVersion -startsWith \"10.0.26100\") and (device.managementType -eq \"MDM\")",
+            "platform": "Windows"
+        },
+        {
+            "displayName": "Intune - Windows 11 25H2 Devices",
+            "description": "All Windows 11 25H2 devices (build 26200) managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "(device.deviceOSType -eq \"Windows\") and (device.deviceOSVersion -startsWith \"10.0.26200\") and (device.managementType -eq \"MDM\")",
+            "platform": "Windows"
+        },
+        {
+            "displayName": "Intune - Windows 11 26H1 Devices",
+            "description": "All Windows 11 26H1 devices (build 28000) managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "(device.deviceOSType -eq \"Windows\") and (device.deviceOSVersion -startsWith \"10.0.28000\") and (device.managementType -eq \"MDM\")",
+            "platform": "Windows"
+        },
+        {
             "displayName": "Intune - Windows ConfigMgr Managed Devices",
-            "description": "All Windows devices managed by ConfigMgr (co-managed)",
+            "description": "All Windows devices managed by ConfigMgr (co-managed). Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceManagementAppId -eq \"54b943f8-d761-4f8d-951e-9cea1846db5a\")",
             "platform": "Windows"
         },
         {
             "displayName": "Intune - macOS Devices",
-            "description": "All macOS devices managed by Intune",
+            "description": "All macOS devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"MacMDM\")",
             "platform": "macOS"
         },
         {
+            "displayName": "Intune - macOS 27 Golden Gate Devices",
+            "description": "All macOS 27 (Golden Gate) devices managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "(device.deviceOSType -eq \"MacMDM\") and (device.deviceOSVersion -startsWith \"27.\")",
+            "platform": "macOS"
+        },
+        {
+            "displayName": "Intune - macOS 26 Tahoe Devices",
+            "description": "All macOS 26 (Tahoe) devices managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "(device.deviceOSType -eq \"MacMDM\") and (device.deviceOSVersion -startsWith \"26.\")",
+            "platform": "macOS"
+        },
+        {
+            "displayName": "Intune - macOS 15 Sequoia Devices",
+            "description": "All macOS 15 (Sequoia) devices managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "(device.deviceOSType -eq \"MacMDM\") and (device.deviceOSVersion -startsWith \"15.\")",
+            "platform": "macOS"
+        },
+        {
+            "displayName": "Intune - macOS 14 Sonoma Devices",
+            "description": "All macOS 14 (Sonoma) devices managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "(device.deviceOSType -eq \"MacMDM\") and (device.deviceOSVersion -startsWith \"14.\")",
+            "platform": "macOS"
+        },
+        {
             "displayName": "Intune - macOS Corporate Devices",
-            "description": "All corporate owned macOS devices managed by Intune",
+            "description": "All corporate owned macOS devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"MacMDM\") and (device.deviceOwnership -eq \"Company\")",
             "platform": "macOS"
         },
         {
             "displayName": "Intune - macOS BYOD Devices",
-            "description": "All personally owned macOS devices managed by Intune",
+            "description": "All personally owned macOS devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"MacMDM\") and (device.deviceOwnership -eq \"Personal\")",
             "platform": "macOS"
         },
         {
             "displayName": "Intune - iOS iPadOS Devices",
-            "description": "All iOS and iPadOS devices managed by Intune",
+            "description": "All iOS and iPadOS devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"iOS\") or (device.deviceOSType -eq \"iPad\")",
             "platform": "iOS"
         },
         {
+            "displayName": "Intune - iOS iPadOS 26 Devices",
+            "description": "All iOS and iPadOS 26 devices managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "((device.deviceOSType -eq \"iOS\") or (device.deviceOSType -eq \"iPad\")) and (device.deviceOSVersion -startsWith \"26.\")",
+            "platform": "iOS"
+        },
+        {
+            "displayName": "Intune - iOS iPadOS 18 Devices",
+            "description": "All iOS and iPadOS 18 devices managed by Intune. Imported by Intune Hydration Kit",
+            "membershipRule": "((device.deviceOSType -eq \"iOS\") or (device.deviceOSType -eq \"iPad\")) and (device.deviceOSVersion -startsWith \"18.\")",
+            "platform": "iOS"
+        },
+        {
             "displayName": "Intune - iPhone Devices",
-            "description": "All iPhone devices managed by Intune",
+            "description": "All iPhone devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"iPhone\")",
             "platform": "iOS"
         },
         {
             "displayName": "Intune - iPhone Corporate Devices",
-            "description": "All corporate owned iPhone devices managed by Intune",
+            "description": "All corporate owned iPhone devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"iPhone\") and (device.deviceOwnership -eq \"Company\")",
             "platform": "iOS"
         },
         {
             "displayName": "Intune - iPhone BYOD Devices",
-            "description": "All personally owned iPhone devices managed by Intune",
+            "description": "All personally owned iPhone devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"iPhone\") and (device.deviceOwnership -eq \"Personal\")",
             "platform": "iOS"
         },
         {
             "displayName": "Intune - iPad Devices",
-            "description": "All iPad devices managed by Intune",
+            "description": "All iPad devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"iPad\")",
             "platform": "iOS"
         },
         {
             "displayName": "Intune - iPad Corporate Devices",
-            "description": "All corporate owned iPad devices managed by Intune",
+            "description": "All corporate owned iPad devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"iPad\") and (device.deviceOwnership -eq \"Company\")",
             "platform": "iOS"
         },
         {
             "displayName": "Intune - iPad BYOD Devices",
-            "description": "All personally owned iPad devices managed by Intune",
+            "description": "All personally owned iPad devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"iPad\") and (device.deviceOwnership -eq \"Personal\")",
             "platform": "iOS"
         },
         {
             "displayName": "Intune - Android Devices",
-            "description": "All Android devices managed by Intune",
+            "description": "All Android devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -match \"Android\")",
             "platform": "Android"
         },
         {
             "displayName": "Intune - Android Corporate Devices",
-            "description": "All corporate owned Android devices managed by Intune",
+            "description": "All corporate owned Android devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"Android\") and (device.deviceOwnership -eq \"Company\")",
             "platform": "Android"
         },
         {
             "displayName": "Intune - Android BYOD Devices",
-            "description": "All personally owned Android devices managed by Intune",
+            "description": "All personally owned Android devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"Android\") and (device.deviceOwnership -eq \"Personal\")",
             "platform": "Android"
         },
         {
             "displayName": "Intune - Android Enterprise Devices",
-            "description": "All Android Enterprise devices managed by Intune",
+            "description": "All Android Enterprise devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -match \"AndroidEnterprise\")",
             "platform": "Android"
         },
         {
             "displayName": "Intune - Android Work Profile Devices",
-            "description": "All Android Work Profile devices managed by Intune",
+            "description": "All Android Work Profile devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"AndroidForWork\") and (device.managementType -eq \"MDM\")",
             "platform": "Android"
         },
         {
             "displayName": "Intune - Android Fully Managed Devices",
-            "description": "All Android Fully Managed devices managed by Intune",
+            "description": "All Android Fully Managed devices managed by Intune. Imported by Intune Hydration Kit",
             "membershipRule": "(device.deviceOSType -eq \"AndroidEnterprise\") and (device.enrollmentProfileName -eq null)",
             "platform": "Android"
         }

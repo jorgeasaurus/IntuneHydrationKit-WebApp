@@ -80,9 +80,13 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
       if (Array.isArray(data.groups)) {
         const groups = data.groups.map((group: GroupTemplate) => ({
           ...group,
-          displayName: `${IMPORT_PREFIX}${group.displayName}`,
+          displayName: group.displayName.startsWith(IMPORT_PREFIX)
+            ? group.displayName
+            : `${IMPORT_PREFIX}${group.displayName}`,
           description: group.description
-            ? `${group.description} ${HYDRATION_MARKER}`
+            ? group.description.includes(HYDRATION_MARKER)
+              ? group.description
+              : `${group.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
         }));
         allGroups.push(...groups);
@@ -111,9 +115,13 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
     if (data.groups && Array.isArray(data.groups)) {
       return data.groups.map((group: GroupTemplate) => ({
         ...group,
-        displayName: `${IMPORT_PREFIX}${group.displayName}`,
+        displayName: group.displayName.startsWith(IMPORT_PREFIX)
+          ? group.displayName
+          : `${IMPORT_PREFIX}${group.displayName}`,
         description: group.description
-          ? `${group.description} ${HYDRATION_MARKER}`
+          ? group.description.includes(HYDRATION_MARKER)
+            ? group.description
+            : `${group.description} ${HYDRATION_MARKER}`
           : HYDRATION_MARKER,
         isStaticGroup: true, // Mark as static group (assigned membership, not dynamic)
       }));
