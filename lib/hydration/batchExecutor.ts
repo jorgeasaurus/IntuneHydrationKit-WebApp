@@ -162,13 +162,22 @@ async function verifyCompliancePolicyCreated(
           setTimeout(() => reject(new Error("Verification timeout")), VERIFICATION_TIMEOUT);
         });
 
-        // Fetch fresh compliance policies from Graph API with timeout.
-        // getCollection follows @odata.nextLink so policies beyond the first
-        // page are not missed in large tenants (a get() here caused false
-        // "failed" statuses for policies that were actually created).
-        const fetchPromise = context.client.getCollection<{ id: string; displayName: string; description?: string }>(
-          "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
-        );
+        // Prefer a targeted $filter query to avoid fetching the entire
+        // collection.  Fall back to a full scan when the name contains
+        // characters that break OData string literals.
+        let fetchPromise: Promise<Array<{ id: string; displayName: string; description?: string }>>;
+        if (/^[^']*$/.test(policyName)) {
+          // No single-quotes — safe for OData string literal
+          const escaped = policyName.replace(/'/g, "''");
+          fetchPromise = context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
+            `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${escaped}'&$select=id,displayName,description`
+          ).then(r => r.value);
+        } else {
+          // Contains single-quotes — fall back to full collection scan
+          fetchPromise = context.client.getCollection<{ id: string; displayName: string; description?: string }>(
+            "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
+          );
+        }
 
         policies = await Promise.race([fetchPromise, timeoutPromise]);
       } catch (attemptError) {
