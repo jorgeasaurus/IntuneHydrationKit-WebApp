@@ -155,20 +155,28 @@ async function verifyCompliancePolicyCreated(
         await sleep(RETRY_DELAY);
       }
 
-      // Create a timeout promise
-      const timeoutPromise = new Promise<null>((_, reject) => {
-        setTimeout(() => reject(new Error("Verification timeout")), VERIFICATION_TIMEOUT);
-      });
+      let policies: Array<{ id: string; displayName: string; description?: string }> | null = null;
+      try {
+        // Create a timeout promise
+        const timeoutPromise = new Promise<null>((_, reject) => {
+          setTimeout(() => reject(new Error("Verification timeout")), VERIFICATION_TIMEOUT);
+        });
 
-      // Fetch fresh compliance policies from Graph API with timeout.
-      // getCollection follows @odata.nextLink so policies beyond the first
-      // page are not missed in large tenants (a get() here caused false
-      // "failed" statuses for policies that were actually created).
-      const fetchPromise = context.client.getCollection<{ id: string; displayName: string; description?: string }>(
-        "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
-      );
+        // Fetch fresh compliance policies from Graph API with timeout.
+        // getCollection follows @odata.nextLink so policies beyond the first
+        // page are not missed in large tenants (a get() here caused false
+        // "failed" statuses for policies that were actually created).
+        const fetchPromise = context.client.getCollection<{ id: string; displayName: string; description?: string }>(
+          "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
+        );
 
-      const policies = await Promise.race([fetchPromise, timeoutPromise]);
+        policies = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (attemptError) {
+        // Timeout or fetch error on this attempt — log and continue to next retry
+        const msg = attemptError instanceof Error ? attemptError.message : String(attemptError);
+        console.warn(`[BatchExecutor] Verification attempt ${attempt + 1} failed for "${policyName}": ${msg}`);
+        continue;
+      }
 
       if (policies) {
         let foundPolicy: { id: string; displayName: string; description?: string } | undefined;
