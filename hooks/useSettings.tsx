@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
 import { AppSettings } from "@/types/hydration";
 import { APP_SETTINGS_STORAGE_KEY } from "@/lib/storageKeys";
 
@@ -69,12 +69,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [settings, setSettings] = useState<AppSettings>(() => readStoredSettings());
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {
-    setSettings((prev) => {
-      const updated = normalizeSettings({ ...prev, ...newSettings });
-      localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(updated));
-      return updated;
-    });
+    setSettings((prev) => normalizeSettings({ ...prev, ...newSettings }));
   }, []);
+
+  // Persist settings whenever they change; keeps the updater pure
+  useEffect(() => {
+    localStorage.setItem(APP_SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+  }, [settings]);
 
   const resetSettings = useCallback(() => {
     setSettings(DEFAULT_SETTINGS);
