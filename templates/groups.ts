@@ -1,7 +1,7 @@
 /**
  * Dynamic and Static Group Templates for Intune Hydration Kit
  *
- * 50 dynamic groups across 6 categories (OS, Autopilot, Ownership,
+ * 58 dynamic groups across 6 categories (OS, Autopilot, Ownership,
  * Manufacturer, User, VM) plus 5 static assignment-ring groups.
  * Mirrors the PowerShell IntuneHydrationKit group templates.
  */
@@ -15,7 +15,7 @@ const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 // ---------------------------------------------------------------------------
 
 export const DYNAMIC_GROUPS: DeviceGroup[] = [
-  // ── OS Groups (20) ──────────────────────────────────────────────────────
+  // ── OS Groups (28) ──────────────────────────────────────────────────────
 
   {
     "@odata.type": "#microsoft.graph.group",
@@ -55,6 +55,42 @@ export const DYNAMIC_GROUPS: DeviceGroup[] = [
   },
   {
     "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - Windows 11 24H2 Devices",
+    description: `All Windows 11 24H2 devices (build 26100) managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneWindows1124H2Devices",
+    securityEnabled: true,
+    membershipRule:
+      '(device.deviceOSType -eq "Windows") and (device.deviceOSVersion -startsWith "10.0.26100") and (device.managementType -eq "MDM")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - Windows 11 25H2 Devices",
+    description: `All Windows 11 25H2 devices (build 26200) managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneWindows1125H2Devices",
+    securityEnabled: true,
+    membershipRule:
+      '(device.deviceOSType -eq "Windows") and (device.deviceOSVersion -startsWith "10.0.26200") and (device.managementType -eq "MDM")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - Windows 11 26H1 Devices",
+    description: `All Windows 11 26H1 devices (build 28000) managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneWindows1126H1Devices",
+    securityEnabled: true,
+    membershipRule:
+      '(device.deviceOSType -eq "Windows") and (device.deviceOSVersion -startsWith "10.0.28000") and (device.managementType -eq "MDM")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
     displayName: "Intune - Windows ConfigMgr Managed Devices",
     description: `All Windows devices co-managed with Configuration Manager. ${HYDRATION_MARKER}`,
     groupTypes: ["DynamicMembership"],
@@ -74,6 +110,42 @@ export const DYNAMIC_GROUPS: DeviceGroup[] = [
     mailNickname: "intuneMacosDevices",
     securityEnabled: true,
     membershipRule: '(device.deviceOSType -eq "MacMDM")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - macOS 26 Tahoe Devices",
+    description: `All macOS 26 (Tahoe) devices managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneMacos26Devices",
+    securityEnabled: true,
+    membershipRule:
+      '(device.deviceOSType -eq "MacMDM") and (device.deviceOSVersion -startsWith "26.")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - macOS 15 Sequoia Devices",
+    description: `All macOS 15 (Sequoia) devices managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneMacos15Devices",
+    securityEnabled: true,
+    membershipRule:
+      '(device.deviceOSType -eq "MacMDM") and (device.deviceOSVersion -startsWith "15.")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - macOS 14 Sonoma Devices",
+    description: `All macOS 14 (Sonoma) devices managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneMacos14Devices",
+    securityEnabled: true,
+    membershipRule:
+      '(device.deviceOSType -eq "MacMDM") and (device.deviceOSVersion -startsWith "14.")',
     membershipRuleProcessingState: "On",
   },
   {
@@ -110,6 +182,30 @@ export const DYNAMIC_GROUPS: DeviceGroup[] = [
     securityEnabled: true,
     membershipRule:
       '(device.deviceOSType -eq "iOS") or (device.deviceOSType -eq "iPad")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - iOS iPadOS 26 Devices",
+    description: `All iOS and iPadOS 26 devices managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneIos26Devices",
+    securityEnabled: true,
+    membershipRule:
+      '((device.deviceOSType -eq "iOS") or (device.deviceOSType -eq "iPad")) and (device.deviceOSVersion -startsWith "26.")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - iOS iPadOS 18 Devices",
+    description: `All iOS and iPadOS 18 devices managed by Intune. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneIos18Devices",
+    securityEnabled: true,
+    membershipRule:
+      '((device.deviceOSType -eq "iOS") or (device.deviceOSType -eq "iPad")) and (device.deviceOSVersion -startsWith "18.")',
     membershipRuleProcessingState: "On",
   },
   {

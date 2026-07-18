@@ -8,10 +8,13 @@
 import androidFilterTemplates from "@/public/IntuneTemplates/Filters/Android-Filters.json";
 import windowsArchitectureFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-Architecture-Filters.json";
 import windowsManufacturerFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-Manufacturer-Filters.json";
+import windowsOsVersionFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-OSVersion-Filters.json";
 import windowsVmFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-VM-Filters.json";
 import iosFilterTemplates from "@/public/IntuneTemplates/Filters/iOS-Filters.json";
+import iosOsVersionFilterTemplates from "@/public/IntuneTemplates/Filters/iOS-OSVersion-Filters.json";
 import macosArchitectureFilterTemplates from "@/public/IntuneTemplates/Filters/macOS-Architecture-Filters.json";
 import macosFilterTemplates from "@/public/IntuneTemplates/Filters/macOS-Filters.json";
+import macosOsVersionFilterTemplates from "@/public/IntuneTemplates/Filters/macOS-OSVersion-Filters.json";
 import type { DeviceFilter } from "@/types/graph";
 import { DEVICE_FILTER_TEMPLATE_PATHS } from "./filterManifest";
 
@@ -34,10 +37,13 @@ const [
   ANDROID_FILTERS_PATH,
   WINDOWS_ARCHITECTURE_FILTERS_PATH,
   WINDOWS_MANUFACTURER_FILTERS_PATH,
+  WINDOWS_OSVERSION_FILTERS_PATH,
   WINDOWS_VM_FILTERS_PATH,
   IOS_FILTERS_PATH,
+  IOS_OSVERSION_FILTERS_PATH,
   MACOS_ARCHITECTURE_FILTERS_PATH,
   MACOS_FILTERS_PATH,
+  MACOS_OSVERSION_FILTERS_PATH,
 ] = DEVICE_FILTER_TEMPLATE_PATHS;
 
 export const DEVICE_FILTER_TEMPLATE_FILES = [
@@ -50,13 +56,22 @@ export const DEVICE_FILTER_TEMPLATE_FILES = [
     path: WINDOWS_MANUFACTURER_FILTERS_PATH,
     source: windowsManufacturerFilterTemplates,
   },
+  {
+    path: WINDOWS_OSVERSION_FILTERS_PATH,
+    source: windowsOsVersionFilterTemplates,
+  },
   { path: WINDOWS_VM_FILTERS_PATH, source: windowsVmFilterTemplates },
   { path: IOS_FILTERS_PATH, source: iosFilterTemplates },
+  { path: IOS_OSVERSION_FILTERS_PATH, source: iosOsVersionFilterTemplates },
   {
     path: MACOS_ARCHITECTURE_FILTERS_PATH,
     source: macosArchitectureFilterTemplates,
   },
   { path: MACOS_FILTERS_PATH, source: macosFilterTemplates },
+  {
+    path: MACOS_OSVERSION_FILTERS_PATH,
+    source: macosOsVersionFilterTemplates,
+  },
 ] satisfies DeviceFilterTemplateFile[];
 
 function normalizePlatform(platform: string): DeviceFilter["platform"] {
