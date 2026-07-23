@@ -5,13 +5,11 @@ const ORGANIZATION_ID_PLACEHOLDER = "%OrganizationId%";
  * mutating the cached source template.
  */
 export function resolveOIBOrganizationId<T>(template: T, tenantId?: string): T {
-  if (!tenantId) {
-    return template;
-  }
-
   const replaceValue = (value: unknown): unknown => {
     if (typeof value === "string") {
-      return value.replaceAll(ORGANIZATION_ID_PLACEHOLDER, tenantId);
+      return tenantId
+        ? value.replaceAll(ORGANIZATION_ID_PLACEHOLDER, tenantId)
+        : value;
     }
 
     if (Array.isArray(value)) {
