@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import { resolveOIBOrganizationId } from "@/lib/hydration/templatePlaceholders";
 import manifest from "@/public/IntuneTemplates/OpenIntuneBaseline/manifest.json";
 
-const ORGANIZATION_ID_PLACEHOLDER = "%OrganizationId%";
 const OIB_ROOT = path.join(process.cwd(), "public/IntuneTemplates/OpenIntuneBaseline");
 const EXPECTED_ORGANIZATION_ID_TEMPLATES = [
   "MACOS/IntuneManagement/SettingsCatalog/MacOS - OIB - Microsoft OneDrive - U - Known Folder Move - v1.0.json",
