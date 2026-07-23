@@ -20,6 +20,7 @@ import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
+import { resolveOIBOrganizationId } from "./templatePlaceholders";
 import { sleep, sleepWithExecutionControl, waitWhilePaused, hasODataUnsafeChars, normalizeName, findByNamePrecedence } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
@@ -450,6 +451,8 @@ async function buildBaselineRequestBody(
     console.log(`[BatchExecutor:baseline] ✗ No template found for "${task.itemName}"`);
     return null;
   }
+
+  template = resolveOIBOrganizationId(template, context.tenantId);
 
   const policyName = (template.name || template.displayName) as string;
 

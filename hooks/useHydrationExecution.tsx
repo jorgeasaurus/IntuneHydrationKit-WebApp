@@ -227,6 +227,7 @@ export function useHydrationExecution() {
       // Create execution context
       const context: ExecutionContext = {
         client,
+        tenantId: state.tenantConfig.tenantId,
         operationMode: state.operationMode,
         isPreview: state.isPreview,
         stopOnFirstError: settings.stopOnFirstError,

@@ -308,6 +308,61 @@ describe("executeTasksInBatches", () => {
     );
   });
 
+  it("replaces OIB organization placeholders in batch Settings Catalog requests", async () => {
+    const policyName = "[IHD] OneDrive configuration";
+    const tenantId = "12345678-1234-1234-1234-123456789abc";
+    mockGetCachedTemplates.mockImplementation((category?: string) => {
+      if (category === "baseline") {
+        return [
+          {
+            name: policyName,
+            displayName: policyName,
+            description: "Imported by Intune Hydration Kit",
+            platforms: "windows10",
+            technologies: "mdm",
+            _oibPolicyType: "SettingsCatalog",
+            settings: [
+              {
+                settingInstance: {
+                  simpleSettingValue: { value: "%OrganizationId%" },
+                },
+              },
+            ],
+          },
+        ];
+      }
+      return undefined;
+    });
+
+    const task: HydrationTask = {
+      id: "batch-create-oib-onedrive",
+      category: "baseline",
+      operation: "create",
+      itemName: policyName,
+      status: "pending",
+    };
+    const client = createBatchClient();
+
+    await executeTasksInBatches([task], createCreateContext(client, { tenantId }));
+
+    expect(client.batch).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          body: expect.objectContaining({
+            settings: [
+              expect.objectContaining({
+                settingInstance: {
+                  simpleSettingValue: { value: tenantId },
+                },
+              }),
+            ],
+          }),
+        }),
+      ],
+      "beta"
+    );
+  });
+
   it("does not retry an entire create batch when the batch request itself fails", async () => {
     const policyName = "[IHD] Require password change for high-risk users";
 
