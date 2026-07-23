@@ -15,6 +15,7 @@ import {
   createBaselineCompliancePolicy,
 } from "../policyCreators";
 import { escapeODataString, hasODataUnsafeChars } from "../utils";
+import { resolveOIBOrganizationId } from "../templatePlaceholders";
 import { createAppProtectionPolicy, deleteAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy, AppProtectionTemplate } from "@/lib/templates/loader";
 
@@ -42,6 +43,8 @@ export async function executeBaselineTask(
     console.error(`[Baseline Task] Template not found for: "${task.itemName}"`);
     return { task, success: false, skipped: false, error: "Template not found" };
   }
+
+  template = resolveOIBOrganizationId(template, context.tenantId);
 
   // Determine the policy type and route accordingly
   const policyType = template._oibPolicyType;

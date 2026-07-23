@@ -29,6 +29,8 @@ export interface ActivityMessage {
  */
 export interface ExecutionContext {
   client: GraphClient;
+  /** Tenant ID established by the authenticated wizard session. */
+  tenantId?: string;
   operationMode: OperationMode;
   isPreview: boolean;
   stopOnFirstError: boolean;

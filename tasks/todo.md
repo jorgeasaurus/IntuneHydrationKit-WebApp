@@ -1,3 +1,26 @@
+# GitHub Issue #16 Investigation
+
+- [x] Retrieve issue #16 details, discussion, and linked work.
+- [x] Trace the reported behavior through the local code and test coverage.
+- [x] Validate the suspected cause and record a concise recommendation.
+
+## Review
+
+- Confirmed: `%OrganizationId%` is sent unchanged by both Settings Catalog paths; the PowerShell module replaces it with the connected tenant ID.
+- Checks passed: focused loader, policy-creator, and baseline-task tests (74 tests).
+
+# GitHub Issue #16 Fix PR
+
+- [x] Thread the authenticated tenant ID into hydration execution.
+- [x] Replace `%OrganizationId%` in OIB payload values for sequential and batch creates.
+- [x] Add regression coverage for both creation paths.
+- [ ] Commit, push, and open a draft PR.
+
+## Review
+
+- OIB templates remain tenant-neutral in cache; only cloned create payloads receive the authenticated tenant ID.
+- Checks passed: focused tests, `npm run type-check`, `npm run test:run` (69 files, 508 tests), `npm run build`, and `git diff --check`.
+
 # React Doctor Follow-up Top 3 Pass
 
 - [x] Fetch canonical rule guidance for touched React Doctor rules.

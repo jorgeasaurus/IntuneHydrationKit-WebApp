@@ -210,6 +210,51 @@ describe("executeBaselineTask", () => {
     });
   });
 
+  it("replaces OIB organization placeholders before sequential Settings Catalog creation", async () => {
+    const policyName = "[IHD] OneDrive configuration";
+    const tenantId = "12345678-1234-1234-1234-123456789abc";
+
+    mockGetCachedTemplates.mockReturnValue([
+      {
+        displayName: policyName,
+        name: policyName,
+        description: "Imported by Intune Hydration Kit",
+        platforms: "windows10",
+        technologies: "mdm",
+        settings: [
+          {
+            settingInstance: {
+              simpleSettingValue: { value: "%OrganizationId%" },
+            },
+          },
+        ],
+      },
+    ]);
+    mockCreateSettingsCatalogPolicy.mockResolvedValue({ id: "settings-catalog-id" });
+
+    await executeBaselineTask(createTask(policyName), {
+      client: createClient(),
+      tenantId,
+      operationMode: "create",
+      isPreview: false,
+      stopOnFirstError: false,
+      cachedSettingsCatalogPolicies: [],
+    });
+
+    expect(mockCreateSettingsCatalogPolicy).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        settings: [
+          {
+            settingInstance: {
+              simpleSettingValue: { value: tenantId },
+            },
+          },
+        ],
+      })
+    );
+  });
+
   it("creates app protection policies when no cached duplicate exists", async () => {
     const policyName = "[IHD] iOS App Protection";
 
