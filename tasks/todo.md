@@ -32,6 +32,17 @@
 
 - Copilot review `PRR_kwDOQzwR3c8AAAABHD-ufQ` completed on `799ffc5605c080926c03106df731f73ee2b252fc` with no comments or unresolved threads.
 
+# Issue #16 OIB Template Coverage
+
+- [x] Verify every bundled OIB `%OrganizationId%` occurrence is covered by the resolver.
+- [x] Add regression coverage for all three OIB template files.
+- [x] Run focused checks and update PR #17.
+
+## Review
+
+- Regression coverage scans the OIB manifest and validates all five `%OrganizationId%` values across the three bundled OneDrive templates.
+- Checks passed: focused placeholder tests, `npm run type-check`, and `git diff --check`.
+
 # React Doctor Follow-up Top 3 Pass
 
 - [x] Fetch canonical rule guidance for touched React Doctor rules.
