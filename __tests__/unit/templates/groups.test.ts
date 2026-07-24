@@ -84,6 +84,20 @@ describe("dynamic group templates", () => {
     });
   });
 
+  it("includes the PowerShell module device trust type groups", () => {
+    expect(getDynamicGroupByName("Intune - Entra Joined Devices")).toMatchObject({
+      membershipRule: '(device.deviceTrustType -eq "AzureAD")',
+    });
+    expect(
+      getDynamicGroupByName("Intune - Hybrid Entra Joined Devices")
+    ).toMatchObject({
+      membershipRule: '(device.deviceTrustType -eq "ServerAD")',
+    });
+    expect(getDynamicGroupByName("Intune - Entra Registered Devices")).toMatchObject({
+      membershipRule: '(device.deviceTrustType -eq "Workplace")',
+    });
+  });
+
   it("marks every group with the hydration marker", () => {
     for (const group of DYNAMIC_GROUPS) {
       expect(group.description).toContain("Imported by Intune Hydration Kit");

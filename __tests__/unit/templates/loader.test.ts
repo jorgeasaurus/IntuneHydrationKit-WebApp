@@ -188,6 +188,9 @@ describe("template loader", () => {
       },
     ]);
     expect(errorSpy).toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("DynamicGroups/DeviceTrustType-Groups.json")
+    );
   });
 
   it("returns no static groups when the payload is missing a groups array", async () => {
@@ -355,6 +358,9 @@ describe("template loader", () => {
     ]);
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("Filters/Windows-Architecture-Filters.json")
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("Filters/Windows-DeviceTrustType-Filters.json")
     );
     expect(fetchMock).toHaveBeenCalledWith(
       expect.stringContaining("Filters/macOS-Architecture-Filters.json")

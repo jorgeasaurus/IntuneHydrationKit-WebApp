@@ -6,11 +6,12 @@
 
 import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hydrationMarker";
 import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filterManifest";
+import { DYNAMIC_GROUP_TEMPLATE_PATHS } from "@/templates/groupManifest";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 20; // Include architecture device filter templates in the cached filter set
+const CACHE_VERSION = 21; // Include device trust type group and filter templates in cached sets
 
 export interface GroupTemplate {
   displayName: string;
@@ -56,18 +57,9 @@ function getTemplateFileName(filePath: string): string {
  * Fetch dynamic groups from local templates
  */
 export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
-  const groupFiles = [
-    "DynamicGroups/Autopilot-Groups.json",
-    "DynamicGroups/Manufacturer-Groups.json",
-    "DynamicGroups/OS-Groups.json",
-    "DynamicGroups/Ownership-Groups.json",
-    "DynamicGroups/User-Groups.json",
-    "DynamicGroups/VM-Groups.json",
-  ];
-
   const allGroups: GroupTemplate[] = [];
 
-  for (const file of groupFiles) {
+  for (const file of DYNAMIC_GROUP_TEMPLATE_PATHS) {
     try {
       const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
       if (!response.ok) {

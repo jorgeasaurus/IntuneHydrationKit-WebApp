@@ -7,6 +7,7 @@
 
 import androidFilterTemplates from "@/public/IntuneTemplates/Filters/Android-Filters.json";
 import windowsArchitectureFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-Architecture-Filters.json";
+import windowsDeviceTrustTypeFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-DeviceTrustType-Filters.json";
 import windowsManufacturerFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-Manufacturer-Filters.json";
 import windowsOsVersionFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-OSVersion-Filters.json";
 import windowsVmFilterTemplates from "@/public/IntuneTemplates/Filters/Windows-VM-Filters.json";
@@ -36,6 +37,7 @@ type DeviceFilterTemplateFile = {
 const [
   ANDROID_FILTERS_PATH,
   WINDOWS_ARCHITECTURE_FILTERS_PATH,
+  WINDOWS_DEVICE_TRUST_TYPE_FILTERS_PATH,
   WINDOWS_MANUFACTURER_FILTERS_PATH,
   WINDOWS_OSVERSION_FILTERS_PATH,
   WINDOWS_VM_FILTERS_PATH,
@@ -51,6 +53,10 @@ export const DEVICE_FILTER_TEMPLATE_FILES = [
   {
     path: WINDOWS_ARCHITECTURE_FILTERS_PATH,
     source: windowsArchitectureFilterTemplates,
+  },
+  {
+    path: WINDOWS_DEVICE_TRUST_TYPE_FILTERS_PATH,
+    source: windowsDeviceTrustTypeFilterTemplates,
   },
   {
     path: WINDOWS_MANUFACTURER_FILTERS_PATH,

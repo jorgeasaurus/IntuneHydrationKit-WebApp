@@ -1,8 +1,8 @@
 /**
  * Dynamic and Static Group Templates for Intune Hydration Kit
  *
- * 59 dynamic groups across 6 categories (OS, Autopilot, Ownership,
- * Manufacturer, User, VM) plus 5 static assignment-ring groups.
+ * 62 dynamic groups across 7 categories (OS, Autopilot, device trust type,
+ * ownership, manufacturer, user, VM) plus 5 static assignment-ring groups.
  * Mirrors the PowerShell IntuneHydrationKit group templates.
  */
 
@@ -11,7 +11,7 @@ import { DeviceGroup } from "@/types/graph";
 const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 
 // ---------------------------------------------------------------------------
-// Dynamic Groups (50)
+// Dynamic Groups (62)
 // ---------------------------------------------------------------------------
 
 export const DYNAMIC_GROUPS: DeviceGroup[] = [
@@ -385,6 +385,42 @@ export const DYNAMIC_GROUPS: DeviceGroup[] = [
     securityEnabled: true,
     membershipRule:
       '(device.deviceOSType -eq "Windows") and (device.devicePhysicalIDs -all (_ -notStartsWith "[ZTDID]"))',
+    membershipRuleProcessingState: "On",
+  },
+
+  // ── Device Trust Type Groups (3) ───────────────────────────────────────
+
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - Entra Joined Devices",
+    description: `All Microsoft Entra joined devices. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneEntraJoinedDevices",
+    securityEnabled: true,
+    membershipRule: '(device.deviceTrustType -eq "AzureAD")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - Hybrid Entra Joined Devices",
+    description: `All Microsoft Entra hybrid joined devices. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneHybridEntraJoinedDevices",
+    securityEnabled: true,
+    membershipRule: '(device.deviceTrustType -eq "ServerAD")',
+    membershipRuleProcessingState: "On",
+  },
+  {
+    "@odata.type": "#microsoft.graph.group",
+    displayName: "Intune - Entra Registered Devices",
+    description: `All Microsoft Entra registered devices. ${HYDRATION_MARKER}`,
+    groupTypes: ["DynamicMembership"],
+    mailEnabled: false,
+    mailNickname: "intuneEntraRegisteredDevices",
+    securityEnabled: true,
+    membershipRule: '(device.deviceTrustType -eq "Workplace")',
     membershipRuleProcessingState: "On",
   },
 

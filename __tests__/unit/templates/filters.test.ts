@@ -15,6 +15,7 @@ import {
 const FILTER_SENTINELS_BY_PATH = {
   "Filters/Android-Filters.json": "Android - Samsung Devices",
   "Filters/Windows-Architecture-Filters.json": "Windows - x64 Devices",
+  "Filters/Windows-DeviceTrustType-Filters.json": "Windows - Entra Joined",
   "Filters/Windows-Manufacturer-Filters.json": "Windows - Dell Devices",
   "Filters/Windows-OSVersion-Filters.json": "Windows - Windows 11 24H2 Devices",
   "Filters/Windows-VM-Filters.json": "Windows - Azure Virtual Desktop (AVD)",
@@ -31,9 +32,9 @@ describe("device filter template offering", () => {
     const displayNames = new Set(filters.map((filter) => filter.displayName));
 
     expect(filters).toHaveLength(DEVICE_FILTER_TEMPLATE_COUNT);
-    expect(DEVICE_FILTER_TEMPLATE_COUNT).toBe(38);
-    expect(displayNames.size).toBe(38);
-    expect(getDeviceFiltersByPlatform("windows10AndLater")).toHaveLength(21);
+    expect(DEVICE_FILTER_TEMPLATE_COUNT).toBe(42);
+    expect(displayNames.size).toBe(42);
+    expect(getDeviceFiltersByPlatform("windows10AndLater")).toHaveLength(25);
     expect(getDeviceFiltersByPlatform("macOS")).toHaveLength(9);
     expect(getDeviceFiltersByPlatform("iOS")).toHaveLength(5);
     expect(getDeviceFilterByName("Android - Samsung Devices")).toMatchObject({
@@ -51,6 +52,22 @@ describe("device filter template offering", () => {
     expect(getDeviceFilterByName("Windows - x86 Devices")).toMatchObject({
       platform: "windows10AndLater",
       rule: '(device.cpuArchitecture -eq "x86")',
+    });
+    expect(getDeviceFilterByName("Windows - Entra Joined")).toMatchObject({
+      platform: "windows10AndLater",
+      rule: '(device.deviceTrustType -eq "Azure AD joined")',
+    });
+    expect(getDeviceFilterByName("Windows - Hybrid Entra Joined")).toMatchObject({
+      platform: "windows10AndLater",
+      rule: '(device.deviceTrustType -eq "Hybrid Azure AD joined")',
+    });
+    expect(getDeviceFilterByName("Windows - Entra Registered")).toMatchObject({
+      platform: "windows10AndLater",
+      rule: '(device.deviceTrustType -eq "Azure AD registered")',
+    });
+    expect(getDeviceFilterByName("Windows - Unknown Entra Join Type")).toMatchObject({
+      platform: "windows10AndLater",
+      rule: '(device.deviceTrustType -eq "Unknown")',
     });
     expect(getDeviceFilterByName("macOS - Apple Silicon Devices")).toMatchObject({
       platform: "macOS",
