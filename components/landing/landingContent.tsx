@@ -187,9 +187,9 @@ export const PERMISSIONS = [
 
 export const FAQ_ITEMS: readonly FaqItem[] = [
   {
-    question: "Is this tool free to use?",
+    question: "Can I use this tool without a commercial license?",
     answer:
-      "Yes. Intune Hydration Kit is free and open-source. You only need valid Microsoft licenses for the Intune features you deploy.",
+      "You may evaluate the software under its EULA. Production, internal business, consulting, managed-service, modification, and redistribution use require a separately purchased written license.",
   },
   {
     question: "Is this tool safe to use in production?",

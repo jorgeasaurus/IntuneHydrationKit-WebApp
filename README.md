@@ -360,16 +360,14 @@ Verify that:
 
 ## Contributing
 
-This project is under active development. Contributions are welcome!
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+Code contributions require a separate written contributor agreement. Do not
+submit a pull request unless one is in place.
 
 ## License
 
-MIT License - See LICENSE file for details
+This software is proprietary. Evaluation is permitted only under the terms in
+the [Commercial End User License Agreement](LICENSE); production and other
+commercial use require a separately purchased written license.
 
 ## Related Projects
 

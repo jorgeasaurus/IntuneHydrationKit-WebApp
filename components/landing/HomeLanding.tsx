@@ -577,7 +577,7 @@ function Footer() {
               Made By Jorgeasaurus
             </span>
             <span className="badge-status badge-info text-[10px]">
-              MIT License
+              Commercial License
             </span>
           </div>
           <div className="flex flex-wrap justify-center gap-6 text-sm">

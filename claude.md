@@ -615,7 +615,7 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 - Environment variable configuration
 - Deployment instructions
 - Security considerations
-- License (MIT, matching PowerShell module)
+- License (proprietary commercial EULA)
 
 **In-app Help**:
 - Tooltip on each wizard step
