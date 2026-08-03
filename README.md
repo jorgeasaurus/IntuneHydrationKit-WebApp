@@ -2,7 +2,7 @@
 
 A web-based version of the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit) that enables IT administrators to bootstrap Microsoft Intune tenants with best-practice configurations through an intuitive browser interface.
 
-![Intune Hydration Kit Landing Page](./LandingPage.jpeg)
+![Current Intune Hydration Kit landing page](./LandingPage.jpeg)
 
 ## Features
 
@@ -172,52 +172,6 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ├── hooks/                   # Custom React hooks
 └── templates/               # Template metadata
 ```
-
-## Development Status
-
-### ✅ Phase 1: Foundation (Completed)
-
-- [x] Next.js 15 project setup with TypeScript
-- [x] MSAL authentication flow
-- [x] 4-step wizard with streamlined workflow
-- [x] shadcn/ui component library
-- [x] Graph API client wrapper with retry logic
-
-### ✅ Phase 2: Core Hydration (Completed)
-
-- [x] Local template system (183+ templates)
-- [x] Task execution engine with queue management
-- [x] Graph API service functions for all policy types
-- [x] Pre-flight validation
-- [x] Error handling and retry logic with exponential backoff
-- [x] Real-time progress tracking
-
-### ✅ Phase 3: UI & UX (Completed)
-
-- [x] Real-time execution dashboard
-- [x] Pause/Resume/Cancel controls
-- [x] Task status indicators
-- [x] Execution results and summary page
-- [x] Dark mode support
-- [x] Mobile-responsive design
-
-### ✅ Phase 4: Advanced Features (Completed)
-
-- [x] Session storage caching with version control
-- [x] App Protection policy pre-fetch optimization (90% API reduction)
-- [x] Duplicate execution prevention
-- [x] PowerShell module parity for App Protection policies
-- [x] Success items display in results
-- [x] Execution lock pattern for React Strict Mode compatibility
-
-### 📋 Phase 5: Testing & Deployment (Current)
-
-- [x] TypeScript strict mode compliance
-- [x] Build optimization
-- [x] Deployment documentation in this README
-- [x] End-to-end testing
-- [x] Production deployment to [intunehydrationkit.com](https://www.intunehydrationkit.com/)
-- [x] Final documentation review
 
 ## Wizard Workflow
 
