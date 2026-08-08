@@ -38,6 +38,8 @@ const FINAL_STATS = {
   duration: "8m 42s",
 };
 
+let nextLogEntryId = 0;
+
 function getTimestamp() {
   const now = new Date();
   return now.toLocaleTimeString("en-US", {
@@ -51,7 +53,7 @@ function getTimestamp() {
 
 function createLogEntry(command: (typeof COMMANDS)[number]): LogEntry {
   return {
-    id: Date.now(),
+    id: nextLogEntryId++,
     type: command.type,
     message: command.message,
     timestamp: getTimestamp(),

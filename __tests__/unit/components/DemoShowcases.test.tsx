@@ -95,6 +95,24 @@ describe('demo showcase components', () => {
     expect(screen.getByText('$ hydrate --mode create --all')).toBeInTheDocument()
   })
 
+  it('uses distinct log keys when entries share the same timestamp', () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(0)
+
+    try {
+      render(<TerminalDemo />)
+
+      act(() => {
+        vi.advanceTimersByTime(800)
+      })
+
+      expect(consoleErrorSpy.mock.calls.flat().join(' ')).not.toContain('same key')
+    } finally {
+      nowSpy.mockRestore()
+      consoleErrorSpy.mockRestore()
+    }
+  })
+
   it('moves WebAppDemo through deploying, completion, and reset states', () => {
     render(<WebAppDemo />)
 

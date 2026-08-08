@@ -184,7 +184,6 @@ export function TenantConfig(): React.JSX.Element {
       hour12: false,
       minute: "2-digit",
       timeZone: "UTC",
-      timeZoneName: "short",
     }).format(new Date(prerequisiteResult.timestamp));
   }, [prerequisiteResult?.timestamp, userLocale]);
   const healthChecks = [
@@ -287,7 +286,7 @@ export function TenantConfig(): React.JSX.Element {
             </p>
             {validatedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Last checked at {validatedAt}
+                Last checked at {validatedAt} UTC
               </p>
             )}
           </div>
