@@ -102,6 +102,7 @@ describe('TenantConfig', () => {
 
     expect((await screen.findAllByText('Contoso')).length).toBeGreaterThan(0)
     expect(await screen.findByText('All prerequisites met')).toBeInTheDocument()
+    expect(screen.getByText(/Last checked at .* UTC/)).toBeInTheDocument()
     await waitFor(() => {
       expect(validatePrerequisites).toHaveBeenCalled()
     })

@@ -170,7 +170,7 @@ export function TenantConfig(): React.JSX.Element {
 
   const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
   const validatedAt = prerequisiteResult?.timestamp
-    ? new Date(prerequisiteResult.timestamp).toLocaleTimeString("en-US", {
+    ? new Date(prerequisiteResult.timestamp).toLocaleTimeString(undefined, {
         hour: "2-digit",
         minute: "2-digit",
         timeZone: "UTC",
@@ -277,7 +277,7 @@ export function TenantConfig(): React.JSX.Element {
             </p>
             {validatedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Last checked at {validatedAt}
+                Last checked at {validatedAt} UTC
               </p>
             )}
           </div>
