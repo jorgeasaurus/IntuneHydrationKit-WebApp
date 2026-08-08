@@ -104,9 +104,10 @@ export function TerminalDemo() {
           ...prev.slice(-12), // Keep last 12 entries
           createLogEntry(cmd),
         ]);
-        setProgress(Math.min(100, Math.round((logIndex / COMMANDS.length) * 100)));
-        logIndex++;
-        logIndexRef.current = logIndex;
+        const completedCount = logIndex + 1;
+        setProgress(Math.round((completedCount / COMMANDS.length) * 100));
+        logIndex = completedCount;
+        logIndexRef.current = completedCount;
       } else {
         // Show completion
         setPhase("complete");
@@ -269,7 +270,14 @@ export function TerminalDemo() {
         </div>
 
         {/* Progress Bar */}
-        <div className="h-1 bg-muted">
+        <div
+          aria-label="Hydration demo progress"
+          aria-valuemax={100}
+          aria-valuemin={0}
+          aria-valuenow={progress}
+          className="h-1 bg-muted"
+          role="progressbar"
+        >
           <m.div
             className="h-full bg-gradient-to-r from-electric to-primary"
             initial={{ scaleX: 0 }}

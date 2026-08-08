@@ -71,7 +71,16 @@ describe('demo showcase components', () => {
     expect(screen.getByText('$ hydrate --mode create --all')).toBeInTheDocument()
 
     act(() => {
-      vi.advanceTimersByTime(6400)
+      vi.advanceTimersByTime(6000)
+    })
+
+    expect(screen.getByRole('progressbar', { name: 'Hydration demo progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '100'
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(400)
     })
 
     expect(screen.getByText('Hydration Complete')).toBeInTheDocument()
