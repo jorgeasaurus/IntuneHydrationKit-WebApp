@@ -170,7 +170,7 @@ export function TenantConfig(): React.JSX.Element {
 
   const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
   const validatedAt = prerequisiteResult?.timestamp
-    ? new Date(prerequisiteResult.timestamp).toLocaleTimeString(undefined, {
+    ? new Date(prerequisiteResult.timestamp).toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
         timeZone: "UTC",
