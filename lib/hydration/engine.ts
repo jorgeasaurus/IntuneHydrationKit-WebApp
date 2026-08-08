@@ -33,6 +33,7 @@ import { executeFilterTask } from "./taskExecutors/filterTask";
 import { executeComplianceTask } from "./taskExecutors/complianceTask";
 import { executeConditionalAccessTask } from "./taskExecutors/conditionalAccessTask";
 import { executeAppProtectionTask } from "./taskExecutors/appProtectionTask";
+import { executeWin32AppTask } from "./taskExecutors/win32AppTask";
 import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
@@ -134,6 +135,9 @@ async function executeTask(
         break;
       case "appProtection":
         result = await executeAppProtectionTask(task, context);
+        break;
+      case "win32Apps":
+        result = await executeWin32AppTask(task, context);
         break;
       case "baseline":
         result = await executeBaselineTask(task, context);

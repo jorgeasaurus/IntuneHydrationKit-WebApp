@@ -15,6 +15,7 @@ export type TaskCategory =
   | "filters"
   | "compliance"
   | "appProtection"
+  | "win32Apps"
   | "conditionalAccess"
   | "enrollment"
   | "notification"
@@ -170,6 +171,7 @@ export interface CategorySelections {
   compliance?: CategorySelection;
   conditionalAccess?: CategorySelection;
   appProtection?: CategorySelection;
+  win32Apps?: CategorySelection;
   enrollment?: CategorySelection;
   baseline?: BaselineSelection;
   cisBaseline?: CategorySelection;

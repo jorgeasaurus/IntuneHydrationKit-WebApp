@@ -67,6 +67,7 @@ const CATEGORY_ORDER: TaskCategory[] = [
   "filters",
   "compliance",
   "appProtection",
+  "win32Apps",
   "conditionalAccess",
   "enrollment",
   "notification",
@@ -93,6 +94,10 @@ const CATEGORY_METADATA: Record<
   appProtection: {
     label: "App Protection",
     description: "Mobile application management templates for Android and iOS/iPadOS.",
+  },
+  win32Apps: {
+    label: "Win32 Apps",
+    description: "Packaged Windows applications that install through Intune.",
   },
   conditionalAccess: {
     label: "Conditional Access",

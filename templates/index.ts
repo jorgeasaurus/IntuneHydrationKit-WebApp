@@ -16,6 +16,7 @@ export * from "./groupManifest";
 export * from "./compliance";
 export * from "./conditionalAccess";
 export * from "./appProtection";
+export * from "./win32Apps";
 export * from "./enrollment";
 
 /**
@@ -52,6 +53,12 @@ export const TEMPLATE_METADATA = {
     description: "Mobile application management (MAM) policies",
     count: 8,
     icon: "Smartphone",
+  },
+  win32Apps: {
+    displayName: "Win32 Apps (Proof of Concept)",
+    description: "7-Zip 25.01 packaged for Intune deployment",
+    count: 1,
+    icon: "Package",
   },
   enrollment: {
     displayName: "Enrollment Profiles",
