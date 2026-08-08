@@ -123,9 +123,7 @@ export function TenantConfig(): React.JSX.Element {
       setPrerequisiteResult(errorResult);
       setWizardPrerequisiteResult(errorResult);
     } finally {
-      if (showLoadingState) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   }, [setWizardPrerequisiteResult]);
 
@@ -172,9 +170,10 @@ export function TenantConfig(): React.JSX.Element {
 
   const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
   const validatedAt = prerequisiteResult?.timestamp
-    ? new Date(prerequisiteResult.timestamp).toLocaleTimeString([], {
+    ? new Date(prerequisiteResult.timestamp).toLocaleTimeString("en-US", {
         hour: "2-digit",
         minute: "2-digit",
+        timeZone: "UTC",
       })
     : null;
 

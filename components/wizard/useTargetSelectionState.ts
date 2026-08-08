@@ -29,10 +29,10 @@ export function useTargetSelectionState(
   const [selectedItems, setSelectedItems] = useState<Record<string, Set<string>>>(
     () => getInitialSelectedItems(categorySelections)
   );
-  const [expandedPlatforms, setExpandedPlatforms] = useState<Set<OIBPlatformId>>(new Set());
-  const [expandedCISCategories, setExpandedCISCategories] = useState<Set<string>>(new Set());
+  const [expandedPlatforms, setExpandedPlatforms] = useState<Set<OIBPlatformId>>(() => new Set());
+  const [expandedCISCategories, setExpandedCISCategories] = useState<Set<string>>(() => new Set());
   const [selectedCISPolicies, setSelectedCISPolicies] = useState<Set<string>>(
-    new Set(categorySelections?.cisBaseline?.selectedItems || [])
+    () => new Set(categorySelections?.cisBaseline?.selectedItems || [])
   );
 
   const toggleItem = (category: TaskCategory, itemName: string) => {

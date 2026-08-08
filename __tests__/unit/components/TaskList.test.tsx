@@ -57,11 +57,19 @@ describe('TaskList', () => {
     const user = userEvent.setup()
     render(<TaskList tasks={tasks} />)
 
-    await user.type(screen.getByPlaceholderText('Search tasks...'), 'windows')
+    await user.type(screen.getByRole('textbox', { name: 'Search tasks' }), 'windows')
 
     expect(screen.getByText('All Windows Devices')).toBeInTheDocument()
     expect(screen.getByText('Duration: 4s')).toBeInTheDocument()
     expect(screen.queryByText('Corporate Devices')).not.toBeInTheDocument()
+  })
+
+  it('gives every task filter an accessible name', () => {
+    render(<TaskList tasks={tasks} />)
+
+    expect(screen.getByRole('textbox', { name: 'Search tasks' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Filter tasks by status' })).toBeInTheDocument()
+    expect(screen.getByRole('combobox', { name: 'Filter tasks by category' })).toBeInTheDocument()
   })
 
   it('supports filtering by status and category and shows an empty state when nothing matches', async () => {

@@ -41,11 +41,21 @@ const FINAL_STATS = {
 function getTimestamp() {
   const now = new Date();
   return now.toLocaleTimeString("en-US", {
+    timeZone: "UTC",
     hour12: false,
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function createLogEntry(command: (typeof COMMANDS)[number]): LogEntry {
+  return {
+    id: Date.now(),
+    type: command.type,
+    message: command.message,
+    timestamp: getTimestamp(),
+  };
 }
 
 function getLogIcon(type: LogEntry["type"]) {
@@ -79,45 +89,54 @@ export function TerminalDemo() {
   const [phase, setPhase] = useState<"running" | "complete">("running");
   const [progress, setProgress] = useState(0);
   const logsContainerRef = useRef<HTMLDivElement>(null);
+  const logIndexRef = useRef(0);
 
   useEffect(() => {
-    let logIndex = 0;
-    let interval: NodeJS.Timeout;
+    if (phase !== "running") {
+      return;
+    }
 
+    let logIndex = logIndexRef.current;
     const addLog = () => {
       if (logIndex < COMMANDS.length) {
         const cmd = COMMANDS[logIndex];
         setLogs((prev) => [
           ...prev.slice(-12), // Keep last 12 entries
-          {
-            id: Date.now(),
-            type: cmd.type,
-            message: cmd.message,
-            timestamp: getTimestamp(),
-          },
+          createLogEntry(cmd),
         ]);
         setProgress(Math.min(100, Math.round((logIndex / COMMANDS.length) * 100)));
         logIndex++;
+        logIndexRef.current = logIndex;
       } else {
         // Show completion
         setPhase("complete");
         clearInterval(interval);
 
-        // Reset after delay
-        setTimeout(() => {
-          setLogs([]);
-          setProgress(0);
-          setPhase("running");
-          logIndex = 0;
-          interval = setInterval(addLog, 400);
-        }, 5000);
       }
     };
 
-    interval = setInterval(addLog, 400);
+    const interval = setInterval(addLog, 400);
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => {
+      clearInterval(interval);
+    };
+  }, [phase]);
+
+  useEffect(() => {
+    if (phase !== "complete") {
+      return;
+    }
+
+    const resetTimeout = setTimeout(() => {
+      const firstCommand = COMMANDS[0];
+      setLogs([createLogEntry(firstCommand)]);
+      setProgress(0);
+      logIndexRef.current = 1;
+      setPhase("running");
+    }, 5000);
+
+    return () => clearTimeout(resetTimeout);
+  }, [phase]);
 
   // Auto-scroll to bottom within container only
   useEffect(() => {
@@ -253,9 +272,10 @@ export function TerminalDemo() {
         <div className="h-1 bg-muted">
           <m.div
             className="h-full bg-gradient-to-r from-electric to-primary"
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
+            initial={{ scaleX: 0 }}
+            animate={{ scaleX: progress / 100 }}
             transition={{ duration: 0.3 }}
+            style={{ transformOrigin: "left" }}
           />
         </div>
       </div>

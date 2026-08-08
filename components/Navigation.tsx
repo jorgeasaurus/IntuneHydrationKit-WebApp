@@ -79,7 +79,7 @@ export function Navigation() {
                   {/* Glow effect on hover */}
                   <div className="absolute inset-0 bg-hydrate/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
-                <span className="hidden sm:block font-bold text-xl leading-tight tracking-tight">
+                <span className="landing-nav-brand hidden sm:block font-bold text-xl leading-tight tracking-tight">
                   Intune Hydration Kit
                 </span>
               </Link>
@@ -106,7 +106,7 @@ export function Navigation() {
                   href="https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="p-2 rounded-md hover:bg-muted transition-colors"
+                  className="landing-nav-icon p-2 rounded-md hover:bg-muted transition-colors"
                   aria-label="GitHub Repository"
                 >
                   <Github className="size-5" />
@@ -114,7 +114,7 @@ export function Navigation() {
                 <ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />
 
                 {/* Terminal Status Indicator */}
-                <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
+                <div className="landing-nav-status hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
                   <span className={`size-2 rounded-full ${isAuthenticated ? 'bg-signal-success' : 'bg-muted-foreground'}`} />
                   <span className="text-xs font-mono text-muted-foreground">
                     {isAuthenticated ? 'CONNECTED' : 'OFFLINE'}

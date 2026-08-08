@@ -63,14 +63,7 @@ export function WebAppDemo() {
     } else if (phase === "deploying") {
       // Simulate deployment progress
       const progressInterval = setInterval(() => {
-        setProgress((prev) => {
-          if (prev >= 100) {
-            clearInterval(progressInterval);
-            setPhase("complete");
-            return 100;
-          }
-          return prev + 2;
-        });
+        setProgress((prev) => Math.min(prev + 2, 100));
       }, 80);
 
       const taskInterval = setInterval(() => {
@@ -94,9 +87,15 @@ export function WebAppDemo() {
     return () => clearTimeout(timeout);
   }, [phase]);
 
+  useEffect(() => {
+    if (phase === "deploying" && progress === 100) {
+      setPhase("complete");
+    }
+  }, [phase, progress]);
+
   return (
     <LazyMotion features={domAnimation}>
-      <div className="relative">
+      <div className="landing-web-app-demo relative">
       {/* Browser Window Frame */}
       <div className="rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
         {/* Browser Chrome */}

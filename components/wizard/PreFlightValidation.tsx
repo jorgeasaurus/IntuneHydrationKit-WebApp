@@ -30,15 +30,8 @@ export function PreFlightValidation() {
 
     setIsValidating(true);
     setProgress(0);
-    let progressInterval: ReturnType<typeof setInterval> | undefined;
-
     try {
       const client = createGraphClient();
-
-      // Simulate progress for better UX
-      progressInterval = setInterval(() => {
-        setProgress((prev) => Math.min(prev + 10, 90));
-      }, 200);
 
       const result = await validateTenant(client);
 
@@ -76,12 +69,21 @@ export function PreFlightValidation() {
         warnings: [],
       });
     } finally {
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
       setIsValidating(false);
     }
   }, [state.tenantConfig]);
+
+  useEffect(() => {
+    if (!isValidating) {
+      return;
+    }
+
+    const progressInterval = setInterval(() => {
+      setProgress((previousProgress) => Math.min(previousProgress + 10, 90));
+    }, 200);
+
+    return () => clearInterval(progressInterval);
+  }, [isValidating]);
 
   useEffect(() => {
     // Auto-start validation when component mounts

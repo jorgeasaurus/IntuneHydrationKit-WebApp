@@ -170,7 +170,7 @@ function Hero({
                 <span className="size-2 rounded-full bg-hydrate" />
                 {APP_VERSION}
               </span>
-              <span className="inline-flex items-center gap-2 rounded-md border border-border/80 bg-background/70 px-3 py-1.5 font-mono text-xs uppercase text-muted-foreground">
+              <span className="landing-context-badge inline-flex items-center gap-2 rounded-md border border-border/80 bg-background/70 px-3 py-1.5 font-mono text-xs uppercase text-muted-foreground">
                 <ShieldCheck className="size-3.5 text-signal-success" />
                 Commercial tenant console
               </span>
@@ -534,7 +534,7 @@ function FinalCta({
     <section className="py-16 sm:py-20">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto max-w-5xl">
-          <div className="overflow-hidden rounded-lg border border-border bg-card">
+          <div className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
             <div className="h-1 bg-gradient-to-r from-hydrate via-primary to-hydrate" />
             <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center">
               <div>
@@ -544,7 +544,7 @@ function FinalCta({
                 <h2 className="mb-3 text-3xl font-bold sm:text-4xl">
                   Start a guided tenant run.
                 </h2>
-                <p className="max-w-2xl text-muted-foreground">
+                <p className="landing-cta-description max-w-2xl text-muted-foreground">
                   Sign in, confirm prerequisites, choose scope, and review the
                   run before any tenant mutation.
                 </p>

@@ -1,7 +1,7 @@
 /* oxlint-disable react-doctor/no-cascading-set-state -- demo timeline intentionally resets step, task, and progress state together. */
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
 import { CheckCircle2, Circle, Settings, Play, FileCheck } from "lucide-react";
 
@@ -24,21 +24,23 @@ export function WizardDemo() {
   const [currentStep, setCurrentStep] = useState(1);
   const [taskIndex, setTaskIndex] = useState(0);
   const [progress, setProgress] = useState(0);
+  const hasStartedCycle = useRef(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentStep((prev) => {
-        if (prev >= 4) {
-          setProgress(0);
-          setTaskIndex(0);
-          return 1;
-        }
-        return prev + 1;
-      });
+      setCurrentStep((previousStep) => (previousStep >= 4 ? 1 : previousStep + 1));
     }, 3000);
 
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (currentStep === 1 && hasStartedCycle.current) {
+      setProgress(0);
+      setTaskIndex(0);
+    }
+    hasStartedCycle.current = true;
+  }, [currentStep]);
 
   useEffect(() => {
     if (currentStep === 3) {

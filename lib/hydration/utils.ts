@@ -101,6 +101,10 @@ export function normalizeName(name: string | undefined | null): string {
     .trim();
 }
 
+function isBidirectionalPartialMatch(name: string, target: string): boolean {
+  return name.includes(target) || target.includes(name);
+}
+
 /**
  * Find an item by bidirectional partial name match, but ONLY when the match is
  * unambiguous (exactly one candidate matches). Picking the first of several
@@ -117,10 +121,7 @@ export function findUniquePartialMatch<T>(
   const matches = items.filter((item) => {
     const normalizedName = normalizeName(getName(item));
     if (!normalizedName) return false;
-    return (
-      normalizedName.includes(normalizedTarget) ||
-      normalizedTarget.includes(normalizedName)
-    );
+    return isBidirectionalPartialMatch(normalizedName, normalizedTarget);
   });
   if (matches.length > 1) {
     console.warn(

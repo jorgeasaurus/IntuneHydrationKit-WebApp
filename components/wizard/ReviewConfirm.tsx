@@ -240,7 +240,7 @@ export function ReviewConfirm(): React.JSX.Element {
             </div>
 
             {showConditionalAccessReminder && (
-              <Alert className="border-amber-500/30 bg-amber-500/10">
+              <Alert className="border-amber-500/60 bg-card/95 text-card-foreground shadow-lg shadow-slate-950/15 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400">
                 <AlertTriangle className="size-4" />
                 <AlertTitle>Conditional Access reminder</AlertTitle>
                 <AlertDescription>

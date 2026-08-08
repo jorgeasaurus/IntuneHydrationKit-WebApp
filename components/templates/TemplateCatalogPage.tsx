@@ -112,6 +112,7 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
     "platforms",
     "priority",
   ];
+  const preferredKeySet = new Set(preferredKeys);
 
   const ignoredKeys = new Set([
     "displayName",
@@ -143,7 +144,7 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
     if (
       highlights.length >= 8 ||
       ignoredKeys.has(key) ||
-      preferredKeys.includes(key) ||
+      preferredKeySet.has(key) ||
       value === undefined ||
       value === null
     ) {
