@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { useWizardState } from "@/hooks/useWizardState";
 import { createGraphClient } from "@/lib/graph/client";
 import { validateTenant, ValidationResult } from "@/lib/hydration/validator";
+import { getNextValidationProgress } from "@/lib/hydration/validationProgress";
 import {
   CheckCircle2,
   XCircle,
@@ -18,10 +19,6 @@ import {
   Key,
   UserCheck,
 } from "lucide-react";
-
-export function getNextValidationProgress(previousProgress: number): number {
-  return previousProgress >= 90 ? previousProgress : Math.min(previousProgress + 10, 90);
-}
 
 export function PreFlightValidation() {
   const { state, nextStep, previousStep } = useWizardState();
