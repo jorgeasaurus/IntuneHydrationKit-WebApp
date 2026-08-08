@@ -19,6 +19,10 @@ import {
   UserCheck,
 } from "lucide-react";
 
+export function getNextValidationProgress(previousProgress: number): number {
+  return previousProgress >= 90 ? previousProgress : Math.min(previousProgress + 10, 90);
+}
+
 export function PreFlightValidation() {
   const { state, nextStep, previousStep } = useWizardState();
   const [isValidating, setIsValidating] = useState(false);
@@ -79,7 +83,7 @@ export function PreFlightValidation() {
     }
 
     const progressInterval = setInterval(() => {
-      setProgress((previousProgress) => Math.min(previousProgress + 10, 90));
+      setProgress(getNextValidationProgress);
     }, 200);
 
     return () => clearInterval(progressInterval);
