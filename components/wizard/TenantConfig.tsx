@@ -1,7 +1,7 @@
 /* oxlint-disable react-doctor/no-giant-component -- tenant readiness UI keeps auth, prerequisite status, and cloud selection in one step. */
 "use client";
 
-import { useCallback, useState, useEffect } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMsal } from "@azure/msal-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,6 +24,10 @@ import { validatePrerequisites } from "@/lib/graph/prerequisites";
 import { getSelectedCloudEnvironment, AuthSessionExpiredError } from "@/lib/auth/authUtils";
 
 const CLOUD_ENVIRONMENT_LABEL = "Global (Commercial)";
+
+const subscribeToUserLocale = () => () => {};
+const getUserLocale = () => navigator.language;
+const getServerLocale = () => null;
 
 function getStatusFromResult(result: PrerequisiteCheckResult): PrerequisiteCheckStatus {
   if (result.errors.length > 0) return "error";
@@ -99,6 +103,7 @@ export function TenantConfig(): React.JSX.Element {
     );
   const [prerequisiteResult, setPrerequisiteResult] =
     useState<PrerequisiteCheckResult | null>(state.prerequisiteResult ?? null);
+  const userLocale = useSyncExternalStore(subscribeToUserLocale, getUserLocale, getServerLocale);
 
   const tenantId = accounts.length > 0 ? accounts[0].tenantId : "";
   const operatorUsername = accounts[0]?.username || "Not signed in";
@@ -123,9 +128,7 @@ export function TenantConfig(): React.JSX.Element {
       setPrerequisiteResult(errorResult);
       setWizardPrerequisiteResult(errorResult);
     } finally {
-      if (showLoadingState) {
-        setIsLoading(false);
-      }
+      setIsLoading(false);
     }
   }, [setWizardPrerequisiteResult]);
 
@@ -171,13 +174,18 @@ export function TenantConfig(): React.JSX.Element {
   }
 
   const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
-  const validatedAt = prerequisiteResult?.timestamp
-    ? new Date(prerequisiteResult.timestamp).toLocaleTimeString([], {
-        hour: "2-digit",
-        minute: "2-digit",
-      })
-    : null;
+  const validatedAt = useMemo(() => {
+    if (!prerequisiteResult?.timestamp || !userLocale) {
+      return null;
+    }
 
+    return new Intl.DateTimeFormat(userLocale, {
+      hour: "2-digit",
+      hour12: false,
+      minute: "2-digit",
+      timeZone: "UTC",
+    }).format(new Date(prerequisiteResult.timestamp));
+  }, [prerequisiteResult?.timestamp, userLocale]);
   const healthChecks = [
     {
       title: "Graph connectivity",
@@ -278,7 +286,7 @@ export function TenantConfig(): React.JSX.Element {
             </p>
             {validatedAt && (
               <p className="mt-1 text-xs text-muted-foreground">
-                Last checked at {validatedAt}
+                Last checked at {validatedAt} UTC
               </p>
             )}
           </div>

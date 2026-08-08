@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
+import { render, screen, within } from '@/__tests__/setup/test-utils'
 import { OperationModeSelection } from '@/components/wizard/OperationMode'
 import type { WizardState } from '@/types/hydration'
 
@@ -49,8 +49,8 @@ describe('OperationModeSelection', () => {
     const user = userEvent.setup()
     render(<OperationModeSelection />)
 
-    await user.click(screen.getByRole('button', { name: /delete/i }))
-    await user.click(screen.getByRole('button', { name: /live/i }))
+    await user.click(screen.getByRole('radio', { name: /delete/i }))
+    await user.click(screen.getByRole('radio', { name: /live/i }))
 
     expect(screen.getByText('Delete mode is live')).toBeInTheDocument()
     expect(screen.getByText(/Conditional Access policies must be disabled/i)).toBeInTheDocument()
@@ -74,5 +74,33 @@ describe('OperationModeSelection', () => {
     await user.click(screen.getByRole('button', { name: 'Back' }))
 
     expect(previousStep).toHaveBeenCalledTimes(1)
+  })
+
+  it('supports keyboard selection and exposes the current choices as radios', async () => {
+    const user = userEvent.setup()
+    render(<OperationModeSelection />)
+
+    const operationIntent = screen.getByRole('radiogroup', { name: 'Operation intent' })
+    const executionBehavior = screen.getByRole('radiogroup', { name: 'Execution behavior' })
+    const create = within(operationIntent).getByRole('radio', { name: /^Create\b/ })
+    const deleteMode = within(operationIntent).getByRole('radio', { name: /^Delete\b/ })
+    const preview = within(executionBehavior).getByRole('radio', { name: /^Preview\b/ })
+    const live = within(executionBehavior).getByRole('radio', { name: /^Live\b/ })
+
+    expect(create).toBeChecked()
+    expect(preview).toBeChecked()
+    expect(create).toHaveClass('focus-visible:ring-2')
+
+    create.focus()
+    await user.keyboard('[ArrowDown]')
+    expect(deleteMode).toHaveFocus()
+    await user.keyboard('[Space]')
+    expect(deleteMode).toBeChecked()
+
+    preview.focus()
+    await user.keyboard('[ArrowDown]')
+    expect(live).toHaveFocus()
+    await user.keyboard('[Space]')
+    expect(live).toBeChecked()
   })
 })

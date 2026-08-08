@@ -1,19 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { type ComponentPropsWithoutRef, type ReactNode, useState } from "react";
+import * as RadioGroupPrimitive from "@radix-ui/react-radio-group";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { RadioGroup } from "@/components/ui/radio-group";
 import {
   AlertTriangle,
   Eye,
-  Radio,
   PlusCircle,
   ShieldAlert,
   Trash2,
 } from "lucide-react";
 import { OperationMode } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
+import { cn } from "@/lib/utils";
 
 interface ExecutionTone {
   shell: string;
@@ -119,6 +121,27 @@ const MODE_OPTIONS = [
   },
 ];
 
+function OperationModeCardRadio({
+  className,
+  children,
+  ...props
+}: ComponentPropsWithoutRef<typeof RadioGroupPrimitive.Item> & { children: ReactNode }) {
+  return (
+    <RadioGroupPrimitive.Item
+      className={cn(
+        "relative h-auto w-full cursor-pointer rounded-2xl border p-5 text-left transition focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+        className
+      )}
+      {...props}
+    >
+      {children}
+      <RadioGroupPrimitive.Indicator className="absolute right-5 top-5 flex size-5 items-center justify-center rounded-full border border-primary text-primary">
+        <span aria-hidden="true" className="size-2.5 rounded-full bg-current" />
+      </RadioGroupPrimitive.Indicator>
+    </RadioGroupPrimitive.Item>
+  );
+}
+
 export function OperationModeSelection(): React.JSX.Element {
   const { state, setOperationMode, setIsPreview, nextStep, previousStep } =
     useWizardState();
@@ -146,41 +169,46 @@ export function OperationModeSelection(): React.JSX.Element {
       </CardHeader>
 
       <CardContent className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-2">
+        <RadioGroup
+          aria-label="Operation intent"
+          className="grid gap-4 md:grid-cols-2"
+          value={mode}
+          onValueChange={(value) => setMode(value as OperationMode)}
+        >
           {MODE_OPTIONS.map((option) => {
             const Icon = option.icon;
             const selected = mode === option.id;
 
             return (
-              <button
+              <OperationModeCardRadio
                 key={option.id}
-                type="button"
-                onClick={() => setMode(option.id)}
-                className={`rounded-2xl border p-5 text-left transition ${
+                id={`operation-mode-${option.id}`}
+                value={option.id}
+                aria-label={option.label}
+                aria-describedby={`operation-mode-${option.id}-description`}
+                className={
                   selected
                     ? `${option.accent} shadow-[0_0_0_1px_hsl(var(--hydrate)/0.12)]`
                     : "border-border/80 bg-background/60 hover:border-hydrate/30 hover:bg-muted/30"
-                }`}
+                }
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="rounded-xl border border-current/15 bg-background/70 p-2 text-foreground">
+                <span className="flex items-start justify-between gap-3">
+                  <span className="rounded-xl border border-current/15 bg-background/70 p-2 text-foreground">
                     <Icon className="size-5" />
-                  </div>
-                  {selected && (
-                    <span className="rounded-full border border-hydrate/40 bg-hydrate/10 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] text-hydrate">
-                      Selected
-                    </span>
-                  )}
-                </div>
+                  </span>
+                </span>
 
-                <p className="mt-4 text-lg font-semibold">{option.label}</p>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                <span className="mt-4 block text-lg font-semibold">{option.label}</span>
+                <span
+                  id={`operation-mode-${option.id}-description`}
+                  className="mt-2 block text-sm leading-relaxed text-muted-foreground"
+                >
                   {option.description}
-                </p>
-              </button>
+                </span>
+              </OperationModeCardRadio>
             );
           })}
-        </div>
+        </RadioGroup>
 
         <div className={`rounded-2xl border p-5 transition-colors ${executionTone.shell}`}>
           <div className="space-y-4">
@@ -210,49 +238,54 @@ export function OperationModeSelection(): React.JSX.Element {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <RadioGroup
+              aria-label="Execution behavior"
+              className="grid gap-4 md:grid-cols-2"
+              value={isPreview ? "preview" : "live"}
+              onValueChange={(value) => setIsPreviewLocal(value === "preview")}
+            >
               {EXECUTION_OPTIONS.map((option) => {
                 const selected =
                   (option.id === "preview" && isPreview) ||
                   (option.id === "live" && !isPreview);
 
                 return (
-                  <button
+                  <OperationModeCardRadio
                     key={option.id}
-                    type="button"
-                    onClick={() => setIsPreviewLocal(option.id === "preview")}
-                    className={`rounded-2xl border p-5 text-left transition ${
+                    id={`execution-behavior-${option.id}`}
+                    value={option.id}
+                    aria-label={option.title}
+                    aria-describedby={`execution-behavior-${option.id}-description`}
+                    className={
                       selected
                         ? `${option.accent} shadow-[0_0_0_1px_hsl(var(--hydrate)/0.12)]`
                         : "border-border/80 bg-background/60 hover:border-hydrate/30 hover:bg-muted/30"
-                    }`}
+                    }
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="rounded-xl border border-current/15 bg-background/70 p-2 text-foreground">
-                        <Radio className="size-5" />
-                      </div>
-                      {selected && (
-                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] ${option.badge}`}>
-                          Selected
-                        </span>
-                      )}
-                    </div>
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="rounded-xl border border-current/15 bg-background/70 p-2 text-foreground">
+                        <Eye className="size-5" />
+                      </span>
+                    </span>
 
-                    <div className="mt-4 flex items-center gap-2">
+                    <span className="mt-4 flex items-center gap-2">
                       <span className={`size-2.5 rounded-full ${option.marker}`} />
-                      <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                      <span className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
                         {option.eyebrow}
-                      </p>
-                    </div>
+                      </span>
+                    </span>
 
-                    <p className="mt-2 text-lg font-semibold">{option.title}</p>
-                    <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                    <span className="mt-2 block text-lg font-semibold">{option.title}</span>
+                    <span
+                      id={`execution-behavior-${option.id}-description`}
+                      className="mt-2 block text-sm leading-relaxed text-muted-foreground"
+                    >
                       {option.description}
-                    </p>
-                  </button>
+                    </span>
+                  </OperationModeCardRadio>
                 );
               })}
-            </div>
+            </RadioGroup>
           </div>
         </div>
 

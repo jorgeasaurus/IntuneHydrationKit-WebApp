@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { useWizardState } from "@/hooks/useWizardState";
 import { createGraphClient } from "@/lib/graph/client";
 import { validateTenant, ValidationResult } from "@/lib/hydration/validator";
+import { getNextValidationProgress } from "@/lib/hydration/validationProgress";
 import {
   CheckCircle2,
   XCircle,
@@ -30,15 +31,8 @@ export function PreFlightValidation() {
 
     setIsValidating(true);
     setProgress(0);
-    let progressInterval: ReturnType<typeof setInterval> | undefined;
-
     try {
       const client = createGraphClient();
-
-      // Simulate progress for better UX
-      progressInterval = setInterval(() => {
-        setProgress((prev) => Math.min(prev + 10, 90));
-      }, 200);
 
       const result = await validateTenant(client);
 
@@ -76,12 +70,21 @@ export function PreFlightValidation() {
         warnings: [],
       });
     } finally {
-      if (progressInterval) {
-        clearInterval(progressInterval);
-      }
       setIsValidating(false);
     }
   }, [state.tenantConfig]);
+
+  useEffect(() => {
+    if (!isValidating) {
+      return;
+    }
+
+    const progressInterval = setInterval(() => {
+      setProgress(getNextValidationProgress);
+    }, 200);
+
+    return () => clearInterval(progressInterval);
+  }, [isValidating]);
 
   useEffect(() => {
     // Auto-start validation when component mounts

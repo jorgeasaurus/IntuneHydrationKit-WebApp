@@ -22,6 +22,19 @@ function StaticWallpaper(): React.JSX.Element {
   );
 }
 
+function subscribeToMotionPreference(
+  query: MediaQueryList,
+  handler: (event: MediaQueryListEvent) => void
+): () => void {
+  if (typeof query.addEventListener === "function") {
+    query.addEventListener("change", handler);
+    return () => query.removeEventListener("change", handler);
+  }
+
+  query.addListener(handler);
+  return () => query.removeListener(handler);
+}
+
 export function RouteWallpaper(): React.JSX.Element | null {
   const pathname = usePathname();
   // The static surface is the deliberate initial state: the animated wallpaper
@@ -89,19 +102,10 @@ export function RouteWallpaper(): React.JSX.Element | null {
       }
     };
 
-    // Older Safari (<14) exposes addListener/removeListener instead of the
-    // standard add/removeEventListener on MediaQueryList.
-    const subscribe = (query: MediaQueryList): (() => void) => {
-      if (typeof query.addEventListener === "function") {
-        query.addEventListener("change", handleMotionChange);
-        return () => query.removeEventListener("change", handleMotionChange);
-      }
-      query.addListener(handleMotionChange);
-      return () => query.removeListener(handleMotionChange);
-    };
-
     load();
-    const unsubscribe = motionQuery ? subscribe(motionQuery) : undefined;
+    const unsubscribe = motionQuery
+      ? subscribeToMotionPreference(motionQuery, handleMotionChange)
+      : undefined;
 
     return () => {
       if (idleHandle !== undefined) {

@@ -102,6 +102,7 @@ describe('TenantConfig', () => {
 
     expect((await screen.findAllByText('Contoso')).length).toBeGreaterThan(0)
     expect(await screen.findByText('All prerequisites met')).toBeInTheDocument()
+    expect(screen.getByText(/Last checked at .* UTC/)).toBeInTheDocument()
     await waitFor(() => {
       expect(validatePrerequisites).toHaveBeenCalled()
     })
@@ -120,6 +121,42 @@ describe('TenantConfig', () => {
     await waitFor(() => {
       expect(validatePrerequisites.mock.calls.length).toBe(initialValidationCalls)
     })
+  })
+
+  it('formats the validation timestamp in the operator locale and labels its UTC timezone', async () => {
+    const languageSpy = vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-DE')
+    const prerequisiteResult: PrerequisiteCheckResult = {
+      organization: { id: 'tenant-123', displayName: 'Contoso' },
+      licenses: {
+        hasIntuneLicense: true,
+        hasConditionalAccessLicense: true,
+        hasPremiumP2License: true,
+        hasWindowsDriverUpdateLicense: true,
+        intuneServicePlans: ['INTUNE_A'],
+        conditionalAccessServicePlans: ['AAD_PREMIUM'],
+        premiumP2ServicePlans: ['AAD_PREMIUM_P2'],
+        windowsDriverUpdateServicePlans: ['WINDOWSUPDATEFORBUSINESS_DEPLOYMENTSERVICE'],
+        allSkus: [],
+      },
+      permissions: { hasRequiredPermissions: true, missingPermissions: [], grantedPermissions: [] },
+      isValid: true,
+      warnings: [],
+      errors: [],
+      timestamp: new Date('2026-04-25T15:00:00.000Z'),
+    }
+    validatePrerequisites.mockResolvedValue(prerequisiteResult)
+
+    try {
+      render(
+        <WizardProvider>
+          <WizardHarness />
+        </WizardProvider>
+      )
+
+      expect(await screen.findByText('Last checked at 15:00 UTC')).toBeInTheDocument()
+    } finally {
+      languageSpy.mockRestore()
+    }
   })
 
   it('restores prerequisite errors after the tenant step remounts', async () => {

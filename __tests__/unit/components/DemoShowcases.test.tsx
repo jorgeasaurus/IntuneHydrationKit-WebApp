@@ -71,7 +71,16 @@ describe('demo showcase components', () => {
     expect(screen.getByText('$ hydrate --mode create --all')).toBeInTheDocument()
 
     act(() => {
-      vi.advanceTimersByTime(6400)
+      vi.advanceTimersByTime(6000)
+    })
+
+    expect(screen.getByRole('progressbar', { name: 'Hydration demo progress' })).toHaveAttribute(
+      'aria-valuenow',
+      '100'
+    )
+
+    act(() => {
+      vi.advanceTimersByTime(400)
     })
 
     expect(screen.getByText('Hydration Complete')).toBeInTheDocument()
@@ -84,6 +93,24 @@ describe('demo showcase components', () => {
 
     expect(screen.queryByText('Hydration Complete')).not.toBeInTheDocument()
     expect(screen.getByText('$ hydrate --mode create --all')).toBeInTheDocument()
+  })
+
+  it('uses distinct log keys when entries share the same timestamp', () => {
+    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(0)
+
+    try {
+      render(<TerminalDemo />)
+
+      act(() => {
+        vi.advanceTimersByTime(800)
+      })
+
+      expect(consoleErrorSpy.mock.calls.flat().join(' ')).not.toContain('same key')
+    } finally {
+      nowSpy.mockRestore()
+      consoleErrorSpy.mockRestore()
+    }
   })
 
   it('moves WebAppDemo through deploying, completion, and reset states', () => {

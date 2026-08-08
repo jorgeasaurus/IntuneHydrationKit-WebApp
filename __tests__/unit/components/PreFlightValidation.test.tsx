@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
 import { PreFlightValidation } from '@/components/wizard/PreFlightValidation'
+import { getNextValidationProgress } from '@/lib/hydration/validationProgress'
 import type { ValidationResult } from '@/lib/hydration/validator'
 import type { WizardState } from '@/types/hydration'
 
@@ -115,5 +116,11 @@ describe('PreFlightValidation', () => {
       expect(validateTenant).toHaveBeenCalledTimes(2)
     })
     expect(await screen.findByText('Connected to Graph')).toBeInTheDocument()
+  })
+
+  it('preserves completed progress while the validation timer is pending cleanup', () => {
+    expect(getNextValidationProgress(80)).toBe(90)
+    expect(getNextValidationProgress(90)).toBe(90)
+    expect(getNextValidationProgress(100)).toBe(100)
   })
 })

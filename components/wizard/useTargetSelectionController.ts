@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { TaskCategory, OIBPlatformId } from "@/types/hydration";
 import { useWizardState } from "@/hooks/useWizardState";
 import { TEMPLATE_METADATA } from "@/templates";
@@ -254,7 +254,8 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     data.baselineManifest,
     data.cisManifest
   );
-  const totalSelectedCount = TARGETS.filter(t => selectionState.targets.includes(t.id)).reduce(
+  const selectedTargetSet = useMemo(() => new Set(selectionState.targets), [selectionState.targets]);
+  const totalSelectedCount = TARGETS.filter(t => selectedTargetSet.has(t.id)).reduce(
     (sum, t) => sum + getSelectedCount(t.id),
     0
   );
