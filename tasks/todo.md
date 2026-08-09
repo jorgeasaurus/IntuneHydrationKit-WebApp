@@ -1,3 +1,71 @@
+# README Status and Screenshot Refresh
+
+- [x] Remove the obsolete development-status section.
+- [x] Capture and add a current landing-page screenshot.
+- [ ] Verify the README image path and documentation diff.
+
+## Review
+
+- Removed the obsolete phase-based development-status section.
+- Replaced `LandingPage.jpeg` with a current 1550×972 landing-page capture and updated its alt text.
+- Checks passed: README status search, image-path and dimensions check, visual inspection, and `git diff --check`.
+- Merged and pushed as documentation-only commit `fefe788` on `main`.
+
+# Proprietary License Transition
+
+- [x] Add a proprietary commercial EULA for future releases.
+- [x] Replace MIT and free/open-source product claims with the proprietary licensing position.
+- [x] Verify no MIT licensing references remain and run documentation checks.
+- [x] Commit and merge only the proprietary-license changes into `main`.
+
+## Review
+
+- Replaced the README, landing footer, FAQ, and project-specification MIT claims with proprietary commercial licensing language.
+- Added `LICENSE` with a commercial EULA: evaluation only; production and other commercial use require a separately purchased written license.
+- Checks passed: focused landing-page test, `npm run type-check`, `git diff --check`, and an MIT-reference search.
+- Merged as licensing-only commit `705e7f0` on `main`; focused React Doctor scan scored 100/100.
+
+# Landing Version Alignment
+
+- [x] Read the PowerShell module version.
+- [x] Update landing-page version references and regression coverage.
+- [x] Run focused verification and record results.
+
+## Review
+
+- Landing badge and supporting copy now display the PowerShell module version, v1.3.0.
+- Checks passed: `npm run test:run -- __tests__/unit/components/HomeLanding.test.tsx`, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# PowerShell Group and Filter Parity
+
+- [x] Compare the PowerShell and web group/filter inventories.
+- [x] Add missing web templates, manifests, counts, and coverage.
+- [x] Run focused tests, type-check, and build; record results.
+
+## Review
+
+- Added the three Microsoft Entra device-trust dynamic groups and four Windows device-trust filters from PowerShell module v1.3.0.
+- Both loader and static-fallback paths are aligned; cache version bumped to invalidate stale browser templates.
+- Checks passed: focused template tests, `npm run type-check`, `npm run test:run` (70 files, 512 tests), `npm run build`, `git diff --check`, and source-file parity.
+
+# Intune Hydration Kit Social Ad
+
+- [x] Define a short-form vertical ad storyboard grounded in current product capabilities.
+- [x] Add a self-contained Remotion composition and render entry point.
+- [x] Render and visually inspect the illustrative MP4.
+- [x] Capture actual local product views at a dark mobile viewport.
+- [x] Replace the illustrative UI in the ad and render the updated MP4.
+- [x] Capture the dark desktop landing page at key real-product views.
+- [x] Recreate the product scenes as desktop browser captures and render the updated MP4.
+
+## Review
+
+- Illustrative version completed; replacing it with real mobile product captures.
+- Revised version uses real 390×844 dark-mode landing and template-catalog captures in the product scenes.
+- Checks passed: `npm run type-check`, rendered MP4, and visual review of both product scenes.
+- Desktop recreation uses real 1440×900 dark-mode landing captures for the hero/live-run and operating-model scenes.
+- Upstream Remotion markup/render guidance used: frame-driven animations, `staticFile()`/`Img` assets, still-frame review, and full render.
+
 # GitHub Issue #16 Investigation
 
 - [x] Retrieve issue #16 details, discussion, and linked work.
@@ -733,3 +801,208 @@
 - Copilot cycles 1 and 2 produced four actionable test-coverage comments; all were fixed, replied to, and resolved.
 - Copilot cycle 3 reviewed functional head `e34450c` and produced no new comments.
 - Checks passed: focused OperationMode tests, `npm run type-check`, Vercel, React Doctor, GitGuardian, and `git diff --check`.
+
+# Make Choices Unmistakable
+
+- [x] Replace the operation choice cards with keyboard-accessible radio groups.
+- [x] Add visible focus treatment and accessible labels for task filtering controls.
+- [x] Add focused regression coverage and verify the affected UI.
+
+## Review
+
+- Operation and execution cards are now focusable radio controls with keyboard selection and clear checked states.
+- Task search, status, and category filters now have accessible names.
+- Checks passed: focused component tests, `npm run type-check`, and `npm run build`.
+
+# Shared Dark Wallpaper, Readable Light UI
+
+- [x] Restore the original dark wallpaper treatment as the shared backdrop.
+- [x] Improve light-mode contrast through foreground and surface styling only.
+- [x] Verify the shared backdrop and light-mode readability through focused and project checks.
+
+## Review
+
+- Both themes now share the original dark water scrim; the wallpaper is not altered by the light theme.
+- Light mode uses high-contrast outer text and more opaque pale content surfaces with dark text for readable scanning.
+- Checks passed: focused landing/wallpaper tests, `npm run type-check`, clean `npm run build`, and `git diff --check`.
+
+# Landing Contrast Follow-up
+
+- [x] Set readable foreground colors for the light navigation brand and status area.
+- [x] Set readable muted copy on the light final CTA surface.
+- [x] Verify the focused landing behavior and project checks.
+
+## Review
+
+- The navigation brand, status, and CTA description now use dark foregrounds on their pale light-mode surfaces.
+- The shared dark water wallpaper remains untouched.
+- Checks passed: focused landing/navigation tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Landing Demo Contrast Follow-up
+
+- [x] Scope readable foreground and muted text to the simulated app window.
+- [x] Verify the demo cycle and project checks.
+
+## Review
+
+- The simulated app browser now renders dark foreground and muted text on its pale light-mode surfaces.
+- The shared wallpaper remains unchanged.
+- Checks passed: focused demo/landing tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Navigation Hover Contrast
+
+- [x] Keep light-mode navigation hover text dark enough for the pale header.
+- [x] Verify the navigation and project checks.
+
+## Review
+
+- Light-mode navigation hover text now uses the deep blue accent; dark mode retains the light hover treatment.
+- Checks passed: focused navigation tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Status Badge Contrast
+
+- [x] Use a readable light-mode label color for informational status badges.
+- [x] Verify the landing checks.
+
+## Review
+
+- Informational badges now use a deep blue label on their pale light-mode surface.
+- Checks passed: focused landing test, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Conditional Access Alert Contrast
+
+- [x] Use an opaque, readable warning surface for Conditional Access follow-up alerts.
+- [x] Verify the results and wizard checks.
+
+## Review
+
+- Conditional Access alerts now use opaque card surfaces, clear foreground text, and amber warning icons over the wallpaper.
+- Checks passed: focused results/wizard tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# React Doctor 100
+
+- [x] Fetch and follow the current React Doctor triage playbook.
+- [x] Fix all React Doctor findings until the full scan scores 100.
+- [x] Run regression and project validation checks.
+
+## Review
+
+- React Doctor 0.9.8 full-project scan: 57 to 100, with zero errors or warnings.
+- Fixed lifecycle cleanup, pure state transitions, deterministic server/client time formatting, animation performance, and repeated lookup issues.
+- Checks passed: focused demo test, full test suite (514 tests), type check, production build, and `git diff --check`.
+
+# Thermonuclear Review Fix Loop
+
+- [x] Review the full current branch diff and record actionable findings.
+- [x] Fix every confirmed finding and run focused checks.
+- [x] Re-review the changed scope until it has zero findings.
+- [x] Run final project validation.
+
+## Round 1 findings
+
+1. Keep the shared compact radio primitive separate from selectable card layout.
+2. Pair the wallpaper media-query listener with the exact matching cleanup API.
+
+## Round 2 finding
+
+1. Keep generic light-mode button hover text on the control-text token.
+
+## Review
+
+- Three review rounds completed. The final fresh review had zero findings.
+- The fixes restored compact-radio ownership, matched wallpaper listener teardown, added card-radio focus treatment, simplified validation-progress cleanup, and corrected light hover contrast.
+- Checks passed: focused component tests, full test suite (514 tests), type check, production build, React Doctor (100/100), and `git diff --check`.
+
+# GitHub Copilot Review Loop
+
+- [x] Inspect pull-request review state and address valid feedback.
+- [x] Push verified fixes and resolve handled review threads.
+- [x] Request and verify a clean new Copilot review cycle.
+
+## Review
+
+- Copilot identified one valid progress-completion race. It was fixed, tested, replied to, and resolved.
+- Two follow-up Copilot review cycles completed. The final cycle reviewed `c0eb626` and added no actionable threads.
+- Checks passed: full test suite (515 tests), type check, production build, changed-scope React Doctor (100/100), matching local and remote heads, and `git diff --check`.
+
+# Website Version Revision
+
+- [x] Increase the website version from 2.6.0 to 2.6.1.
+- [x] Add the pull-request version-increment merge requirement.
+
+# PR #19 Copilot Review Refresh
+
+- [x] Record the latest pull-request review state and request a new Copilot review for the 2.6.1 head.
+- [x] Address and verify any new actionable feedback.
+- [x] Confirm a clean Copilot review is anchored to the latest commit.
+
+## Review
+
+- Copilot review `PRR_kwDOQzwR3c8AAAABI3Nklw` completed on `1a298fd` with no actionable comments or unresolved threads.
+- The only suppressed suggestion concerns an existing UTC timestamp label and is outside the version-update scope.
+- Checks passed: package metadata consistency, `git diff --check`, and matching local/remote PR heads.
+
+# Suppressed Review Follow-up
+
+- [x] Make the prerequisite-validation timestamp's UTC timezone explicit.
+- [x] Add focused regression coverage and update PR #19.
+
+## Review
+
+- The prerequisite timestamp now visibly states UTC and retains an explicit locale/timezone formatter for deterministic rendering.
+- Checks passed: focused TenantConfig test, type check, production build, changed-line React Doctor scan, and `git diff --check`.
+
+# Suppressed Copilot Feedback Follow-up
+
+- [x] Make terminal-demo progress reach 100% after the final command.
+- [x] Format the UTC validation timestamp in the operator's runtime locale.
+- [x] Add regression coverage and verify the focused changed scope.
+
+## Review
+
+- Four valid suppressed findings were fixed across two commits: `12800e7` and `8885123`.
+- Copilot review `PRR_kwDOQzwR3c8AAAABI3UpFw` completed on `8885123` with no actionable comments or unresolved threads.
+- The remaining suppressed wallpaper suggestion conflicts with the requested same-treatment light/dark wallpaper and was intentionally not applied.
+- Checks passed: focused component tests (8 tests), type check, production build, changed-line React Doctor scans, `git diff --check`, and matching local/remote heads.
+
+# Win32 App Proof of Concept
+
+- [x] Identify one PowerShell-module Win32 app that can be represented safely in the web app.
+- [x] Add the minimal template and Graph task path for that app.
+- [x] Add focused coverage and validate the proof of concept.
+
+## Review
+
+- Uses the supplied 7-Zip 25.01 `.intunewin` package, including its Intune encryption metadata.
+- Checks passed: focused tests, type check, lint, and whitespace validation.
+
+# Thermonuclear Review: Win32 App Proof of Concept
+
+- [x] Review the branch diff against `origin/main` and record actionable findings.
+- [x] Fix each actionable finding and run focused verification.
+- [x] Repeat the strict review until it has zero findings, then run final validation.
+
+## Review
+
+- Moved app-specific metadata into the Win32 template, reject malformed package-size metadata, clean up a failed app upload, use the no-retry create boundary, and keep outer and encrypted package names distinct.
+- Final strict review found no remaining structural, boundary, or maintainability issues in the branch scope.
+
+# Win32 Upload Commit Failure
+
+- [x] Match the module's Azure block-upload and block-list protocol in the same-origin upload proxy.
+- [x] Cover the protocol with a focused route test and verify the Win32 upload path.
+
+## Review
+
+- The proxy now uploads each package block and explicitly commits the Azure block list before Graph receives the encryption metadata.
+- Checks passed: focused Win32 tests, type check, lint, production build, and whitespace validation.
+
+# Win32 Catalog Visibility
+
+- [x] Include shipped Win32 app templates in the template-documentation catalog.
+- [x] Add a catalog regression test and verify the catalog UI source.
+
+## Review
+
+- The 7-Zip proof-of-concept is now discoverable under Win32 Apps with its import-ready template payload.
+- Checks passed: focused catalog tests, type check, lint, production build, and whitespace validation.

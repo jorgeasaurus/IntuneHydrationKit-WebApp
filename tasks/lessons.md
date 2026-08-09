@@ -1,5 +1,6 @@
 # Lessons
 
+- When a user says a README status is obsolete, remove the full stale section and refresh its supporting visual in the same change.
 - When a tenant-only Graph create error cannot be fully reproduced locally, add scoped failure diagnostics at the Graph response boundary so the next generic 400 includes task, endpoint, API version, response body, and sanitized payload.
 - For Microsoft Graph batch errors, preserve `error.innerError.message`; Graph often puts the actionable cause there while the outer message stays generic.
 - For ARIA boolean attributes, avoid undefined-returning expressions; use explicit booleans so axe tooling sees valid `true`/`false` values.
@@ -19,5 +20,19 @@
 - If a UI already computes progress from source-of-truth data, use that computed value for the visual indicator; step-specific width classes drift when the step list changes.
 - For Edge/webhint diagnostics, avoid JSX `style` props for progress widths; prefer native progress elements or stylesheet-driven rendering tied to the computed value.
 - If static accessibility tooling flags JSX expressions in ARIA attributes, render literal `aria-*` values in explicit branches and omit irrelevant ARIA attributes.
+- When a user asks to preserve an existing background treatment, improve readability through text and content surfaces; do not solve it by changing or obscuring the background itself.
+- When changing a landing-page foreground token, audit inherited navigation labels and muted copy inside light surfaces; they may need explicit surface-level colors.
+- Demo windows rendered inside a themed landing page need their own foreground scope; otherwise inherited outer-copy colors can make their simulated app content unreadable.
+- Theme-aware hover states need their own contrast audit; a foreground token that works over the wallpaper may fail over a pale navigation surface.
+- Status badges on pale surfaces must use a local dark label color rather than an outer landing-copy token.
+- Alerts placed directly over the shared wallpaper need an opaque card surface and explicit foreground; translucent semantic tints alone are not readable enough.
+- When displaying a timestamp in a forced timezone, include that timezone in the visible label so users are not led to assume it is local time.
 - When bundled template files change, bump the template cache version so existing browser caches cannot hide newly shipped templates.
 - When a review calls out source-of-truth drift, remove the duplicated model before opening the PR instead of relying only on sync tests.
+- When a product ad is asked to show the app, capture and animate real product views at the requested viewport instead of recreating representative UI.
+- When a requested product-ad theme changes, recapture every visible product view in that theme rather than recoloring or mixing screenshots.
+- When an ad is redirected from mobile to desktop, replace the embedded product capture treatment rather than reusing mobile screens inside a different frame.
+- When a user supplies a deployment artifact, use that exact artifact in the proof of concept and preserve the metadata needed to upload it correctly.
+- When a client-side workflow receives a pre-signed Azure Blob upload URL, include the scoped Blob Storage origin in CSP `connect-src` and validate the browser’s actual upload path.
+- A CSP allowlist does not overcome Azure Blob CORS. Route browser uploads through a same-origin, host-validated server endpoint when the signed Blob URL lacks CORS headers.
+- For Intune Win32 uploads, a successful Azure single-blob PUT is insufficient: use the Graph-compatible Azure block upload plus block-list commit before submitting file-encryption metadata.

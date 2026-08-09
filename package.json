@@ -15,7 +15,9 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "npx react-doctor@latest",
+    "video:studio": "remotion studio video/index.ts",
+    "video:render": "remotion render video/index.ts IntuneHydrationKit-Ad out/intune-hydration-kit-ad.mp4"
   },
   "dependencies": {
     "@azure/msal-browser": "^3.30.0",
@@ -49,6 +51,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@remotion/cli": "^4.0.498",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
@@ -64,6 +67,7 @@
     "jsdom": "^27.4.0",
     "msw": "^2.12.7",
     "postcss": "^8.5.15",
+    "remotion": "^4.0.498",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "vitest": "^4.1.10"

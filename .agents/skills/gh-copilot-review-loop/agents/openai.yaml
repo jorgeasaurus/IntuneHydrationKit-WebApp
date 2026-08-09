@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Copilot Review Loop"
+  short_description: "Fix PR feedback until Copilot returns clean"
+  default_prompt: "Use $gh-copilot-review-loop to address all actionable PR comments and repeat Copilot reviews until a clean cycle."
