@@ -312,10 +312,13 @@ export function OperationModeSelection(): React.JSX.Element {
         </div>
 
         {mode === "delete" && !isPreview && (
-          <Alert variant="destructive" className="border-red-500/30 bg-red-500/10">
+          <Alert
+            variant="destructive"
+            className="border-red-400/70 bg-slate-950/90 text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur-md [&>svg]:text-red-300"
+          >
             <ShieldAlert className="size-4" />
-            <AlertTitle>Delete mode is live</AlertTitle>
-            <AlertDescription>
+            <AlertTitle className="text-red-200">Delete mode is live</AlertTitle>
+            <AlertDescription className="text-slate-100/90">
               Delete mode will remove configurations created by this tool. Only objects with
               &quot;Imported by Intune Hydration Kit&quot; in the description will be deleted.
               Conditional Access policies must be disabled to be deleted.
