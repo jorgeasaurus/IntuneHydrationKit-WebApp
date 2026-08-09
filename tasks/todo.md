@@ -1284,5 +1284,10 @@
 
 - [x] Rev the website patch version to 2.6.4.
 - [x] Stage only the accumulated product changes and exclude local artifacts.
-- [ ] Commit, push, and open a ready PR against `main`.
-- [ ] Verify the published PR metadata and checks.
+- [x] Commit, push, and open a ready PR against `main`.
+- [x] Verify the published PR metadata and checks.
+
+## Review
+
+- Ready PR #20 targets `main` from `codex/consolidate-win32-glass-ui` with website version 2.6.4.
+- Local validation passed: 529 tests, lint, type check, production build, React Doctor 100/100, browser verification, and whitespace validation.
