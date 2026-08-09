@@ -18,10 +18,6 @@ export const REQUIRED_SCOPES = [
   "Organization.Read.All",
 ];
 
-// Client IDs are public by design. This project registration keeps preview and branch
-// builds functional when the hosting environment has not copied the public variable.
-export const DEFAULT_MSAL_CLIENT_ID = "12e05781-817c-410c-9a99-0e73399ec318";
-
 /**
  * Get the Graph API endpoint (global/commercial cloud only)
  */
@@ -44,11 +40,10 @@ export function getAuthorityUrl(tenantId: string = "common"): string {
 const redirectUri =
   process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI ||
   (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
-const clientId = process.env.NEXT_PUBLIC_MSAL_CLIENT_ID || DEFAULT_MSAL_CLIENT_ID;
 
 export const msalConfig: Configuration = {
   auth: {
-    clientId,
+    clientId: process.env.NEXT_PUBLIC_MSAL_CLIENT_ID || "",
     authority:
       process.env.NEXT_PUBLIC_MSAL_AUTHORITY ||
       "https://login.microsoftonline.com/common",
