@@ -300,9 +300,9 @@ export function ReviewConfirm(): React.JSX.Element {
         )}
 
         {state.isPreview && (
-          <div className="rounded-2xl border border-blue-500/30 bg-blue-500/10 p-5">
-            <p className="font-medium text-blue-900 dark:text-blue-100">Preview mode</p>
-            <p className="mt-1 text-sm text-blue-700 dark:text-blue-300">
+          <div className="rounded-2xl border border-sky-300/45 bg-sky-500/18 p-5 text-sky-50">
+            <p className="font-medium text-sky-50">Preview mode</p>
+            <p className="mt-1 text-sm text-sky-100">
               Preview mode will check what would{" "}
               {state.operationMode === "create" ? "be created" : "be deleted"} without making
               any changes to your tenant.

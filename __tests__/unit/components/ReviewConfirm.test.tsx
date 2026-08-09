@@ -73,7 +73,8 @@ describe('ReviewConfirm', () => {
     const user = userEvent.setup()
     render(<ReviewConfirm />)
 
-    expect(screen.getByText('Preview mode')).toBeInTheDocument()
+    expect(screen.getByText('Preview mode')).toHaveClass('text-sky-50')
+    expect(screen.getByText(/Preview mode will check/)).toHaveClass('text-sky-100')
     expect(screen.getByRole('button', { name: 'Preview Create' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Preview Create' }))
