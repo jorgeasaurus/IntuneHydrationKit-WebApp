@@ -24,7 +24,7 @@ describe("POST /api/win32-upload", () => {
     expect(response.status).toBe(204);
     expect(fetchMock).toHaveBeenNthCalledWith(
       1,
-      "https://tenant.blob.core.windows.net/package?sig=value&comp=block&blockid=MDAwMA%3D%3D",
+      "https://tenant.blob.core.windows.net/package?sig=value&comp=block&blockid=MDAwMDAwMDA%3D",
       expect.objectContaining({
         method: "PUT",
         redirect: "manual",
@@ -38,7 +38,7 @@ describe("POST /api/win32-upload", () => {
         method: "PUT",
         redirect: "manual",
         headers: expect.objectContaining({ "Content-Type": "text/plain; charset=UTF-8" }),
-        body: '<?xml version="1.0" encoding="utf-8"?><BlockList><Latest>MDAwMA==</Latest></BlockList>',
+        body: '<?xml version="1.0" encoding="utf-8"?><BlockList><Latest>MDAwMDAwMDA=</Latest></BlockList>',
       })
     );
   });
@@ -54,6 +54,23 @@ describe("POST /api/win32-upload", () => {
     }));
 
     expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects packages over the maximum size before reading or forwarding them", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(new Request("http://localhost/api/win32-upload", {
+      method: "POST",
+      headers: {
+        "content-length": String((8 * 1024 * 1024 * 1024) + 1),
+        "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value",
+      },
+      body: new Uint8Array([1]),
+    }));
+
+    expect(response.status).toBe(413);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 

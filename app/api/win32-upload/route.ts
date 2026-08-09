@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 
 const BLOCK_SIZE_BYTES = 6 * 1024 * 1024;
+const MAX_PACKAGE_SIZE_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_UPLOAD_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 5000;
+const BLOCK_ID_INDEX_WIDTH = 8;
 const AZURE_BLOB_HOST_SUFFIXES = [
   ".blob.core.windows.net",
   ".blob.core.usgovcloudapi.net",
@@ -56,10 +58,10 @@ function appendAzureQuery(uploadUrl: string, query: string): string {
 }
 
 function createBlockId(index: number): string {
-  return Buffer.from(String(index).padStart(4, "0"), "ascii").toString("base64");
+  return Buffer.from(String(index).padStart(BLOCK_ID_INDEX_WIDTH, "0"), "ascii").toString("base64");
 }
 
-async function uploadBlock(uploadUrl: string, blockId: string, content: ArrayBuffer): Promise<void> {
+async function uploadBlock(uploadUrl: string, blockId: string, content: Uint8Array): Promise<void> {
   const response = await fetchWithRetry(
     appendAzureQuery(uploadUrl, `comp=block&blockid=${encodeURIComponent(blockId)}`),
     {
@@ -68,7 +70,7 @@ async function uploadBlock(uploadUrl: string, blockId: string, content: ArrayBuf
         "Content-Length": String(content.byteLength),
         "Content-Type": "application/octet-stream",
       },
-      body: content,
+      body: content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer,
     }
   );
 
@@ -95,12 +97,42 @@ async function commitBlockList(uploadUrl: string, blockIds: string[]): Promise<v
   }
 }
 
-async function uploadPackageInBlocks(uploadUrl: string, packageContent: ArrayBuffer): Promise<void> {
+async function uploadPackageInBlocks(uploadUrl: string, packageContent: ReadableStream<Uint8Array>): Promise<void> {
   const blockIds: string[] = [];
-  for (let offset = 0; offset < packageContent.byteLength; offset += BLOCK_SIZE_BYTES) {
+  const reader = packageContent.getReader();
+  let bufferedContent = new Uint8Array(0);
+  let uploadedBytes = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    uploadedBytes += value.byteLength;
+    if (uploadedBytes > MAX_PACKAGE_SIZE_BYTES) {
+      throw new Error("The Win32 package exceeds the maximum supported size of 8 GB.");
+    }
+
+    const combinedContent = new Uint8Array(bufferedContent.byteLength + value.byteLength);
+    combinedContent.set(bufferedContent);
+    combinedContent.set(value, bufferedContent.byteLength);
+    bufferedContent = combinedContent;
+
+    while (bufferedContent.byteLength >= BLOCK_SIZE_BYTES) {
+      const blockId = createBlockId(blockIds.length);
+      blockIds.push(blockId);
+      await uploadBlock(uploadUrl, blockId, bufferedContent.slice(0, BLOCK_SIZE_BYTES));
+      bufferedContent = bufferedContent.slice(BLOCK_SIZE_BYTES);
+    }
+  }
+
+  if (uploadedBytes === 0) {
+    throw new Error("The Win32 package is empty.");
+  }
+
+  if (bufferedContent.byteLength > 0) {
     const blockId = createBlockId(blockIds.length);
     blockIds.push(blockId);
-    await uploadBlock(uploadUrl, blockId, packageContent.slice(offset, offset + BLOCK_SIZE_BYTES));
+    await uploadBlock(uploadUrl, blockId, bufferedContent);
   }
 
   await commitBlockList(uploadUrl, blockIds);
@@ -112,13 +144,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid Intune upload URL." }, { status: 400 });
   }
 
-  const packageContent = await request.arrayBuffer();
-  if (packageContent.byteLength === 0) {
-    return NextResponse.json({ error: "The Win32 package size is not supported." }, { status: 413 });
+  const contentLength = request.headers.get("content-length");
+  if (contentLength && Number(contentLength) > MAX_PACKAGE_SIZE_BYTES) {
+    return NextResponse.json(
+      { error: "The Win32 package exceeds the maximum supported size of 8 GB." },
+      { status: 413 }
+    );
+  }
+
+  if (!request.body) {
+    return NextResponse.json({ error: "The Win32 package is empty." }, { status: 400 });
   }
 
   try {
-    await uploadPackageInBlocks(uploadUrl, packageContent);
+    await uploadPackageInBlocks(uploadUrl, request.body);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Azure Storage upload failed." },
