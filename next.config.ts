@@ -15,7 +15,7 @@ const nextConfig: NextConfig = {
           {
             key: "Content-Security-Policy",
             value:
-              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://*.login.microsoftonline.com https://raw.githubusercontent.com https://vitals.vercel-insights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
+              "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://va.vercel-scripts.com; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com https://*.login.microsoftonline.com https://raw.githubusercontent.com https://*.blob.core.windows.net https://vitals.vercel-insights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:;",
           },
           {
             key: "X-Frame-Options",
