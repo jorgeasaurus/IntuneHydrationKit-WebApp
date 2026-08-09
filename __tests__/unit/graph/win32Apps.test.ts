@@ -51,8 +51,11 @@ describe("createWin32AppFromPackage", () => {
       "beta"
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      "https://upload.example/package",
-      expect.objectContaining({ method: "PUT" })
+      "/api/win32-upload",
+      expect.objectContaining({
+        method: "POST",
+        headers: { "x-intune-upload-url": "https://upload.example/package" },
+      })
     );
     expect(post).toHaveBeenLastCalledWith(
       expect.stringContaining("/files/file-id/commit"),

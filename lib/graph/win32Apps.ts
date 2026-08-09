@@ -85,13 +85,14 @@ async function waitForUploadState(
 }
 
 async function uploadToAzureStorage(uploadUri: string, content: Blob): Promise<void> {
-  const response = await fetch(uploadUri, {
-    method: "PUT",
-    headers: { "x-ms-blob-type": "BlockBlob" },
+  const response = await fetch("/api/win32-upload", {
+    method: "POST",
+    headers: { "x-intune-upload-url": uploadUri },
     body: content,
   });
   if (!response.ok) {
-    throw new Error(`Azure Storage upload failed: ${response.status} ${response.statusText}`);
+    const details = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(details?.error || `Azure Storage upload failed: ${response.status} ${response.statusText}`);
   }
 }
 
