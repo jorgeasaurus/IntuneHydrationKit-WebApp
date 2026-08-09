@@ -102,6 +102,8 @@ describe('TenantConfig', () => {
 
     expect((await screen.findAllByText('Contoso')).length).toBeGreaterThan(0)
     expect(await screen.findByText('All prerequisites met')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveClass('bg-emerald-500/18', 'text-emerald-50')
+    expect(screen.getByText(/Validation passed/i)).toHaveClass('text-emerald-100')
     expect(screen.getByText(/Last checked at .* UTC/)).toBeInTheDocument()
     await waitFor(() => {
       expect(validatePrerequisites).toHaveBeenCalled()
