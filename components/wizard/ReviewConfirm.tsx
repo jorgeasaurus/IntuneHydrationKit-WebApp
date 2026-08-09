@@ -274,22 +274,22 @@ export function ReviewConfirm(): React.JSX.Element {
         </div>
 
         {!state.isPreview && (
-          <div className="rounded-2xl border border-sky-300/50 bg-slate-950/90 p-5 text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur-md">
+          <div className="live-acknowledgement rounded-2xl border p-5 shadow-xl backdrop-blur-md">
             <div className="flex items-start gap-x-3">
               <Checkbox
                 id="acknowledge"
                 checked={acknowledged}
                 onCheckedChange={(checked) => setAcknowledged(checked as boolean)}
-                className="border-sky-200 bg-slate-900 text-slate-950 focus-visible:ring-sky-200 data-[state=checked]:bg-sky-200 data-[state=checked]:text-slate-950"
+                className="live-acknowledgement__checkbox"
               />
               <div className="space-y-1">
                 <Label
                   htmlFor="acknowledge"
-                  className="cursor-pointer font-medium text-slate-50"
+                  className="live-acknowledgement__title cursor-pointer font-medium"
                 >
                   I understand this run will modify my Intune tenant
                 </Label>
-                <p className="text-sm text-slate-200">
+                <p className="live-acknowledgement__copy text-sm">
                   This operation will{" "}
                   {state.operationMode === "create" ? "create new" : "delete existing"}{" "}
                   configurations in your Intune tenant. Completed actions are not rolled back
