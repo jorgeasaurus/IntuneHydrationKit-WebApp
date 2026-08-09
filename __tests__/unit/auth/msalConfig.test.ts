@@ -66,11 +66,12 @@ describe("msalConfig", () => {
     expect(module.msalConfig.auth.postLogoutRedirectUri).toBe("http://localhost:3000");
   });
 
-  it("explains when the Entra client ID is missing", async () => {
+  it("uses the project Entra client ID when a branch build has no public environment variable", async () => {
     vi.stubEnv("NEXT_PUBLIC_MSAL_CLIENT_ID", "");
     const module = await importModule();
 
-    expect(module.getMsalConfigurationError()).toContain("NEXT_PUBLIC_MSAL_CLIENT_ID");
+    expect(module.msalConfig.auth.clientId).toBe(module.DEFAULT_MSAL_CLIENT_ID);
+    expect(module.getMsalConfigurationError()).toBeNull();
 
     vi.unstubAllEnvs();
   });
