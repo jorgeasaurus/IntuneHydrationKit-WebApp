@@ -106,6 +106,12 @@ describe('ReviewConfirm', () => {
     expect(screen.getByText('Conditional Access reminder')).toBeInTheDocument()
     expect(screen.getByText('Conditional access license missing')).toBeInTheDocument()
     expect(screen.getByText('Tenant has custom naming policies')).toBeInTheDocument()
+    const acknowledgementLabel = screen.getByText('I understand this run will modify my Intune tenant')
+    const acknowledgementDescription = screen.getByText(/^This operation will/i)
+    const acknowledgement = acknowledgementLabel.closest('.rounded-2xl')
+    expect(acknowledgementLabel).toHaveClass('text-slate-50')
+    expect(acknowledgementDescription).toHaveClass('text-slate-200')
+    expect(acknowledgement).toHaveClass('bg-slate-950/90', 'border-sky-300/50')
 
     await user.click(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
     expect(startButton).toBeEnabled()
