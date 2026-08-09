@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-const MAX_PACKAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const BLOCK_SIZE_BYTES = 6 * 1024 * 1024;
 const MAX_UPLOAD_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 5000;
@@ -114,7 +113,7 @@ export async function POST(request: Request) {
   }
 
   const packageContent = await request.arrayBuffer();
-  if (packageContent.byteLength === 0 || packageContent.byteLength > MAX_PACKAGE_SIZE_BYTES) {
+  if (packageContent.byteLength === 0) {
     return NextResponse.json({ error: "The Win32 package size is not supported." }, { status: 413 });
   }
 

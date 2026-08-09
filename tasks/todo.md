@@ -1,3 +1,11 @@
+# PR #20 Copilot Review Loop
+
+- [x] Capture the initial Copilot state and actionable threads.
+- [x] Fix Win32 asset diagnostics and remove the arbitrary package-size ceiling.
+- [ ] Run focused checks, commit, and push the fixes.
+- [ ] Resolve handled threads and request a fresh Copilot review.
+- [ ] Verify a new clean Copilot review cycle.
+
 # README Status and Screenshot Refresh
 
 - [x] Remove the obsolete development-status section.

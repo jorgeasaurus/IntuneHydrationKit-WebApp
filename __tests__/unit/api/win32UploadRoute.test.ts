@@ -73,6 +73,23 @@ describe("POST /api/win32-upload", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("uploads packages larger than 10 MB in Azure blocks", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(new Request("http://localhost/api/win32-upload", {
+      method: "POST",
+      headers: { "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value" },
+      body: new Uint8Array((10 * 1024 * 1024) + 1),
+    }));
+
+    expect(response.status).toBe(204);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
   it("retries a transient Azure block failure before committing", async () => {
     vi.useFakeTimers();
     const fetchMock = vi.fn()

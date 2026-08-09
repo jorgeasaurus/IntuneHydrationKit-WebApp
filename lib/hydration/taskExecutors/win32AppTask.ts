@@ -126,7 +126,9 @@ function getDisplayNameVariants(displayName: string): string[] {
 async function fetchSuppliedPackage(packageUrl: string): Promise<Blob> {
   const response = await fetch(packageUrl);
   if (!response.ok) {
-    throw new Error(`Unable to load the supplied Intune package: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Unable to load the supplied Intune package from ${packageUrl}: ${response.status} ${response.statusText}`
+    );
   }
   return response.blob();
 }
@@ -134,7 +136,9 @@ async function fetchSuppliedPackage(packageUrl: string): Promise<Blob> {
 async function fetchTextAsset(assetUrl: string, label: string): Promise<string> {
   const response = await fetch(assetUrl);
   if (!response.ok) {
-    throw new Error(`Unable to load the supplied ${label}: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Unable to load the supplied ${label} from ${assetUrl}: ${response.status} ${response.statusText}`
+    );
   }
   return response.text();
 }

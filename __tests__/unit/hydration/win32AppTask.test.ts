@@ -128,6 +128,17 @@ describe("executeWin32AppTask", () => {
     );
   });
 
+  it("identifies the unavailable supplied asset by URL", async () => {
+    vi.stubGlobal("fetch", vi.fn()
+      .mockResolvedValueOnce(new Response(new Blob(["package"]), { status: 200 }))
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: "Not Found" })));
+    mockReadIntuneWinPackage.mockResolvedValue({ setupFile: "Install-WinGetPackage.ps1" });
+
+    await expect(executeWin32AppTask(task, createContext())).rejects.toThrow(
+      "Unable to load the supplied WinGet detection script from /win32-apps/7-zip/Detect-WinGetPackage.ps1: 404 Not Found"
+    );
+  });
+
   it("skips an owned legacy-name app but not an unrelated same-name app", async () => {
     mockGetWin32LobApps.mockResolvedValueOnce([
       {
