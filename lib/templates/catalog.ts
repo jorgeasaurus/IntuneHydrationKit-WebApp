@@ -14,6 +14,7 @@ import {
   CISBaselineManifestFile,
   OIBManifestFile,
 } from "@/lib/templates/loader";
+import { getWin32AppTemplates } from "@/templates/win32Apps";
 import { TaskCategory } from "@/types/hydration";
 
 export interface TemplateDocumentationCategorySummary {
@@ -417,6 +418,20 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     };
   });
 
+  const win32AppItems: TemplateDocumentationItem[] = getWin32AppTemplates().map((app) => ({
+    id: createItemId("win32Apps", app.id),
+    category: "win32Apps",
+    categoryLabel: CATEGORY_METADATA.win32Apps.label,
+    displayName: app.displayName,
+    description: normalizeDescription(
+      app.description,
+      "Packaged Windows application imported by Intune Hydration Kit."
+    ),
+    platform: "Windows",
+    itemType: "Windows app (Win32)",
+    payloadSource: inlinePayloadSource(app),
+  }));
+
   const baselineItems: TemplateDocumentationItem[] = (oibManifest?.files ?? []).map((file) => ({
     id: createItemId("baseline", file.path),
     category: "baseline",
@@ -460,6 +475,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ...filterItems,
     ...complianceItems,
     ...appProtectionItems,
+    ...win32AppItems,
     ...conditionalAccessItems,
     ...enrollmentItems,
     ...notificationItems,
