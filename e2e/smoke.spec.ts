@@ -103,36 +103,9 @@ test.describe("Protected Routes", () => {
   });
 });
 
-test.describe("Theme", () => {
-  test("applies a concrete light or dark color scheme", async ({ page }) => {
-    await page.goto("/");
-    const html = page.locator("html");
-    await expect(html).toHaveClass(/light|dark/);
-    await expect(html).toHaveAttribute("style", /color-scheme:\s*(light|dark)/);
-  });
-
-  test("cycles between light and dark mode", async ({ page }) => {
+test.describe("Glass visual system", () => {
+  test("discards retired theme settings and keeps the fixed glass visual system", async ({ page }) => {
     await page.addInitScript((storageKey) => {
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({ stopOnFirstError: false, theme: "light" })
-      );
-    }, APP_SETTINGS_STORAGE_KEY);
-
-    await page.goto("/");
-    const html = page.locator("html");
-    await expect(html).toHaveClass(/\blight\b/);
-
-    await page.getByRole("button", { name: /cycle theme/i }).click();
-
-    await expect(html).toHaveClass(/\bdark\b/);
-    await expect(html).toHaveAttribute("style", /color-scheme:\s*dark/);
-  });
-
-  test("cycles from a stored dark setting back to light on a light OS", async ({ page }) => {
-    await page.emulateMedia({ colorScheme: "light" });
-    await page.addInitScript((storageKey) => {
-      localStorage.setItem("theme", "system");
       localStorage.setItem(
         storageKey,
         JSON.stringify({ stopOnFirstError: false, theme: "dark" })
@@ -141,40 +114,16 @@ test.describe("Theme", () => {
 
     await page.goto("/");
     const html = page.locator("html");
-    await expect(html).toHaveClass(/\bdark\b/);
-
-    await page.getByRole("button", { name: /cycle theme/i }).click();
-
-    await expect(html).toHaveClass(/\blight\b/);
-    await expect(html).toHaveAttribute("style", /color-scheme:\s*light/);
+    await expect(html).not.toHaveClass(/\b(?:dark|light|corporate-1999)\b/);
     await expect(page.getByRole("heading", { name: /intune hydration kit/i })).toHaveCSS(
       "color",
-      "rgb(13, 26, 43)"
+      "rgb(255, 255, 255)"
     );
-  });
-
-  test("resets an out-of-cycle corporate theme to light from the landing toggle", async ({ page }) => {
-    await page.addInitScript((storageKey) => {
-      localStorage.setItem("theme", "corporate-1999");
-      localStorage.setItem(
-        storageKey,
-        JSON.stringify({ stopOnFirstError: false, theme: "corporate-1999" })
-      );
-    }, APP_SETTINGS_STORAGE_KEY);
-
-    await page.goto("/");
-    const html = page.locator("html");
-    await expect(html).toHaveClass(/\bcorporate-1999\b/);
-
-    await page.getByRole("button", { name: /cycle theme/i }).click();
-
-    await expect(html).toHaveClass(/\blight\b/);
-    await expect(html).toHaveAttribute("style", /color-scheme:\s*light/);
     expect(
       await page.evaluate(
         (storageKey) => localStorage.getItem(storageKey),
         APP_SETTINGS_STORAGE_KEY
       )
-    ).toContain('"theme":"light"');
+    ).toBe('{"stopOnFirstError":false}');
   });
 });

@@ -1,13 +1,10 @@
 import { ReactNode } from "react";
-import { act, renderHook, waitFor } from "@testing-library/react";
+import { act, renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsProvider, useSettings } from "@/hooks/useSettings";
-import { AppSettings } from "@/types/hydration";
-
 const DEFAULT_SETTINGS = {
   stopOnFirstError: false,
-  theme: "system",
 } as const;
 
 let store: Record<string, string> = {};
@@ -46,7 +43,7 @@ describe("useSettings", () => {
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("loads stored settings synchronously and normalizes unsupported themes", () => {
+  it("loads stored settings synchronously and discards retired theme settings", () => {
     window.localStorage.setItem(
       "app-settings:v1",
       JSON.stringify({
@@ -57,10 +54,7 @@ describe("useSettings", () => {
 
     const { result } = renderHook(() => useSettings(), { wrapper });
 
-    expect(result.current.settings).toEqual({
-      stopOnFirstError: false,
-      theme: "system",
-    });
+    expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
   });
 
   it("keeps defaults and logs when stored settings are invalid JSON", () => {
@@ -81,36 +75,18 @@ describe("useSettings", () => {
     const { result } = renderHook(() => useSettings(), { wrapper });
 
     act(() => {
-      result.current.updateSettings({ theme: "dark" });
-      result.current.updateSettings({ stopOnFirstError: false });
+      result.current.updateSettings({ stopOnFirstError: true });
     });
 
-    expect(result.current.settings).toEqual({
-      stopOnFirstError: false,
-      theme: "dark",
-    });
-    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual({
-      stopOnFirstError: false,
-      theme: "dark",
-    });
-  });
-
-  it("normalizes invalid updates before applying and persisting them", () => {
-    const { result } = renderHook(() => useSettings(), { wrapper });
-
-    act(() => {
-      result.current.updateSettings({ theme: "retro-terminal" as AppSettings["theme"] });
-    });
-
-    expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
-    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual(DEFAULT_SETTINGS);
+    expect(result.current.settings).toEqual({ stopOnFirstError: true });
+    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual({ stopOnFirstError: true });
   });
 
   it("resets settings to defaults and persists the reset", () => {
     const { result } = renderHook(() => useSettings(), { wrapper });
 
     act(() => {
-      result.current.updateSettings({ theme: "corporate-1999", stopOnFirstError: false });
+      result.current.updateSettings({ stopOnFirstError: true });
       result.current.resetSettings();
     });
 

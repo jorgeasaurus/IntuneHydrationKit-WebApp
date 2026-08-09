@@ -132,9 +132,9 @@ export default function ResultsPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen relative z-10">
-        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        <header className="app-glass-header">
+          <div className="container mx-auto flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <Image
                 src="/IHTLogoClear.png"
                 alt="Intune Hydration Kit"
@@ -143,8 +143,8 @@ export default function ResultsPage() {
                 className="h-10 w-auto"
                 style={{ width: "auto" }}
               />
-              <div>
-                <h1 className="text-2xl font-bold">Execution Results</h1>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold sm:text-2xl">Execution Results</h1>
                 <p className="text-sm text-muted-foreground">
                   {summary
                     ? `${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)} operation completed`
@@ -152,12 +152,12 @@ export default function ResultsPage() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => router.push("/")}>
+            <div className="flex w-full gap-2 sm:w-auto">
+              <Button variant="outline" onClick={() => router.push("/")} className="flex-1 sm:flex-none">
                 <Home className="size-4 mr-2" />
                 Home
               </Button>
-              <Button onClick={handleStartNew}>
+              <Button onClick={handleStartNew} className="flex-1 sm:flex-none">
                 <RefreshCcw className="size-4 mr-2" />
                 Start New Hydration
               </Button>

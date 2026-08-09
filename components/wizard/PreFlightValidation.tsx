@@ -209,8 +209,8 @@ export function PreFlightValidation() {
         )}
 
         {/* Actions */}
-        <div className="flex gap-4">
-          <Button variant="outline" onClick={previousStep} className="flex-1">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+          <Button variant="outline" onClick={previousStep} className="w-full sm:flex-1">
             Back
           </Button>
           {validation && !validation.isValid ? (
@@ -218,7 +218,7 @@ export function PreFlightValidation() {
               variant="outline"
               onClick={handleValidate}
               disabled={isValidating}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {isValidating ? (
                 <>
@@ -233,7 +233,7 @@ export function PreFlightValidation() {
             <Button
               onClick={nextStep}
               disabled={!validation || !validation.isValid || isValidating}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               Continue to Target Selection
             </Button>

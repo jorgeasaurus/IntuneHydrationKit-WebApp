@@ -7,7 +7,6 @@ import { SettingsProvider } from '@/hooks/useSettings'
 
 const DEFAULT_SETTINGS = {
   stopOnFirstError: false,
-  theme: 'system',
 } as const
 
 describe('SettingsModal', () => {
@@ -62,14 +61,11 @@ describe('SettingsModal', () => {
     )
 
     await user.click(screen.getByRole('switch', { name: /stop on first error/i }))
-    await user.click(screen.getByRole('combobox', { name: /theme/i }))
-    await user.click(await screen.findByRole('option', { name: 'Dark' }))
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual({
       stopOnFirstError: true,
-      theme: 'dark',
     })
   })
 
@@ -99,7 +95,6 @@ describe('SettingsModal', () => {
       'app-settings:v1',
       JSON.stringify({
         stopOnFirstError: false,
-        theme: 'dark',
       })
     )
 

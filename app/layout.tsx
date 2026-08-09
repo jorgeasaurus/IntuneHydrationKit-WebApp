@@ -3,8 +3,6 @@ import { DM_Sans, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import "./landing.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
-import { ThemeProvider } from "@/components/providers/ThemeProvider";
-import { SettingsThemeSync } from "@/components/providers/SettingsThemeSync";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
@@ -94,25 +92,16 @@ export default function RootLayout({
         {/* Rendered outside MsalProvider (which gates SSR) so the JSON-LD is
             always present in the server HTML for crawlers. */}
         <StructuredData />
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="dark"
-          themes={["light", "dark", "corporate-1999"]}
-          enableSystem
-          disableTransitionOnChange
-        >
-          <MsalProvider>
-            <SettingsProvider>
-              <SettingsThemeSync />
-              <WizardProvider>
-                <RouteWallpaper />
-                {children}
-                <Toaster />
-                <Analytics />
-              </WizardProvider>
-            </SettingsProvider>
-          </MsalProvider>
-        </ThemeProvider>
+        <MsalProvider>
+          <SettingsProvider>
+            <WizardProvider>
+              <RouteWallpaper />
+              {children}
+              <Toaster />
+              <Analytics />
+            </WizardProvider>
+          </SettingsProvider>
+        </MsalProvider>
       </body>
     </html>
   );

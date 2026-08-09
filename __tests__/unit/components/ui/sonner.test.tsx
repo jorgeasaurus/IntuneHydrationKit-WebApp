@@ -15,13 +15,8 @@ interface SonnerMockProps {
   }
 }
 
-const { useTheme, sonnerToaster } = vi.hoisted(() => ({
-  useTheme: vi.fn(),
+const { sonnerToaster } = vi.hoisted(() => ({
   sonnerToaster: vi.fn((_props: SonnerMockProps) => <div data-testid="sonner-root" />),
-}))
-
-vi.mock('next-themes', () => ({
-  useTheme: () => useTheme(),
 }))
 
 vi.mock('sonner', () => ({
@@ -33,9 +28,7 @@ describe('Toaster', () => {
     vi.clearAllMocks()
   })
 
-  it('maps the corporate theme back to Sonner light mode', () => {
-    useTheme.mockReturnValue({ theme: 'corporate-1999' })
-
+  it('uses the fixed glass-theme toast palette', () => {
     render(<Toaster richColors />)
 
     const props = sonnerToaster.mock.calls[0]?.[0]
@@ -43,15 +36,13 @@ describe('Toaster', () => {
       throw new Error('Expected Sonner Toaster to be rendered')
     }
 
-    expect(props.theme).toBe('light')
+    expect(props.theme).toBe('dark')
     expect(props.richColors).toBe(true)
     expect(props.className).toBe('toaster group')
     expect(props.toastOptions?.classNames.toast).toContain('group toast')
   })
 
-  it('passes through standard themes unchanged', () => {
-    useTheme.mockReturnValue({ theme: 'dark' })
-
+  it('passes standard props through to Sonner', () => {
     render(<Toaster closeButton />)
 
     const props = sonnerToaster.mock.calls[0]?.[0]
