@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "@/app/api/win32-upload/route";
 
+const sameOriginHeaders = { origin: "http://localhost" };
+
 describe("POST /api/win32-upload", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -17,7 +19,10 @@ describe("POST /api/win32-upload", () => {
 
     const response = await POST(new Request("http://localhost/api/win32-upload", {
       method: "POST",
-      headers: { "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value" },
+      headers: {
+        ...sameOriginHeaders,
+        "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value",
+      },
       body: content,
     }));
 
@@ -49,7 +54,7 @@ describe("POST /api/win32-upload", () => {
 
     const response = await POST(new Request("http://localhost/api/win32-upload", {
       method: "POST",
-      headers: { "x-intune-upload-url": "https://example.com/package" },
+      headers: { ...sameOriginHeaders, "x-intune-upload-url": "https://example.com/package" },
       body: new Uint8Array([1]),
     }));
 
@@ -64,6 +69,7 @@ describe("POST /api/win32-upload", () => {
     const response = await POST(new Request("http://localhost/api/win32-upload", {
       method: "POST",
       headers: {
+        ...sameOriginHeaders,
         "content-length": String((8 * 1024 * 1024 * 1024) + 1),
         "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value",
       },
@@ -83,6 +89,7 @@ describe("POST /api/win32-upload", () => {
     const response = await POST(new Request("http://localhost/api/win32-upload", {
       method: "POST",
       headers: {
+        ...sameOriginHeaders,
         "x-intune-upload-url": "https://tenant.blob.core.usgovcloudapi.net/package?sig=value",
       },
       body: new Uint8Array([1]),
@@ -101,7 +108,10 @@ describe("POST /api/win32-upload", () => {
 
     const response = await POST(new Request("http://localhost/api/win32-upload", {
       method: "POST",
-      headers: { "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value" },
+      headers: {
+        ...sameOriginHeaders,
+        "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value",
+      },
       body: new Uint8Array((10 * 1024 * 1024) + 1),
     }));
 
@@ -119,12 +129,32 @@ describe("POST /api/win32-upload", () => {
 
     const responsePromise = POST(new Request("http://localhost/api/win32-upload", {
       method: "POST",
-      headers: { "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value" },
+      headers: {
+        ...sameOriginHeaders,
+        "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value",
+      },
       body: new Uint8Array([1, 2, 3]),
     }));
     await vi.runAllTimersAsync();
 
     await expect(responsePromise).resolves.toMatchObject({ status: 204 });
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("rejects cross-origin upload requests before forwarding content", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(new Request("http://localhost/api/win32-upload", {
+      method: "POST",
+      headers: {
+        origin: "https://untrusted.example",
+        "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value",
+      },
+      body: new Uint8Array([1]),
+    }));
+
+    expect(response.status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

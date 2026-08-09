@@ -25,6 +25,14 @@ function isAzureBlobUploadUrl(value: string): boolean {
   }
 }
 
+function hasSameOrigin(request: Request): boolean {
+  try {
+    return request.headers.get("origin") === new URL(request.url).origin;
+  } catch {
+    return false;
+  }
+}
+
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -146,6 +154,10 @@ async function uploadPackageInBlocks(uploadUrl: string, packageContent: Readable
 }
 
 export async function POST(request: Request) {
+  if (!hasSameOrigin(request)) {
+    return NextResponse.json({ error: "Invalid request origin." }, { status: 403 });
+  }
+
   const uploadUrl = request.headers.get("x-intune-upload-url");
   if (!uploadUrl || !isAzureBlobUploadUrl(uploadUrl)) {
     return NextResponse.json({ error: "Invalid Intune upload URL." }, { status: 400 });
