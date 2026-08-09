@@ -26,6 +26,7 @@ import {
   loadTemplateDocumentationCatalog,
   loadTemplateDocumentationPayload,
   getPlatformFilterOrder,
+  TEMPLATE_DOCUMENTATION_CATEGORY_ORDER,
   TemplateDocumentationCatalog,
   TemplateDocumentationItem,
 } from "@/lib/templates/catalog";
@@ -48,31 +49,21 @@ type PayloadState = {
   error?: string;
 };
 
-const CATEGORY_ORDER: TaskCategory[] = [
-  "groups",
-  "filters",
-  "compliance",
-  "appProtection",
-  "conditionalAccess",
-  "enrollment",
-  "notification",
-  "baseline",
-  "cisBaseline",
-];
-
 const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_INCREMENT = 120;
 const ACTIVE_FILTER_BUTTON_CLASSNAME =
   "border-black bg-black text-white hover:bg-neutral-900 hover:text-white focus-visible:ring-black dark:border-white/20 dark:bg-black dark:text-white dark:hover:bg-neutral-900 dark:focus-visible:ring-white/40";
 
 function formatSummaryLabel(key: string): string {
-  return key
+  const label = key
     .replace(/^@/, "")
     .replace(/^_+/, "")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function formatSummaryValue(value: unknown): string {
@@ -103,6 +94,14 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
   const record = payload as Record<string, unknown>;
   const preferredKeys = [
     "@odata.type",
+    "packageIdentifier",
+    "publisher",
+    "version",
+    "setupFilePath",
+    "installCommandLine",
+    "uninstallCommandLine",
+    "applicableArchitectures",
+    "allowAvailableUninstall",
     "state",
     "membershipRule",
     "rule",
@@ -211,7 +210,10 @@ export function TemplateCatalogPage() {
         setCatalog(result);
         setVisibleItems(
           Object.fromEntries(
-            CATEGORY_ORDER.map((category) => [category, INITIAL_VISIBLE_ITEMS])
+            TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.map((category) => [
+              category,
+              INITIAL_VISIBLE_ITEMS,
+            ])
           )
         );
       } catch (loadError) {
@@ -279,7 +281,9 @@ export function TemplateCatalogPage() {
       groups.set(item.category, items);
     }
 
-    return CATEGORY_ORDER.reduce<Array<{ category: TaskCategory; items: TemplateDocumentationItem[] }>>(
+    return TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.reduce<
+      Array<{ category: TaskCategory; items: TemplateDocumentationItem[] }>
+    >(
       (orderedGroups, category) => {
         const items = groups.get(category);
         if (items?.length) {

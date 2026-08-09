@@ -7,7 +7,110 @@ import {
   isOwnedWin32App,
 } from "@/lib/graph/win32Apps";
 import { getWin32AppTemplateByName } from "@/templates/win32Apps";
+import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
+
+const DELETE_VISIBILITY_RETRY_DELAYS_MS = [2000, 4000, 8000] as const;
+const RECENT_WIN32_APPS_STORAGE_KEY = "intune-hydration-recent-win32-apps";
+const RECENT_WIN32_APP_TTL_MS = 60 * 60 * 1000;
+
+type Win32LobApp = Awaited<ReturnType<typeof getWin32LobApps>>[number];
+
+interface RecentWin32App {
+  id: string;
+  displayName: string;
+  createdAt: number;
+}
+
+function isRecentWin32App(value: unknown): value is RecentWin32App {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.id === "string" &&
+    candidate.id.length > 0 &&
+    typeof candidate.displayName === "string" &&
+    candidate.displayName.length > 0 &&
+    typeof candidate.createdAt === "number" &&
+    Number.isFinite(candidate.createdAt)
+  );
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function readRecentWin32Apps(): Record<string, RecentWin32App> {
+  if (typeof sessionStorage === "undefined") return {};
+
+  try {
+    const stored = sessionStorage.getItem(RECENT_WIN32_APPS_STORAGE_KEY);
+    if (!stored) return {};
+
+    const parsed: unknown = JSON.parse(stored);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    const recentApps = Object.values(parsed).filter(isRecentWin32App);
+    return Object.fromEntries(
+      recentApps.map((app) => [app.displayName.toLowerCase(), app])
+    );
+  } catch {
+    return {};
+  }
+}
+
+function writeRecentWin32Apps(apps: Record<string, RecentWin32App>): void {
+  if (typeof sessionStorage === "undefined") return;
+
+  try {
+    sessionStorage.setItem(RECENT_WIN32_APPS_STORAGE_KEY, JSON.stringify(apps));
+  } catch {
+    // A missing session hint only falls back to the Graph collection lookup.
+  }
+}
+
+function rememberRecentWin32App(app: Pick<RecentWin32App, "id" | "displayName">): void {
+  const apps = readRecentWin32Apps();
+  apps[app.displayName.toLowerCase()] = { ...app, createdAt: Date.now() };
+  writeRecentWin32Apps(apps);
+}
+
+function forgetRecentWin32App(displayName: string): void {
+  const apps = readRecentWin32Apps();
+  delete apps[displayName.toLowerCase()];
+  writeRecentWin32Apps(apps);
+}
+
+async function getRecentOwnedApp(
+  displayName: string,
+  context: ExecutionContext
+): Promise<Win32LobApp | null> {
+  const recent = readRecentWin32Apps()[displayName.toLowerCase()];
+  if (!recent) return null;
+
+  if (Date.now() - recent.createdAt > RECENT_WIN32_APP_TTL_MS) {
+    forgetRecentWin32App(displayName);
+    return null;
+  }
+
+  try {
+    const app = await context.client.get<Win32LobApp>(
+      `/deviceAppManagement/mobileApps/${recent.id}`,
+      "beta"
+    );
+    const displayNameVariants = new Set(getDisplayNameVariants(displayName));
+    if (displayNameVariants.has(app.displayName.toLowerCase()) && isOwnedWin32App(app)) {
+      return app;
+    }
+  } catch {
+    // The object may have been removed outside this session; discard the hint.
+  }
+
+  forgetRecentWin32App(displayName);
+  return null;
+}
 
 function getDisplayNameVariants(displayName: string): string[] {
   const suffix = " - [IHD]";
@@ -56,15 +159,11 @@ async function fetchOptionalIcon(iconUrl: string | undefined): Promise<string | 
   }
 }
 
-export async function executeWin32AppTask(
-  task: HydrationTask,
+async function getOwnedMatchingApps(
+  template: Win32AppTemplate,
   context: ExecutionContext
-): Promise<ExecutionResult> {
-  const template = getWin32AppTemplateByName(task.itemName);
-  if (!template) {
-    return { task, success: false, skipped: false, error: "Win32 app template not found" };
-  }
-
+): Promise<Win32LobApp[]> {
+  const recentApp = await getRecentOwnedApp(template.displayName, context);
   const displayNameVariants = new Set(getDisplayNameVariants(template.displayName));
   const matchingApps = (await getWin32LobApps(context.client)).filter((app) =>
     displayNameVariants.has(app.displayName.toLowerCase())
@@ -79,7 +178,40 @@ export async function executeWin32AppTask(
     );
     return isLegacyOwnedWin32App(appDetails, template) ? appDetails : null;
   }));
-  const existingApps = ownershipResults.filter((app) => app !== null);
+  const ownedApps = ownershipResults.filter((app) => app !== null);
+  if (recentApp && !ownedApps.some((app) => app.id === recentApp.id)) {
+    ownedApps.unshift(recentApp);
+  }
+  return ownedApps;
+}
+
+async function getDeleteCandidates(
+  template: Win32AppTemplate,
+  context: ExecutionContext
+): Promise<Win32LobApp[]> {
+  let existingApps = await getOwnedMatchingApps(template, context);
+
+  for (const delay of DELETE_VISIBILITY_RETRY_DELAYS_MS) {
+    if (existingApps.length > 0) break;
+    await sleep(delay);
+    existingApps = await getOwnedMatchingApps(template, context);
+  }
+
+  return existingApps;
+}
+
+export async function executeWin32AppTask(
+  task: HydrationTask,
+  context: ExecutionContext
+): Promise<ExecutionResult> {
+  const template = getWin32AppTemplateByName(task.itemName);
+  if (!template) {
+    return { task, success: false, skipped: false, error: "Win32 app template not found" };
+  }
+
+  const existingApps = task.operation === "delete"
+    ? await getDeleteCandidates(template, context)
+    : await getOwnedMatchingApps(template, context);
 
   if (task.operation === "create") {
     if (existingApps.length > 0) {
@@ -105,6 +237,7 @@ export async function executeWin32AppTask(
       detectionScript,
       iconBase64
     );
+    rememberRecentWin32App({ id: app.id, displayName: template.displayName });
     return { task, success: true, skipped: false, createdId: app.id };
   }
 
@@ -121,5 +254,6 @@ export async function executeWin32AppTask(
     ),
     Promise.resolve()
   );
+  forgetRecentWin32App(template.displayName);
   return { task, success: true, skipped: false };
 }

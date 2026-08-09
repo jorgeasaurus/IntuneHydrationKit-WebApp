@@ -63,7 +63,7 @@ export interface TemplateDocumentationCatalog {
   totalCount: number;
 }
 
-const CATEGORY_ORDER: TaskCategory[] = [
+export const TEMPLATE_DOCUMENTATION_CATEGORY_ORDER = [
   "groups",
   "filters",
   "compliance",
@@ -74,7 +74,7 @@ const CATEGORY_ORDER: TaskCategory[] = [
   "notification",
   "baseline",
   "cisBaseline",
-];
+] as const satisfies readonly TaskCategory[];
 
 const CATEGORY_METADATA: Record<
   TaskCategory,
@@ -167,7 +167,8 @@ function createItemId(category: TaskCategory, seed: string): string {
 function sortItems(items: TemplateDocumentationItem[]): TemplateDocumentationItem[] {
   return items.toSorted((left, right) => {
     const categoryDiff =
-      CATEGORY_ORDER.indexOf(left.category) - CATEGORY_ORDER.indexOf(right.category);
+      TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.indexOf(left.category) -
+      TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.indexOf(right.category);
     if (categoryDiff !== 0) {
       return categoryDiff;
     }
@@ -427,8 +428,10 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       app.description,
       "Packaged Windows application imported by Intune Hydration Kit."
     ),
+    subcategory: "WinGet Package",
     platform: "Windows",
     itemType: "Windows app (Win32)",
+    sourcePath: app.packageUrl,
     payloadSource: inlinePayloadSource(app),
   }));
 
@@ -483,7 +486,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ...cisItems,
   ]);
 
-  const categories = CATEGORY_ORDER.map((category) =>
+  const categories = TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.map((category) =>
     getCategorySummary(
       category,
       items.filter((item) => item.category === category)

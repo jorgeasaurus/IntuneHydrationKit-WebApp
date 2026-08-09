@@ -22,7 +22,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('next/image', () => ({
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt ?? ''} />,
+  default: () => null,
 }))
 
 vi.mock('next/link', () => ({
@@ -61,7 +61,14 @@ describe('Navigation', () => {
 
     render(<Navigation />)
 
+    expect(screen.getByRole('navigation').parentElement).toHaveClass(
+      'container',
+      'mx-auto',
+      'px-4',
+      'sm:px-6',
+    )
     expect(screen.getByText('OFFLINE')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Intune Hydration Kit home' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features')
 
     await user.click(screen.getByRole('button', { name: /sign in/i }))

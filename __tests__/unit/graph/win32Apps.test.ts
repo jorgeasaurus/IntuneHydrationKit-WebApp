@@ -14,12 +14,12 @@ describe("createWin32AppFromPackage", () => {
 
   it("creates, uploads, commits, and publishes the supplied Win32 content", async () => {
     const detectionScript = "Write-Output '7zip.7zip is installed'";
-    const postNoRetry = vi.fn().mockResolvedValue({ id: "app-id" });
-    const post = vi
+    const postNoRetry = vi
       .fn()
+      .mockResolvedValueOnce({ id: "app-id" })
       .mockResolvedValueOnce({ id: "content-id" })
-      .mockResolvedValueOnce({ id: "file-id" })
-      .mockResolvedValueOnce({});
+      .mockResolvedValueOnce({ id: "file-id" });
+    const post = vi.fn().mockResolvedValue({});
     const get = vi
       .fn()
       .mockResolvedValueOnce({ uploadState: "azureStorageUriRequestSuccess", azureStorageUri: "https://upload.example/package" })
@@ -90,8 +90,8 @@ describe("createWin32AppFromPackage", () => {
         headers: { "x-intune-upload-url": "https://upload.example/package" },
       })
     );
-    expect(post).toHaveBeenNthCalledWith(
-      2,
+    expect(postNoRetry).toHaveBeenNthCalledWith(
+      3,
       expect.stringContaining("/contentVersions/content-id/files"),
       expect.objectContaining({
         name: "IntunePackage.intunewin",
@@ -176,13 +176,12 @@ describe("createWin32AppFromPackage", () => {
   });
 
   it("renews an expired Azure upload URL before committing content", async () => {
-    const postNoRetry = vi.fn().mockResolvedValue({ id: "app-id" });
-    const post = vi
+    const postNoRetry = vi
       .fn()
+      .mockResolvedValueOnce({ id: "app-id" })
       .mockResolvedValueOnce({ id: "content-id" })
-      .mockResolvedValueOnce({ id: "file-id" })
-      .mockResolvedValueOnce({})
-      .mockResolvedValueOnce({});
+      .mockResolvedValueOnce({ id: "file-id" });
+    const post = vi.fn().mockResolvedValue({});
     const get = vi
       .fn()
       .mockResolvedValueOnce({
@@ -246,8 +245,11 @@ describe("createWin32AppFromPackage", () => {
   });
 
   it("removes the uncommitted app when content publishing fails", async () => {
-    const postNoRetry = vi.fn().mockResolvedValue({ id: "app-id" });
-    const post = vi.fn().mockRejectedValueOnce(new Error("content version unavailable"));
+    const postNoRetry = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "app-id" })
+      .mockRejectedValueOnce(new Error("content version unavailable"));
+    const post = vi.fn();
     const deleteApp = vi.fn().mockResolvedValue(undefined);
     const client = { postNoRetry, post, delete: deleteApp };
 

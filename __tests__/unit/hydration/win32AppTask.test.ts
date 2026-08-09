@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
@@ -47,7 +47,12 @@ describe("executeWin32AppTask", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.unstubAllGlobals();
+    sessionStorage.clear();
     mockGetWin32LobApps.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   it("previews the module-generated app without loading package assets", async () => {
@@ -59,6 +64,15 @@ describe("executeWin32AppTask", () => {
     expect(result).toMatchObject({ success: true, skipped: false });
     expect(fetchMock).not.toHaveBeenCalled();
     expect(mockCreateWin32AppFromPackage).not.toHaveBeenCalled();
+  });
+
+  it("ignores malformed recent-app session hints", async () => {
+    sessionStorage.setItem("intune-hydration-recent-win32-apps", "null");
+
+    await expect(executeWin32AppTask(task, createContext(true))).resolves.toMatchObject({
+      success: true,
+      skipped: false,
+    });
   });
 
   it("loads and publishes the PowerShell module package, detection script, and icon", async () => {
@@ -93,6 +107,25 @@ describe("executeWin32AppTask", () => {
       "AQID"
     );
     expect(result).toMatchObject({ success: true, skipped: false, createdId: "created-app" });
+
+    vi.mocked(context.client.get).mockResolvedValue({
+      id: "created-app",
+      displayName: "7-Zip - [IHD]",
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    });
+    await expect(executeWin32AppTask(
+      { ...task, operation: "delete" },
+      context
+    )).resolves.toMatchObject({ success: true, skipped: false });
+    expect(context.client.get).toHaveBeenCalledWith(
+      "/deviceAppManagement/mobileApps/created-app",
+      "beta"
+    );
+    expect(context.client.delete).toHaveBeenCalledWith(
+      "/deviceAppManagement/mobileApps/created-app",
+      "beta"
+    );
   });
 
   it("skips an owned legacy-name app but not an unrelated same-name app", async () => {
@@ -169,6 +202,35 @@ describe("executeWin32AppTask", () => {
     expect(context.client.delete).toHaveBeenNthCalledWith(
       2,
       "/deviceAppManagement/mobileApps/legacy-app",
+      "beta"
+    );
+    expect(result).toMatchObject({ success: true, skipped: false });
+  });
+
+  it("retries an immediate delete until a newly created app is visible", async () => {
+    vi.useFakeTimers();
+    mockGetWin32LobApps
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: "newly-visible-app",
+          displayName: "7-Zip - [IHD]",
+          description: "Imported by Intune Hydration Kit",
+          notes: "Imported from WinGet",
+        },
+      ]);
+    const context = createContext();
+
+    const resultPromise = executeWin32AppTask(
+      { ...task, operation: "delete" },
+      context
+    );
+    await vi.advanceTimersByTimeAsync(2000);
+    const result = await resultPromise;
+
+    expect(mockGetWin32LobApps).toHaveBeenCalledTimes(2);
+    expect(context.client.delete).toHaveBeenCalledWith(
+      "/deviceAppManagement/mobileApps/newly-visible-app",
       "beta"
     );
     expect(result).toMatchObject({ success: true, skipped: false });

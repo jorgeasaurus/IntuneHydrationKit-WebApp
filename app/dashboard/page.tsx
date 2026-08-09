@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { AppNavigation } from "@/components/AppNavigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertTriangle, Loader2, Eye } from "lucide-react";
@@ -123,30 +123,21 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen relative z-10">
-        <header className="app-glass-header">
-          <div className="container mx-auto flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex min-w-0 items-center gap-3">
-              <Image
-                src="/IHTLogoClear.png"
-                alt="Intune Hydration Kit"
-                width={144}
-                height={169}
-                className="h-10 w-auto"
-                style={{ width: "auto" }}
-              />
-              <div className="min-w-0">
-                <h1 className="text-xl font-bold sm:text-2xl">Hydration Dashboard</h1>
-                <p className="text-sm text-muted-foreground">
-                  {getOperationText()} in {state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" onClick={() => router.push("/wizard")} className="w-full sm:w-auto">
-              <ArrowLeft className="size-4 mr-2" />
-              Back to Wizard
+        <AppNavigation
+          eyebrow={(
+            <span className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
+              Live execution
+            </span>
+          )}
+          title="Hydration Dashboard"
+          description={`${getOperationText()} in ${state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}`}
+          actions={(
+            <Button variant="outline" onClick={() => router.push("/wizard")} className="nav-action size-9 px-0 sm:w-auto sm:px-4">
+              <ArrowLeft className="size-4 sm:mr-2" />
+              <span className="sr-only sm:not-sr-only">Back to Wizard</span>
             </Button>
-          </div>
-        </header>
+          )}
+        />
 
         <main className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">

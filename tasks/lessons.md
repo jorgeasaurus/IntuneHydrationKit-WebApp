@@ -36,3 +36,24 @@
 - When a client-side workflow receives a pre-signed Azure Blob upload URL, include the scoped Blob Storage origin in CSP `connect-src` and validate the browser’s actual upload path.
 - A CSP allowlist does not overcome Azure Blob CORS. Route browser uploads through a same-origin, host-validated server endpoint when the signed Blob URL lacks CORS headers.
 - For Intune Win32 uploads, a successful Azure single-blob PUT is insufficient: use the Graph-compatible Azure block upload plus block-list commit before submitting file-encryption metadata.
+- When an app supports only one cloud, do not put a confirmation dialog between a sign-in CTA and `loginPopup`; start the popup from the original click and validate the Entra client ID first.
+- When consolidating diverged worktrees, checkpoint the dirty feature work first, merge it into a branch based on the newer product work, and regenerate dependency metadata after resolving package changes.
+- Public build-time identity configuration must have an intentional fallback or be provisioned to every preview environment; otherwise branch deployments can emit invalid OAuth requests with an empty client ID.
+- Before changing authentication code for a missing local client ID, compare ignored environment files across worktrees; each worktree needs its own `.env.local` and Git will not carry it during consolidation.
+- After switching worktrees, ensure a single server owns the test port; mixed IPv4/IPv6 listeners can serve incompatible Next.js chunk manifests from different directories.
+- When a fixed dark visual system replaces theme classes, replace `dark:`-dependent semantic text with explicit foreground colors on success, warning, and error surfaces.
+- Preview and dry-run callouts also need explicit light foregrounds after dark-theme variants are removed.
+- Preserve an explicitly requested visual effect unless the user asks to replace it; scope restyling to the surrounding surfaces.
+- Check action-label fit at the narrowest supported viewport and use compact mobile labels when needed.
+- Removing navigation decoration must not remove the structural border the user still expects.
+- Shared surface classes must not override positioning owned by portaled overlays.
+- When web work is intended to prove parity with the PowerShell module, copy the module's generated wrapper, payload, detection, and upload behavior instead of adapting an unrelated installer package.
+- Destructive wizard alerts over the blue wallpaper need a dark opaque surface with pale foreground text; saturated red text on translucent blue is not legible enough.
+- Live-run acknowledgement panels need explicit light label, supporting copy, and checkbox colors; inherited blue foregrounds disappear against the blue wallpaper.
+- When a visual fix passes an injected preview but the real wizard still shows retired colors, verify the compiled route and use a scoped component class; an approximation can miss stale bundles or theme precedence.
+- Interactive MSAL Playwright tests must start on the exact registered redirect origin; `127.0.0.1` and `localhost` are different origins, so mixing them strands the popup callback.
+- Intune's Win32 collection can hide a newly committed app for more than 15 seconds; preserve the created object ID, re-fetch and ownership-validate it directly, and keep collection polling only as a fallback.
+- Preview-result notices on the fixed dark theme must use one explicit dark surface and explicit pale icon, title, and body colors; light-mode utility backgrounds can otherwise pair with inherited white text.
+- When replacing a proof-of-concept ownership format, preserve a narrowly fingerprinted migration path for objects created by the previous format so safe delete mode can still clean them up.
+- Site-wide navigation should reuse the landing hero's responsive container and gutters; an independent max-width will drift across breakpoints.
+- Avoid rectangular guide lines behind a focal demo window; they read as an unintended backplate even when their fill is transparent.

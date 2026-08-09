@@ -4,9 +4,9 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { useMsal } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
+import { AppNavigation } from "@/components/AppNavigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SettingsModal } from "@/components/SettingsModal";
 import { TenantConfig } from "@/components/wizard/TenantConfig";
@@ -124,51 +124,38 @@ function WizardContent() {
 
   return (
     <div className="min-h-screen relative z-10">
-        <header className="app-glass-header">
-        <div className="container mx-auto flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-            <Image
-              src="/IHTLogoClear.png"
-              alt="Intune Hydration Kit Logo"
-              width={144}
-              height={169}
-              className="h-12 w-auto"
-              style={{ width: "auto" }}
-            />
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <p className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
-                  Hydration Console
-                </p>
-                <span className="rounded-full border border-hydrate/30 bg-hydrate/10 px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.24em] text-hydrate">
-                  Step {state.currentStep}/{WIZARD_STEPS.length}
-                </span>
-              </div>
-              <h1 className="text-xl font-bold sm:text-2xl">Intune Hydration Kit</h1>
-              <p className="hidden text-sm text-muted-foreground sm:block">
-                Signed in as {accounts[0]?.username ?? "Connected operator"}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex w-full items-center gap-2 sm:w-auto">
-            <Button variant="outline" onClick={() => setShowSettings(true)} className="size-10 flex-1 px-0 sm:w-auto sm:flex-none sm:px-4">
+      <AppNavigation
+        eyebrow={(
+          <>
+            <span className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
+              Hydration Console
+            </span>
+            <span className="rounded-full border border-hydrate/30 bg-hydrate/10 px-2 py-0.5 text-[10px] font-mono uppercase tracking-[0.24em] text-hydrate">
+              Step {state.currentStep}/{WIZARD_STEPS.length}
+            </span>
+          </>
+        )}
+        title="Intune Hydration Kit"
+        description={`Signed in as ${accounts[0]?.username ?? "Connected operator"}`}
+        actions={(
+          <>
+            <Button variant="outline" onClick={() => setShowSettings(true)} className="size-9 px-0 sm:w-auto sm:px-3">
               <Settings2 className="size-4 sm:mr-2" />
               <span className="sr-only sm:not-sr-only">Settings</span>
             </Button>
-            <Button variant="outline" asChild className="size-10 flex-1 px-0 sm:w-auto sm:flex-none sm:px-4">
+            <Button variant="outline" asChild className="size-9 px-0 sm:w-auto sm:px-3">
               <Link href="/">
                 <Home className="size-4 sm:mr-2" />
                 <span className="sr-only sm:not-sr-only">Home</span>
               </Link>
             </Button>
-            <Button variant="outline" onClick={handleSignOut} className="size-10 flex-1 px-0 sm:w-auto sm:flex-none sm:px-4">
+            <Button variant="outline" onClick={handleSignOut} className="size-9 px-0 sm:w-auto sm:px-3">
               <LogOut className="size-4 sm:mr-2" />
               <span className="sr-only sm:not-sr-only">Sign Out</span>
             </Button>
-          </div>
-        </div>
-      </header>
+          </>
+        )}
+      />
 
       <main className="container mx-auto grid max-w-7xl gap-6 px-4 py-8 lg:grid-cols-[320px_minmax(0,1fr)]">
         <aside className="space-y-5 self-start lg:sticky lg:top-24">

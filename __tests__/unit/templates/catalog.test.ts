@@ -160,6 +160,13 @@ describe('template catalog', () => {
       displayName: '7-Zip - [IHD]',
       itemType: 'Windows app (Win32)',
       platform: 'Windows',
+      sourcePath: '/win32-apps/7-zip.intunewin',
+      subcategory: 'WinGet Package',
+    })
+
+    await expect(loadTemplateDocumentationPayload(win32Item!)).resolves.toMatchObject({
+      packageIdentifier: '7zip.7zip',
+      setupFilePath: 'Install-WinGetPackage.ps1',
     })
   })
 

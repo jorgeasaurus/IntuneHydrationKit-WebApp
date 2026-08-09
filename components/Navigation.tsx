@@ -2,8 +2,8 @@
 
 import { useIsAuthenticated } from "@azure/msal-react";
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
+import { NavigationBrand } from "@/components/NavigationBrand";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
@@ -43,30 +43,11 @@ export function Navigation() {
       <div className="fixed top-0 left-0 right-0 z-50">
         <div className="h-[2px] bg-gradient-to-r from-transparent via-hydrate to-transparent" />
 
-        <nav className="nav-industrial">
-          <div className="container mx-auto px-4 sm:px-6">
-            <div className="flex items-center justify-between h-16">
+        <div className="container mx-auto px-4 sm:px-6">
+          <nav className="nav-industrial">
+            <div className="flex h-16 items-center justify-between px-4 sm:px-6">
               {/* Logo and Brand */}
-              <Link
-                href="/"
-                className="flex items-center gap-3 group"
-              >
-                <div className="relative">
-                  <Image
-                    src="/IHTLogoClear.png"
-                    alt="Intune Hydration Kit"
-                    width={144}
-                    height={169}
-                    className="h-9 w-auto transition-transform group-hover:scale-105"
-                    style={{ width: "auto" }}
-                  />
-                  {/* Glow effect on hover */}
-                  <div className="absolute inset-0 bg-hydrate/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <span className="landing-nav-brand hidden sm:block font-bold text-xl leading-tight tracking-tight">
-                  Intune Hydration Kit
-                </span>
-              </Link>
+              <NavigationBrand showWordmark />
 
               {/* Navigation Links */}
               <div className="hidden md:flex items-center gap-8">
@@ -133,8 +114,8 @@ export function Navigation() {
                 </Button>
               </div>
             </div>
-          </div>
-        </nav>
+          </nav>
+        </div>
 
       </div>
 

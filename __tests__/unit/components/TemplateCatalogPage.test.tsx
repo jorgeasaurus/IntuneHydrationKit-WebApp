@@ -23,6 +23,12 @@ vi.mock('@/lib/templates/catalog', () => ({
   loadTemplateDocumentationPayload: (...args: unknown[]) =>
     loadTemplateDocumentationPayload(...args),
   getPlatformFilterOrder: (platforms: string[]) => platforms,
+  TEMPLATE_DOCUMENTATION_CATEGORY_ORDER: [
+    'groups',
+    'win32Apps',
+    'baseline',
+    'cisBaseline',
+  ],
 }))
 
 describe('TemplateCatalogPage', () => {
@@ -33,12 +39,18 @@ describe('TemplateCatalogPage', () => {
 
   it('renders catalog data, filters results, and expands raw JSON on demand', async () => {
     loadTemplateDocumentationCatalog.mockResolvedValue({
-      totalCount: 2,
+      totalCount: 3,
       categories: [
         {
           id: 'groups',
           label: 'Groups',
           description: 'Dynamic and assigned Entra groups.',
+          count: 1,
+        },
+        {
+          id: 'win32Apps',
+          label: 'Win32 Apps',
+          description: 'Packaged Windows applications that install through Intune.',
           count: 1,
         },
         {
@@ -68,6 +80,31 @@ describe('TemplateCatalogPage', () => {
             payload: {
               displayName: '[IHD] Intune - Windows Devices',
               membershipRule: '(device.deviceOSType -eq "Windows")',
+            },
+          },
+        },
+        {
+          id: 'win32Apps:7-zip',
+          category: 'win32Apps',
+          categoryLabel: 'Win32 Apps',
+          displayName: '7-Zip - [IHD]',
+          description: 'Starter-pack WinGet template for 7-Zip Win32 packaging.',
+          subcategory: 'WinGet Package',
+          platform: 'Windows',
+          itemType: 'Windows app (Win32)',
+          sourcePath: '/win32-apps/7-zip.intunewin',
+          payloadSource: {
+            kind: 'inline',
+            payload: {
+              displayName: '7-Zip - [IHD]',
+              packageIdentifier: '7zip.7zip',
+              publisher: 'Igor Pavlov',
+              version: 'latest',
+              setupFilePath: 'Install-WinGetPackage.ps1',
+              installCommandLine: 'powershell.exe -File .\\Install-WinGetPackage.ps1',
+              uninstallCommandLine: 'powershell.exe -File .\\Uninstall-WinGetPackage.ps1',
+              applicableArchitectures: 'x64',
+              allowAvailableUninstall: true,
             },
           },
         },
@@ -132,5 +169,31 @@ describe('TemplateCatalogPage', () => {
     expect(screen.getAllByText(/Dynamic Group/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Membership Rule/i)).toBeInTheDocument()
     expect(screen.getByText(/\(device\.deviceOSType -eq "Windows"\)/i)).toBeInTheDocument()
+
+    await user.clear(screen.getByLabelText(/Search template catalog/i))
+    await user.click(screen.getByRole('button', { name: /^Win32 Apps$/i }))
+
+    expect(await screen.findByText('7-Zip - [IHD]')).toBeInTheDocument()
+
+    loadTemplateDocumentationPayload.mockResolvedValue({
+      displayName: '7-Zip - [IHD]',
+      packageIdentifier: '7zip.7zip',
+      publisher: 'Igor Pavlov',
+      version: 'latest',
+      setupFilePath: 'Install-WinGetPackage.ps1',
+      installCommandLine: 'powershell.exe -File .\\Install-WinGetPackage.ps1',
+      uninstallCommandLine: 'powershell.exe -File .\\Uninstall-WinGetPackage.ps1',
+      applicableArchitectures: 'x64',
+      allowAvailableUninstall: true,
+    })
+    await user.click(screen.getByRole('button', { name: /7-Zip - \[IHD\]/i }))
+
+    await waitFor(() => {
+      expect(loadTemplateDocumentationPayload).toHaveBeenCalledTimes(2)
+    })
+    expect(await screen.findByText(/Human-readable summary/i)).toBeInTheDocument()
+    expect(await screen.findByText('Package Identifier')).toBeInTheDocument()
+    expect(screen.getByText('7zip.7zip')).toBeInTheDocument()
+    expect(screen.getByText('Install Command Line')).toBeInTheDocument()
   })
 })

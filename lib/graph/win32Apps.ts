@@ -193,8 +193,8 @@ export async function createWin32AppFromPackage(
   );
   try {
     const contentEndpoint = `${APPS_ENDPOINT}/${app.id}/microsoft.graph.win32LobApp/contentVersions`;
-    const contentVersion = await client.post<ContentVersion>(contentEndpoint, {}, "beta");
-    const contentFile = await client.post<ContentFile>(
+    const contentVersion = await client.postNoRetry<ContentVersion>(contentEndpoint, {}, "beta");
+    const contentFile = await client.postNoRetry<ContentFile>(
       `${contentEndpoint}/${contentVersion.id}/files`,
       {
         "@odata.type": "#microsoft.graph.mobileAppContentFile",

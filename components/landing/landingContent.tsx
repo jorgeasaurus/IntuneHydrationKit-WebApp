@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import packageJson from "@/package.json";
 import {
   Activity,
   Box,
@@ -15,7 +16,7 @@ import {
   Zap,
 } from "lucide-react";
 
-export const APP_VERSION = "v1.3.0";
+export const APP_VERSION = `v${packageJson.version}`;
 const FAQ_LINK_CLASS_NAME = "text-hydrate hover:underline";
 
 export type FaqItem = {

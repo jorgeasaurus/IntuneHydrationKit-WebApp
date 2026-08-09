@@ -1006,3 +1006,283 @@
 
 - The 7-Zip proof-of-concept is now discoverable under Win32 Apps with its import-ready template payload.
 - Checks passed: focused catalog tests, type check, lint, production build, and whitespace validation.
+
+# Sign-in Popup Investigation
+
+- [x] Reproduce the unauthenticated browser flow through the cloud confirmation dialog.
+- [x] Start the Global-cloud MSAL popup directly from every sign-in call to action.
+- [x] Add regression coverage and verify the authenticated entry point.
+
+## Review
+
+- The redundant Global-cloud confirmation was the extra interaction before MSAL could receive the browser click. Sign-in now starts directly from the call to action.
+- A missing Entra client ID now displays an actionable configuration error instead of creating an invalid authorization request.
+- Checks passed: focused authentication/component tests, direct Chrome popup verification, type check, lint, production build, and whitespace validation.
+
+# Worktree Consolidation
+
+- [x] Checkpoint the Glass UI worktree without absorbing task bookkeeping.
+- [x] Create a combined branch from the Win32 work and merge the Glass UI checkpoint.
+- [x] Resolve integration conflicts, revise the version, and run the full verification suite.
+
+## Review
+
+- Combined branch: `codex/consolidate-win32-glass-ui`, version 2.6.3.
+- Checks passed: 515 tests, type check, lint, production build, whitespace validation, and Chrome verification of the glass landing surface plus direct Entra popup.
+
+# Entra Client ID Regression
+
+- [x] Restore the missing local Entra environment configuration to the Glass UI worktree.
+- [x] Verify the generated authorization URL includes `client_id` from that restored configuration.
+
+## Review
+
+- The Glass UI worktree was missing its ignored `.env.local`; the regular environment-driven configuration is restored and the temporary fallback was removed.
+- Checks passed: direct Chrome test against the restarted Glass UI server confirms the authorization URL includes `client_id`.
+
+# Wizard Chunk Recovery
+
+- [x] Identify the server/worktree conflict serving stale wizard assets on port 3000.
+- [x] Rebuild the current branch's generated Next.js cache and verify the wizard route in Chrome.
+
+## Review
+
+- A stale Glass UI server was also bound to port 3000 over IPv6, while the consolidated worktree used IPv4.
+- The stale generated cache was moved to `.next-stale-chunk-recovery`; the replacement server is the sole port-3000 listener and Chrome loaded `/wizard` without a chunk error.
+
+# Prerequisite Banner Contrast
+
+- [x] Give the successful prerequisite banner explicit Glass UI foreground colors.
+- [x] Add a regression assertion and verify the wizard component.
+
+## Review
+
+- The prerequisite-success icon, title, and description now use explicit light emerald foregrounds that remain readable over the dark Glass surface.
+- Checks passed: focused component test, type check, lint, clean production build, and whitespace validation.
+
+# Preview Callout Contrast
+
+- [x] Give the preview-mode callout explicit Glass UI foreground colors.
+- [x] Run focused and project verification, then record results.
+
+## Review
+
+- Preview mode now uses explicit light sky foregrounds over a slightly stronger blue surface, so its status and description remain readable in the fixed Glass UI theme.
+- Checks passed: focused component test, type check, lint, clean production build, and whitespace validation.
+
+# Glass UI Site-wide Restyle
+
+- [x] Inspect the SPXC reference and map its visual primitives to the landing page.
+- [x] Replace the landing theme with the strict glass system over the retained Vanta water effect.
+- [x] Add responsive and reduced-transparency fallbacks.
+- [x] Verify the landing page with tests, build, and desktop/mobile screenshots.
+- [x] Apply the approved visual system to the remaining product surfaces.
+
+## Review
+
+- Retained the Vanta water effect after user correction; glass panels and navigation now use the SPXC/blog visual language.
+- Applied the glass system to the wizard, dashboard, results, template catalog, navigation, dialogs, controls, status cards, and progress surfaces.
+- Checks passed: full tests, type check, production build, desktop/mobile Chrome checks, and reduced-transparency coverage.
+
+# Thermonuclear Review Fix Loop: Glass UI Site-wide
+
+- [x] Inspect the current branch diff and establish review scope.
+- [x] Run strict review rounds and fix every actionable finding.
+- [x] Verify the final changed scope and browser behavior.
+
+## Review
+
+- Centralized shared glass rules, removed the obsolete multi-theme system, and replaced stale theme end-to-end checks.
+- Three review rounds completed; the final round had no findings.
+
+# Glass UI Responsive Follow-ups
+
+- [x] Make hero action labels fit narrow phone layouts.
+- [x] Scan public routes and authenticated headers for equivalent risks.
+- [x] Remove the requested landing navigation decoration without disturbing its structural border.
+
+## Review
+
+- Compact labels prevent horizontal overflow at 320px and 393px while preserving full desktop labels.
+- Wizard, dashboard, results, and pre-flight actions now stack or use accessible icon-only controls on phones.
+
+# Dialog Positioning Fix
+
+- [x] Preserve the glass-dialog appearance without overriding its viewport positioning.
+- [x] Add a browser regression test for a centered dialog and verify it in Chrome.
+
+## Review
+
+- The shared Glass surface selector no longer changes Radix dialog positioning from fixed to relative.
+- Checks passed: focused component test, direct Chrome viewport-center check, type check, lint, and whitespace validation.
+
+# Glass Worktree Final Consolidation
+
+- [x] Confirm the Glass commit is already an ancestor of the combined main-directory branch.
+- [x] Preserve remaining Glass-only task notes and local lessons in the main directory.
+- [x] Retire the redundant Glass worktree and verify the main directory remains healthy.
+
+## Review
+
+- All committed Glass UI work is present in `codex/consolidate-win32-glass-ui`; the former Glass branch had no unique commits.
+- Matching local Entra and Vercel configuration was confirmed before retirement, and the Glass-only task history was preserved here.
+- The redundant worktree was unregistered, its port-3300 server stopped, and its remaining generated directory moved to Trash for recovery.
+
+# PowerShell WinGet Win32 Parity
+
+- [x] Trace the module's 7-Zip template, generated wrapper, package, Graph payload, and upload flow.
+- [x] Replace the mismatched PSADT proof of concept with the module-equivalent WinGet package behavior.
+- [x] Add parity and regression coverage for the package, commands, detection, and content publishing path.
+- [x] Run focused and full verification, then record the result.
+
+## Review
+
+- The web proof now generates and ships the module's WinGet install, uninstall, and detection wrappers for `7zip.7zip`, including SYSTEM bootstrap behavior and ownership metadata.
+- The obsolete PSADT/MSI package was retired; Intune now receives the module-equivalent commands, PowerShell detection rule, icon, requirements, and encrypted content package.
+- Upload parity includes transient retries, sovereign Azure Blob hosts, and Graph SAS renewal; icon failures remain non-blocking and duplicate owned apps are handled safely.
+- Checks passed: 524 tests, type check, lint, production build, zero-finding parity review, static-asset requests on port 3000, and whitespace validation.
+
+# Delete Warning Contrast
+
+- [x] Give the live-delete warning an opaque dark surface and explicit high-contrast foregrounds.
+- [x] Add a regression assertion and verify the wizard locally.
+
+## Review
+
+- The warning now uses a near-opaque slate panel, pale body copy, light red heading, and stronger red border while leaving the wallpaper unchanged.
+- Checks passed: focused component test, type check, rendered Chrome screenshot, and whitespace validation.
+
+# Live Acknowledgement Contrast
+
+- [x] Give the live-run acknowledgement panel and checkbox explicit high-contrast colors.
+- [x] Add regression coverage and verify the rendered treatment.
+
+## Review
+
+- The acknowledgement panel now uses an opaque slate surface, white label, light supporting copy, and a bright checkbox border/check state while preserving the wallpaper.
+- Checks passed: focused component test, type check, rendered Chrome screenshot, and whitespace validation.
+
+# Live Acknowledgement Contrast Regression
+
+- [x] Confirm the source and compiled wizard bundle no longer use the retired blue-on-blue treatment.
+- [x] Replace utility-dependent colors with a scoped high-contrast Glass UI variant.
+- [x] Verify the real rendered panel and complete project checks.
+
+## Review
+
+- The live acknowledgement now owns an opaque near-black surface, white title, pale copy, and bright checkbox styling through a scoped component class.
+- Computed browser colors and the rendered Chrome screenshot passed; 526 tests, type check, lint, production build, React Doctor 100/100, and whitespace validation passed.
+
+# Win32 Delete Ownership Diagnosis
+
+- [x] Use Lokka to inspect the tenant's 7-Zip mobile-app records and ownership metadata.
+- [x] Fix the safe delete matcher for the confirmed metadata shape.
+- [x] Add regression coverage and complete project verification.
+
+## Review
+
+- Lokka confirmed the tenant record is the original PSADT proof app, which has the hydration marker but predates the WinGet ownership notes required by the current safe delete matcher.
+- The migration path accepts only the exact observed legacy metadata fingerprint; current WinGet ownership rules remain unchanged for all other apps.
+- Checks passed: 526 tests, type check, lint, production build, React Doctor 100/100, zero-finding safety review, and whitespace validation.
+# Sitewide Landing-Style Navigation
+
+- [x] Create one shared app navigation shell with landing-page pill styling.
+- [x] Migrate wizard, dashboard, and results without losing contextual controls.
+- [x] Verify desktop/mobile behavior across landing, templates, wizard, dashboard, and results.
+- [x] Run focused and full project checks.
+
+## Review
+
+- Wizard, dashboard, and results now share the landing page's pill geometry, glass fill, border, blur, shadow, logo treatment, and compact contextual actions.
+- Playwright confirmed matching computed styling at desktop width and zero horizontal overflow at 390px; 528 tests, lint, type check, production build, React Doctor 100/100, and whitespace validation passed.
+
+# Thermonuclear Review Fix Loop
+
+- [x] Review the current branch diff against its merge base with full thermonuclear strictness.
+- [x] Fix every actionable structural or maintainability finding.
+- [x] Repeat the review until a fresh round returns zero findings.
+- [x] Run focused and full validation and record the clean result.
+
+## Review
+
+- Round 1 removed five root causes: version drift, duplicated navigation branding, unsafe session-cache parsing, repeated Win32 template resolution, and an obsolete direct-Blob CSP allowance.
+- Round 2 moved Win32 content-version and content-file creates onto the existing non-retrying Graph boundary; round 3 returned zero findings.
+- Checks passed: 529 tests, lint, type check, production build, React Doctor 100/100, Playwright landing/wizard verification, and whitespace validation.
+
+# Win32 Template Documentation
+
+- [x] Reproduce the missing Win32 template entry and trace the catalog/filter path.
+- [x] Add the Win32 app to Template Docs through the canonical catalog model.
+- [x] Add regression coverage for category, platform, summary, and payload inspection.
+- [x] Verify the rendered page and complete project checks.
+
+## Review
+
+- Template Docs now renders the 7-Zip proof app under Win32 Apps with its package source, WinGet metadata, commands, requirements, and raw import payload.
+- The page and catalog share one category order, preventing future template categories from disappearing during grouped rendering.
+- Checks passed: 529 tests, lint, type check, production build, React Doctor 100/100, rendered Playwright verification, and whitespace validation.
+
+# Stale Branch Cleanup
+
+- [x] Audit local branches, remote branches, worktrees, and merged PR history.
+- [x] Delete every stale branch while preserving `main` and the current branch.
+- [x] Prune and verify the final local and GitHub branch lists.
+
+## Review
+
+- Local and GitHub now contain only `main` and `codex/consolidate-win32-glass-ui`.
+
+# Preview Results Notice Contrast
+
+- [x] Replace the pale preview notice with an explicit dark, high-contrast surface.
+- [x] Add focused regression assertions for all visible notice colors.
+- [x] Verify the real results screen in Playwright and complete project checks.
+
+## Review
+
+- The preview notice now uses a near-black surface, white title, pale supporting copy, sky icon, and visible sky border while leaving the wallpaper unchanged.
+- Playwright computed-color verification and screenshot inspection passed; 527 tests, lint, type check, production build, React Doctor 100/100, and whitespace validation passed.
+
+# Live 7-Zip Create/Delete Playwright Validation
+
+- [x] Sign in through a persistent headed Playwright browser.
+- [x] Create only the 7-Zip proof app and verify the result.
+- [x] Delete only the 7-Zip proof app and verify the final tenant state.
+- [x] Capture the browser evidence and document the result.
+
+## Review
+
+- Playwright reproduced Intune collection lag after creation, then verified the exact created ID handoff fixes immediate deletion while retaining ownership validation and list retries.
+- Final live cycle: created 1, deleted 1, skipped 0, failed 0. A final read-only delete preview reported `Not found in tenant`.
+- Checks passed: 527 tests, lint, type check, production build, React Doctor 100/100, and whitespace validation.
+
+# Site-wide Navigation Width
+
+- [x] Match both shared navigation variants to the landing hero container.
+- [x] Add regression coverage for the shared responsive frame.
+- [x] Verify landing, templates, wizard, dashboard, and results at desktop and mobile widths.
+- [x] Run project checks and record the result.
+
+## Review
+
+- Public and application navigation now use the landing hero's responsive container and gutters instead of an independent 1120px cap.
+- Browser measurements matched exactly at desktop and mobile widths with no horizontal overflow.
+- Checks passed: 529 tests, lint, type check, production build, React Doctor 100/100, screenshot inspection, and whitespace validation.
+
+# Landing Demo Backplate Removal
+
+- [x] Remove the rectangular decorative layer behind the live-run demo.
+- [x] Add regression coverage that preserves the demo without the backplate.
+- [x] Verify the desktop landing composition and run focused checks.
+
+## Review
+
+- Removed the absolute border backplate while preserving the preview strip, demo window, and soft glow.
+- Checks passed: focused landing tests, type check, lint, production build, screenshot inspection, and whitespace validation.
+
+# Version 2.6.4 Ready PR
+
+- [x] Rev the website patch version to 2.6.4.
+- [x] Stage only the accumulated product changes and exclude local artifacts.
+- [ ] Commit, push, and open a ready PR against `main`.
+- [ ] Verify the published PR metadata and checks.

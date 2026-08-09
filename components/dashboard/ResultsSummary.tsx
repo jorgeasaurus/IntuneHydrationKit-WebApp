@@ -108,10 +108,10 @@ export function ResultsSummary({
     <div className="space-y-6">
       {/* Preview Mode Banner */}
       {isPreview && (
-        <Alert className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30">
-          <Eye className="size-4" />
-          <AlertTitle>Preview Mode</AlertTitle>
-          <AlertDescription>
+        <Alert className="border-sky-300/60 bg-slate-950/95 text-slate-100 shadow-xl shadow-slate-950/25 backdrop-blur-md">
+          <Eye className="size-4 !text-sky-200" />
+          <AlertTitle className="text-slate-50">Preview Mode</AlertTitle>
+          <AlertDescription className="text-slate-200">
             This is a preview of what would happen. No changes were made to your tenant.
             {summary.operationMode === "create"
               ? " Items marked as 'Would Create' do not exist in your tenant yet."

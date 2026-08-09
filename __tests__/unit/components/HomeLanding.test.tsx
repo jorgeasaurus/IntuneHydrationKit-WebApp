@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@/__tests__/setup/test-utils'
 import { HomeLanding } from '@/components/landing/HomeLanding'
+import packageJson from '@/package.json'
 
 const onSignInClick = vi.fn()
 const onContinue = vi.fn()
@@ -44,11 +45,11 @@ describe('HomeLanding', () => {
     vi.clearAllMocks()
   })
 
-  it('renders the v1.3.0 landing surface with product proof and core sections', () => {
+  it('renders the current app version with product proof and core sections', () => {
     renderLanding()
 
     expect(screen.getByRole('heading', { name: 'Intune Hydration Kit' })).toBeInTheDocument()
-    expect(screen.getByText('v1.3.0')).toBeInTheDocument()
+    expect(screen.getByText(`v${packageJson.version}`)).toBeInTheDocument()
     expect(screen.getByTestId('web-app-demo')).toBeInTheDocument()
     expect(screen.getAllByRole('link', { name: /PowerShell Module/i })[0]).toHaveAttribute(
       'href',
@@ -58,6 +59,10 @@ describe('HomeLanding', () => {
     expect(screen.getByText('Available Configurations')).toBeInTheDocument()
     expect(screen.getByText('Required Microsoft Graph Permissions')).toBeInTheDocument()
     expect(screen.getByText('Made By Jorgeasaurus')).toBeInTheDocument()
+
+    const demoColumn = screen.getByTestId('web-app-demo').closest('.landing-demo-column')
+    expect(demoColumn).not.toBeNull()
+    expect(demoColumn?.querySelector('[aria-hidden="true"]')).toBeNull()
   })
 
   it('starts sign-in or continues to the wizard from the primary CTA', async () => {

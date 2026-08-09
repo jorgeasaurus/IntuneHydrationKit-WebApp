@@ -237,11 +237,7 @@ function Hero({
             </div>
           </div>
 
-          <div className="relative hidden lg:block">
-            <div
-              className="absolute -inset-x-6 top-8 bottom-8 border-y border-hydrate/20"
-              aria-hidden="true"
-            />
+          <div className="landing-demo-column relative hidden lg:block">
             <div className="relative mx-auto max-w-2xl">
               <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
                 <div>

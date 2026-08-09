@@ -85,7 +85,13 @@ describe('ResultsSummary', () => {
   it('renders preview-specific labels, successful items, and errors', () => {
     render(<ResultsSummary summary={summary} tasks={tasks} isPreview />)
 
-    expect(screen.getByText('Preview Mode')).toBeInTheDocument()
+    const previewTitle = screen.getByText('Preview Mode')
+    const previewDescription = screen.getByText(/This is a preview of what would happen/i)
+    const previewAlert = previewTitle.closest('[role="alert"]')
+    expect(previewAlert).toHaveClass('bg-slate-950/95', 'border-sky-300/60', 'text-slate-100')
+    expect(previewTitle).toHaveClass('text-slate-50')
+    expect(previewDescription).toHaveClass('text-slate-200')
+    expect(previewAlert?.querySelector('svg')).toHaveClass('!text-sky-200')
     expect(screen.getByText('Would Create')).toBeInTheDocument()
     expect(screen.getByText('33%')).toBeInTheDocument()
     expect(screen.getAllByText(/Items That Would Be Created/i).length).toBeGreaterThan(0)
