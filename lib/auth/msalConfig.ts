@@ -82,6 +82,18 @@ export const msalConfig: Configuration = {
 };
 
 /**
+ * Returns a clear operator-facing error before MSAL attempts an invalid interactive flow.
+ */
+export function getMsalConfigurationError(): string | null {
+  const clientId = msalConfig.auth.clientId?.trim();
+  if (!clientId || clientId === "your-client-id-here") {
+    return "Microsoft Entra sign-in is not configured. Set NEXT_PUBLIC_MSAL_CLIENT_ID and restart the app.";
+  }
+
+  return null;
+}
+
+/**
  * Scopes for login request
  */
 export const loginRequest = {

@@ -66,6 +66,15 @@ describe("msalConfig", () => {
     expect(module.msalConfig.auth.postLogoutRedirectUri).toBe("http://localhost:3000");
   });
 
+  it("explains when the Entra client ID is missing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_MSAL_CLIENT_ID", "");
+    const module = await importModule();
+
+    expect(module.getMsalConfigurationError()).toContain("NEXT_PUBLIC_MSAL_CLIENT_ID");
+
+    vi.unstubAllEnvs();
+  });
+
   it("routes logger messages to the expected console method and skips PII logs", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});

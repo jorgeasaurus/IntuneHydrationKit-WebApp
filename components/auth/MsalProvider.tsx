@@ -1,7 +1,11 @@
 "use client";
 
 import { MsalProvider as BaseMsalProvider, useMsal } from "@azure/msal-react";
-import { msalInstance, initializeMsal } from "@/lib/auth/msalConfig";
+import {
+  getMsalConfigurationError,
+  initializeMsal,
+  msalInstance,
+} from "@/lib/auth/msalConfig";
 import { loadCloudEnvironmentFromSession, signOut } from "@/lib/auth/authUtils";
 import { useEffect, useState } from "react";
 
@@ -64,6 +68,15 @@ export function MsalProvider({ children }: MsalProviderProps) {
     // Restore (and sanitize) the persisted cloud environment before any token calls
     loadCloudEnvironmentFromSession();
 
+    const configurationError = getMsalConfigurationError();
+    if (configurationError) {
+      const error = new Error(configurationError);
+      console.error("[MSAL] Failed to initialize:", error);
+      setInitError(error);
+      setIsInitialized(true);
+      return;
+    }
+
     initializeMsal()
       .then(() => {
         setIsInitialized(true);
@@ -88,8 +101,7 @@ export function MsalProvider({ children }: MsalProviderProps) {
         <div className="max-w-md space-y-2 rounded-lg border border-red-500/40 bg-red-500/10 p-6 text-center">
           <h2 className="text-lg font-semibold">Authentication unavailable</h2>
           <p className="text-sm text-muted-foreground">
-            Sign-in could not be initialized. Check the app&apos;s Entra ID configuration
-            (client ID, redirect URI) and reload the page.
+            {initError.message}
           </p>
         </div>
       </div>

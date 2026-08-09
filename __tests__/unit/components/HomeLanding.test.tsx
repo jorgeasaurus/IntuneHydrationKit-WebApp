@@ -6,8 +6,6 @@ import { render, screen } from '@/__tests__/setup/test-utils'
 import { HomeLanding } from '@/components/landing/HomeLanding'
 
 const onSignInClick = vi.fn()
-const onCloudSelect = vi.fn()
-const onCloudSelectorCancel = vi.fn()
 const onContinue = vi.fn()
 
 vi.mock('next/link', () => ({
@@ -30,32 +28,11 @@ vi.mock('@/components/ui/animated-counter', () => ({
   AnimatedCounter: ({ value }: { value: number }) => <span>{value}</span>,
 }))
 
-vi.mock('@/components/CloudEnvironmentSelector', () => ({
-  CloudEnvironmentSelector: ({
-    open,
-    onSelect,
-    onCancel,
-  }: {
-    open: boolean
-    onSelect: (environment: 'global') => void
-    onCancel: () => void
-  }) =>
-    open ? (
-      <div data-testid="cloud-selector">
-        <button onClick={() => onSelect('global')}>Choose Global</button>
-        <button onClick={onCancel}>Cancel</button>
-      </div>
-    ) : null,
-}))
-
 function renderLanding(overrides: Partial<ComponentProps<typeof HomeLanding>> = {}) {
   render(
     <HomeLanding
       isAuthenticated={false}
-      showCloudSelector={false}
       onSignInClick={onSignInClick}
-      onCloudSelect={onCloudSelect}
-      onCloudSelectorCancel={onCloudSelectorCancel}
       onContinue={onContinue}
       {...overrides}
     />
@@ -98,15 +75,4 @@ describe('HomeLanding', () => {
     expect(onContinue).toHaveBeenCalledTimes(1)
   })
 
-  it('passes cloud selector events through to the page state container', async () => {
-    const user = userEvent.setup()
-
-    renderLanding({ showCloudSelector: true })
-
-    await user.click(screen.getByRole('button', { name: 'Choose Global' }))
-    expect(onCloudSelect).toHaveBeenCalledWith('global')
-
-    await user.click(screen.getByRole('button', { name: 'Cancel' }))
-    expect(onCloudSelectorCancel).toHaveBeenCalledTimes(1)
-  })
 })

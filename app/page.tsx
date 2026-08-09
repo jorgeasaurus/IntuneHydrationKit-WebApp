@@ -1,7 +1,6 @@
 /* oxlint-disable react-doctor/nextjs-missing-metadata -- route metadata is defined in app/layout.tsx for this client page. */
 "use client";
 
-import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -13,14 +12,7 @@ export default function Home() {
   const isAuthenticated = useIsAuthenticated();
   const router = useRouter();
   const { resetWizard } = useWizardState();
-  const [showCloudSelector, setShowCloudSelector] = useState(false);
-
-  const handleSignInClick = () => {
-    setShowCloudSelector(true);
-  };
-
-  const handleCloudSelect = async () => {
-    setShowCloudSelector(false);
+  const handleSignInClick = async () => {
     try {
       await signIn();
       toast.success("Successfully signed in!");
@@ -32,10 +24,6 @@ export default function Home() {
     }
   };
 
-  const handleCloudSelectorCancel = () => {
-    setShowCloudSelector(false);
-  };
-
   const handleContinue = () => {
     resetWizard();
     router.push("/wizard");
@@ -44,10 +32,7 @@ export default function Home() {
   return (
     <HomeLanding
       isAuthenticated={isAuthenticated}
-      showCloudSelector={showCloudSelector}
       onSignInClick={handleSignInClick}
-      onCloudSelect={handleCloudSelect}
-      onCloudSelectorCancel={handleCloudSelectorCancel}
       onContinue={handleContinue}
     />
   );

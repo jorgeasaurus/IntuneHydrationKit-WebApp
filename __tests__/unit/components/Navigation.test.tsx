@@ -53,16 +53,6 @@ vi.mock('@/components/ThemeToggle', () => ({
   ThemeToggle: () => <div data-testid="theme-toggle" />,
 }))
 
-vi.mock('@/components/CloudEnvironmentSelector', () => ({
-  CloudEnvironmentSelector: ({ open, onSelect, onCancel }: { open: boolean; onSelect: () => void; onCancel: () => void }) =>
-    open ? (
-      <div data-testid="cloud-selector">
-        <button onClick={() => onSelect()}>Choose Global</button>
-        <button onClick={onCancel}>Cancel Sign In</button>
-      </div>
-    ) : null,
-}))
-
 describe('Navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -80,7 +70,6 @@ describe('Navigation', () => {
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features')
 
     await user.click(screen.getByRole('button', { name: /sign in/i }))
-    await user.click(screen.getByRole('button', { name: 'Choose Global' }))
 
     await waitFor(() => {
       expect(signIn).toHaveBeenCalled()
@@ -116,7 +105,6 @@ describe('Navigation', () => {
     render(<Navigation />)
 
     await user.click(screen.getByRole('button', { name: /sign in/i }))
-    await user.click(screen.getByRole('button', { name: 'Choose Global' }))
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('Failed to sign in. Please try again.')

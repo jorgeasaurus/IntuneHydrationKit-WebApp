@@ -3,11 +3,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
 import { MsalProvider } from '@/components/auth/MsalProvider'
 
-const { baseMsalProvider, initializeMsal, msalInstance } = vi.hoisted(() => ({
+const { baseMsalProvider, getMsalConfigurationError, initializeMsal, msalInstance } = vi.hoisted(() => ({
   baseMsalProvider: vi.fn(({ children }: { children: React.ReactNode; instance: unknown }) => (
     <div data-testid="base-msal-provider">{children}</div>
   )),
   initializeMsal: vi.fn(),
+  getMsalConfigurationError: vi.fn<() => string | null>(() => null),
   msalInstance: { instance: 'test-msal' },
 }))
 
@@ -23,6 +24,7 @@ vi.mock('@/lib/auth/authUtils', () => ({
 
 vi.mock('@/lib/auth/msalConfig', () => ({
   msalInstance,
+  getMsalConfigurationError: () => getMsalConfigurationError(),
   initializeMsal: (...args: unknown[]) => initializeMsal(...args),
 }))
 
@@ -84,6 +86,25 @@ describe('MsalProvider', () => {
     expect(baseMsalProvider).not.toHaveBeenCalled()
     expect(consoleError).toHaveBeenCalledWith('[MSAL] Failed to initialize:', expect.any(Error))
 
+    consoleError.mockRestore()
+  })
+
+  it('shows the Entra configuration error before attempting MSAL initialization', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    getMsalConfigurationError.mockReturnValue('Microsoft Entra sign-in is not configured.')
+
+    render(
+      <MsalProvider>
+        <span>Fallback render</span>
+      </MsalProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByText('Microsoft Entra sign-in is not configured.')).toBeInTheDocument()
+    })
+
+    expect(initializeMsal).not.toHaveBeenCalled()
+    expect(baseMsalProvider).not.toHaveBeenCalled()
     consoleError.mockRestore()
   })
 })

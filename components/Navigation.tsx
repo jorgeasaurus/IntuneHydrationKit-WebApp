@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
@@ -8,7 +7,6 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
-import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { useWizardState } from "@/hooks/useWizardState";
 import { LIGHT_DARK_THEME_CYCLE, ThemeToggle } from "@/components/ThemeToggle";
 import { Terminal, Github } from "lucide-react";
@@ -18,16 +16,9 @@ export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const { resetWizard } = useWizardState();
-  const [showCloudSelector, setShowCloudSelector] = useState(false);
-
   const getSectionHref = (hash: string) => (pathname === "/" ? hash : `/${hash}`);
 
-  const handleSignInClick = () => {
-    setShowCloudSelector(true);
-  };
-
-  const handleCloudSelect = async () => {
-    setShowCloudSelector(false);
+  const handleSignInClick = async () => {
     try {
       await signIn();
       toast.success("Successfully signed in!");
@@ -37,10 +28,6 @@ export function Navigation() {
       toast.error("Failed to sign in. Please try again.");
       console.error("Sign in error:", error);
     }
-  };
-
-  const handleCloudSelectorCancel = () => {
-    setShowCloudSelector(false);
   };
 
   const handleGetStarted = () => {
@@ -158,12 +145,6 @@ export function Navigation() {
         <div className="h-px bg-border" />
       </div>
 
-      {/* Cloud Environment Selector Dialog */}
-      <CloudEnvironmentSelector
-        open={showCloudSelector}
-        onSelect={handleCloudSelect}
-        onCancel={handleCloudSelectorCancel}
-      />
     </>
   );
 }

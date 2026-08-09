@@ -25,7 +25,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { Navigation } from "@/components/Navigation";
 import { WebAppDemo } from "@/components/WebAppDemo";
 import {
@@ -42,10 +41,7 @@ import {
 
 type HomeLandingProps = {
   isAuthenticated: boolean;
-  showCloudSelector: boolean;
   onSignInClick: () => void;
-  onCloudSelect: () => void | Promise<void>;
-  onCloudSelectorCancel: () => void;
   onContinue: () => void;
 };
 
@@ -614,10 +610,7 @@ function Footer() {
 
 export function HomeLanding({
   isAuthenticated,
-  showCloudSelector,
   onSignInClick,
-  onCloudSelect,
-  onCloudSelectorCancel,
   onContinue,
 }: HomeLandingProps) {
   return (
@@ -641,12 +634,6 @@ export function HomeLanding({
         />
         <Footer />
       </div>
-
-      <CloudEnvironmentSelector
-        open={showCloudSelector}
-        onSelect={onCloudSelect}
-        onCancel={onCloudSelectorCancel}
-      />
     </div>
   );
 }
