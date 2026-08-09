@@ -33,7 +33,7 @@ async function fetchWithRetry(url: string, init: RequestInit): Promise<Response>
 
   for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt += 1) {
     try {
-      const response = await fetch(url, init);
+      const response = await fetch(url, { ...init, redirect: "manual" });
       if (response.ok) return response;
       lastResponse = response;
       if (response.status === 401 || response.status === 403 || attempt === MAX_UPLOAD_ATTEMPTS) {

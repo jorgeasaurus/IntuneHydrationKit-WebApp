@@ -27,6 +27,7 @@ describe("POST /api/win32-upload", () => {
       "https://tenant.blob.core.windows.net/package?sig=value&comp=block&blockid=MDAwMA%3D%3D",
       expect.objectContaining({
         method: "PUT",
+        redirect: "manual",
         headers: expect.objectContaining({ "Content-Type": "application/octet-stream" }),
       })
     );
@@ -35,6 +36,7 @@ describe("POST /api/win32-upload", () => {
       "https://tenant.blob.core.windows.net/package?sig=value&comp=blocklist",
       expect.objectContaining({
         method: "PUT",
+        redirect: "manual",
         headers: expect.objectContaining({ "Content-Type": "text/plain; charset=UTF-8" }),
         body: '<?xml version="1.0" encoding="utf-8"?><BlockList><Latest>MDAwMA==</Latest></BlockList>',
       })
