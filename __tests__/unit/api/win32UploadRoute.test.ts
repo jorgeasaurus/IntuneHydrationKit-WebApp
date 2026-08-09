@@ -5,6 +5,7 @@ import { POST } from "@/app/api/win32-upload/route";
 describe("POST /api/win32-upload", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.useRealTimers();
   });
 
   it("forwards a package only to the signed Azure Blob URL", async () => {
@@ -52,5 +53,42 @@ describe("POST /api/win32-upload", () => {
 
     expect(response.status).toBe(400);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts signed Azure Blob URLs for sovereign clouds", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(new Request("http://localhost/api/win32-upload", {
+      method: "POST",
+      headers: {
+        "x-intune-upload-url": "https://tenant.blob.core.usgovcloudapi.net/package?sig=value",
+      },
+      body: new Uint8Array([1]),
+    }));
+
+    expect(response.status).toBe(204);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("retries a transient Azure block failure before committing", async () => {
+    vi.useFakeTimers();
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(null, { status: 500, statusText: "Transient" }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }))
+      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const responsePromise = POST(new Request("http://localhost/api/win32-upload", {
+      method: "POST",
+      headers: { "x-intune-upload-url": "https://tenant.blob.core.windows.net/package?sig=value" },
+      body: new Uint8Array([1, 2, 3]),
+    }));
+    await vi.runAllTimersAsync();
+
+    await expect(responsePromise).resolves.toMatchObject({ status: 204 });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });

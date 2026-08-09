@@ -1,51 +1,54 @@
-export interface Win32FileSystemDetectionRule {
-  path: string;
-  fileOrFolderName: string;
-  check32BitOn64System: boolean;
-  operationType: "exists";
-}
-
 export interface Win32AppTemplate {
   id: string;
+  packageIdentifier: string;
   displayName: string;
   packageUrl: string;
   packageFileName: string;
+  detectionScriptUrl: string;
+  iconUrl?: string;
   publisher: string;
+  developer: string;
+  owner: string;
   version: string;
   description: string;
   notes: string;
-  informationUrl: string;
-  privacyInformationUrl: string;
   setupFilePath: string;
   installCommandLine: string;
   uninstallCommandLine: string;
   minimumSupportedOperatingSystem: { v10_21H1: true };
   applicableArchitectures: "x64";
-  detectionRule: Win32FileSystemDetectionRule;
+  allowAvailableUninstall: boolean;
 }
 
 export const SEVEN_ZIP_WIN32_APP: Win32AppTemplate = {
-  id: "7-zip-25.01",
+  id: "7-zip",
+  packageIdentifier: "7zip.7zip",
   displayName: "7-Zip - [IHD]",
-  packageUrl: "/win32-apps/7zip-25.01.intunewin",
-  packageFileName: "7zip-25.01.intunewin",
+  packageUrl: "/win32-apps/7-zip.intunewin",
+  packageFileName: "7-zip.intunewin",
+  detectionScriptUrl: "/win32-apps/7-zip/Detect-WinGetPackage.ps1",
+  iconUrl: "/win32-apps/7-zip.png",
   publisher: "Igor Pavlov",
-  version: "25.01",
-  description: "7-Zip is a file archiver with a high compression ratio.",
-  notes: "File archiver utility",
-  informationUrl: "https://www.7-zip.org",
-  privacyInformationUrl: "https://www.7-zip.org",
-  setupFilePath: "Deploy-Application.exe",
-  installCommandLine: "Deploy-Application.exe install",
-  uninstallCommandLine: "Deploy-Application.exe uninstall",
+  developer: "Igor Pavlov",
+  owner: "",
+  version: "latest",
+  description: "Starter-pack WinGet template for 7-Zip Win32 packaging.",
+  notes: [
+    "Imported from WinGet",
+    "WinGetPackageIdentifier: 7zip.7zip",
+    "WinGetPackageVersion: latest",
+    "WinGetTemplateId: 7-zip",
+    "WinGetManifestRepository: microsoft/winget-pkgs",
+    "WinGetManifestPath: manifests/7/7zip/7zip",
+  ].join("\n"),
+  setupFilePath: "Install-WinGetPackage.ps1",
+  installCommandLine:
+    "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Install-WinGetPackage.ps1",
+  uninstallCommandLine:
+    "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Uninstall-WinGetPackage.ps1",
   minimumSupportedOperatingSystem: { v10_21H1: true },
   applicableArchitectures: "x64",
-  detectionRule: {
-    path: "C:\\Program Files\\7-Zip",
-    fileOrFolderName: "7z.exe",
-    check32BitOn64System: false,
-    operationType: "exists",
-  },
+  allowAvailableUninstall: true,
 };
 
 const WIN32_APP_TEMPLATES = [SEVEN_ZIP_WIN32_APP] as const;

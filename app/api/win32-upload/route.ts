@@ -2,16 +2,54 @@ import { NextResponse } from "next/server";
 
 const MAX_PACKAGE_SIZE_BYTES = 10 * 1024 * 1024;
 const BLOCK_SIZE_BYTES = 6 * 1024 * 1024;
+const MAX_UPLOAD_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 5000;
+const AZURE_BLOB_HOST_SUFFIXES = [
+  ".blob.core.windows.net",
+  ".blob.core.usgovcloudapi.net",
+  ".blob.core.chinacloudapi.cn",
+  ".blob.core.cloudapi.de",
+] as const;
 
 export const runtime = "nodejs";
 
 function isAzureBlobUploadUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && url.hostname.endsWith(".blob.core.windows.net");
+    return url.protocol === "https:" && AZURE_BLOB_HOST_SUFFIXES.some(
+      (suffix) => url.hostname.endsWith(suffix)
+    );
   } catch {
     return false;
   }
+}
+
+function sleep(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+  let lastResponse: Response | undefined;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= MAX_UPLOAD_ATTEMPTS; attempt += 1) {
+    try {
+      const response = await fetch(url, init);
+      if (response.ok) return response;
+      lastResponse = response;
+      if (response.status === 401 || response.status === 403 || attempt === MAX_UPLOAD_ATTEMPTS) {
+        return response;
+      }
+    } catch (error) {
+      lastError = error;
+      if (attempt === MAX_UPLOAD_ATTEMPTS) throw error;
+    }
+
+    await sleep(RETRY_BASE_DELAY_MS * attempt);
+  }
+
+  if (lastResponse) return lastResponse;
+  throw lastError instanceof Error ? lastError : new Error("Azure Storage request failed.");
 }
 
 function appendAzureQuery(uploadUrl: string, query: string): string {
@@ -23,7 +61,7 @@ function createBlockId(index: number): string {
 }
 
 async function uploadBlock(uploadUrl: string, blockId: string, content: ArrayBuffer): Promise<void> {
-  const response = await fetch(
+  const response = await fetchWithRetry(
     appendAzureQuery(uploadUrl, `comp=block&blockid=${encodeURIComponent(blockId)}`),
     {
       method: "PUT",
@@ -44,7 +82,7 @@ async function commitBlockList(uploadUrl: string, blockIds: string[]): Promise<v
   const content = `<?xml version="1.0" encoding="utf-8"?><BlockList>${blockIds
     .map((blockId) => `<Latest>${blockId}</Latest>`)
     .join("")}</BlockList>`;
-  const response = await fetch(appendAzureQuery(uploadUrl, "comp=blocklist"), {
+  const response = await fetchWithRetry(appendAzureQuery(uploadUrl, "comp=blocklist"), {
     method: "PUT",
     headers: {
       "Content-Length": String(Buffer.byteLength(content)),

@@ -11,6 +11,7 @@ export interface IntuneWinEncryptionInfo {
 export interface IntuneWinPackage {
   encryptedContent: Blob;
   encryptedContentName: string;
+  setupFile: string;
   unencryptedContentSize: number;
   encryptionInfo: IntuneWinEncryptionInfo;
 }
@@ -103,6 +104,7 @@ export async function readIntuneWinPackage(file: Blob | ArrayBuffer): Promise<In
       ) as ArrayBuffer,
     ]),
     encryptedContentName,
+    setupFile: requiredXmlValue(document, "SetupFile"),
     unencryptedContentSize: requiredPositiveInteger(document, "UnencryptedContentSize"),
     encryptionInfo: {
       encryptionKey: requiredXmlValue(document, "EncryptionKey"),

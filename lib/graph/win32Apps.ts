@@ -1,5 +1,9 @@
 import { GraphClient } from "./client";
-import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import {
+  addHydrationMarker,
+  HYDRATION_MARKER,
+  HYDRATION_MARKER_LEGACY,
+} from "@/lib/utils/hydrationMarker";
 import { IntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { Win32AppTemplate } from "@/templates/win32Apps";
 
@@ -7,6 +11,7 @@ interface Win32LobApp {
   id: string;
   displayName: string;
   description?: string;
+  notes?: string;
 }
 
 interface ContentVersion {
@@ -27,26 +32,43 @@ function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
 
-function buildWin32LobAppPayload(template: Win32AppTemplate, packageFileName: string): Record<string, unknown> {
+function encodeUtf8AsBase64(value: string): string {
+  const bytes = new TextEncoder().encode(value);
+  let binary = "";
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+  return btoa(binary);
+}
+
+function buildWin32LobAppPayload(
+  template: Win32AppTemplate,
+  packageFileName: string,
+  detectionScript: string,
+  iconBase64?: string
+): Record<string, unknown> {
   return {
     "@odata.type": "#microsoft.graph.win32LobApp",
     displayName: template.displayName,
     description: addHydrationMarker(template.description),
     publisher: template.publisher,
-    developer: template.publisher,
-    owner: template.publisher,
+    developer: template.developer,
+    owner: template.owner,
     notes: template.notes,
     appVersion: template.version,
-    informationUrl: template.informationUrl,
-    privacyInformationUrl: template.privacyInformationUrl,
+    informationUrl: null,
+    privacyInformationUrl: null,
     fileName: packageFileName,
     setupFilePath: template.setupFilePath,
     installCommandLine: template.installCommandLine,
     uninstallCommandLine: template.uninstallCommandLine,
     minimumSupportedOperatingSystem: template.minimumSupportedOperatingSystem,
     applicableArchitectures: template.applicableArchitectures,
+    minimumFreeDiskSpaceInMB: null,
+    minimumMemoryInMB: null,
     installExperience: { runAsAccount: "system" },
     deviceRestartBehavior: "suppress",
+    allowAvailableUninstall: template.allowAvailableUninstall,
     returnCodes: [
       { returnCode: 0, type: "success" },
       { returnCode: 1707, type: "success" },
@@ -56,12 +78,22 @@ function buildWin32LobAppPayload(template: Win32AppTemplate, packageFileName: st
     ],
     rules: [
       {
-        "@odata.type": "#microsoft.graph.win32LobAppFileSystemRule",
+        "@odata.type": "#microsoft.graph.win32LobAppPowerShellScriptRule",
         ruleType: "detection",
-        ...template.detectionRule,
-        operator: "notConfigured",
+        scriptContent: encodeUtf8AsBase64(detectionScript),
+        enforceSignatureCheck: false,
+        runAs32Bit: false,
       },
     ],
+    ...(iconBase64
+      ? {
+          largeIcon: {
+            "@odata.type": "#microsoft.graph.mimeContent",
+            type: "image/png",
+            value: iconBase64,
+          },
+        }
+      : {}),
   };
 }
 
@@ -96,9 +128,41 @@ async function uploadToAzureStorage(uploadUri: string, content: Blob): Promise<v
   }
 }
 
+async function uploadWithRenewal(
+  client: GraphClient,
+  contentFileEndpoint: string,
+  uploadUri: string,
+  content: Blob
+): Promise<void> {
+  let currentUploadUri = uploadUri;
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      await uploadToAzureStorage(currentUploadUri, content);
+      return;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isAuthorizationFailure = /AuthenticationFailed|\b403\b|authori[sz]ed/i.test(message);
+      if (!isAuthorizationFailure || attempt === 3) {
+        throw error;
+      }
+
+      await client.post(`${contentFileEndpoint}/renewUpload`, {}, "beta");
+      const renewedTarget = await waitForUploadState(
+        client,
+        contentFileEndpoint,
+        "azureStorageUriRenewalSuccess"
+      );
+      if (!renewedTarget.azureStorageUri) {
+        throw new Error("Intune did not provide a renewed Azure Storage upload URI.");
+      }
+      currentUploadUri = renewedTarget.azureStorageUri;
+    }
+  }
+}
+
 export async function getWin32LobApps(client: GraphClient): Promise<Win32LobApp[]> {
   return client.getCollection<Win32LobApp>(
-    `${APPS_ENDPOINT}?$filter=isof('microsoft.graph.win32LobApp')&$select=id,displayName,description`,
+    `${APPS_ENDPOINT}?$filter=isof('microsoft.graph.win32LobApp')&$select=id,displayName,description,notes`,
     "beta"
   );
 }
@@ -106,11 +170,13 @@ export async function getWin32LobApps(client: GraphClient): Promise<Win32LobApp[
 export async function createWin32AppFromPackage(
   client: GraphClient,
   template: Win32AppTemplate,
-  packageFile: IntuneWinPackage
+  packageFile: IntuneWinPackage,
+  detectionScript: string,
+  iconBase64?: string
 ): Promise<Win32LobApp> {
   const app = await client.postNoRetry<Win32LobApp>(
     APPS_ENDPOINT,
-    buildWin32LobAppPayload(template, template.packageFileName),
+    buildWin32LobAppPayload(template, template.packageFileName, detectionScript, iconBase64),
     "beta"
   );
   try {
@@ -123,6 +189,7 @@ export async function createWin32AppFromPackage(
         name: packageFile.encryptedContentName,
         size: packageFile.unencryptedContentSize,
         sizeEncrypted: packageFile.encryptedContent.size,
+        manifest: null,
         isDependency: false,
       },
       "beta"
@@ -133,7 +200,12 @@ export async function createWin32AppFromPackage(
       throw new Error("Intune did not provide an Azure Storage upload URI.");
     }
 
-    await uploadToAzureStorage(uploadTarget.azureStorageUri, packageFile.encryptedContent);
+    await uploadWithRenewal(
+      client,
+      contentFileEndpoint,
+      uploadTarget.azureStorageUri,
+      packageFile.encryptedContent
+    );
     await client.post(
       `${contentFileEndpoint}/commit`,
       { fileEncryptionInfo: packageFile.encryptionInfo },
@@ -153,5 +225,16 @@ export async function createWin32AppFromPackage(
 }
 
 export function isOwnedWin32App(app: Win32LobApp): boolean {
-  return hasHydrationMarker(app.description);
+  const fields = [app.description, app.notes]
+    .filter((field): field is string => Boolean(field))
+    .map((field) => field.toLowerCase());
+  const hydrationMarkers = [HYDRATION_MARKER, HYDRATION_MARKER_LEGACY]
+    .map((marker) => marker.toLowerCase());
+  const hasFullHydrationMarker = fields.some((field) =>
+    hydrationMarkers.some((marker) => field.includes(marker))
+  );
+  const hasWinGetMarker = fields.some(
+    (field) => field.includes("imported from winget") || field.includes("wingetpackageidentifier:")
+  );
+  return hasFullHydrationMarker && hasWinGetMarker;
 }
