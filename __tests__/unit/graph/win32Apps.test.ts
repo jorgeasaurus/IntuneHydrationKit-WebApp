@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createWin32AppFromPackage, isOwnedWin32App } from "@/lib/graph/win32Apps";
+import {
+  createWin32AppFromPackage,
+  isLegacyOwnedWin32App,
+  isOwnedWin32App,
+} from "@/lib/graph/win32Apps";
 import { SEVEN_ZIP_WIN32_APP } from "@/templates/win32Apps";
 
 describe("createWin32AppFromPackage", () => {
@@ -142,6 +146,33 @@ describe("createWin32AppFromPackage", () => {
       description: "[IHD] app",
       notes: "Imported from WinGet",
     })).toBe(false);
+  });
+
+  it("recognizes only the exact legacy 7-Zip proof package fingerprint", () => {
+    const legacyApp = {
+      "@odata.type": "#microsoft.graph.win32LobApp",
+      id: "legacy-7zip",
+      displayName: "7-Zip - [IHD]",
+      description: "7-Zip is a file archiver with a high compression ratio. - Imported by Intune Hydration Kit",
+      notes: "File archiver utility",
+      publisher: "Igor Pavlov",
+      owner: "Igor Pavlov",
+      developer: "Igor Pavlov",
+      informationUrl: "https://www.7-zip.org",
+      privacyInformationUrl: "https://www.7-zip.org",
+      fileName: "7zip-25.01.intunewin",
+      size: 2315712,
+      setupFilePath: "Deploy-Application.exe",
+      installCommandLine: "Deploy-Application.exe install",
+      uninstallCommandLine: "Deploy-Application.exe uninstall",
+      allowAvailableUninstall: false,
+    };
+
+    expect(isLegacyOwnedWin32App(legacyApp, SEVEN_ZIP_WIN32_APP)).toBe(true);
+    expect(isLegacyOwnedWin32App(
+      { ...legacyApp, setupFilePath: "unrelated-installer.exe" },
+      SEVEN_ZIP_WIN32_APP
+    )).toBe(false);
   });
 
   it("renews an expired Azure upload URL before committing content", async () => {

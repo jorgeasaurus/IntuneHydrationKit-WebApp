@@ -18,6 +18,21 @@ export interface Win32AppTemplate {
   minimumSupportedOperatingSystem: { v10_21H1: true };
   applicableArchitectures: "x64";
   allowAvailableUninstall: boolean;
+  legacyOwnership?: {
+    description: string;
+    notes: string;
+    publisher: string;
+    owner: string;
+    developer: string;
+    informationUrl: string;
+    privacyInformationUrl: string;
+    fileName: string;
+    size: number;
+    setupFilePath: string;
+    installCommandLine: string;
+    uninstallCommandLine: string;
+    allowAvailableUninstall: boolean;
+  };
 }
 
 export const SEVEN_ZIP_WIN32_APP: Win32AppTemplate = {
@@ -49,6 +64,21 @@ export const SEVEN_ZIP_WIN32_APP: Win32AppTemplate = {
   minimumSupportedOperatingSystem: { v10_21H1: true },
   applicableArchitectures: "x64",
   allowAvailableUninstall: true,
+  legacyOwnership: {
+    description: "7-Zip is a file archiver with a high compression ratio. - Imported by Intune Hydration Kit",
+    notes: "File archiver utility",
+    publisher: "Igor Pavlov",
+    owner: "Igor Pavlov",
+    developer: "Igor Pavlov",
+    informationUrl: "https://www.7-zip.org",
+    privacyInformationUrl: "https://www.7-zip.org",
+    fileName: "7zip-25.01.intunewin",
+    size: 2315712,
+    setupFilePath: "Deploy-Application.exe",
+    installCommandLine: "Deploy-Application.exe install",
+    uninstallCommandLine: "Deploy-Application.exe uninstall",
+    allowAvailableUninstall: false,
+  },
 };
 
 const WIN32_APP_TEMPLATES = [SEVEN_ZIP_WIN32_APP] as const;

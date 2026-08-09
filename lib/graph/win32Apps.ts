@@ -8,10 +8,22 @@ import { IntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { Win32AppTemplate } from "@/templates/win32Apps";
 
 interface Win32LobApp {
+  "@odata.type"?: string;
   id: string;
   displayName: string;
   description?: string;
   notes?: string;
+  publisher?: string;
+  owner?: string;
+  developer?: string;
+  informationUrl?: string;
+  privacyInformationUrl?: string;
+  fileName?: string;
+  size?: number;
+  setupFilePath?: string;
+  installCommandLine?: string;
+  uninstallCommandLine?: string;
+  allowAvailableUninstall?: boolean;
 }
 
 interface ContentVersion {
@@ -237,4 +249,30 @@ export function isOwnedWin32App(app: Win32LobApp): boolean {
     (field) => field.includes("imported from winget") || field.includes("wingetpackageidentifier:")
   );
   return hasFullHydrationMarker && hasWinGetMarker;
+}
+
+export function isLegacyOwnedWin32App(
+  app: Win32LobApp,
+  template: Win32AppTemplate
+): boolean {
+  const fingerprint = template.legacyOwnership;
+  if (!fingerprint) return false;
+
+  return (
+    app["@odata.type"] === "#microsoft.graph.win32LobApp" &&
+    app.displayName.toLowerCase() === template.displayName.toLowerCase() &&
+    app.description === fingerprint.description &&
+    app.notes === fingerprint.notes &&
+    app.publisher === fingerprint.publisher &&
+    app.owner === fingerprint.owner &&
+    app.developer === fingerprint.developer &&
+    app.informationUrl === fingerprint.informationUrl &&
+    app.privacyInformationUrl === fingerprint.privacyInformationUrl &&
+    app.fileName === fingerprint.fileName &&
+    app.size === fingerprint.size &&
+    app.setupFilePath === fingerprint.setupFilePath &&
+    app.installCommandLine === fingerprint.installCommandLine &&
+    app.uninstallCommandLine === fingerprint.uninstallCommandLine &&
+    app.allowAvailableUninstall === fingerprint.allowAvailableUninstall
+  );
 }

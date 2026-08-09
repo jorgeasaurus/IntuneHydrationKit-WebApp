@@ -37,7 +37,7 @@ const task: HydrationTask = {
 };
 
 const createContext = (isPreview = false): ExecutionContext => ({
-  client: { delete: vi.fn() } as unknown as ExecutionContext["client"],
+  client: { delete: vi.fn(), get: vi.fn().mockResolvedValue({}) } as unknown as ExecutionContext["client"],
   operationMode: "create",
   isPreview,
   stopOnFirstError: false,
@@ -169,6 +169,48 @@ describe("executeWin32AppTask", () => {
     expect(context.client.delete).toHaveBeenNthCalledWith(
       2,
       "/deviceAppManagement/mobileApps/legacy-app",
+      "beta"
+    );
+    expect(result).toMatchObject({ success: true, skipped: false });
+  });
+
+  it("deletes the exact legacy PSADT proof app after loading its full metadata", async () => {
+    const legacyListRecord = {
+      id: "legacy-7zip",
+      displayName: "7-Zip - [IHD]",
+      description: "7-Zip is a file archiver with a high compression ratio. - Imported by Intune Hydration Kit",
+      notes: "File archiver utility",
+      publisher: "Igor Pavlov",
+      owner: "Igor Pavlov",
+      developer: "Igor Pavlov",
+    };
+    const legacyDetails = {
+      ...legacyListRecord,
+      "@odata.type": "#microsoft.graph.win32LobApp",
+      informationUrl: "https://www.7-zip.org",
+      privacyInformationUrl: "https://www.7-zip.org",
+      fileName: "7zip-25.01.intunewin",
+      size: 2315712,
+      setupFilePath: "Deploy-Application.exe",
+      installCommandLine: "Deploy-Application.exe install",
+      uninstallCommandLine: "Deploy-Application.exe uninstall",
+      allowAvailableUninstall: false,
+    };
+    mockGetWin32LobApps.mockResolvedValue([legacyListRecord]);
+    const context = createContext();
+    vi.mocked(context.client.get).mockResolvedValue(legacyDetails);
+
+    const result = await executeWin32AppTask(
+      { ...task, operation: "delete" },
+      context
+    );
+
+    expect(context.client.get).toHaveBeenCalledWith(
+      "/deviceAppManagement/mobileApps/legacy-7zip",
+      "beta"
+    );
+    expect(context.client.delete).toHaveBeenCalledWith(
+      "/deviceAppManagement/mobileApps/legacy-7zip",
       "beta"
     );
     expect(result).toMatchObject({ success: true, skipped: false });

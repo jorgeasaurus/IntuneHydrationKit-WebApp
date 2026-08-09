@@ -3,6 +3,7 @@ import { ExecutionContext, ExecutionResult } from "../types";
 import {
   createWin32AppFromPackage,
   getWin32LobApps,
+  isLegacyOwnedWin32App,
   isOwnedWin32App,
 } from "@/lib/graph/win32Apps";
 import { getWin32AppTemplateByName } from "@/templates/win32Apps";
@@ -65,11 +66,20 @@ export async function executeWin32AppTask(
   }
 
   const displayNameVariants = new Set(getDisplayNameVariants(template.displayName));
-  const existingApps = (await getWin32LobApps(context.client)).filter(
-    (app) =>
-      displayNameVariants.has(app.displayName.toLowerCase()) &&
-      isOwnedWin32App(app)
+  const matchingApps = (await getWin32LobApps(context.client)).filter((app) =>
+    displayNameVariants.has(app.displayName.toLowerCase())
   );
+  const ownershipResults = await Promise.all(matchingApps.map(async (app) => {
+    if (isOwnedWin32App(app)) return app;
+    if (!template.legacyOwnership) return null;
+
+    const appDetails = await context.client.get<typeof app>(
+      `/deviceAppManagement/mobileApps/${app.id}`,
+      "beta"
+    );
+    return isLegacyOwnedWin32App(appDetails, template) ? appDetails : null;
+  }));
+  const existingApps = ownershipResults.filter((app) => app !== null);
 
   if (task.operation === "create") {
     if (existingApps.length > 0) {
