@@ -61,7 +61,7 @@ function createBlockId(index: number): string {
   return Buffer.from(String(index).padStart(BLOCK_ID_INDEX_WIDTH, "0"), "ascii").toString("base64");
 }
 
-async function uploadBlock(uploadUrl: string, blockId: string, content: Uint8Array): Promise<void> {
+async function uploadBlock(uploadUrl: string, blockId: string, content: ArrayBuffer): Promise<void> {
   const response = await fetchWithRetry(
     appendAzureQuery(uploadUrl, `comp=block&blockid=${encodeURIComponent(blockId)}`),
     {
@@ -70,7 +70,7 @@ async function uploadBlock(uploadUrl: string, blockId: string, content: Uint8Arr
         "Content-Length": String(content.byteLength),
         "Content-Type": "application/octet-stream",
       },
-      body: content.buffer.slice(content.byteOffset, content.byteOffset + content.byteLength) as ArrayBuffer,
+      body: content,
     }
   );
 
@@ -100,7 +100,8 @@ async function commitBlockList(uploadUrl: string, blockIds: string[]): Promise<v
 async function uploadPackageInBlocks(uploadUrl: string, packageContent: ReadableStream<Uint8Array>): Promise<void> {
   const blockIds: string[] = [];
   const reader = packageContent.getReader();
-  let bufferedContent = new Uint8Array(0);
+  const blockBuffer = new Uint8Array(BLOCK_SIZE_BYTES);
+  let bufferedByteLength = 0;
   let uploadedBytes = 0;
 
   while (true) {
@@ -112,16 +113,22 @@ async function uploadPackageInBlocks(uploadUrl: string, packageContent: Readable
       throw new Error("The Win32 package exceeds the maximum supported size of 8 GB.");
     }
 
-    const combinedContent = new Uint8Array(bufferedContent.byteLength + value.byteLength);
-    combinedContent.set(bufferedContent);
-    combinedContent.set(value, bufferedContent.byteLength);
-    bufferedContent = combinedContent;
+    let valueOffset = 0;
+    while (valueOffset < value.byteLength) {
+      const copyLength = Math.min(
+        BLOCK_SIZE_BYTES - bufferedByteLength,
+        value.byteLength - valueOffset
+      );
+      blockBuffer.set(value.subarray(valueOffset, valueOffset + copyLength), bufferedByteLength);
+      bufferedByteLength += copyLength;
+      valueOffset += copyLength;
 
-    while (bufferedContent.byteLength >= BLOCK_SIZE_BYTES) {
-      const blockId = createBlockId(blockIds.length);
-      blockIds.push(blockId);
-      await uploadBlock(uploadUrl, blockId, bufferedContent.slice(0, BLOCK_SIZE_BYTES));
-      bufferedContent = bufferedContent.slice(BLOCK_SIZE_BYTES);
+      if (bufferedByteLength === BLOCK_SIZE_BYTES) {
+        const blockId = createBlockId(blockIds.length);
+        blockIds.push(blockId);
+        await uploadBlock(uploadUrl, blockId, blockBuffer.slice().buffer);
+        bufferedByteLength = 0;
+      }
     }
   }
 
@@ -129,10 +136,10 @@ async function uploadPackageInBlocks(uploadUrl: string, packageContent: Readable
     throw new Error("The Win32 package is empty.");
   }
 
-  if (bufferedContent.byteLength > 0) {
+  if (bufferedByteLength > 0) {
     const blockId = createBlockId(blockIds.length);
     blockIds.push(blockId);
-    await uploadBlock(uploadUrl, blockId, bufferedContent);
+    await uploadBlock(uploadUrl, blockId, blockBuffer.slice(0, bufferedByteLength).buffer);
   }
 
   await commitBlockList(uploadUrl, blockIds);
