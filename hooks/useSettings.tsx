@@ -6,21 +6,7 @@ import { APP_SETTINGS_STORAGE_KEY } from "@/lib/storageKeys";
 
 const DEFAULT_SETTINGS: AppSettings = {
   stopOnFirstError: false,
-  theme: "system",
 };
-
-function normalizeTheme(theme: unknown): AppSettings["theme"] {
-  if (
-    theme === "light" ||
-    theme === "dark" ||
-    theme === "system" ||
-    theme === "corporate-1999"
-  ) {
-    return theme;
-  }
-
-  return DEFAULT_SETTINGS.theme;
-}
 
 function normalizeSettings(candidate: unknown): AppSettings {
   if (!candidate || typeof candidate !== "object") {
@@ -31,7 +17,6 @@ function normalizeSettings(candidate: unknown): AppSettings {
 
   return {
     stopOnFirstError: parsed.stopOnFirstError ?? DEFAULT_SETTINGS.stopOnFirstError,
-    theme: normalizeTheme(parsed.theme),
   };
 }
 
@@ -64,8 +49,6 @@ function readStoredSettings(): AppSettings {
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  // Read persisted settings in the initializer so the stored theme applies on
-  // first client render without flashing the default theme.
   const [settings, setSettings] = useState<AppSettings>(() => readStoredSettings());
 
   const updateSettings = useCallback((newSettings: Partial<AppSettings>) => {

@@ -14,9 +14,13 @@ const DynamicWallpaper = dynamic(
 // Lightweight, dependency-free surface shown before the animated wallpaper
 // loads and as the permanent background for reduced-motion users. Mirrors the
 // CSS surface used by DynamicWallpaper so the page background never flashes.
-function StaticWallpaper(): React.JSX.Element {
+function StaticWallpaper({ landing }: { landing: boolean }): React.JSX.Element {
   return (
-    <div aria-hidden="true" tabIndex={-1} className="dynamic-wallpaper">
+    <div
+      aria-hidden="true"
+      tabIndex={-1}
+      className={landing ? "dynamic-wallpaper dynamic-wallpaper--landing" : "dynamic-wallpaper"}
+    >
       <div className="dynamic-wallpaper__scrim" />
     </div>
   );
@@ -37,6 +41,7 @@ function subscribeToMotionPreference(
 
 export function RouteWallpaper(): React.JSX.Element | null {
   const pathname = usePathname();
+  const landing = pathname === "/";
   // The static surface is the deliberate initial state: the animated wallpaper
   // is mounted later via requestIdleCallback so it never blocks LCP/INP, and it
   // depends on browser-only APIs (matchMedia/requestIdleCallback) unavailable
@@ -119,5 +124,5 @@ export function RouteWallpaper(): React.JSX.Element | null {
     return null;
   }
 
-  return animated ? <DynamicWallpaper /> : <StaticWallpaper />;
+  return animated ? <DynamicWallpaper landing={landing} /> : <StaticWallpaper landing={landing} />;
 }

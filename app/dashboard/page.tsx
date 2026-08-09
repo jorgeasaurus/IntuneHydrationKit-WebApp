@@ -123,9 +123,9 @@ export default function DashboardPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen relative z-10">
-        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
+        <header className="app-glass-header">
+          <div className="container mx-auto flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
               <Image
                 src="/IHTLogoClear.png"
                 alt="Intune Hydration Kit"
@@ -134,14 +134,14 @@ export default function DashboardPage() {
                 className="h-10 w-auto"
                 style={{ width: "auto" }}
               />
-              <div>
-                <h1 className="text-2xl font-bold">Hydration Dashboard</h1>
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold sm:text-2xl">Hydration Dashboard</h1>
                 <p className="text-sm text-muted-foreground">
                   {getOperationText()} in {state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}
                 </p>
               </div>
             </div>
-            <Button variant="outline" onClick={() => router.push("/wizard")}>
+            <Button variant="outline" onClick={() => router.push("/wizard")} className="w-full sm:w-auto">
               <ArrowLeft className="size-4 mr-2" />
               Back to Wizard
             </Button>

@@ -120,7 +120,6 @@ export interface TenantConfig {
 
 export interface AppSettings {
   stopOnFirstError: boolean;
-  theme: "light" | "dark" | "system" | "corporate-1999";
 }
 
 /**

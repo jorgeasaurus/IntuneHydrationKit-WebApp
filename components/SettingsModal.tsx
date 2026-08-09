@@ -12,13 +12,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { useSettings } from "@/hooks/useSettings";
 import { AppSettings } from "@/types/hydration";
 import { RotateCcw } from "lucide-react";
@@ -30,7 +23,6 @@ interface SettingsModalProps {
 
 const DEFAULT_LOCAL_SETTINGS: AppSettings = {
   stopOnFirstError: false,
-  theme: "system",
 };
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
@@ -81,28 +73,6 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 }
               />
             </div>
-          </div>
-
-          {/* Theme */}
-          <div className="space-y-2">
-            <Label htmlFor="theme">Theme</Label>
-            <Select
-              value={localSettings.theme}
-              onValueChange={(value: AppSettings["theme"]) =>
-                setLocalSettings({ ...localSettings, theme: value })
-              }
-            >
-              <SelectTrigger id="theme">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="light">Light</SelectItem>
-                <SelectItem value="dark">Dark</SelectItem>
-                <SelectItem value="corporate-1999">Corporate Intranet 1999</SelectItem>
-                <SelectItem value="system">System</SelectItem>
-              </SelectContent>
-            </Select>
-            <p className="text-sm text-muted-foreground">Choose your preferred theme</p>
           </div>
         </div>
 

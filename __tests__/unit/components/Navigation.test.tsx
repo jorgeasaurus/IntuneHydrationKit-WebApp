@@ -48,11 +48,6 @@ vi.mock('@/hooks/useWizardState', () => ({
   useWizardState: () => ({ resetWizard }),
 }))
 
-vi.mock('@/components/ThemeToggle', () => ({
-  LIGHT_DARK_THEME_CYCLE: ['light', 'dark'],
-  ThemeToggle: () => <div data-testid="theme-toggle" />,
-}))
-
 describe('Navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()

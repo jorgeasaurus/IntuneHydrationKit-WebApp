@@ -124,9 +124,9 @@ function WizardContent() {
 
   return (
     <div className="min-h-screen relative z-10">
-      <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/70">
-        <div className="container mx-auto flex items-center justify-between gap-4 p-4">
-          <div className="flex items-center gap-4">
+        <header className="app-glass-header">
+        <div className="container mx-auto flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <div className="flex min-w-0 items-center gap-3 sm:gap-4">
             <Image
               src="/IHTLogoClear.png"
               alt="Intune Hydration Kit Logo"
@@ -135,7 +135,7 @@ function WizardContent() {
               className="h-12 w-auto"
               style={{ width: "auto" }}
             />
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <p className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
                   Hydration Console
@@ -144,27 +144,27 @@ function WizardContent() {
                   Step {state.currentStep}/{WIZARD_STEPS.length}
                 </span>
               </div>
-              <h1 className="text-2xl font-bold">Intune Hydration Kit</h1>
-              <p className="text-sm text-muted-foreground">
+              <h1 className="text-xl font-bold sm:text-2xl">Intune Hydration Kit</h1>
+              <p className="hidden text-sm text-muted-foreground sm:block">
                 Signed in as {accounts[0]?.username ?? "Connected operator"}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={() => setShowSettings(true)}>
-              <Settings2 className="mr-2 size-4" />
-              Settings
+          <div className="flex w-full items-center gap-2 sm:w-auto">
+            <Button variant="outline" onClick={() => setShowSettings(true)} className="size-10 flex-1 px-0 sm:w-auto sm:flex-none sm:px-4">
+              <Settings2 className="size-4 sm:mr-2" />
+              <span className="sr-only sm:not-sr-only">Settings</span>
             </Button>
-            <Button variant="outline" asChild>
+            <Button variant="outline" asChild className="size-10 flex-1 px-0 sm:w-auto sm:flex-none sm:px-4">
               <Link href="/">
-                <Home className="mr-2 size-4" />
-                Home
+                <Home className="size-4 sm:mr-2" />
+                <span className="sr-only sm:not-sr-only">Home</span>
               </Link>
             </Button>
-            <Button variant="outline" onClick={handleSignOut}>
-              <LogOut className="mr-2 size-4" />
-              Sign Out
+            <Button variant="outline" onClick={handleSignOut} className="size-10 flex-1 px-0 sm:w-auto sm:flex-none sm:px-4">
+              <LogOut className="size-4 sm:mr-2" />
+              <span className="sr-only sm:not-sr-only">Sign Out</span>
             </Button>
           </div>
         </div>

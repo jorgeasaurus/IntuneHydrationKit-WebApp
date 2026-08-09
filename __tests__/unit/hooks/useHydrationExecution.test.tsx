@@ -181,7 +181,6 @@ describe("useHydrationExecution", () => {
     wizardState = createWizardState();
     settings = {
       stopOnFirstError: false,
-      theme: "system",
     };
 
     mockUseWizardState.mockImplementation(() => ({ state: wizardState }));

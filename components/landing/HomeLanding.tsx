@@ -114,7 +114,7 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
 
 function MobileRunPreview() {
   return (
-    <div className="landing-mobile-preview rounded-lg border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur lg:hidden">
+    <div className="landing-mobile-preview glass-surface rounded-lg border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur lg:hidden">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-mono text-xs uppercase text-muted-foreground">
@@ -159,7 +159,7 @@ function Hero({
         aria-hidden="true"
       />
       <div className="container relative mx-auto px-4 sm:px-6">
-        <div className="grid items-center gap-6 sm:gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.05fr)]">
+        <div className="landing-hero-panel glass-panel grid items-center gap-6 sm:gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.05fr)]">
           <div className="space-y-5 sm:space-y-8">
             <div className="flex flex-wrap items-center gap-3">
               <span className="landing-version-badge inline-flex items-center gap-2 rounded-md border border-hydrate/35 bg-hydrate/10 px-3 py-1.5 font-mono text-xs uppercase text-hydrate">
@@ -192,7 +192,7 @@ function Hero({
               <Button
                 variant="outline"
                 size="lg"
-                className="landing-secondary-action h-12 shrink-0 border-2 px-4 text-base font-semibold sm:px-7"
+                className="landing-secondary-action h-12 min-w-0 w-full border-2 px-3 text-sm font-semibold sm:w-auto sm:px-7 sm:text-base"
                 asChild
               >
                 <a
@@ -201,13 +201,14 @@ function Hero({
                   rel="noopener noreferrer"
                 >
                   <GitBranch className="size-5" />
-                  PowerShell Module
+                  <span className="sm:hidden">PowerShell</span>
+                  <span className="hidden sm:inline">PowerShell Module</span>
                 </a>
               </Button>
               <Button
                 variant="ghost"
                 size="lg"
-                className="landing-tertiary-action h-12 shrink-0 px-4 text-base font-semibold sm:px-5"
+                className="landing-tertiary-action h-12 min-w-0 w-full px-3 text-sm font-semibold sm:w-auto sm:px-5 sm:text-base"
                 asChild
               >
                 <Link href="/templates">
@@ -219,7 +220,7 @@ function Hero({
 
             <MobileRunPreview />
 
-            <div className="landing-stat-rail hidden gap-2 rounded-lg border border-border/80 bg-card/70 p-2 backdrop-blur sm:grid sm:grid-cols-4">
+            <div className="landing-stat-rail glass-surface hidden gap-2 rounded-lg border border-border/80 bg-card/70 p-2 backdrop-blur sm:grid sm:grid-cols-4">
               {HERO_STATS.map((stat) => (
                 <div
                   key={stat.label}
@@ -242,7 +243,7 @@ function Hero({
               aria-hidden="true"
             />
             <div className="relative mx-auto max-w-2xl">
-              <div className="landing-preview-bar mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
+              <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
                 <div>
                   <p className="font-mono text-xs uppercase text-muted-foreground">
                     Live run preview
@@ -614,7 +615,7 @@ export function HomeLanding({
   onContinue,
 }: HomeLandingProps) {
   return (
-    <div className="landing-shell relative min-h-screen">
+    <div className="landing-shell landing-glass-shell relative min-h-screen">
       <div className="relative z-10">
         <Navigation />
         <Hero

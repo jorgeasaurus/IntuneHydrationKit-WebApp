@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import { useWizardState } from "@/hooks/useWizardState";
-import { LIGHT_DARK_THEME_CYCLE, ThemeToggle } from "@/components/ThemeToggle";
 import { Terminal, Github } from "lucide-react";
 
 export function Navigation() {
@@ -41,9 +40,7 @@ export function Navigation() {
 
   return (
     <>
-      {/* Industrial Navigation Bar */}
       <div className="fixed top-0 left-0 right-0 z-50">
-        {/* Top accent line */}
         <div className="h-[2px] bg-gradient-to-r from-transparent via-hydrate to-transparent" />
 
         <nav className="nav-industrial">
@@ -98,8 +95,6 @@ export function Navigation() {
                 >
                   <Github className="size-5" />
                 </a>
-                <ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />
-
                 {/* Terminal Status Indicator */}
                 <div className="landing-nav-status hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
                   <span className={`size-2 rounded-full ${isAuthenticated ? 'bg-signal-success' : 'bg-muted-foreground'}`} />
@@ -112,7 +107,7 @@ export function Navigation() {
                 <Button
                   onClick={handleGetStarted}
                   variant="outline"
-                  className="landing-nav-action h-9 rounded-md border-2 px-4 text-sm font-semibold"
+                  className="nav-action h-9 rounded-md border-2 px-4 text-sm font-semibold"
                 >
                   {isAuthenticated ? (
                     <>
@@ -141,8 +136,6 @@ export function Navigation() {
           </div>
         </nav>
 
-        {/* Bottom border with accent */}
-        <div className="h-px bg-border" />
       </div>
 
     </>
