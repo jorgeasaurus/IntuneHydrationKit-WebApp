@@ -1,3 +1,15 @@
+# PR #21 Copilot Review Loop
+
+- [x] Inspect authentication, PR metadata, review counts, and unresolved threads.
+- [x] Address every valid Copilot thread with focused tests and verification.
+- [x] Push fixes, reply to and resolve handled threads, then request a fresh review.
+- [x] Repeat until Copilot reviews the latest head with no new actionable feedback.
+
+## Review
+
+- Replaced the landing client bundle's package-manifest import with a build-time version constant sourced from `package.json` in Next and Vitest configuration.
+- Verified the focused landing tests, lint, type-check, production build, and whitespace before completing the clean review cycle.
+
 # Dev Branch Rename and Deployment
 
 - [x] Rename the current remote branch to `dev` and preserve the ready-PR path.

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import packageJson from "@/package.json";
 import {
   Activity,
   Box,
@@ -16,7 +15,13 @@ import {
   Zap,
 } from "lucide-react";
 
-export const APP_VERSION = `v${packageJson.version}`;
+const appVersion = process.env.NEXT_PUBLIC_APP_VERSION;
+
+if (!appVersion) {
+  throw new Error("NEXT_PUBLIC_APP_VERSION must be injected at build time.");
+}
+
+export const APP_VERSION = `v${appVersion}`;
 const FAQ_LINK_CLASS_NAME = "text-hydrate hover:underline";
 
 export type FaqItem = {
