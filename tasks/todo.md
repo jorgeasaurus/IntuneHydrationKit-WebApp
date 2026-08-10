@@ -3,13 +3,13 @@
 - [x] Add Google Chrome, Mozilla Firefox, PowerShell, and Visual Studio Code definitions.
 - [x] Generate module-equivalent wrappers, icons, and `.intunewin` packages.
 - [x] Expand catalog, package, preview, create, and delete coverage.
-- [ ] Run project checks, commit, push, and verify PR #20.
+- [x] Run project checks, commit, push, and verify PR #20.
 
 ## Review
 
 - Added four WinGet-based Win32 apps through the shared 7-Zip execution path.
 - Wrapper scripts match the PowerShell module generators for all four apps.
-- Checks passed: focused Win32/catalog/selection tests, full test suite (72 files, 545 tests), type-check, production build, browser catalog verification, and `git diff --check`.
+- Checks passed: focused Win32/catalog/selection tests, full test suite (72 files, 545 tests), type-check, production build, browser catalog verification, `git diff --check`, React Doctor, GitGuardian, and Vercel.
 
 # PR #20 Copilot Review Loop
 
