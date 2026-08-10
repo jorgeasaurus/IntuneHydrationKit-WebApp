@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
+import { render, screen, waitFor, within } from '@/__tests__/setup/test-utils'
 import { TemplateCatalogPage } from '@/components/templates/TemplateCatalogPage'
 
 const loadTemplateDocumentationCatalog = vi.fn()
@@ -94,8 +94,8 @@ describe('TemplateCatalogPage', () => {
           itemType: 'Windows app (Win32)',
           sourcePath: '/win32-apps/7-zip.intunewin',
           payloadSource: {
-            kind: 'inline',
-            payload: {
+            kind: 'win32',
+            template: {
               displayName: '7-Zip - [IHD]',
               packageIdentifier: '7zip.7zip',
               publisher: 'Igor Pavlov',
@@ -185,6 +185,10 @@ describe('TemplateCatalogPage', () => {
       uninstallCommandLine: 'powershell.exe -File .\\Uninstall-WinGetPackage.ps1',
       applicableArchitectures: 'x64',
       allowAvailableUninstall: true,
+      installScriptContent:
+        "$packageIdentifier = '7zip.7zip'\nInstall-WinGetPackage $packageIdentifier",
+      uninstallScriptContent:
+        "$packageIdentifier = '7zip.7zip'\nUninstall-WinGetPackage $packageIdentifier",
     })
     await user.click(screen.getByRole('button', { name: /7-Zip - \[IHD\]/i }))
 
@@ -195,5 +199,15 @@ describe('TemplateCatalogPage', () => {
     expect(await screen.findByText('Package Identifier')).toBeInTheDocument()
     expect(screen.getByText('7zip.7zip')).toBeInTheDocument()
     expect(screen.getByText('Install Command Line')).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Install script' })).getByText(
+        /Install-WinGetPackage \$packageIdentifier/
+      )
+    ).toBeInTheDocument()
+    expect(
+      within(screen.getByRole('region', { name: 'Uninstall script' })).getByText(
+        /Uninstall-WinGetPackage \$packageIdentifier/
+      )
+    ).toBeInTheDocument()
   })
 })

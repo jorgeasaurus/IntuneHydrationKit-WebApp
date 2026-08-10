@@ -15,6 +15,7 @@ import {
   OIBManifestFile,
 } from "@/lib/templates/loader";
 import { getWin32AppTemplates } from "@/templates/win32Apps";
+import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { TaskCategory } from "@/types/hydration";
 
 export interface TemplateDocumentationCategorySummary {
@@ -39,10 +40,16 @@ type CISPayloadSource = {
   file: CISBaselineManifestFile;
 };
 
+type Win32PayloadSource = {
+  kind: "win32";
+  template: Win32AppTemplate;
+};
+
 export type TemplateDocumentationPayloadSource =
   | InlinePayloadSource
   | OIBPayloadSource
-  | CISPayloadSource;
+  | CISPayloadSource
+  | Win32PayloadSource;
 
 export interface TemplateDocumentationItem {
   id: string;
@@ -158,6 +165,24 @@ function cisPayloadSource(file: CISBaselineManifestFile): CISPayloadSource {
     kind: "cis",
     file,
   };
+}
+
+function win32PayloadSource(template: Win32AppTemplate): Win32PayloadSource {
+  return {
+    kind: "win32",
+    template,
+  };
+}
+
+async function fetchScriptContent(url: string, label: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(
+      `Unable to load the ${label} from ${url}: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.text();
 }
 
 function createItemId(category: TaskCategory, seed: string): string {
@@ -432,7 +457,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     platform: "Windows",
     itemType: "Windows app (Win32)",
     sourcePath: app.packageUrl,
-    payloadSource: inlinePayloadSource(app),
+    payloadSource: win32PayloadSource(app),
   }));
 
   const baselineItems: TemplateDocumentationItem[] = (oibManifest?.files ?? []).map((file) => ({
@@ -510,6 +535,19 @@ export async function loadTemplateDocumentationPayload(
       return fetchBaselinePolicyByManifestFile(item.payloadSource.file);
     case "cis":
       return fetchCISBaselinePolicyByManifestFile(item.payloadSource.file);
+    case "win32": {
+      const template = item.payloadSource.template;
+      const [installScriptContent, uninstallScriptContent] = await Promise.all([
+        fetchScriptContent(template.installScriptUrl, "Win32 install script"),
+        fetchScriptContent(template.uninstallScriptUrl, "Win32 uninstall script"),
+      ]);
+
+      return {
+        ...template,
+        installScriptContent,
+        uninstallScriptContent,
+      };
+    }
     default:
       return null;
   }

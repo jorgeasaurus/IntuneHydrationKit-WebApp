@@ -5,6 +5,8 @@ export interface Win32AppTemplate {
   packageUrl: string;
   packageFileName: string;
   detectionScriptUrl: string;
+  installScriptUrl: string;
+  uninstallScriptUrl: string;
   iconUrl?: string;
   publisher: string;
   developer: string;
@@ -63,6 +65,8 @@ function createWinGetStarterApp(
     packageUrl: `/win32-apps/${id}.intunewin`,
     packageFileName: `${id}.intunewin`,
     detectionScriptUrl: `/win32-apps/${id}/Detect-WinGetPackage.ps1`,
+    installScriptUrl: `/win32-apps/${id}/Install-WinGetPackage.ps1`,
+    uninstallScriptUrl: `/win32-apps/${id}/Uninstall-WinGetPackage.ps1`,
     iconUrl: `/win32-apps/${id}.png`,
     publisher,
     developer: publisher,

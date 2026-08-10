@@ -29,6 +29,12 @@ describe("readIntuneWinPackage", () => {
 
   it.each(getWin32AppTemplates())("ships only the PowerShell module's WinGet wrapper source files for $displayName", (template) => {
     const wrapperRoot = join(process.cwd(), "public/win32-apps", template.id);
+    expect(template.installScriptUrl).toBe(
+      `/win32-apps/${template.id}/Install-WinGetPackage.ps1`
+    );
+    expect(template.uninstallScriptUrl).toBe(
+      `/win32-apps/${template.id}/Uninstall-WinGetPackage.ps1`
+    );
     expect(readdirSync(wrapperRoot).sort()).toEqual([
       "Detect-WinGetPackage.ps1",
       "Install-WinGetPackage.ps1",

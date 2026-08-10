@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   loadTemplateDocumentationCatalog,
@@ -127,6 +127,23 @@ vi.mock('@/lib/templates/loader', () => ({
 describe('template catalog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        const operation = url.includes('/Install-') ? 'Install' : 'Uninstall'
+        return Promise.resolve(
+          new Response(
+            `$packageIdentifier = '7zip.7zip'\n${operation}-WinGetPackage $packageIdentifier`,
+            { status: 200 }
+          )
+        )
+      })
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('builds a catalog from loader-backed sources and manifests', async () => {
@@ -176,7 +193,25 @@ describe('template catalog', () => {
     await expect(loadTemplateDocumentationPayload(win32Item!)).resolves.toMatchObject({
       packageIdentifier: '7zip.7zip',
       setupFilePath: 'Install-WinGetPackage.ps1',
+      installScriptContent: expect.stringContaining('Install-WinGetPackage'),
+      uninstallScriptContent: expect.stringContaining('Uninstall-WinGetPackage'),
     })
+    expect(fetch).toHaveBeenNthCalledWith(1, '/win32-apps/7-zip/Install-WinGetPackage.ps1')
+    expect(fetch).toHaveBeenNthCalledWith(2, '/win32-apps/7-zip/Uninstall-WinGetPackage.ps1')
+  })
+
+  it('identifies a Win32 script asset that cannot be loaded', async () => {
+    const catalog = await loadTemplateDocumentationCatalog()
+    const win32Item = catalog.items.find(
+      (item) => item.displayName === 'Google Chrome - [IHD]'
+    )
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValueOnce(new Response('uninstall', { status: 200 }))
+
+    await expect(loadTemplateDocumentationPayload(win32Item!)).rejects.toThrow(
+      'Unable to load the Win32 install script from /win32-apps/google-chrome/Install-WinGetPackage.ps1: 404 Not Found'
+    )
   })
 
   it('returns inline payloads directly and defers manifest-backed payloads', async () => {

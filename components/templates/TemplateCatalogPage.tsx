@@ -49,6 +49,11 @@ type PayloadState = {
   error?: string;
 };
 
+interface Win32ScriptContents {
+  installScriptContent: string;
+  uninstallScriptContent: string;
+}
+
 const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_INCREMENT = 120;
 const ACTIVE_FILTER_BUTTON_CLASSNAME =
@@ -123,6 +128,8 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
     "_cisCategory",
     "_cisSubcategory",
     "_cisFilePath",
+    "installScriptContent",
+    "uninstallScriptContent",
   ]);
 
   const highlights: Array<{ label: string; value: string }> = [];
@@ -166,6 +173,50 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
   });
 
   return highlights.slice(0, 8);
+}
+
+function getWin32ScriptContents(payload: unknown): Win32ScriptContents | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (
+    typeof record.installScriptContent !== "string" ||
+    typeof record.uninstallScriptContent !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    installScriptContent: record.installScriptContent,
+    uninstallScriptContent: record.uninstallScriptContent,
+  };
+}
+
+function PowerShellScriptPanel({
+  id,
+  title,
+  content,
+}: {
+  id: string;
+  title: string;
+  content: string;
+}) {
+  return (
+    <section
+      aria-labelledby={id}
+      className="overflow-hidden rounded-2xl border border-border/70 bg-[#050816]"
+    >
+      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-xs font-mono uppercase tracking-[0.24em] text-slate-300">
+        <FileCode2 className="size-3.5" />
+        <h4 id={id}>{title}</h4>
+      </div>
+      <pre className="max-h-[420px] overflow-auto p-4 text-xs leading-6 text-slate-100 selection:bg-white/20">
+        <code className="font-mono">{content}</code>
+      </pre>
+    </section>
+  );
 }
 
 function matchesSearch(item: TemplateDocumentationItem, query: string): boolean {
@@ -387,8 +438,8 @@ export function TemplateCatalogPage() {
                         <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
                           This catalog shows the actual transformed templates the web app imports,
                           including the <span className="font-mono text-foreground">[IHD]</span> prefix
-                          and hydration marker. Browse by category, search by keyword, and open raw JSON
-                          only when you need the full object.
+                          and hydration marker. Browse by category, search by keyword, and open raw
+                          payloads and Win32 scripts only when you need the full details.
                         </p>
                       </div>
                     </div>
@@ -414,7 +465,7 @@ export function TemplateCatalogPage() {
                           On-demand loading
                         </div>
                         <div className="mt-2 text-sm text-muted-foreground">
-                          Large baseline catalogs stay fast because heavy payloads are fetched only after expansion.
+                          Large baseline payloads and Win32 scripts are fetched only after expansion.
                         </div>
                       </div>
                     </div>
@@ -629,7 +680,7 @@ export function TemplateCatalogPage() {
                             </div>
                             <div className="mt-2 text-sm leading-6 text-muted-foreground">
                               Summaries show the import-ready payload. Expand any row to inspect the exact JSON
-                              the app will use.
+                              and Win32 wrapper scripts the app will use.
                             </div>
                           </div>
                           <Button asChild variant="outline">
@@ -712,6 +763,9 @@ export function TemplateCatalogPage() {
                                         {renderedItems.map((item) => {
                                           const payloadState = payloadStates[item.id];
                                           const highlights = buildHighlights(payloadState?.data);
+                                          const win32Scripts = getWin32ScriptContents(
+                                            payloadState?.data
+                                          );
 
                                           return (
                                             <AccordionItem
@@ -820,6 +874,21 @@ export function TemplateCatalogPage() {
                                                             </div>
                                                           ))}
                                                         </div>
+                                                      </div>
+                                                    ) : null}
+
+                                                    {win32Scripts ? (
+                                                      <div className="grid gap-4 xl:grid-cols-2">
+                                                        <PowerShellScriptPanel
+                                                          id={`${item.id}-install-script`}
+                                                          title="Install script"
+                                                          content={win32Scripts.installScriptContent}
+                                                        />
+                                                        <PowerShellScriptPanel
+                                                          id={`${item.id}-uninstall-script`}
+                                                          title="Uninstall script"
+                                                          content={win32Scripts.uninstallScriptContent}
+                                                        />
                                                       </div>
                                                     ) : null}
 
