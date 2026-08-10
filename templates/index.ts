@@ -55,9 +55,9 @@ export const TEMPLATE_METADATA = {
     icon: "Smartphone",
   },
   win32Apps: {
-    displayName: "Win32 Apps (Proof of Concept)",
-    description: "7-Zip 25.01 packaged for Intune deployment",
-    count: 1,
+    displayName: "Win32 Apps",
+    description: "WinGet applications packaged for Intune deployment",
+    count: 5,
     icon: "Package",
   },
   enrollment: {

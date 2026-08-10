@@ -35,37 +35,71 @@ export interface Win32AppTemplate {
   };
 }
 
+interface WinGetStarterAppDefinition {
+  id: string;
+  packageIdentifier: string;
+  displayName: string;
+  publisher: string;
+  description: string;
+  manifestPath: string;
+}
+
+function createWinGetStarterApp(
+  definition: WinGetStarterAppDefinition,
+): Win32AppTemplate {
+  const {
+    id,
+    packageIdentifier,
+    displayName,
+    publisher,
+    description,
+    manifestPath,
+  } = definition;
+
+  return {
+    id,
+    packageIdentifier,
+    displayName: `${displayName} - [IHD]`,
+    packageUrl: `/win32-apps/${id}.intunewin`,
+    packageFileName: `${id}.intunewin`,
+    detectionScriptUrl: `/win32-apps/${id}/Detect-WinGetPackage.ps1`,
+    iconUrl: `/win32-apps/${id}.png`,
+    publisher,
+    developer: publisher,
+    owner: "",
+    version: "latest",
+    description,
+    notes: [
+      "Imported from WinGet",
+      `WinGetPackageIdentifier: ${packageIdentifier}`,
+      "WinGetPackageVersion: latest",
+      `WinGetTemplateId: ${id}`,
+      "WinGetManifestRepository: microsoft/winget-pkgs",
+      `WinGetManifestPath: ${manifestPath}`,
+    ].join("\n"),
+    setupFilePath: "Install-WinGetPackage.ps1",
+    installCommandLine:
+      "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Install-WinGetPackage.ps1",
+    uninstallCommandLine:
+      "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Uninstall-WinGetPackage.ps1",
+    minimumSupportedOperatingSystem: { v10_21H1: true },
+    applicableArchitectures: "x64",
+    allowAvailableUninstall: true,
+  };
+}
+
 export const SEVEN_ZIP_WIN32_APP: Win32AppTemplate = {
-  id: "7-zip",
-  packageIdentifier: "7zip.7zip",
-  displayName: "7-Zip - [IHD]",
-  packageUrl: "/win32-apps/7-zip.intunewin",
-  packageFileName: "7-zip.intunewin",
-  detectionScriptUrl: "/win32-apps/7-zip/Detect-WinGetPackage.ps1",
-  iconUrl: "/win32-apps/7-zip.png",
-  publisher: "Igor Pavlov",
-  developer: "Igor Pavlov",
-  owner: "",
-  version: "latest",
-  description: "Starter-pack WinGet template for 7-Zip Win32 packaging.",
-  notes: [
-    "Imported from WinGet",
-    "WinGetPackageIdentifier: 7zip.7zip",
-    "WinGetPackageVersion: latest",
-    "WinGetTemplateId: 7-zip",
-    "WinGetManifestRepository: microsoft/winget-pkgs",
-    "WinGetManifestPath: manifests/7/7zip/7zip",
-  ].join("\n"),
-  setupFilePath: "Install-WinGetPackage.ps1",
-  installCommandLine:
-    "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Install-WinGetPackage.ps1",
-  uninstallCommandLine:
-    "powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File .\\Uninstall-WinGetPackage.ps1",
-  minimumSupportedOperatingSystem: { v10_21H1: true },
-  applicableArchitectures: "x64",
-  allowAvailableUninstall: true,
+  ...createWinGetStarterApp({
+    id: "7-zip",
+    packageIdentifier: "7zip.7zip",
+    displayName: "7-Zip",
+    publisher: "Igor Pavlov",
+    description: "Starter-pack WinGet template for 7-Zip Win32 packaging.",
+    manifestPath: "manifests/7/7zip/7zip",
+  }),
   legacyOwnership: {
-    description: "7-Zip is a file archiver with a high compression ratio. - Imported by Intune Hydration Kit",
+    description:
+      "7-Zip is a file archiver with a high compression ratio. - Imported by Intune Hydration Kit",
     notes: "File archiver utility",
     publisher: "Igor Pavlov",
     owner: "Igor Pavlov",
@@ -81,12 +115,59 @@ export const SEVEN_ZIP_WIN32_APP: Win32AppTemplate = {
   },
 };
 
-const WIN32_APP_TEMPLATES = [SEVEN_ZIP_WIN32_APP] as const;
+export const GOOGLE_CHROME_WIN32_APP = createWinGetStarterApp({
+  id: "google-chrome",
+  packageIdentifier: "Google.Chrome",
+  displayName: "Google Chrome",
+  publisher: "Google LLC",
+  description:
+    "Starter-pack WinGet template for Google Chrome Win32 packaging.",
+  manifestPath: "manifests/g/Google/Chrome",
+});
+
+export const MOZILLA_FIREFOX_WIN32_APP = createWinGetStarterApp({
+  id: "mozilla-firefox",
+  packageIdentifier: "Mozilla.Firefox",
+  displayName: "Mozilla Firefox",
+  publisher: "Mozilla",
+  description:
+    "Starter-pack WinGet template for Mozilla Firefox Win32 packaging.",
+  manifestPath: "manifests/m/Mozilla/Firefox",
+});
+
+export const POWERSHELL_WIN32_APP = createWinGetStarterApp({
+  id: "powershell",
+  packageIdentifier: "Microsoft.PowerShell",
+  displayName: "PowerShell",
+  publisher: "Microsoft Corporation",
+  description: "Starter-pack WinGet template for PowerShell Win32 packaging.",
+  manifestPath: "manifests/m/Microsoft/PowerShell",
+});
+
+export const VISUAL_STUDIO_CODE_WIN32_APP = createWinGetStarterApp({
+  id: "visual-studio-code",
+  packageIdentifier: "Microsoft.VisualStudioCode",
+  displayName: "Visual Studio Code",
+  publisher: "Microsoft Corporation",
+  description:
+    "Starter-pack WinGet template for Visual Studio Code Win32 packaging.",
+  manifestPath: "manifests/m/Microsoft/VisualStudioCode",
+});
+
+const WIN32_APP_TEMPLATES = [
+  SEVEN_ZIP_WIN32_APP,
+  GOOGLE_CHROME_WIN32_APP,
+  MOZILLA_FIREFOX_WIN32_APP,
+  POWERSHELL_WIN32_APP,
+  VISUAL_STUDIO_CODE_WIN32_APP,
+] as const;
 
 export function getWin32AppTemplates(): readonly Win32AppTemplate[] {
   return WIN32_APP_TEMPLATES;
 }
 
-export function getWin32AppTemplateByName(name: string): Win32AppTemplate | undefined {
+export function getWin32AppTemplateByName(
+  name: string,
+): Win32AppTemplate | undefined {
   return WIN32_APP_TEMPLATES.find((template) => template.displayName === name);
 }

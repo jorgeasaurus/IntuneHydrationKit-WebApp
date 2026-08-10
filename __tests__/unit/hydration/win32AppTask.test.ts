@@ -27,6 +27,7 @@ vi.mock("@/lib/win32/intuneWinPackage", () => ({
 }));
 
 import { executeWin32AppTask } from "@/lib/hydration/taskExecutors/win32AppTask";
+import { getWin32AppTemplates } from "@/templates/win32Apps";
 
 const task: HydrationTask = {
   id: "7-zip",
@@ -75,7 +76,7 @@ describe("executeWin32AppTask", () => {
     });
   });
 
-  it("loads and publishes the PowerShell module package, detection script, and icon", async () => {
+  it.each(getWin32AppTemplates())("loads, publishes, and deletes the $displayName package", async (template) => {
     const packageBlob = new Blob(["package"]);
     const iconBytes = new Uint8Array([1, 2, 3]);
     const parsedPackage = {
@@ -89,41 +90,43 @@ describe("executeWin32AppTask", () => {
       .mockResolvedValueOnce(new Response(iconBytes, { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     mockReadIntuneWinPackage.mockResolvedValue(parsedPackage);
-    mockCreateWin32AppFromPackage.mockResolvedValue({ id: "created-app" });
+    const createdId = `created-${template.id}`;
+    mockCreateWin32AppFromPackage.mockResolvedValue({ id: createdId });
 
     const context = createContext();
-    const result = await executeWin32AppTask(task, context);
+    const appTask = { ...task, id: template.id, itemName: template.displayName };
+    const result = await executeWin32AppTask(appTask, context);
 
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      "/win32-apps/7-zip.intunewin",
-      "/win32-apps/7-zip/Detect-WinGetPackage.ps1",
-      "/win32-apps/7-zip.png",
+      template.packageUrl,
+      template.detectionScriptUrl,
+      template.iconUrl,
     ]);
     expect(mockCreateWin32AppFromPackage).toHaveBeenCalledWith(
       context.client,
-      expect.objectContaining({ packageIdentifier: "7zip.7zip" }),
+      expect.objectContaining({ packageIdentifier: template.packageIdentifier }),
       parsedPackage,
       "Write-Output 'detected'",
       "AQID"
     );
-    expect(result).toMatchObject({ success: true, skipped: false, createdId: "created-app" });
+    expect(result).toMatchObject({ success: true, skipped: false, createdId });
 
     vi.mocked(context.client.get).mockResolvedValue({
-      id: "created-app",
-      displayName: "7-Zip - [IHD]",
+      id: createdId,
+      displayName: template.displayName,
       description: "Imported by Intune Hydration Kit",
       notes: "Imported from WinGet",
     });
     await expect(executeWin32AppTask(
-      { ...task, operation: "delete" },
+      { ...appTask, operation: "delete" },
       context
     )).resolves.toMatchObject({ success: true, skipped: false });
     expect(context.client.get).toHaveBeenCalledWith(
-      "/deviceAppManagement/mobileApps/created-app",
+      `/deviceAppManagement/mobileApps/${createdId}`,
       "beta"
     );
     expect(context.client.delete).toHaveBeenCalledWith(
-      "/deviceAppManagement/mobileApps/created-app",
+      `/deviceAppManagement/mobileApps/${createdId}`,
       "beta"
     );
   });

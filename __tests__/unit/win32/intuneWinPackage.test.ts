@@ -3,11 +3,12 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
+import { getWin32AppTemplates } from "@/templates/win32Apps";
 
 describe("readIntuneWinPackage", () => {
-  it("reads the supplied 7-Zip package metadata and encrypted content", async () => {
+  it.each(getWin32AppTemplates())("reads the supplied $displayName package metadata and encrypted content", async (template) => {
     const packageBytes = readFileSync(
-      join(process.cwd(), "public/win32-apps/7-zip.intunewin")
+      join(process.cwd(), `public${template.packageUrl}`)
     );
     const packageFile = await readIntuneWinPackage(
       packageBytes.buffer.slice(
@@ -26,8 +27,8 @@ describe("readIntuneWinPackage", () => {
     });
   });
 
-  it("ships only the PowerShell module's WinGet wrapper source files", () => {
-    const wrapperRoot = join(process.cwd(), "public/win32-apps/7-zip");
+  it.each(getWin32AppTemplates())("ships only the PowerShell module's WinGet wrapper source files for $displayName", (template) => {
+    const wrapperRoot = join(process.cwd(), "public/win32-apps", template.id);
     expect(readdirSync(wrapperRoot).sort()).toEqual([
       "Detect-WinGetPackage.ps1",
       "Install-WinGetPackage.ps1",
@@ -37,9 +38,9 @@ describe("readIntuneWinPackage", () => {
     const installScript = readFileSync(join(wrapperRoot, "Install-WinGetPackage.ps1"), "utf8");
     const uninstallScript = readFileSync(join(wrapperRoot, "Uninstall-WinGetPackage.ps1"), "utf8");
     const detectionScript = readFileSync(join(wrapperRoot, "Detect-WinGetPackage.ps1"), "utf8");
-    expect(installScript).toContain("winget install --id 7zip.7zip --exact --silent --scope machine");
-    expect(uninstallScript).toContain("winget uninstall --id 7zip.7zip --exact --scope machine --silent");
-    expect(detectionScript).toContain("$PackageIdentifier = '7zip.7zip'");
+    expect(installScript).toContain(`winget install --id ${template.packageIdentifier} --exact --silent --scope machine`);
+    expect(uninstallScript).toContain(`winget uninstall --id ${template.packageIdentifier} --exact --scope machine --silent`);
+    expect(detectionScript).toContain(`$PackageIdentifier = '${template.packageIdentifier}'`);
     expect(detectionScript).toContain("Test-InstalledApplicationRegistry");
   });
 });
