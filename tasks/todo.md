@@ -1,3 +1,15 @@
+# Dev Branch Rename and Deployment
+
+- [x] Rename the current remote branch to `dev` and preserve the ready-PR path.
+- [x] Realign the local branch and upstream tracking.
+- [x] Deploy and verify the exact Vercel `git-dev` alias.
+- [x] Record final PR, deployment, and workspace state.
+
+## Review
+
+- GitHub closed legacy PR #20 during the server-side rename because its head ref remained bound to the retired branch name; ready replacement PR #21 targets `main` from `dev` with the same 2.6.4 changes.
+- Local `dev` tracks `origin/dev`; the requested Vercel branch alias is the deployment verification target.
+
 # Win32 Script Content in Template Docs
 
 - [x] Load each Win32 install and uninstall wrapper when its template is expanded.
