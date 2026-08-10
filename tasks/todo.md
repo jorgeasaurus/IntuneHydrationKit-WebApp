@@ -3,12 +3,12 @@
 - [x] Load each Win32 install and uninstall wrapper when its template is expanded.
 - [x] Show both scripts as readable PowerShell while retaining them in the raw payload.
 - [x] Add catalog and UI regression coverage for script content and failures.
-- [ ] Run project/browser checks and refresh PR #20.
+- [x] Run project/browser checks and refresh PR #20.
 
 ## Review
 
 - Script assets remain out of the initial catalog bundle and load only for the expanded Win32 item.
-- Checks passed: focused catalog/UI/package tests, full test suite (72 files, 546 tests), type-check, production build, React Doctor, browser content assertions, visual review, and `git diff --check`.
+- Checks passed: focused catalog/UI/package tests, full test suite (72 files, 546 tests), type-check, production build, browser content assertions, visual review, `git diff --check`, React Doctor, GitGuardian, and Vercel.
 
 # Expanded Win32 Starter Pack
 
