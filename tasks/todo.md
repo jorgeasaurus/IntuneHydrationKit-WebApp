@@ -1,3 +1,15 @@
+# Vercel Win32 Upload Origin Recovery
+
+- [x] Reproduce the deployed 403 without forwarding content to Azure or Intune.
+- [x] Add a regression for branch-alias and immutable-deployment origin divergence.
+- [x] Accept only the request origin or explicitly configured deployment origin.
+- [x] Verify locally and against the redeployed Vercel endpoint, then commit and push.
+
+## Review
+
+- The immutable deployment hostname reproduced the report's 403 when paired with the browser-facing `dev` origin; the route now permits that explicitly configured deployment origin without trusting forwarded headers.
+- The regression failed before the fix and passes after it; focused tests, cross-origin rejection, lint, type-check, production build, whitespace, and the safe deployed endpoint probe pass.
+
 # Dev Deployment Sign-in Recovery
 
 - [x] Reproduce the deployed sign-in failure and capture the redirect/configuration path.

@@ -157,4 +157,29 @@ describe("POST /api/win32-upload", () => {
     expect(response.status).toBe(403);
     expect(fetchMock).not.toHaveBeenCalled();
   });
+
+  it("accepts the configured public origin when Vercel uses an immutable request host", async () => {
+    vi.stubEnv(
+      "NEXT_PUBLIC_MSAL_REDIRECT_URI",
+      "https://intune-hydration-kit-web-app-git-dev.example.vercel.app/"
+    );
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await POST(new Request(
+      "https://intune-hydration-kit-web-immutable.example.vercel.app/api/win32-upload",
+      {
+        method: "POST",
+        headers: {
+          origin: "https://intune-hydration-kit-web-app-git-dev.example.vercel.app",
+          "x-intune-upload-url": "https://example.com/package",
+        },
+        body: new Uint8Array([1]),
+      }
+    ));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: "Invalid Intune upload URL." });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 });

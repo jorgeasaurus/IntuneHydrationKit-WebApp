@@ -1,5 +1,6 @@
 # Lessons
 
+- Same-origin API checks behind Vercel must account for the explicitly configured public deployment origin as well as the runtime request URL; branch aliases and immutable deployment hostnames can legitimately diverge.
 - A Vercel preview is not authentication-ready merely because its Entra redirect URI is registered; verify the deployed MSAL client ID, exact runtime redirect, and any Vercel access-protection redirect through the real sign-in initiation path.
 - When a user says a README status is obsolete, remove the full stale section and refresh its supporting visual in the same change.
 - When a tenant-only Graph create error cannot be fully reproduced locally, add scoped failure diagnostics at the Graph response boundary so the next generic 400 includes task, endpoint, API version, response body, and sanitized payload.

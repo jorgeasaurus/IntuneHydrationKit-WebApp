@@ -27,7 +27,16 @@ function isAzureBlobUploadUrl(value: string): boolean {
 
 function hasSameOrigin(request: Request): boolean {
   try {
-    return request.headers.get("origin") === new URL(request.url).origin;
+    const requestOrigin = request.headers.get("origin");
+    if (!requestOrigin) return false;
+
+    const allowedOrigins = new Set([new URL(request.url).origin]);
+    const configuredRedirectUri = process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI;
+    if (configuredRedirectUri) {
+      allowedOrigins.add(new URL(configuredRedirectUri).origin);
+    }
+
+    return allowedOrigins.has(requestOrigin);
   } catch {
     return false;
   }
