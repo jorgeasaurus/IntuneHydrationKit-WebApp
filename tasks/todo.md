@@ -1,3 +1,15 @@
+# Dev Deployment Sign-in Recovery
+
+- [x] Reproduce the deployed sign-in failure and capture the redirect/configuration path.
+- [x] Compare the dev deployment environment and access protection with local and production behavior.
+- [x] Implement the smallest durable fix and add regression coverage.
+- [x] Verify sign-in initiation on the deployed dev alias, then commit and push the repair.
+
+## Review
+
+- The `dev` preview inherited the global production redirect because its branch override remained scoped to the retired pre-rename branch.
+- Browser auth now uses the initiating origin, `dev` has an explicit Vercel preview override, and focused auth tests, the popup redirect assertion, lint, type-check, production build, and whitespace checks pass.
+
 # PR #21 Copilot Review Loop
 
 - [x] Inspect authentication, PR metadata, review counts, and unresolved threads.

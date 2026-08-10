@@ -35,11 +35,12 @@ export function getAuthorityUrl(tenantId: string = "common"): string {
 /**
  * MSAL configuration for authentication
  */
-// Prefer the configured redirect URI; otherwise fall back to the current origin in the
-// browser so a missing env var doesn't silently point production sign-in at localhost.
+// Interactive browser flows must return to the origin that initiated them. This keeps
+// branch aliases and custom domains from inheriting a stale build-time redirect URI.
 const redirectUri =
+  (typeof window !== "undefined" ? window.location.origin : undefined) ||
   process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI ||
-  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+  "http://localhost:3000";
 
 export const msalConfig: Configuration = {
   auth: {

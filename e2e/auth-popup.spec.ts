@@ -9,5 +9,8 @@ test.describe("Sign-in", () => {
     const popup = await popupPromise;
 
     await popup.waitForURL(/login\.microsoftonline\.com/, { timeout: 30_000 });
+    expect(new URL(popup.url()).searchParams.get("redirect_uri")).toBe(
+      new URL(page.url()).origin
+    );
   });
 });
