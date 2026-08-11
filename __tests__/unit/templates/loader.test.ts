@@ -220,7 +220,7 @@ describe("template loader", () => {
               {
                 displayName: "Android Corporate",
                 description: "Android filter",
-                platform: "android",
+                platform: "androidForWork",
                 rule: '(device.osVersion -contains "14")',
               },
             ],
