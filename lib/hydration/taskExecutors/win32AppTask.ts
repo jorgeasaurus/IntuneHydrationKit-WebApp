@@ -163,7 +163,7 @@ async function fetchOptionalIcon(iconUrl: string | undefined): Promise<string | 
   }
 }
 
-async function getOwnedMatchingApps(
+async function getMatchingApps(
   template: Win32AppTemplate,
   context: ExecutionContext
 ): Promise<Win32LobApp[]> {
@@ -172,6 +172,18 @@ async function getOwnedMatchingApps(
   const matchingApps = (await getWin32LobApps(context.client)).filter((app) =>
     displayNameVariants.has(app.displayName.toLowerCase())
   );
+
+  if (recentApp && !matchingApps.some((app) => app.id === recentApp.id)) {
+    matchingApps.unshift(recentApp);
+  }
+  return matchingApps;
+}
+
+async function getOwnedMatchingApps(
+  template: Win32AppTemplate,
+  context: ExecutionContext
+): Promise<Win32LobApp[]> {
+  const matchingApps = await getMatchingApps(template, context);
   const ownershipResults = await Promise.all(matchingApps.map(async (app) => {
     if (isOwnedWin32App(app)) return app;
     if (!template.legacyOwnership) return null;
@@ -182,11 +194,7 @@ async function getOwnedMatchingApps(
     );
     return isLegacyOwnedWin32App(appDetails, template) ? appDetails : null;
   }));
-  const ownedApps = ownershipResults.filter((app) => app !== null);
-  if (recentApp && !ownedApps.some((app) => app.id === recentApp.id)) {
-    ownedApps.unshift(recentApp);
-  }
-  return ownedApps;
+  return ownershipResults.filter((app) => app !== null);
 }
 
 async function getDeleteCandidates(
@@ -215,7 +223,7 @@ export async function executeWin32AppTask(
 
   const existingApps = task.operation === "delete"
     ? await getDeleteCandidates(template, context)
-    : await getOwnedMatchingApps(template, context);
+    : await getMatchingApps(template, context);
 
   if (task.operation === "create") {
     if (existingApps.length > 0) {

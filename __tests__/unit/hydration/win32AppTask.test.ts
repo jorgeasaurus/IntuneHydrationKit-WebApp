@@ -142,7 +142,7 @@ describe("executeWin32AppTask", () => {
     );
   });
 
-  it("skips an owned legacy-name app but not an unrelated same-name app", async () => {
+  it("skips any matching app name without requiring hydration ownership", async () => {
     mockGetWin32LobApps.mockResolvedValueOnce([
       {
         id: "owned-app",
@@ -165,21 +165,12 @@ describe("executeWin32AppTask", () => {
         description: "Managed by another tool",
       },
     ]);
-    vi.stubGlobal("fetch", vi.fn()
-      .mockResolvedValueOnce(new Response(new Blob(["package"]), { status: 200 }))
-      .mockResolvedValueOnce(new Response("detected", { status: 200 }))
-      .mockResolvedValueOnce({
-        ok: true,
-        arrayBuffer: vi.fn().mockRejectedValue(new Error("icon body unavailable")),
-      } as unknown as Response));
-    mockReadIntuneWinPackage.mockResolvedValue({ setupFile: "Install-WinGetPackage.ps1" });
-    mockCreateWin32AppFromPackage.mockResolvedValue({ id: "new-owned-app" });
-
     await expect(executeWin32AppTask(task, createContext())).resolves.toMatchObject({
       success: true,
-      skipped: false,
-      createdId: "new-owned-app",
+      skipped: true,
+      error: "Already exists",
     });
+    expect(mockCreateWin32AppFromPackage).not.toHaveBeenCalled();
   });
 
   it("deletes every owned current or legacy name match", async () => {

@@ -1,5 +1,6 @@
 # Lessons
 
+- Create-mode duplicate checks must consider all name matches; ownership markers restrict delete mutations, not existence detection.
 - Result status colors must be selected for the dark glass surface itself; light-theme color variants can still render over the shared blue wallpaper.
 - Script documentation panels must use language-aware syntax tokens; plain monochrome source is hard to scan even when its base text contrast passes.
 - Same-origin API checks behind Vercel must account for the explicitly configured public deployment origin as well as the runtime request URL; branch aliases and immutable deployment hostnames can legitimately diverge.
