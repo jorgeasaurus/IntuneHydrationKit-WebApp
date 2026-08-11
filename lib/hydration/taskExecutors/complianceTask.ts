@@ -174,11 +174,16 @@ export async function executeComplianceTask(
     const targetName = template?.displayName ?? requestedName;
 
     if (!template && !context.cachedV2CompliancePolicies) {
-      context.cachedV2CompliancePolicies = await client.getCollection<{
-        id: string;
-        name: string;
-        description?: string;
-      }>("/deviceManagement/compliancePolicies?$select=id,name,description");
+      try {
+        context.cachedV2CompliancePolicies = await client.getCollection<{
+          id: string;
+          name: string;
+          description?: string;
+        }>("/deviceManagement/compliancePolicies?$select=id,name,description");
+      } catch (error) {
+        console.warn("[Engine:Compliance] V2 policy lookup failed; continuing with V1 deletion", error);
+        context.cachedV2CompliancePolicies = [];
+      }
     }
 
     const v2Policy = context.cachedV2CompliancePolicies?.find((existingPolicy) =>

@@ -397,10 +397,10 @@ describe("executeComplianceTask", () => {
     });
   });
 
-  it("deletes a directly selected V1 policy when no template is cached", async () => {
+  it("deletes a directly selected V1 policy when V2 discovery fails", async () => {
     const policyName = "[IHD] Legacy Windows Compliance";
     const client = createClient();
-    vi.mocked(client.getCollection).mockResolvedValue([]);
+    vi.mocked(client.getCollection).mockRejectedValue(new Error("V2 discovery failed"));
     mockCompliancePolicyExists.mockResolvedValue(true);
     mockDeleteCompliancePolicyByName.mockResolvedValue({ skipped: false });
 
