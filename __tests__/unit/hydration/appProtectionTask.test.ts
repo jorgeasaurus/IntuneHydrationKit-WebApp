@@ -70,25 +70,29 @@ describe("executeAppProtectionTask", () => {
       patch: vi.fn(),
     } as unknown as ExecutionContext["client"];
 
+    const cachedAppProtectionPolicies: NonNullable<
+      ExecutionContext["cachedAppProtectionPolicies"]
+    > = [
+      {
+        id: "ios-policy-id",
+        "@odata.type": "#microsoft.graph.iosManagedAppProtection",
+        displayName: "[IHD] iOS App Protection",
+        description: "Imported by Intune Hydration Kit",
+        _platform: "iOS",
+      },
+    ];
     const context: ExecutionContext = {
       client,
       operationMode: "delete",
       isPreview: false,
       stopOnFirstError: false,
-      cachedAppProtectionPolicies: [
-        {
-          id: "ios-policy-id",
-          "@odata.type": "#microsoft.graph.iosManagedAppProtection",
-          displayName: "[IHD] iOS App Protection",
-          description: "Imported by Intune Hydration Kit",
-          _platform: "iOS",
-        },
-      ],
+      cachedAppProtectionPolicies,
     };
 
     const result = await executeAppProtectionTask(task, context);
 
     expect(result).toMatchObject({ success: true, skipped: false });
     expect(mockDeleteAppProtectionPolicy).toHaveBeenCalledWith(client, "ios-policy-id", "iOS");
+    expect(cachedAppProtectionPolicies).toHaveLength(0);
   });
 });
