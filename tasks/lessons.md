@@ -1,5 +1,6 @@
 # Lessons
 
+- Keep service base URLs in server-safe modules shared by browser clients and server routes; do not couple endpoint constants to browser-only authentication code.
 - Parse large package payloads with `Uint8Array.subarray` views and pass those views directly to consumers; avoid full-size intermediate buffer copies.
 - Intune detection scripts must be read-only; if a dependency is unavailable, use a non-mutating fallback instead of bootstrapping software during detection.
 - Safe-delete discovery must preserve both name-match and ownership results so skip messages distinguish a protected app from an absent app.

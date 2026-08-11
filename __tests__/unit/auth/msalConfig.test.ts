@@ -47,7 +47,8 @@ describe("msalConfig", () => {
   });
 
   it("returns the correct graph endpoint and authority URL for the global cloud", async () => {
-    const { getAuthorityUrl, getGraphEndpoint } = await importModule();
+    const { getAuthorityUrl } = await importModule();
+    const { getGraphEndpoint } = await import("@/lib/graph/endpoints");
 
     expect(getGraphEndpoint()).toBe("https://graph.microsoft.com");
     expect(getAuthorityUrl()).toBe("https://login.microsoftonline.com/common");

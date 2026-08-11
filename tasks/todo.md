@@ -6,6 +6,7 @@
 - [x] Make Win32 detection read-only, correct Prism token mapping, and clarify protected-delete results.
 - [x] Distinguish protected delete matches from absent apps.
 - [x] Remove redundant full-payload copies from `.intunewin` parsing.
+- [x] Centralize the Graph base URL in a server-safe endpoint module.
 - [x] Verify, commit, push, and disposition all current-head comments.
 - [ ] Complete a clean Copilot review cycle on the latest head.
 - [ ] Squash-merge PR #21 and verify the merged state.
@@ -17,6 +18,7 @@
 - Protected delete candidates now report the ownership requirement, and PowerShell `class-name` tokens receive the intended syntax color.
 - Delete discovery now preserves whether any app name matched, so absent apps report `Not found in tenant` while unowned matches report the ownership protection.
 - `.intunewin` ZIP entries now remain views over the package buffer, and the encrypted-content view goes directly to `Blob` without another full-payload slice.
+- The Graph client and Win32 upload authorization now use the same server-safe endpoint helper.
 - Checks passed: 559 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
 
 # Win32 Single-App Selection

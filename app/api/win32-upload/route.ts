@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
+import { getGraphEndpoint } from "@/lib/graph/endpoints";
 
 const BLOCK_SIZE_BYTES = 6 * 1024 * 1024;
 const MAX_PACKAGE_SIZE_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_UPLOAD_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 5000;
 const BLOCK_ID_INDEX_WIDTH = 8;
-const GRAPH_ENDPOINT = "https://graph.microsoft.com";
 const VALID_UPLOAD_STATES = new Set([
   "azureStorageUriRequestSuccess",
   "azureStorageUriRenewalSuccess",
@@ -68,7 +68,7 @@ async function authorizeUploadTarget(
   }
 
   const graphResponse = await fetch(
-    `${GRAPH_ENDPOINT}/beta${contentFileEndpoint}?$select=azureStorageUri,uploadState`,
+    `${getGraphEndpoint()}/beta${contentFileEndpoint}?$select=azureStorageUri,uploadState`,
     {
       method: "GET",
       headers: {

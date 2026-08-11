@@ -19,13 +19,6 @@ export const REQUIRED_SCOPES = [
 ];
 
 /**
- * Get the Graph API endpoint (global/commercial cloud only)
- */
-export function getGraphEndpoint(): string {
-  return "https://graph.microsoft.com";
-}
-
-/**
  * Get the authority URL for a tenant (global/commercial cloud only)
  */
 export function getAuthorityUrl(tenantId: string = "common"): string {

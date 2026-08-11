@@ -1,5 +1,5 @@
 import { getAccessToken } from "@/lib/auth/authUtils";
-import { getGraphEndpoint } from "@/lib/auth/msalConfig";
+import { getGraphEndpoint } from "@/lib/graph/endpoints";
 import { GraphResponse } from "@/types/graph";
 import { retryWithBackoff } from "@/lib/utils/retry";
 import { BatchRequest, BatchResult } from "./batch";
