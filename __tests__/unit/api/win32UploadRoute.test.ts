@@ -66,7 +66,7 @@ describe("POST /api/win32-upload", () => {
       expect.objectContaining({
         method: "PUT",
         redirect: "manual",
-        headers: expect.objectContaining({ "Content-Type": "text/plain; charset=UTF-8" }),
+        headers: expect.objectContaining({ "Content-Type": "application/xml; charset=UTF-8" }),
         body: '<?xml version="1.0" encoding="utf-8"?><BlockList><Latest>MDAwMDAwMDA=</Latest></BlockList>',
       })
     );

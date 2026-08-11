@@ -8,6 +8,7 @@
 - [x] Remove redundant full-payload copies from `.intunewin` parsing.
 - [x] Centralize the Graph base URL in a server-safe endpoint module.
 - [x] Remove per-block copies from server-side Azure uploads.
+- [x] Send the Azure block list with an XML content type.
 - [x] Verify, commit, push, and disposition all current-head comments.
 - [ ] Complete a clean Copilot review cycle on the latest head.
 - [ ] Squash-merge PR #21 and verify the merged state.
@@ -21,6 +22,7 @@
 - `.intunewin` ZIP entries now remain views over the package buffer, and the encrypted-content view goes directly to `Blob` without another full-payload slice.
 - The Graph client and Win32 upload authorization now use the same server-safe endpoint helper.
 - Azure block uploads now reuse one 6 MB buffer and send full or tail views without per-block copies.
+- Azure block-list commits now declare the XML body as `application/xml`.
 - Checks passed: 559 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
 
 # Win32 Single-App Selection

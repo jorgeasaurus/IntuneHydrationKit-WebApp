@@ -176,7 +176,7 @@ async function commitBlockList(uploadUrl: string, blockIds: string[]): Promise<v
     method: "PUT",
     headers: {
       "Content-Length": String(Buffer.byteLength(content)),
-      "Content-Type": "text/plain; charset=UTF-8",
+      "Content-Type": "application/xml; charset=UTF-8",
     },
     body: content,
   });
