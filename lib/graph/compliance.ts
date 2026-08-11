@@ -1,4 +1,3 @@
-/* oxlint-disable react-doctor/async-await-in-loop -- Graph writes are intentionally sequenced to preserve throttling and deterministic error handling. */
 /**
  * Microsoft Graph API operations for Compliance Policies
  */
@@ -33,7 +32,7 @@ interface DeviceComplianceScript {
 /**
  * Get all device compliance scripts
  */
-export async function getAllDeviceComplianceScripts(
+async function getAllDeviceComplianceScripts(
   client: GraphClient
 ): Promise<DeviceComplianceScript[]> {
   return client.getCollection<DeviceComplianceScript>(
@@ -44,7 +43,7 @@ export async function getAllDeviceComplianceScripts(
 /**
  * Get a device compliance script by display name
  */
-export async function getDeviceComplianceScriptByName(
+async function getDeviceComplianceScriptByName(
   client: GraphClient,
   displayName: string
 ): Promise<DeviceComplianceScript | null> {
@@ -57,7 +56,7 @@ export async function getDeviceComplianceScriptByName(
 /**
  * Create a device compliance script for Custom Compliance
  */
-export async function createDeviceComplianceScript(
+async function createDeviceComplianceScript(
   client: GraphClient,
   definition: DeviceComplianceScriptDefinition,
   fallbackDisplayName: string
@@ -81,26 +80,16 @@ export async function createDeviceComplianceScript(
 /**
  * Get all compliance policies in the tenant
  */
-export async function getAllCompliancePolicies(
+async function getAllCompliancePolicies(
   client: GraphClient
 ): Promise<CompliancePolicy[]> {
   return client.getCollection<CompliancePolicy>("/deviceManagement/deviceCompliancePolicies");
 }
 
 /**
- * Get compliance policies created by Intune Hydration Kit
- */
-export async function getHydrationKitCompliancePolicies(
-  client: GraphClient
-): Promise<CompliancePolicy[]> {
-  const policies = await getAllCompliancePolicies(client);
-  return policies.filter((policy) => hasHydrationMarker(policy.description));
-}
-
-/**
  * Get a compliance policy by ID
  */
-export async function getCompliancePolicyById(
+async function getCompliancePolicyById(
   client: GraphClient,
   policyId: string
 ): Promise<CompliancePolicy> {
@@ -112,7 +101,7 @@ export async function getCompliancePolicyById(
 /**
  * Get a compliance policy by display name
  */
-export async function getCompliancePolicyByName(
+async function getCompliancePolicyByName(
   client: GraphClient,
   displayName: string
 ): Promise<CompliancePolicy | null> {
@@ -132,17 +121,6 @@ export async function compliancePolicyExists(
 ): Promise<boolean> {
   const policy = await getCompliancePolicyByName(client, displayName);
   return policy !== null;
-}
-
-/**
- * Get compliance policies by platform type
- */
-export async function getCompliancePoliciesByPlatform(
-  client: GraphClient,
-  odataType: string
-): Promise<CompliancePolicy[]> {
-  const policies = await getAllCompliancePolicies(client);
-  return policies.filter((policy) => policy["@odata.type"] === odataType);
 }
 
 /**
@@ -237,24 +215,10 @@ export async function createCompliancePolicy(
 }
 
 /**
- * Update an existing compliance policy
- */
-export async function updateCompliancePolicy(
-  client: GraphClient,
-  policyId: string,
-  updates: Partial<CompliancePolicy>
-): Promise<CompliancePolicy> {
-  return client.patch<CompliancePolicy>(
-    `/deviceManagement/deviceCompliancePolicies/${policyId}`,
-    updates
-  );
-}
-
-/**
  * Delete a compliance policy by ID
  * Only deletes if created by Intune Hydration Kit and has no active assignments
  */
-export async function deleteCompliancePolicy(
+async function deleteCompliancePolicy(
   client: GraphClient,
   policyId: string
 ): Promise<DeletionResult> {
@@ -301,141 +265,11 @@ export async function deleteCompliancePolicyByName(
 /**
  * Get assignments for a compliance policy
  */
-export async function getCompliancePolicyAssignments(
+async function getCompliancePolicyAssignments(
   client: GraphClient,
   policyId: string
 ): Promise<unknown[]> {
   return client.getCollection(
     `/deviceManagement/deviceCompliancePolicies/${policyId}/assignments`
   );
-}
-
-/**
- * Assign a compliance policy to a group
- */
-export async function assignCompliancePolicy(
-  client: GraphClient,
-  policyId: string,
-  groupId: string,
-  filterId?: string,
-  filterMode?: "include" | "exclude"
-): Promise<unknown> {
-  const assignment = {
-    target: {
-      "@odata.type": "#microsoft.graph.groupAssignmentTarget",
-      groupId,
-      deviceAndAppManagementAssignmentFilterId: filterId || null,
-      deviceAndAppManagementAssignmentFilterType: filterMode || "none",
-    },
-  };
-
-  return client.post(
-    `/deviceManagement/deviceCompliancePolicies/${policyId}/assignments`,
-    assignment
-  );
-}
-
-/**
- * Get compliance policy device status
- */
-export async function getCompliancePolicyDeviceStatus(
-  client: GraphClient,
-  policyId: string
-): Promise<{
-  compliantDeviceCount: number;
-  nonCompliantDeviceCount: number;
-  errorDeviceCount: number;
-  conflictDeviceCount: number;
-}> {
-  try {
-    const status = await client.get<{
-      compliantDeviceCount: number;
-      nonCompliantDeviceCount: number;
-      errorDeviceCount: number;
-      conflictDeviceCount: number;
-    }>(`/deviceManagement/deviceCompliancePolicies/${policyId}/deviceStatuses`);
-    return status;
-  } catch {
-    // Return zeros if status not available
-    return {
-      compliantDeviceCount: 0,
-      nonCompliantDeviceCount: 0,
-      errorDeviceCount: 0,
-      conflictDeviceCount: 0,
-    };
-  }
-}
-
-/**
- * Batch create multiple compliance policies
- * Returns array of results with success/failure status
- */
-export async function batchCreateCompliancePolicies(
-  client: GraphClient,
-  policies: CompliancePolicy[]
-): Promise<
-  Array<{ policy: CompliancePolicy; success: boolean; error?: string; id?: string }>
-> {
-  const results: Array<{
-    policy: CompliancePolicy;
-    success: boolean;
-    error?: string;
-    id?: string;
-  }> = [];
-
-  for (const policy of policies) {
-    try {
-      // Check if policy already exists
-      const exists = await compliancePolicyExists(client, policy.displayName);
-      if (exists) {
-        results.push({
-          policy,
-          success: false,
-          error: "Policy already exists",
-        });
-        continue;
-      }
-
-      // Create the policy
-      const createdPolicy = await createCompliancePolicy(client, policy);
-      results.push({
-        policy,
-        success: true,
-        id: createdPolicy.id,
-      });
-    } catch (error) {
-      results.push({
-        policy,
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
-
-  return results;
-}
-
-/**
- * Batch delete multiple compliance policies created by Intune Hydration Kit
- */
-export async function batchDeleteCompliancePolicies(
-  client: GraphClient,
-  policyIds: string[]
-): Promise<Array<{ policyId: string; success: boolean; error?: string }>> {
-  const results: Array<{ policyId: string; success: boolean; error?: string }> = [];
-
-  for (const policyId of policyIds) {
-    try {
-      await deleteCompliancePolicy(client, policyId);
-      results.push({ policyId, success: true });
-    } catch (error) {
-      results.push({
-        policyId,
-        success: false,
-        error: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
-
-  return results;
 }
