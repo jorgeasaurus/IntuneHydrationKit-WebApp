@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pause, Play, Square, Download, Layers } from "lucide-react";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
-import { format } from "date-fns";
+import { formatDateTime } from "@/lib/utils/dateFormat";
 
 interface ExecutionControlsProps {
   tasks: HydrationTask[];
@@ -134,12 +134,12 @@ export function ExecutionControls({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">Started</p>
-            <p className="font-medium">{format(startTime, "PPp")}</p>
+            <p className="font-medium">{formatDateTime(startTime)}</p>
           </div>
           {isCompleted && (
             <div>
               <p className="text-muted-foreground">Completed</p>
-              <p className="font-medium">{endTime ? format(endTime, "PPp") : "Completed"}</p>
+              <p className="font-medium">{endTime ? formatDateTime(endTime) : "Completed"}</p>
             </div>
           )}
         </div>
