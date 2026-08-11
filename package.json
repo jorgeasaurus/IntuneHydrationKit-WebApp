@@ -1,6 +1,6 @@
 {
   "name": "intune-hydration-kit-webapp",
-  "version": "2.6.22",
+  "version": "2.6.23",
   "private": true,
   "scripts": {
     "dev": "next dev",
