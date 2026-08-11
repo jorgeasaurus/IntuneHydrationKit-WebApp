@@ -614,63 +614,6 @@ export async function fetchBaselinePolicyByManifestFile(
   return transformOIBPolicy(policy as Record<string, unknown>, file);
 }
 
-/**
- * CIS Intune Baselines category structure
- */
-export interface CISBaselineCategory {
-  name: string;
-  path: string;
-  subcategories: string[];
-}
-
-export const CIS_BASELINE_CATEGORIES: CISBaselineCategory[] = [
-  {
-    name: "Android Benchmarks",
-    path: "1.0 - Android Benchmarks",
-    subcategories: ["Android Compliance", "Android Enterprise for Intune"],
-  },
-  {
-    name: "Apple Benchmarks",
-    path: "2.0 - Apple Benchmarks",
-    subcategories: ["Apple MacOS Compliance", "Apple MacOS for Intune", "Apple iOS Benchmarks", "Apple iOS Compliance"],
-  },
-  {
-    name: "Browser Benchmarks",
-    path: "3.0 - Browser Benchmarks",
-    subcategories: ["Google Chrome", "Microsoft Edge"],
-  },
-  {
-    name: "CIS Benchmarks",
-    path: "4.0 - CIS Benchmarks",
-    subcategories: ["CIS -  Intune for Windows 11 Benchmarks", "CIS - Apple Intune for MacOS 15"],
-  },
-  {
-    name: "Linux Benchmarks",
-    path: "5.0 - Linux Benchmarks",
-    subcategories: ["Linux Compliance"],
-  },
-  {
-    name: "Microsoft Endpoint Security",
-    path: "6.0 - Microsoft Endpoint Security Benchmarks",
-    subcategories: ["Microsoft Endpoint Security Antivirus", "Microsoft Endpoint Security Firewall"],
-  },
-  {
-    name: "Visual Studio Benchmarks",
-    path: "7.0 - Visual Studio Benchmarks",
-    subcategories: ["VS Code for Enterprise", "Visual Studio Enterprise 2017", "Visual Studio Enterprise 2019", "Visual Studio Enterprise 2022", "Visual Studio Professional 2017", "Visual Studio Professional 2019", "Visual Studio Professional 2022", "VisualStudio.com"],
-  },
-  {
-    name: "Windows 11 Benchmarks",
-    path: "8.0 - Windows 11 Benchmarks",
-    subcategories: ["Windows 11 - BitLocker", "Windows 11 - Edge - Machine", "Windows 11 - Intune Benchmarks", "Windows 11 - Microsoft 365 Apps"],
-  },
-  {
-    name: "Windows Cloud PC & AVD",
-    path: "9.0 - Windows Cloud PC and AVD",
-    subcategories: ["Azure Virtual Desktop", "Windows 365 Cloud PC"],
-  },
-];
-
 const CIS_BASELINES_PATH = "/CISIntuneBaselines";
 
 /**
