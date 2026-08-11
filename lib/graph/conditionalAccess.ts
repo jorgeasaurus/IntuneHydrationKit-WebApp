@@ -6,7 +6,12 @@
 import { GraphClient } from "./client";
 import type { ApiVersion } from "@/lib/graph/batch";
 import { ConditionalAccessPolicy } from "@/types/graph";
-import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import {
+  HYDRATION_MARKER,
+  HYDRATION_MARKER_LEGACY,
+  IMPORT_PREFIX,
+  hasHydrationMarker,
+} from "@/lib/utils/hydrationMarker";
 
 export const CONDITIONAL_ACCESS_POLICIES_ENDPOINT =
   "/identity/conditionalAccess/policies";
@@ -139,6 +144,30 @@ async function getConditionalAccessPolicyById(
   );
 }
 
+const CONDITIONAL_ACCESS_MARKER_SUFFIXES = [
+  " [intune hydration kit]",
+  ` [${HYDRATION_MARKER.toLowerCase()}]`,
+  ` [${HYDRATION_MARKER_LEGACY.toLowerCase()}]`,
+];
+
+function normalizeConditionalAccessPolicyName(displayName: string): string {
+  let normalized = displayName.trim().toLowerCase();
+  const importPrefix = IMPORT_PREFIX.toLowerCase();
+
+  if (normalized.startsWith(importPrefix)) {
+    normalized = normalized.slice(importPrefix.length);
+  }
+
+  const markerSuffix = CONDITIONAL_ACCESS_MARKER_SUFFIXES.find((suffix) =>
+    normalized.endsWith(suffix)
+  );
+  if (markerSuffix) {
+    normalized = normalized.slice(0, -markerSuffix.length);
+  }
+
+  return normalized.trim();
+}
+
 /**
  * Get a conditional access policy by display name
  */
@@ -147,21 +176,13 @@ async function getConditionalAccessPolicyByName(
   displayName: string
 ): Promise<ConditionalAccessPolicy | null> {
   const policies = await getAllConditionalAccessPolicies(client);
-  const lowerName = displayName.toLowerCase();
-  // Legacy short-form suffix used by older releases
-  const suffixedLowerName = `${lowerName} [intune hydration kit]`;
-  // Derived from HYDRATION_MARKER so lookup stays in sync with creation format
-  const fullMarkerLowerName = `${lowerName} [${HYDRATION_MARKER.toLowerCase()}]`;
+  const normalizedName = normalizeConditionalAccessPolicyName(displayName);
 
-  const found = policies.find((policy) => {
-    const policyLower = policy.displayName.toLowerCase();
-    return (
+  const found = policies.find(
+    (policy) =>
       hasHydrationMarker(policy.displayName) &&
-      (policyLower === lowerName ||
-        policyLower === suffixedLowerName ||
-        policyLower === fullMarkerLowerName)
-    );
-  });
+      normalizeConditionalAccessPolicyName(policy.displayName) === normalizedName
+  );
   return found || null;
 }
 

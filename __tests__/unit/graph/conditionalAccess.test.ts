@@ -33,6 +33,8 @@ describe("conditionalAccess graph helpers", () => {
       getCollection: vi.fn().mockResolvedValue([
         createPolicy({ displayName: "Require MFA" }),
         createPolicy({ displayName: "Block legacy auth [Imported by Intune Hydration Kit]" }),
+        createPolicy({ displayName: "Legacy policy [Imported by Intune-Hydration-Kit]" }),
+        createPolicy({ displayName: "[IHD] Prefix policy" }),
       ]),
     } as const;
 
@@ -42,6 +44,12 @@ describe("conditionalAccess graph helpers", () => {
     await expect(
       conditionalAccessPolicyExists(client as never, "Require MFA")
     ).resolves.toBe(false);
+    await expect(
+      conditionalAccessPolicyExists(client as never, "Legacy policy")
+    ).resolves.toBe(true);
+    await expect(
+      conditionalAccessPolicyExists(client as never, "Prefix policy")
+    ).resolves.toBe(true);
   });
 
   it("forces created policies to disabled state and appends the marker once", async () => {
