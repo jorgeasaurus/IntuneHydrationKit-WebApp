@@ -131,6 +131,7 @@ describe('TemplateCatalogPage', () => {
     })
 
     loadTemplateDocumentationPayload.mockResolvedValue({
+      '@odata.type': '#microsoft.graph.group',
       displayName: '[IHD] Intune - Windows Devices',
       membershipRule: '(device.deviceOSType -eq "Windows")',
       description: 'All Windows devices.',
@@ -166,6 +167,8 @@ describe('TemplateCatalogPage', () => {
     })
 
     expect(await screen.findByText(/Human-readable summary/i)).toBeInTheDocument()
+    expect(screen.getByText('OData type')).toBeInTheDocument()
+    expect(screen.getByText('#microsoft.graph.group')).toBeInTheDocument()
     expect(screen.getAllByText(/Dynamic Group/i).length).toBeGreaterThan(0)
     expect(screen.getByText(/Membership Rule/i)).toBeInTheDocument()
     expect(screen.getByText(/\(device\.deviceOSType -eq "Windows"\)/i)).toBeInTheDocument()

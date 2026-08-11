@@ -66,6 +66,10 @@ const PowerShellScriptPanel = dynamic(() =>
 );
 
 function formatSummaryLabel(key: string): string {
+  if (key === "@odata.type") {
+    return "OData type";
+  }
+
   const label = key
     .replace(/^@/, "")
     .replace(/^_+/, "")
