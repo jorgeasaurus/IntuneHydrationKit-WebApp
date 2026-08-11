@@ -8,7 +8,7 @@ import { HydrationTask, OperationMode, BatchProgress, TaskCategory, CISCategoryI
 import {
   DeviceGroup,
   DeviceFilter,
-  AppProtectionPolicy,
+  TenantAppProtectionPolicy,
 } from "@/types/graph";
 import { BaselinePolicy } from "@/lib/templates/loader";
 import type { Win32LobApp } from "@/lib/graph/win32Apps";
@@ -44,7 +44,7 @@ export interface ExecutionContext {
   shouldCancel?: () => boolean;
   shouldPause?: () => boolean;
   // Pre-fetched data caches to avoid repeated API calls
-  cachedAppProtectionPolicies?: AppProtectionPolicy[];
+  cachedAppProtectionPolicies?: TenantAppProtectionPolicy[];
   cachedIntuneGroups?: DeviceGroup[];
   cachedFilters?: DeviceFilter[];
   cachedWin32LobApps?: Win32LobApp[];

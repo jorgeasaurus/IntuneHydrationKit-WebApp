@@ -46,7 +46,7 @@ describe("executeAppProtectionTask", () => {
     expect(result).toMatchObject({
       success: false,
       skipped: false,
-      error: "Template not found",
+      error: "Template not found for [IHD] iOS App Protection. Reload templates and try again.",
     });
   });
 

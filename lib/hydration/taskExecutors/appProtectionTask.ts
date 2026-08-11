@@ -50,7 +50,12 @@ export async function executeAppProtectionTask(
 
   if (mode === "create") {
     if (!template) {
-      return { task, success: false, skipped: false, error: "Template not found" };
+      return {
+        task,
+        success: false,
+        skipped: false,
+        error: `Template not found for ${requestedName}. Reload templates and try again.`,
+      };
     }
 
     // Check if policy already exists using cached policies
