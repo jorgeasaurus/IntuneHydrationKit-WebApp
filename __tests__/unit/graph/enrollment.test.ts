@@ -19,9 +19,9 @@ import {
 import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
 import type {
   AutopilotDeploymentProfile,
+  DevicePreparationProfile,
   EnrollmentStatusPageConfiguration,
 } from "@/lib/graph/enrollment";
-import type { DevicePreparationProfile } from "@/templates/enrollment";
 
 function makeAutopilotProfile(
   overrides: Partial<AutopilotDeploymentProfile> = {}

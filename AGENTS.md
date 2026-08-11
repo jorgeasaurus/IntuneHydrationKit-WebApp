@@ -291,34 +291,17 @@ interface HydrationSummary {
 ### 7. Object Templates
 
 **Template Storage**:
-- Embed templates as TypeScript constants (mirrors PowerShell `Templates/` folder)
-- Separate files per category:
-  - `templates/compliance.ts`
-  - `templates/groups.ts`
-  - `templates/filters.ts`
-  - `templates/conditionalAccess.ts`
-  - `templates/appProtection.ts`
-  - `templates/enrollment.ts`
+- Store policy templates as JSON in `public/IntuneTemplates`.
+- Load templates through `lib/templates/loader.ts` before execution.
+- Keep shared types in their Graph domain modules. Do not add TypeScript template mirrors.
 
 **Template Structure**:
-```typescript
-interface PolicyTemplate {
-  '@odata.type': string;
-  displayName: string;
-  description: string;  // Must include: "Imported by Intune Hydration Kit"
-  [key: string]: any;  // Policy-specific properties
+```json
+{
+  "@odata.type": "#microsoft.graph.windows10CompliancePolicy",
+  "displayName": "Windows 11 - Security Baseline",
+  "description": "Imported by Intune Hydration Kit"
 }
-
-// Example: Compliance Policy Template
-export const WINDOWS_11_COMPLIANCE: PolicyTemplate = {
-  '@odata.type': '#microsoft.graph.windows10CompliancePolicy',
-  displayName: 'Windows 11 - Security Baseline',
-  description: 'Windows 11 compliance policy with security baseline requirements. Imported by Intune Hydration Kit',
-  passwordRequired: true,
-  passwordMinimumLength: 14,
-  osMinimumVersion: '10.0.22000.0',
-  // ... additional settings
-};
 ```
 
 **OpenIntuneBaseline Integration**:
