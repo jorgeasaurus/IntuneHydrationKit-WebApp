@@ -2,7 +2,8 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { act, render, screen, waitFor, within } from '@/__tests__/setup/test-utils'
-import { TargetSelection } from '@/components/wizard/TargetSelection'
+import { TargetSelectionView } from '@/components/wizard/TargetSelectionView'
+import { useTargetSelectionController } from '@/components/wizard/useTargetSelectionController'
 import { IMPORT_PREFIX } from '@/lib/utils/hydrationMarker'
 import type { CISBaselineManifest, OIBManifest } from '@/lib/templates/loader'
 import type { WizardState } from '@/types/hydration'
@@ -45,6 +46,12 @@ vi.mock('@/lib/templates/loader', async () => {
     fetchCISBaselineManifest: (...args: unknown[]) => fetchCISBaselineManifestMock(...args),
   }
 })
+
+function TargetSelectionHarness() {
+  const model = useTargetSelectionController()
+
+  return <TargetSelectionView model={model} />
+}
 
 function createState(overrides: Partial<WizardState> = {}): WizardState {
   return {
@@ -246,7 +253,7 @@ describe('TargetSelection', () => {
       previousStep,
     })
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('Entra Groups'))
     expect(await screen.findByLabelText(`${IMPORT_PREFIX}Windows Devices`)).toBeChecked()
@@ -268,7 +275,7 @@ describe('TargetSelection', () => {
   it('applies the Windows platform filter to matching categories, baseline, and CIS manifests', async () => {
     const user = userEvent.setup()
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('Windows'))
 
@@ -318,7 +325,7 @@ describe('TargetSelection', () => {
       previousStep,
     })
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByRole('button', { name: 'Review Selection' }))
 
@@ -335,7 +342,7 @@ describe('TargetSelection', () => {
   it('labels category icon buttons and exposes expansion state', async () => {
     const user = userEvent.setup()
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     const selectButton = screen.getByRole('button', { name: 'Select Entra Groups' })
     expect(selectButton).toHaveAttribute('aria-expanded', 'false')
@@ -353,7 +360,7 @@ describe('TargetSelection', () => {
   it('loads baseline policies, validates empty selections, and saves baseline choices on continue', async () => {
     const user = userEvent.setup()
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('OpenIntuneBaseline'))
     await waitFor(() => expect(fetchOIBManifestMock).toHaveBeenCalled())
@@ -392,7 +399,7 @@ describe('TargetSelection', () => {
   it('supports item-level group selection plus search-aware select and deselect actions', async () => {
     const user = userEvent.setup()
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('Entra Groups'))
     const windowsGroup = await screen.findByLabelText(`${IMPORT_PREFIX}Windows Devices`)
@@ -428,7 +435,7 @@ describe('TargetSelection', () => {
   it('filters baseline and CIS manifests by search and only clears matching policies', async () => {
     const user = userEvent.setup()
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('OpenIntuneBaseline'))
     await user.click(screen.getByLabelText('CIS Intune Baselines'))
@@ -471,7 +478,7 @@ describe('TargetSelection', () => {
   it('selects every category by default and clears all selections globally', async () => {
     const user = userEvent.setup()
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByRole('button', { name: 'Select All' }))
 
@@ -500,7 +507,7 @@ describe('TargetSelection', () => {
     fetchDynamicGroupsMock.mockReturnValueOnce(dynamicGroupsDeferred.promise)
     fetchStaticGroupsMock.mockResolvedValueOnce([])
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('Entra Groups'))
     expect(await screen.findByText('Loading entra groups...')).toBeInTheDocument()
@@ -527,7 +534,7 @@ describe('TargetSelection', () => {
     fetchOIBManifestMock.mockReturnValueOnce(baselineDeferred.promise)
     fetchCISBaselineManifestMock.mockReturnValueOnce(cisDeferred.promise)
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('OpenIntuneBaseline'))
     await user.click(screen.getByLabelText('CIS Intune Baselines'))
@@ -593,7 +600,7 @@ describe('TargetSelection', () => {
       ],
     })
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('OpenIntuneBaseline'))
     await waitFor(() => expect(fetchOIBManifestMock).toHaveBeenCalled())
@@ -670,7 +677,7 @@ describe('TargetSelection', () => {
       ],
     })
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('CIS Intune Baselines'))
     await waitFor(() => expect(fetchCISBaselineManifestMock).toHaveBeenCalled())
@@ -703,7 +710,7 @@ describe('TargetSelection', () => {
   it('derives selected CIS category ids from selected policy paths on continue', async () => {
     const user = userEvent.setup()
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     await user.click(screen.getByLabelText('CIS Intune Baselines'))
     await waitFor(() => expect(fetchCISBaselineManifestMock).toHaveBeenCalled())
@@ -782,7 +789,7 @@ describe('TargetSelection', () => {
       ],
     })
 
-    render(<TargetSelection />)
+    render(<TargetSelectionHarness />)
 
     const windowsPlatformFilter = document.getElementById('platform-filter-windows')
     const macosPlatformFilter = document.getElementById('platform-filter-macos')
