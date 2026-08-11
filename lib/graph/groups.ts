@@ -65,7 +65,7 @@ async function deleteGroup(client: GraphClient, groupId: string): Promise<void> 
 
   if (!hasHydrationMarker(group.description)) {
     throw new Error(
-      `Cannot delete group "${group.displayName}": Not created by Intune Hydration Kit`
+      `Cannot delete group "${group.displayName || groupId}": Not created by Intune Hydration Kit`
     );
   }
 

@@ -89,4 +89,18 @@ describe("graph/groups", () => {
     );
     expect(del).not.toHaveBeenCalled();
   });
+
+  it("uses the group id when an unsafe deletion response has no display name", async () => {
+    const get = vi.fn().mockResolvedValue(
+      makeGroup({ displayName: undefined, description: "Manually created" })
+    );
+    const getCollection = vi.fn().mockResolvedValue([
+      makeGroup({ id: "sparse-group", displayName: "Sparse Group" }),
+    ]);
+    const client = { get, getCollection, delete: vi.fn() } as unknown as GraphClient;
+
+    await expect(deleteGroupByName(client, "Sparse Group")).rejects.toThrow(
+      'Cannot delete group "sparse-group": Not created by Intune Hydration Kit'
+    );
+  });
 });
