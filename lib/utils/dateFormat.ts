@@ -1,6 +1,7 @@
 const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
+  hour12: true,
 });
 
 const pad2 = (value: number): string => String(value).padStart(2, "0");
