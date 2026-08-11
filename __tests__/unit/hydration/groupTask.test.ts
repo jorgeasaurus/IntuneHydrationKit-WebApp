@@ -3,19 +3,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
 
-const { mockGetCachedTemplates, mockGetDynamicGroupByName, mockCreateGroup, mockDeleteGroupByName } = vi.hoisted(() => ({
+const { mockGetCachedTemplates, mockCreateGroup, mockDeleteGroupByName } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
-  mockGetDynamicGroupByName: vi.fn(),
   mockCreateGroup: vi.fn(),
   mockDeleteGroupByName: vi.fn(),
 }));
 
 vi.mock("@/lib/templates/loader", () => ({
   getCachedTemplates: mockGetCachedTemplates,
-}));
-
-vi.mock("@/templates", () => ({
-  getDynamicGroupByName: mockGetDynamicGroupByName,
 }));
 
 vi.mock("@/lib/graph/groups", () => ({
@@ -48,7 +43,6 @@ describe("executeGroupTask", () => {
 
   it("returns an error when no matching group template exists", async () => {
     mockGetCachedTemplates.mockReturnValue(undefined);
-    mockGetDynamicGroupByName.mockReturnValue(undefined);
 
     const result = await executeGroupTask(task, {
       client: createClient(),
@@ -252,48 +246,6 @@ describe("executeGroupTask", () => {
       skipped: true,
       error: "Not found in tenant",
     });
-    expect(mockDeleteGroupByName).not.toHaveBeenCalled();
-  });
-
-  it("uses fallback templates for preview delete without mutating Graph", async () => {
-    mockGetCachedTemplates.mockReturnValue(undefined);
-    mockGetDynamicGroupByName.mockReturnValue({
-      "@odata.type": "#microsoft.graph.group",
-      displayName: "[IHD] All Windows Devices",
-      description: "Imported by Intune Hydration Kit",
-      groupTypes: ["DynamicMembership"],
-      mailEnabled: false,
-      mailNickname: "IHDAllWindowsDevices",
-      securityEnabled: true,
-      membershipRule: '(device.deviceOSType -eq "Windows")',
-      membershipRuleProcessingState: "On",
-    });
-
-    const result = await executeGroupTask(
-      { ...task, operation: "delete" },
-      {
-        client: createClient(),
-        operationMode: "delete",
-        isPreview: true,
-        stopOnFirstError: false,
-        cachedIntuneGroups: [
-          {
-            id: "tenant-group-id",
-            "@odata.type": "#microsoft.graph.group",
-            displayName: "All Windows Devices",
-            description: "Imported by Intune Hydration Kit",
-            groupTypes: ["DynamicMembership"],
-            mailEnabled: false,
-            mailNickname: "AllWindowsDevices",
-            securityEnabled: true,
-            membershipRule: '(device.deviceOSType -eq "Windows")',
-            membershipRuleProcessingState: "On",
-          },
-        ],
-      }
-    );
-
-    expect(result).toMatchObject({ success: true, skipped: false });
     expect(mockDeleteGroupByName).not.toHaveBeenCalled();
   });
 

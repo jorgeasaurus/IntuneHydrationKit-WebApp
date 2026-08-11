@@ -250,13 +250,6 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
   }
 
   if (!template) {
-    template = Templates.getDynamicGroupByName(task.itemName);
-    if (template) {
-      console.log(`[BatchExecutor:groups] Found template in Templates module for "${task.itemName}"`);
-    }
-  }
-
-  if (!template) {
     console.log(`[BatchExecutor:groups] ✗ No template found for "${task.itemName}"`);
     return { type: "error", reason: "Template not found" };
   }

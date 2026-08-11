@@ -8,7 +8,6 @@ import type { HydrationTask } from "@/types/hydration";
 const {
   mockGetCachedTemplates,
   mockGetAllTemplateCacheKeys,
-  mockGetDynamicGroupByName,
   mockGetDeviceFilterByName,
   mockGetBatchConfig,
   mockSleep,
@@ -17,7 +16,6 @@ const {
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockGetAllTemplateCacheKeys: vi.fn(),
-  mockGetDynamicGroupByName: vi.fn(),
   mockGetDeviceFilterByName: vi.fn(),
   mockGetBatchConfig: vi.fn(),
   mockSleep: vi.fn(),
@@ -38,7 +36,6 @@ vi.mock("@/templates", async () => {
   const actual = await vi.importActual("@/templates");
   return {
     ...actual,
-    getDynamicGroupByName: mockGetDynamicGroupByName,
     getDeviceFilterByName: mockGetDeviceFilterByName,
   };
 });
@@ -104,7 +101,6 @@ describe("batchExecutor branch coverage", () => {
     vi.clearAllMocks();
     mockGetCachedTemplates.mockReset();
     mockGetAllTemplateCacheKeys.mockReset();
-    mockGetDynamicGroupByName.mockReset();
     mockGetDeviceFilterByName.mockReset();
     mockGetBatchConfig.mockReturnValue(defaultBatchConfig);
     mockSleep.mockResolvedValue(undefined);
