@@ -1,5 +1,6 @@
 # Lessons
 
+- Operator-facing errors must state the current technical constraint and recovery action, not describe the implementation as a proof of concept.
 - Every item-selectable category must be included in wizard-state persistence and have single-item queue tests for create and delete modes.
 - When a proof-of-concept app leaves the inventory, remove its template, documentation entry, tests, package, icon, and wrapper assets together.
 - Convert browser byte arrays to base64 in bounded chunks; repeated single-byte string concatenation adds avoidable time and memory pressure.

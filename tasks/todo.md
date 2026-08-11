@@ -1,3 +1,16 @@
+# PR #21 Final Copilot Review and Merge
+
+- [x] Inspect normal threads and all historical suppressed comments.
+- [x] Fix the remaining valid `.intunewin` format-message comment with regression coverage.
+- [x] Verify, commit, push, and disposition the fix.
+- [ ] Complete a clean Copilot review cycle on the latest head.
+- [ ] Squash-merge PR #21 and verify the merged state.
+
+## Review
+
+- The parser now tells operators that supplied packages need stored ZIP entries without data descriptors; it no longer labels the production path as a proof of concept.
+- Checks passed: 555 tests, type-check, lint, production build, and `git diff --check`.
+
 # Win32 Single-App Selection
 
 - [x] Trace the selected Win32 item from Target Selection into task queue construction.

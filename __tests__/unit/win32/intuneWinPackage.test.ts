@@ -6,6 +6,17 @@ import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { getWin32AppTemplates } from "@/templates/win32Apps";
 
 describe("readIntuneWinPackage", () => {
+  it("describes the required ZIP format when an entry is compressed", async () => {
+    const packageBytes = new ArrayBuffer(30);
+    const view = new DataView(packageBytes);
+    view.setUint32(0, 0x04034b50, true);
+    view.setUint16(8, 8, true);
+
+    await expect(readIntuneWinPackage(packageBytes)).rejects.toThrow(
+      "The supplied .intunewin package must contain stored (uncompressed) ZIP entries without data descriptors."
+    );
+  });
+
   it.each(getWin32AppTemplates())("reads the supplied $displayName package metadata and encrypted content", async (template) => {
     const packageBytes = readFileSync(
       join(process.cwd(), `public${template.packageUrl}`)

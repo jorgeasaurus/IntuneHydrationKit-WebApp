@@ -38,7 +38,9 @@ function readStoredZipEntries(packageBytes: ArrayBuffer): ZipEntry[] {
     const extraLength = view.getUint16(offset + 28, true);
 
     if ((flags & 0x08) !== 0 || compressionMethod !== 0) {
-      throw new Error("This proof of concept supports supplied, stored .intunewin packages only.");
+      throw new Error(
+        "The supplied .intunewin package must contain stored (uncompressed) ZIP entries without data descriptors."
+      );
     }
 
     const contentStart = offset + 30 + nameLength + extraLength;
