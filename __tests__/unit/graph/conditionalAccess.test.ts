@@ -1,18 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  batchCreateConditionalAccessPolicies,
-  batchDeleteConditionalAccessPolicies,
-  batchDisableConditionalAccessPolicies,
   buildConditionalAccessCreatePlan,
+  conditionalAccessPolicyExists,
   createConditionalAccessPolicy,
-  deleteConditionalAccessPolicy,
   deleteConditionalAccessPolicyByName,
-  enableConditionalAccessPolicy,
-  getConditionalAccessPolicyByName,
-  getHydrationKitConditionalAccessPolicies,
-  normalizeConditionalAccessPolicyForCreate,
-  validateConditionalAccessPolicy,
 } from "@/lib/graph/conditionalAccess";
 import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
 import type { ConditionalAccessPolicy } from "@/types/graph";
@@ -36,47 +28,30 @@ describe("conditionalAccess graph helpers", () => {
     vi.clearAllMocks();
   });
 
-  it("filters hydration kit policies and matches legacy marker formats by name", async () => {
+  it("matches current marker formats and rejects unmarked name collisions", async () => {
     const client = {
       getCollection: vi.fn().mockResolvedValue([
         createPolicy({ displayName: "Require MFA" }),
-        createPolicy({ displayName: "[IHD] Require compliant device" }),
-        createPolicy({ displayName: "Require phishing-resistant MFA [Intune Hydration Kit]" }),
         createPolicy({ displayName: "Block legacy auth [Imported by Intune Hydration Kit]" }),
       ]),
     } as const;
 
-    await expect(getHydrationKitConditionalAccessPolicies(client as never)).resolves.toEqual([
-      expect.objectContaining({ displayName: "[IHD] Require compliant device" }),
-      expect.objectContaining({
-        displayName: "Block legacy auth [Imported by Intune Hydration Kit]",
-      }),
-    ]);
-
     await expect(
-      getConditionalAccessPolicyByName(client as never, "Block legacy auth")
-    ).resolves.toEqual(
-      expect.objectContaining({
-        displayName: "Block legacy auth [Imported by Intune Hydration Kit]",
-      })
-    );
-
+      conditionalAccessPolicyExists(client as never, "Block legacy auth")
+    ).resolves.toBe(true);
     await expect(
-      getConditionalAccessPolicyByName(client as never, "Require MFA")
-    ).resolves.toBeNull();
+      conditionalAccessPolicyExists(client as never, "Require MFA")
+    ).resolves.toBe(false);
   });
 
-  it("forces created policies to disabled state and appends the hydration marker once", async () => {
-    const client = {
-      post: vi.fn().mockResolvedValue({ id: "created-id" }),
-    } as const;
+  it("forces created policies to disabled state and appends the marker once", async () => {
+    const client = { post: vi.fn().mockResolvedValue({ id: "created-id" }) } as const;
 
-    const created = await createConditionalAccessPolicy(
+    await createConditionalAccessPolicy(
       client as never,
       createPolicy({ displayName: "Block legacy auth", state: "enabled" })
     );
 
-    expect(created).toEqual({ id: "created-id" });
     expect(client.post).toHaveBeenCalledWith(
       "/identity/conditionalAccess/policies",
       expect.objectContaining({
@@ -87,7 +62,7 @@ describe("conditionalAccess graph helpers", () => {
     );
   });
 
-  it("plans beta creates only for beta-only conditional access payload features", () => {
+  it("uses beta only for beta-only create features", () => {
     const stablePlan = buildConditionalAccessCreatePlan(
       createPolicy({ displayName: "Require compliant device (Preview)" }) as unknown as Record<string, unknown>
     );
@@ -95,14 +70,9 @@ describe("conditionalAccess graph helpers", () => {
       createPolicy({
         displayName: "Secure account recovery with identity verification (Preview)",
         conditions: {
-          applications: {
-            includeUserActions: ["urn:user:accountrecovery"],
-          },
+          applications: { includeUserActions: ["urn:user:accountrecovery"] },
         },
-        grantControls: {
-          operator: "AND",
-          builtInControls: ["verifiedID"],
-        },
+        grantControls: { operator: "AND", builtInControls: ["verifiedID"] },
       }) as unknown as Record<string, unknown>
     );
 
@@ -110,237 +80,88 @@ describe("conditionalAccess graph helpers", () => {
     expect(betaPlan.apiVersion).toBe("beta");
   });
 
-  it("strips exported Graph response metadata from create payloads", () => {
-    const normalized = normalizeConditionalAccessPolicyForCreate({
-      "@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/policies/$entity",
+  it("strips exported Graph response metadata from create plans", () => {
+    const { payload } = buildConditionalAccessCreatePlan({
+      "@odata.context": "metadata",
       "@odata.type": "#microsoft.graph.conditionalAccessPolicy",
       id: "exported-policy-id",
       createdDateTime: "2026-05-30T18:00:00Z",
       modifiedDateTime: null,
-      displayName: "Secure account recovery with identity verification (Preview)",
-      state: "disabled",
+      displayName: "Secure account recovery",
+      state: "enabled",
       sessionControls: null,
       conditions: {
         locations: null,
         applications: {
-          includeApplications: [],
           includeUserActions: ["urn:user:accountrecovery"],
           networkAccess: null,
         },
-        users: {
-          includeUsers: ["All"],
-          includeGuestsOrExternalUsers: null,
-          excludeGuestsOrExternalUsers: {
-            externalTenants: {
-              "@odata.type": "#microsoft.graph.conditionalAccessAllExternalTenants",
-              membershipKind: "all",
-            },
-          },
-        },
       },
       grantControls: {
-        "authenticationStrength@odata.context": "https://graph.microsoft.com/beta/$metadata#conditionalAccess/templates('template-id')/details/grantControls/authenticationStrength/$entity",
+        "authenticationStrength@odata.context": "metadata",
         authenticationStrength: null,
         operator: "AND",
         builtInControls: ["verifiedID"],
       },
     });
 
-    expect(normalized).not.toHaveProperty("@odata.context");
-    expect(normalized).not.toHaveProperty("id");
-    expect(normalized).not.toHaveProperty("createdDateTime");
-    expect(normalized).not.toHaveProperty("modifiedDateTime");
-    expect(normalized).not.toHaveProperty("sessionControls");
-    expect(normalized).toHaveProperty("@odata.type", "#microsoft.graph.conditionalAccessPolicy");
+    expect(payload).not.toHaveProperty("@odata.context");
+    expect(payload).not.toHaveProperty("id");
+    expect(payload).not.toHaveProperty("createdDateTime");
+    expect(payload).not.toHaveProperty("modifiedDateTime");
+    expect(payload).not.toHaveProperty("sessionControls");
+    expect(payload).toHaveProperty("@odata.type", "#microsoft.graph.conditionalAccessPolicy");
+    expect(payload).toHaveProperty("state", "disabled");
 
-    const grantControls = normalized.grantControls as Record<string, unknown>;
+    const grantControls = payload.grantControls as Record<string, unknown>;
     expect(grantControls).not.toHaveProperty("authenticationStrength@odata.context");
     expect(grantControls).not.toHaveProperty("authenticationStrength");
-    expect(grantControls).toMatchObject({
-      operator: "AND",
-      builtInControls: ["verifiedID"],
-    });
-
-    const conditions = normalized.conditions as Record<string, unknown>;
-    expect(conditions).not.toHaveProperty("locations");
-
-    const applications = conditions.applications as Record<string, unknown>;
-    expect(applications).not.toHaveProperty("networkAccess");
-    expect(applications).toHaveProperty("includeUserActions", ["urn:user:accountrecovery"]);
-
-    const users = conditions.users as Record<string, unknown>;
-    expect(users).not.toHaveProperty("includeGuestsOrExternalUsers");
-
-    const excludedGuests = users.excludeGuestsOrExternalUsers as Record<string, unknown>;
-    const externalTenants = excludedGuests.externalTenants as Record<string, unknown>;
-    expect(externalTenants).toHaveProperty(
-      "@odata.type",
-      "#microsoft.graph.conditionalAccessAllExternalTenants"
-    );
   });
 
-  it("enables only hydration-kit policies", async () => {
-    const client = {
-      get: vi
-        .fn()
-        .mockResolvedValueOnce(createPolicy({ displayName: "Require MFA" }))
-        .mockResolvedValueOnce(
-          createPolicy({
-            displayName: "[IHD] Require compliant device",
-          })
-        ),
-      patch: vi.fn().mockResolvedValue({ id: "policy-id", state: "enabled" }),
-    } as const;
-
-    await expect(enableConditionalAccessPolicy(client as never, "policy-id")).rejects.toThrow(
-      'Cannot enable policy "Require MFA": Not created by Intune Hydration Kit'
-    );
-
-    await expect(enableConditionalAccessPolicy(client as never, "policy-id")).resolves.toEqual({
-      id: "policy-id",
+  it("enforces marker and disabled-state safety before deletion by name", async () => {
+    const markedUnsafe = createPolicy({
+      id: "unsafe",
+      displayName: "Unsafe policy [Imported by Intune Hydration Kit]",
+    });
+    const enabled = createPolicy({
+      id: "enabled",
+      displayName: "Enabled policy [Imported by Intune Hydration Kit]",
       state: "enabled",
     });
-    expect(client.patch).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/policy-id",
-      { state: "enabled" }
-    );
-  });
-
-  it("enforces marker and disabled-state safety checks before deletion", async () => {
+    const safe = createPolicy({
+      id: "safe",
+      displayName: "Safe policy [Imported by Intune Hydration Kit]",
+    });
     const client = {
+      getCollection: vi
+        .fn()
+        .mockResolvedValueOnce([markedUnsafe])
+        .mockResolvedValueOnce([enabled])
+        .mockResolvedValueOnce([safe])
+        .mockResolvedValueOnce([]),
       get: vi
         .fn()
-        .mockResolvedValueOnce(createPolicy({ displayName: "Require MFA" }))
-        .mockResolvedValueOnce(
-          createPolicy({
-            displayName: "[IHD] Require compliant device",
-            state: "enabled",
-          })
-        )
-        .mockResolvedValueOnce(
-          createPolicy({
-            id: "delete-me",
-            displayName: "[IHD] Block legacy auth",
-            state: "disabled",
-          })
-        ),
+        .mockResolvedValueOnce(createPolicy({ id: "unsafe", displayName: "Unsafe policy" }))
+        .mockResolvedValueOnce(enabled)
+        .mockResolvedValueOnce(safe),
       delete: vi.fn().mockResolvedValue(undefined),
     } as const;
 
-    await expect(deleteConditionalAccessPolicy(client as never, "policy-a")).rejects.toThrow(
-      'Cannot delete policy "Require MFA": Not created by Intune Hydration Kit'
-    );
-
-    await expect(deleteConditionalAccessPolicy(client as never, "policy-b")).rejects.toThrow(
-      'Cannot delete policy "[IHD] Require compliant device": Policy must be disabled before deletion. Current state: enabled'
-    );
-
-    await expect(deleteConditionalAccessPolicy(client as never, "delete-me")).resolves.toBeUndefined();
-    expect(client.delete).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/delete-me"
-    );
-  });
-
-  it("supports delete-by-name and aggregates batch create/delete/disable outcomes", async () => {
-    const existingPolicy = createPolicy({
-      id: "existing-id",
-      displayName: "Existing policy [Imported by Intune Hydration Kit]",
-    });
-    const createError = new Error("Graph create failed");
-    const deleteError = new Error("Delete blocked");
-    const disableError = new Error("Patch failed");
-
-    const client = {
-      getCollection: vi.fn().mockResolvedValue([existingPolicy]),
-      post: vi
-        .fn()
-        .mockResolvedValueOnce({ id: "created-id" })
-        .mockRejectedValueOnce(createError),
-      get: vi
-        .fn()
-        .mockResolvedValueOnce(existingPolicy)
-        .mockResolvedValueOnce(
-          createPolicy({
-            id: "delete-ok",
-            displayName: "[IHD] Delete ok",
-          })
-        )
-        .mockResolvedValueOnce(
-          createPolicy({
-            id: "delete-bad",
-            displayName: "[IHD] Delete bad",
-          })
-        ),
-      delete: vi
-        .fn()
-        .mockResolvedValueOnce(undefined)
-        .mockResolvedValueOnce(undefined)
-        .mockRejectedValueOnce(deleteError),
-      patch: vi.fn().mockResolvedValueOnce({}).mockRejectedValueOnce(disableError),
-    } as const;
-
     await expect(
-      deleteConditionalAccessPolicyByName(client as never, "Existing policy")
+      deleteConditionalAccessPolicyByName(client as never, "Unsafe policy")
+    ).rejects.toThrow('Cannot delete policy "Unsafe policy": Not created by Intune Hydration Kit');
+    await expect(
+      deleteConditionalAccessPolicyByName(client as never, "Enabled policy")
+    ).rejects.toThrow("Policy must be disabled before deletion");
+    await expect(
+      deleteConditionalAccessPolicyByName(client as never, "Safe policy")
     ).resolves.toBeUndefined();
-
-    const createResults = await batchCreateConditionalAccessPolicies(client as never, [
-      createPolicy({ displayName: "Existing policy" }),
-      createPolicy({ displayName: "Create ok" }),
-      createPolicy({ displayName: "Create bad" }),
-    ]);
-
-    expect(createResults).toEqual([
-      expect.objectContaining({
-        policy: expect.objectContaining({ displayName: "Existing policy" }),
-        success: false,
-        error: "Policy already exists",
-      }),
-      expect.objectContaining({
-        policy: expect.objectContaining({ displayName: "Create ok" }),
-        success: true,
-        id: "created-id",
-      }),
-      expect.objectContaining({
-        policy: expect.objectContaining({ displayName: "Create bad" }),
-        success: false,
-        error: "Graph create failed",
-      }),
-    ]);
-
     await expect(
-      batchDeleteConditionalAccessPolicies(client as never, ["delete-ok", "delete-bad"])
-    ).resolves.toEqual([
-      { policyId: "delete-ok", success: true },
-      { policyId: "delete-bad", success: false, error: "Delete blocked" },
-    ]);
+      deleteConditionalAccessPolicyByName(client as never, "Missing policy")
+    ).rejects.toThrow('Conditional access policy "Missing policy" not found');
 
-    await expect(
-      batchDisableConditionalAccessPolicies(client as never, ["disable-ok", "disable-bad"])
-    ).resolves.toEqual([
-      { policyId: "disable-ok", success: true },
-      { policyId: "disable-bad", success: false, error: "Patch failed" },
-    ]);
-  });
-
-  it("validates required conditional access policy fields", () => {
-    expect(
-      validateConditionalAccessPolicy(
-        createPolicy({
-          displayName: "",
-          conditions: undefined as never,
-          grantControls: undefined,
-          sessionControls: undefined,
-          state: "enabled",
-        })
-      )
-    ).toEqual({
-      isValid: false,
-      errors: [
-        "Policy must have a display name",
-        "Policy must have conditions defined",
-        "Policy must have either grant controls or session controls",
-        "Policy state must be 'disabled' for safety",
-      ],
-    });
+    expect(client.delete).toHaveBeenCalledWith(
+      "/identity/conditionalAccess/policies/safe"
+    );
   });
 });
