@@ -75,16 +75,25 @@ const PLATFORM_DISPLAY_NAMES = {
   'WINDOWS365': 'Windows 365 Cloud PC',
 };
 
+function getExistingDisplayNames() {
+  if (!fs.existsSync(MANIFEST_PATH)) return new Map();
+
+  try {
+    const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+    if (!Array.isArray(manifest.files)) return new Map();
+
+    return new Map(manifest.files.map(file => [file.path, file.displayName]));
+  } catch {
+    console.warn('Existing manifest is invalid. Display-name aliases cannot be retained.');
+    return new Map();
+  }
+}
+
 function generateManifest() {
   console.log('Scanning OpenIntuneBaseline directory...');
 
   const jsonFiles = getJsonFiles(OIB_DIR);
-  const existingManifest = fs.existsSync(MANIFEST_PATH)
-    ? JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
-    : { files: [] };
-  const existingDisplayNames = new Map(
-    existingManifest.files.map(file => [file.path, file.displayName])
-  );
+  const existingDisplayNames = getExistingDisplayNames();
 
   console.log(`Found ${jsonFiles.length} JSON files`);
 
