@@ -1,3 +1,20 @@
+# Win32 Detection Scripts in Template Docs
+
+- [x] Trace the current lazy Win32 script-loading and documentation path.
+- [x] Load and display each Win32 detection script with PowerShell highlighting.
+- [x] Add catalog and component regression coverage.
+- [x] Run focused tests, type-check, lint, and review the diff.
+- [x] Increment the website version for the new pull request.
+- [ ] Complete a clean Copilot review cycle on the latest head.
+- [ ] Squash-merge the clean pull request and verify the merged state.
+
+## Review
+
+- Detection, install, and uninstall scripts now load together only after a Win32 template expands.
+- The detection script uses the same selectable, syntax-highlighted PowerShell panel as the other scripts.
+- Thermonuclear review completed in one round with zero actionable findings.
+- Checks passed: 560 tests, type-check, lint, production build, and `git diff --check`.
+
 # PR #21 Final Copilot Review and Merge
 
 - [x] Inspect normal threads and all historical suppressed comments.

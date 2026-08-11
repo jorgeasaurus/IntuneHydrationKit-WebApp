@@ -136,7 +136,11 @@ describe('template catalog', () => {
       'fetch',
       vi.fn((input: RequestInfo | URL) => {
         const url = String(input)
-        const operation = url.includes('/Install-') ? 'Install' : 'Uninstall'
+        const operation = url.includes('/Detect-')
+          ? 'Detect'
+          : url.includes('/Install-')
+            ? 'Install'
+            : 'Uninstall'
         return Promise.resolve(
           new Response(
             `$packageIdentifier = '7zip.7zip'\n${operation}-WinGetPackage $packageIdentifier`,
@@ -197,11 +201,13 @@ describe('template catalog', () => {
     await expect(loadTemplateDocumentationPayload(win32Item!)).resolves.toMatchObject({
       packageIdentifier: '7zip.7zip',
       setupFilePath: 'Install-WinGetPackage.ps1',
+      detectionScriptContent: expect.stringContaining('Detect-WinGetPackage'),
       installScriptContent: expect.stringContaining('Install-WinGetPackage'),
       uninstallScriptContent: expect.stringContaining('Uninstall-WinGetPackage'),
     })
-    expect(fetch).toHaveBeenNthCalledWith(1, '/win32-apps/7-zip/Install-WinGetPackage.ps1')
-    expect(fetch).toHaveBeenNthCalledWith(2, '/win32-apps/7-zip/Uninstall-WinGetPackage.ps1')
+    expect(fetch).toHaveBeenNthCalledWith(1, '/win32-apps/7-zip/Detect-WinGetPackage.ps1')
+    expect(fetch).toHaveBeenNthCalledWith(2, '/win32-apps/7-zip/Install-WinGetPackage.ps1')
+    expect(fetch).toHaveBeenNthCalledWith(3, '/win32-apps/7-zip/Uninstall-WinGetPackage.ps1')
   })
 
   it('identifies a Win32 script asset that cannot be loaded', async () => {
@@ -211,10 +217,11 @@ describe('template catalog', () => {
     )
     vi.mocked(fetch)
       .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValueOnce(new Response('install', { status: 200 }))
       .mockResolvedValueOnce(new Response('uninstall', { status: 200 }))
 
     await expect(loadTemplateDocumentationPayload(win32Item!)).rejects.toThrow(
-      'Unable to load the Win32 install script from /win32-apps/google-chrome/Install-WinGetPackage.ps1: 404 Not Found'
+      'Unable to load the Win32 detection script from /win32-apps/google-chrome/Detect-WinGetPackage.ps1: 404 Not Found'
     )
   })
 

@@ -188,6 +188,8 @@ describe('TemplateCatalogPage', () => {
       uninstallCommandLine: 'powershell.exe -File .\\Uninstall-WinGetPackage.ps1',
       applicableArchitectures: 'x64',
       allowAvailableUninstall: true,
+      detectionScriptContent:
+        "$packageIdentifier = '7zip.7zip'\nDetect-WinGetPackage $packageIdentifier",
       installScriptContent:
         "$packageIdentifier = '7zip.7zip'\nInstall-WinGetPackage $packageIdentifier",
       uninstallScriptContent:
@@ -202,6 +204,9 @@ describe('TemplateCatalogPage', () => {
     expect(await screen.findByText('Package Identifier')).toBeInTheDocument()
     expect(screen.getByText('7zip.7zip')).toBeInTheDocument()
     expect(screen.getByText('Install Command Line')).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Detection script' })).toHaveTextContent(
+      'Detect-WinGetPackage $packageIdentifier'
+    )
     expect(await screen.findByRole('region', { name: 'Install script' })).toHaveTextContent(
       'Install-WinGetPackage $packageIdentifier'
     )

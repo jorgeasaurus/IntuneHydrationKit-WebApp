@@ -537,13 +537,19 @@ export async function loadTemplateDocumentationPayload(
       return fetchCISBaselinePolicyByManifestFile(item.payloadSource.file);
     case "win32": {
       const template = item.payloadSource.template;
-      const [installScriptContent, uninstallScriptContent] = await Promise.all([
+      const [
+        detectionScriptContent,
+        installScriptContent,
+        uninstallScriptContent,
+      ] = await Promise.all([
+        fetchScriptContent(template.detectionScriptUrl, "Win32 detection script"),
         fetchScriptContent(template.installScriptUrl, "Win32 install script"),
         fetchScriptContent(template.uninstallScriptUrl, "Win32 uninstall script"),
       ]);
 
       return {
         ...template,
+        detectionScriptContent,
         installScriptContent,
         uninstallScriptContent,
       };

@@ -51,6 +51,7 @@ type PayloadState = {
 };
 
 interface Win32ScriptContents {
+  detectionScriptContent: string;
   installScriptContent: string;
   uninstallScriptContent: string;
 }
@@ -138,6 +139,7 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
     "_cisCategory",
     "_cisSubcategory",
     "_cisFilePath",
+    "detectionScriptContent",
     "installScriptContent",
     "uninstallScriptContent",
   ]);
@@ -192,6 +194,7 @@ function getWin32ScriptContents(payload: unknown): Win32ScriptContents | null {
 
   const record = payload as Record<string, unknown>;
   if (
+    typeof record.detectionScriptContent !== "string" ||
     typeof record.installScriptContent !== "string" ||
     typeof record.uninstallScriptContent !== "string"
   ) {
@@ -199,6 +202,7 @@ function getWin32ScriptContents(payload: unknown): Win32ScriptContents | null {
   }
 
   return {
+    detectionScriptContent: record.detectionScriptContent,
     installScriptContent: record.installScriptContent,
     uninstallScriptContent: record.uninstallScriptContent,
   };
@@ -863,7 +867,12 @@ export function TemplateCatalogPage() {
                                                     ) : null}
 
                                                     {win32Scripts ? (
-                                                      <div className="grid gap-4 xl:grid-cols-2">
+                                                      <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                                                        <PowerShellScriptPanel
+                                                          id={`${item.id}-detection-script`}
+                                                          title="Detection script"
+                                                          content={win32Scripts.detectionScriptContent}
+                                                        />
                                                         <PowerShellScriptPanel
                                                           id={`${item.id}-install-script`}
                                                           title="Install script"

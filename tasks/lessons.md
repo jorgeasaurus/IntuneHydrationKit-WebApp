@@ -1,5 +1,6 @@
 # Lessons
 
+- Treat merge as a separate final gate after review completion; check for newly arrived user direction immediately before the irreversible merge command.
 - Map internal camelCase category IDs to explicit user-facing labels; capitalization alone does not create readable names.
 - Preserve standard technology names and casing in generated labels; generic title casing turns `OData` into a typo.
 - Cache full Graph collections for one execution and update the cache after mutations; use direct recent-object lookups for eventual-consistency retries.
