@@ -107,7 +107,7 @@ export function buildConditionalAccessCreatePlan(
   policy: Record<string, unknown>
 ): ConditionalAccessCreatePlan {
   const displayName = typeof policy.displayName === "string" ? policy.displayName : "";
-  const markedDisplayName = hasHydrationMarker(displayName)
+  const markedDisplayName = hasConditionalAccessHydrationMarker(displayName)
     ? displayName
     : `${displayName} [${HYDRATION_MARKER}]`.trim();
   const payload = normalizeConditionalAccessPolicyForCreate({
@@ -149,6 +149,13 @@ const CONDITIONAL_ACCESS_MARKER_SUFFIXES = [
   ` [${HYDRATION_MARKER.toLowerCase()}]`,
   ` [${HYDRATION_MARKER_LEGACY.toLowerCase()}]`,
 ];
+
+function hasConditionalAccessHydrationMarker(displayName: string): boolean {
+  return (
+    hasHydrationMarker(displayName) ||
+    displayName.trim().toLowerCase().endsWith(" [intune hydration kit]")
+  );
+}
 
 function normalizeConditionalAccessPolicyName(displayName: string): string {
   let normalized = displayName.trim().toLowerCase();
@@ -195,7 +202,7 @@ async function getConditionalAccessPolicyByName(
 
   const matches = policies.filter(
     (policy) =>
-      hasHydrationMarker(policy.displayName) &&
+      hasConditionalAccessHydrationMarker(policy.displayName) &&
       normalizeConditionalAccessPolicyName(policy.displayName) === normalizedName
   );
 
@@ -255,7 +262,7 @@ async function deleteConditionalAccessPolicy(
   // First, verify the policy has the hydration marker and is disabled
   const policy = await getConditionalAccessPolicyById(client, policyId);
 
-  if (!hasHydrationMarker(policy.displayName)) {
+  if (!hasConditionalAccessHydrationMarker(policy.displayName)) {
     throw new Error(
       `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
     );

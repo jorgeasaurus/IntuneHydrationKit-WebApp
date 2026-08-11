@@ -28,12 +28,13 @@ describe("conditionalAccess graph helpers", () => {
     vi.clearAllMocks();
   });
 
-  it("matches current marker formats and rejects unmarked name collisions", async () => {
+  it("matches current and legacy marker formats and rejects unmarked name collisions", async () => {
     const client = {
       getCollection: vi.fn().mockResolvedValue([
         createPolicy({ displayName: "Require MFA" }),
         createPolicy({ displayName: "Block legacy auth [Imported by Intune Hydration Kit]" }),
         createPolicy({ displayName: "Legacy policy [Imported by Intune-Hydration-Kit]" }),
+        createPolicy({ displayName: "Short legacy policy [Intune Hydration Kit]" }),
         createPolicy({ displayName: "[IHD] Prefix policy" }),
       ]),
     } as const;
@@ -46,6 +47,9 @@ describe("conditionalAccess graph helpers", () => {
     ).resolves.toBe(false);
     await expect(
       conditionalAccessPolicyExists(client as never, "Legacy policy")
+    ).resolves.toBe(true);
+    await expect(
+      conditionalAccessPolicyExists(client as never, "Short legacy policy")
     ).resolves.toBe(true);
     await expect(
       conditionalAccessPolicyExists(client as never, "Prefix policy")
@@ -68,6 +72,14 @@ describe("conditionalAccess graph helpers", () => {
       }),
       "v1.0"
     );
+  });
+
+  it("preserves the legacy short marker in create plans", () => {
+    const { payload } = buildConditionalAccessCreatePlan(
+      createPolicy({ displayName: "Legacy policy [Intune Hydration Kit]" }) as unknown as Record<string, unknown>
+    );
+
+    expect(payload.displayName).toBe("Legacy policy [Intune Hydration Kit]");
   });
 
   it("uses beta only for beta-only create features", () => {
@@ -195,6 +207,24 @@ describe("conditionalAccess graph helpers", () => {
     );
     expect(client.delete).toHaveBeenCalledWith(
       "/identity/conditionalAccess/policies/current"
+    );
+  });
+
+  it("deletes policies with the legacy short marker", async () => {
+    const legacy = createPolicy({
+      id: "legacy-short",
+      displayName: "Legacy short policy [Intune Hydration Kit]",
+    });
+    const client = {
+      getCollection: vi.fn().mockResolvedValue([legacy]),
+      get: vi.fn().mockResolvedValue(legacy),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as const;
+
+    await deleteConditionalAccessPolicyByName(client as never, "Legacy short policy");
+
+    expect(client.delete).toHaveBeenCalledWith(
+      "/identity/conditionalAccess/policies/legacy-short"
     );
   });
 });
