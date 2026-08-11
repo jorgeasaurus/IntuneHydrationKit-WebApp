@@ -140,6 +140,12 @@ describe("POST /api/win32-upload", () => {
 
     expect(response.status).toBe(204);
     expect(fetchMock).toHaveBeenCalledTimes(4);
+    const fullBlock = fetchMock.mock.calls[1][1]?.body as Uint8Array;
+    const partialBlock = fetchMock.mock.calls[2][1]?.body as Uint8Array;
+    expect(fullBlock).toBeInstanceOf(Uint8Array);
+    expect(fullBlock.byteLength).toBe(6 * 1024 * 1024);
+    expect(partialBlock.byteLength).toBe((4 * 1024 * 1024) + 1);
+    expect(partialBlock.buffer).toBe(fullBlock.buffer);
   });
 
   it("retries a transient Azure block failure before committing", async () => {

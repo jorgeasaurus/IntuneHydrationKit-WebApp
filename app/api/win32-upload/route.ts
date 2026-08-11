@@ -146,7 +146,11 @@ function createBlockId(index: number): string {
   return Buffer.from(String(index).padStart(BLOCK_ID_INDEX_WIDTH, "0"), "ascii").toString("base64");
 }
 
-async function uploadBlock(uploadUrl: string, blockId: string, content: ArrayBuffer): Promise<void> {
+async function uploadBlock(
+  uploadUrl: string,
+  blockId: string,
+  content: Uint8Array<ArrayBuffer>
+): Promise<void> {
   const response = await fetchWithRetry(
     appendAzureQuery(uploadUrl, `comp=block&blockid=${encodeURIComponent(blockId)}`),
     {
@@ -211,7 +215,7 @@ async function uploadPackageInBlocks(uploadUrl: string, packageContent: Readable
       if (bufferedByteLength === BLOCK_SIZE_BYTES) {
         const blockId = createBlockId(blockIds.length);
         blockIds.push(blockId);
-        await uploadBlock(uploadUrl, blockId, blockBuffer.slice().buffer);
+        await uploadBlock(uploadUrl, blockId, blockBuffer);
         bufferedByteLength = 0;
       }
     }
@@ -224,7 +228,7 @@ async function uploadPackageInBlocks(uploadUrl: string, packageContent: Readable
   if (bufferedByteLength > 0) {
     const blockId = createBlockId(blockIds.length);
     blockIds.push(blockId);
-    await uploadBlock(uploadUrl, blockId, blockBuffer.slice(0, bufferedByteLength).buffer);
+    await uploadBlock(uploadUrl, blockId, blockBuffer.subarray(0, bufferedByteLength));
   }
 
   await commitBlockList(uploadUrl, blockIds);

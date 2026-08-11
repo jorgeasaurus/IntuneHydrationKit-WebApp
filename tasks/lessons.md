@@ -1,5 +1,6 @@
 # Lessons
 
+- Pass reusable `Uint8Array` views to block-upload requests; `slice()` adds one full block allocation for every upload.
 - Keep service base URLs in server-safe modules shared by browser clients and server routes; do not couple endpoint constants to browser-only authentication code.
 - Parse large package payloads with `Uint8Array.subarray` views and pass those views directly to consumers; avoid full-size intermediate buffer copies.
 - Intune detection scripts must be read-only; if a dependency is unavailable, use a non-mutating fallback instead of bootstrapping software during detection.
