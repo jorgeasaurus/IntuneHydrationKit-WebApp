@@ -80,7 +80,6 @@ export type { ExecutionContext, ExecutionResult, CISPolicyType, BuildTaskQueueOp
 export { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 export { detectCISPolicyType } from "./policyDetection";
 export {
-  buildTaskQueue,
   buildTaskQueueAsync,
   getEstimatedTaskCount,
   getEstimatedCategoryCount,
