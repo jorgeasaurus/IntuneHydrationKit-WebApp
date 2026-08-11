@@ -57,7 +57,7 @@ async function loadJsonTemplateFiles<T>(
     try {
       const response = await fetch(`${basePath}/${file}`);
       if (!response.ok) {
-        const message = `Failed to fetch ${fileLabel}: ${response.statusText}`;
+        const message = `Failed to fetch ${fileLabel}: HTTP ${response.status} ${response.statusText}`;
         if (options.warn) console.warn(message);
         else console.error(message);
         continue;
@@ -65,7 +65,7 @@ async function loadJsonTemplateFiles<T>(
 
       templates.push(...normalize(await response.json(), file));
     } catch (error) {
-      const message = `Error fetching ${fileLabel}:`;
+      const message = `Error loading ${fileLabel}:`;
       if (options.warn) console.warn(message, error);
       else console.error(message, error);
     }
