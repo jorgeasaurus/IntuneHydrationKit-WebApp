@@ -162,9 +162,11 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
       if (data.filters && Array.isArray(data.filters)) {
         const filters = data.filters.map((filter: RawFilterTemplate) => ({
           ...filter,
-          displayName: `${IMPORT_PREFIX}${filter.displayName}`,
+          displayName: addImportPrefix(filter.displayName),
           description: filter.description
-            ? `${filter.description} ${HYDRATION_MARKER}`
+            ? filter.description.includes(HYDRATION_MARKER)
+              ? filter.description
+              : `${filter.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
           platform: normalizeFilterPlatform(filter.platform),
         }));
