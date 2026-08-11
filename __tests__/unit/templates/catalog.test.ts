@@ -8,6 +8,7 @@ import {
   fetchBaselinePolicyByManifestFile,
   fetchCISBaselinePolicyByManifestFile,
 } from '@/lib/templates/loader'
+import { getWin32AppTemplates, TEMPLATE_METADATA } from '@/templates'
 
 vi.mock('@/lib/templates/loader', () => ({
   fetchDynamicGroups: vi.fn().mockResolvedValue([
@@ -125,6 +126,10 @@ vi.mock('@/lib/templates/loader', () => ({
 }))
 
 describe('template catalog', () => {
+  it('keeps Win32 metadata aligned with the shipped template inventory', () => {
+    expect(TEMPLATE_METADATA.win32Apps.count).toBe(getWin32AppTemplates().length)
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal(

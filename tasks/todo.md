@@ -2,6 +2,7 @@
 
 - [x] Inspect normal threads and all historical suppressed comments.
 - [x] Fix the remaining valid `.intunewin` format-message comment with regression coverage.
+- [x] Align the Win32 metadata count with the four shipped templates.
 - [x] Verify, commit, push, and disposition the fix.
 - [ ] Complete a clean Copilot review cycle on the latest head.
 - [ ] Squash-merge PR #21 and verify the merged state.
