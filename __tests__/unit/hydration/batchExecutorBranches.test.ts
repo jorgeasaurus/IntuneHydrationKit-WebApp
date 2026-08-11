@@ -8,7 +8,6 @@ import type { HydrationTask } from "@/types/hydration";
 const {
   mockGetCachedTemplates,
   mockGetAllTemplateCacheKeys,
-  mockGetDeviceFilterByName,
   mockGetBatchConfig,
   mockSleep,
   mockSleepWithExecutionControl,
@@ -16,7 +15,6 @@ const {
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockGetAllTemplateCacheKeys: vi.fn(),
-  mockGetDeviceFilterByName: vi.fn(),
   mockGetBatchConfig: vi.fn(),
   mockSleep: vi.fn(),
   mockSleepWithExecutionControl: vi.fn(),
@@ -29,14 +27,6 @@ vi.mock("@/lib/templates/loader", async () => {
     ...actual,
     getCachedTemplates: mockGetCachedTemplates,
     getAllTemplateCacheKeys: mockGetAllTemplateCacheKeys,
-  };
-});
-
-vi.mock("@/templates", async () => {
-  const actual = await vi.importActual("@/templates");
-  return {
-    ...actual,
-    getDeviceFilterByName: mockGetDeviceFilterByName,
   };
 });
 
@@ -101,7 +91,6 @@ describe("batchExecutor branch coverage", () => {
     vi.clearAllMocks();
     mockGetCachedTemplates.mockReset();
     mockGetAllTemplateCacheKeys.mockReset();
-    mockGetDeviceFilterByName.mockReset();
     mockGetBatchConfig.mockReturnValue(defaultBatchConfig);
     mockSleep.mockResolvedValue(undefined);
     mockSleepWithExecutionControl.mockResolvedValue("completed");
@@ -118,7 +107,6 @@ describe("batchExecutor branch coverage", () => {
 
       return undefined;
     });
-    mockGetDeviceFilterByName.mockReturnValue(undefined);
   });
 
   it("retries throttled create responses and updates the group cache after success", async () => {
@@ -609,7 +597,7 @@ describe("batchExecutor branch coverage", () => {
     expect(batch).not.toHaveBeenCalled();
   });
 
-  it("creates filter tasks from cached and fallback templates while skipping existing filters", async () => {
+  it("creates cached filter tasks while skipping existing filters", async () => {
     mockGetCachedTemplates.mockImplementation((category?: string) => {
       if (category === "groups") {
         return [
@@ -625,13 +613,13 @@ describe("batchExecutor branch coverage", () => {
           {
             displayName: "Cached Filter",
             description: "Cached filter description",
-            platform: "windows",
+            platform: "windows10AndLater",
             rule: '(device.deviceOwnership -eq "Company")',
           },
           {
             displayName: "Existing Filter",
             description: "Existing filter description",
-            platform: "windows",
+            platform: "windows10AndLater",
             rule: '(device.deviceOwnership -eq "Personal")',
           },
         ];
@@ -639,23 +627,8 @@ describe("batchExecutor branch coverage", () => {
 
       return undefined;
     });
-    mockGetDeviceFilterByName.mockImplementation((name: string) => {
-      if (name === "Fallback Filter") {
-        return {
-          "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-          displayName: "Fallback Filter",
-          description: "Fallback filter description",
-          platform: "androidForWork",
-          rule: '(device.enrollmentProfileName -eq "BYOD")',
-        };
-      }
-
-      return undefined;
-    });
-
     const cachedTask = createTask("filter-cached", "filters", "create", "Cached Filter");
     const existingTask = createTask("filter-existing", "filters", "create", "Existing Filter");
-    const fallbackTask = createTask("filter-fallback", "filters", "create", "Fallback Filter");
 
     const context: ExecutionContext = {
       client: {
@@ -675,21 +648,8 @@ describe("batchExecutor branch coverage", () => {
                 "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
                 displayName: "Cached Filter",
                 description: "Cached filter description. Imported by Intune Hydration Kit",
-                platform: "windows",
+                platform: "windows10AndLater",
                 rule: '(device.deviceOwnership -eq "Company")',
-              },
-            },
-            {
-              id: "req-2",
-              status: 201,
-              headers: {},
-              body: {
-                id: "fallback-filter-id",
-                "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-                displayName: "Fallback Filter",
-                description: "Fallback filter description. Imported by Intune Hydration Kit",
-                platform: "androidForWork",
-                rule: '(device.enrollmentProfileName -eq "BYOD")',
               },
             },
           ],
@@ -711,7 +671,7 @@ describe("batchExecutor branch coverage", () => {
     };
 
     const results = await executeTasksInBatches(
-      [cachedTask, existingTask, fallbackTask],
+      [cachedTask, existingTask],
       context
     );
 
@@ -728,12 +688,6 @@ describe("batchExecutor branch coverage", () => {
         skipped: false,
         createdId: "cached-filter-id",
       }),
-      expect.objectContaining({
-        task: fallbackTask,
-        success: true,
-        skipped: false,
-        createdId: "fallback-filter-id",
-      }),
     ]);
     expect(context.client.batch).toHaveBeenCalledWith(
       [
@@ -742,15 +696,7 @@ describe("batchExecutor branch coverage", () => {
           url: "/deviceManagement/assignmentFilters",
           body: expect.objectContaining({
             displayName: "Cached Filter",
-            platform: "windows",
-          }),
-        }),
-        expect.objectContaining({
-          id: "req-2",
-          url: "/deviceManagement/assignmentFilters",
-          body: expect.objectContaining({
-            displayName: "Fallback Filter",
-            platform: "androidForWork",
+            platform: "windows10AndLater",
           }),
         }),
       ],
@@ -759,7 +705,6 @@ describe("batchExecutor branch coverage", () => {
     expect(context.cachedFilters).toEqual([
       expect.objectContaining({ id: "existing-filter-id", displayName: "existing filter" }),
       expect.objectContaining({ id: "cached-filter-id", displayName: "Cached Filter" }),
-      expect.objectContaining({ id: "fallback-filter-id", displayName: "Fallback Filter" }),
     ]);
   });
 

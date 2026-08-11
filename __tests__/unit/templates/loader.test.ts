@@ -220,8 +220,14 @@ describe("template loader", () => {
               {
                 displayName: "Android Corporate",
                 description: "Android filter",
-                platform: "android",
+                platform: "androidForWork",
                 rule: '(device.osVersion -contains "14")',
+              },
+              {
+                displayName: "[IHD] Android Personal",
+                description: "Android personal filter Imported by Intune Hydration Kit",
+                platform: "android",
+                rule: '(device.deviceOwnership -eq "Personal")',
               },
             ],
           }),
@@ -254,6 +260,12 @@ describe("template loader", () => {
         description: "Android filter Imported by Intune Hydration Kit",
         platform: "android",
         rule: '(device.osVersion -contains "14")',
+      },
+      {
+        displayName: "[IHD] Android Personal",
+        description: "Android personal filter Imported by Intune Hydration Kit",
+        platform: "android",
+        rule: '(device.deviceOwnership -eq "Personal")',
       },
     ]);
     expect(errorSpy).toHaveBeenCalled();

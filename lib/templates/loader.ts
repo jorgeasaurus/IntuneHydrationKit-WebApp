@@ -7,11 +7,12 @@
 import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hydrationMarker";
 import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filterManifest";
 import { DYNAMIC_GROUP_TEMPLATE_PATHS } from "@/templates/groupManifest";
+import type { DeviceFilter } from "@/types/graph";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 21; // Include device trust type group and filter templates in cached sets
+const CACHE_VERSION = 22; // Normalize cached device filter platform values
 
 export interface GroupTemplate {
   displayName: string;
@@ -23,8 +24,24 @@ export interface GroupTemplate {
 export interface FilterTemplate {
   displayName: string;
   description: string;
-  platform: string;
+  platform: DeviceFilter["platform"];
   rule: string;
+}
+
+type RawFilterTemplate = Omit<FilterTemplate, "platform"> & { platform: string };
+
+function normalizeFilterPlatform(platform: string): FilterTemplate["platform"] {
+  switch (platform) {
+    case "androidForWork":
+      return "android";
+    case "android":
+    case "iOS":
+    case "macOS":
+    case "windows10AndLater":
+      return platform;
+    default:
+      throw new Error(`Unsupported device filter platform: ${platform}`);
+  }
 }
 
 export interface ComplianceTemplate {
@@ -143,12 +160,15 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
       const data = await response.json();
 
       if (data.filters && Array.isArray(data.filters)) {
-        const filters = data.filters.map((filter: FilterTemplate) => ({
+        const filters = data.filters.map((filter: RawFilterTemplate) => ({
           ...filter,
-          displayName: `${IMPORT_PREFIX}${filter.displayName}`,
+          displayName: addImportPrefix(filter.displayName),
           description: filter.description
-            ? `${filter.description} ${HYDRATION_MARKER}`
+            ? filter.description.includes(HYDRATION_MARKER)
+              ? filter.description
+              : `${filter.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
+          platform: normalizeFilterPlatform(filter.platform),
         }));
         allFilters.push(...filters);
       }
