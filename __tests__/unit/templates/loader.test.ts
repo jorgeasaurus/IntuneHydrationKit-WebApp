@@ -428,60 +428,16 @@ describe("template loader", () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
-  it("falls back to in-memory cache when sessionStorage quota is exceeded", () => {
-    const quotaError = new DOMException("Quota exceeded", "QuotaExceededError");
+  it("stores, lists, and clears templates in the module cache", () => {
+    cacheTemplates("module-test", [{ displayName: "Cached Policy" }]);
 
-    vi.spyOn(sessionStorage, "setItem").mockImplementation(() => {
-      throw quotaError;
-    });
-
-    cacheTemplates("quota-test", [{ displayName: "Cached Policy" }]);
-
-    expect(getCachedTemplates("quota-test")).toEqual([
+    expect(getCachedTemplates("module-test")).toEqual([
       { displayName: "Cached Policy" },
     ]);
-    expect(getAllTemplateCacheKeys()).toContain("intune-hydration-templates-quota-test");
+    expect(getAllTemplateCacheKeys()).toContain("intune-hydration-templates-module-test");
 
-    clearCategoryCache("quota-test");
-    expect(getCachedTemplates("quota-test")).toBeNull();
-  });
-
-  it("invalidates expired or version-mismatched session cache entries", () => {
-    sessionStorage.setItem(
-      "intune-hydration-templates-expired-test",
-      JSON.stringify({
-        templates: [{ displayName: "Old Policy" }],
-        timestamp: Date.now() - (2 * 60 * 60 * 1000),
-        version: 20,
-      })
-    );
-
-    sessionStorage.setItem(
-      "intune-hydration-templates-version-test",
-      JSON.stringify({
-        templates: [{ displayName: "Wrong Version Policy" }],
-        timestamp: Date.now(),
-        version: 18,
-      })
-    );
-
-    sessionStorage.setItem(
-      "intune-hydration-templates-filters",
-      JSON.stringify({
-        templates: [{ displayName: "[IHD] Windows - Dell Devices" }],
-        timestamp: Date.now(),
-        version: 19,
-      })
-    );
-
-    expect(getCachedTemplates("expired-test")).toBeNull();
-    expect(sessionStorage.getItem("intune-hydration-templates-expired-test")).toBeNull();
-
-    expect(getCachedTemplates("version-test")).toBeNull();
-    expect(sessionStorage.getItem("intune-hydration-templates-version-test")).toBeNull();
-
-    expect(getCachedTemplates("filters")).toBeNull();
-    expect(sessionStorage.getItem("intune-hydration-templates-filters")).toBeNull();
+    clearCategoryCache("module-test");
+    expect(getCachedTemplates("module-test")).toBeNull();
   });
 
   it("transforms OIB manifest files using the policy name and manifest metadata", async () => {
@@ -914,44 +870,6 @@ describe("template loader", () => {
 
     await expect(fetchCISBaselinePoliciesByCategories(["android"])).resolves.toEqual([]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("removes expired in-memory cache entries after a quota fallback", () => {
-    vi.spyOn(Date, "now")
-      .mockReturnValueOnce(0)
-      .mockReturnValue(2 * 60 * 60 * 1000);
-
-    vi.spyOn(sessionStorage, "setItem").mockImplementation(() => {
-      throw new DOMException("Quota exceeded", "QuotaExceededError");
-    });
-
-    cacheTemplates("memory-expired", [{ displayName: "Old cached item" }]);
-
-    expect(getCachedTemplates("memory-expired")).toBeNull();
-    expect(getAllTemplateCacheKeys()).not.toContain(
-      "intune-hydration-templates-memory-expired"
-    );
-  });
-
-  it("returns null when cached template JSON cannot be parsed", () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-    sessionStorage.setItem("intune-hydration-templates-invalid-json", "{");
-
-    expect(getCachedTemplates("invalid-json")).toBeNull();
-    expect(errorSpy).toHaveBeenCalled();
-  });
-
-  it("returns an empty cache key list when sessionStorage keys cannot be read", () => {
-    vi.spyOn(Object, "keys").mockImplementation((value: object) => {
-      if (value === sessionStorage) {
-        throw new Error("unavailable");
-      }
-
-      return Reflect.ownKeys(value).filter((key): key is string => typeof key === "string");
-    });
-
-    expect(getAllTemplateCacheKeys()).toEqual([]);
   });
 
   it("returns no CIS baseline policies when the manifest cannot be fetched", async () => {
