@@ -2,6 +2,7 @@ import { HydrationTask } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult } from "../types";
 import {
   createWin32AppFromPackage,
+  getWin32AppDisplayNameVariants,
   getWin32LobApps,
   isLegacyOwnedWin32App,
   isOwnedWin32App,
@@ -100,7 +101,7 @@ async function getRecentOwnedApp(
       `/deviceAppManagement/mobileApps/${recent.id}`,
       "beta"
     );
-    const displayNameVariants = new Set(getDisplayNameVariants(displayName));
+    const displayNameVariants = new Set(getWin32AppDisplayNameVariants(displayName));
     if (displayNameVariants.has(app.displayName.toLowerCase()) && isOwnedWin32App(app)) {
       return app;
     }
@@ -110,17 +111,6 @@ async function getRecentOwnedApp(
 
   forgetRecentWin32App(displayName);
   return null;
-}
-
-function getDisplayNameVariants(displayName: string): string[] {
-  const suffix = " - [IHD]";
-  const trimmedName = displayName.trim();
-  const baseName = trimmedName.toLowerCase().endsWith(suffix.toLowerCase())
-    ? trimmedName.slice(0, -suffix.length).trimEnd()
-    : trimmedName.replace(/^\[IHD\]\s+/i, "");
-
-  return [...new Set([`${baseName}${suffix}`, trimmedName, `[IHD] ${baseName}`, baseName])]
-    .map((name) => name.toLowerCase());
 }
 
 async function fetchSuppliedPackage(packageUrl: string): Promise<Blob> {
@@ -168,7 +158,7 @@ async function getMatchingApps(
   context: ExecutionContext
 ): Promise<Win32LobApp[]> {
   const recentApp = await getRecentOwnedApp(template.displayName, context);
-  const displayNameVariants = new Set(getDisplayNameVariants(template.displayName));
+  const displayNameVariants = new Set(getWin32AppDisplayNameVariants(template.displayName));
   const matchingApps = (await getWin32LobApps(context.client)).filter((app) =>
     displayNameVariants.has(app.displayName.toLowerCase())
   );

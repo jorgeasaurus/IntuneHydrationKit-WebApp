@@ -1,5 +1,6 @@
 # Lessons
 
+- Legacy ownership fingerprints must accept only the known display-name variants used by discovery; arbitrary renames must not weaken safe-delete checks.
 - Ownership-detail lookups in delete discovery must treat a missing candidate as an expected race, while other Graph errors must still fail the task.
 - A same-origin upload proxy must also require delegated authentication and confirm the exact Graph-issued target before it streams tenant content.
 - Authentication popup tests must intercept the identity-provider navigation; the redirect contract does not require live external network access.
@@ -23,8 +24,6 @@
 - Template documentation category cards should not display live fraction counts; stale manifest counts create visual noise and make category quality look broken.
 - Category-card buttons in stretched CSS grids need explicit top alignment; short descriptions can otherwise appear vertically centered next to taller cards.
 - Playwright e2e should use a dedicated local port by default; reusing any existing localhost server can accidentally validate the wrong app.
-- Theme toggles must prefer a persisted non-system app setting over `next-themes` reporting `system`; otherwise dark settings on a light OS can never cycle back to light.
-- For theme regressions, verify the visible screen state with Playwright screenshots and computed styles; HTML class/storage assertions alone can miss a dark-looking light mode.
 - If a UI already computes progress from source-of-truth data, use that computed value for the visual indicator; step-specific width classes drift when the step list changes.
 - For Edge/webhint diagnostics, avoid JSX `style` props for progress widths; prefer native progress elements or stylesheet-driven rendering tied to the computed value.
 - If static accessibility tooling flags JSX expressions in ARIA attributes, render literal `aria-*` values in explicit branches and omit irrelevant ARIA attributes.

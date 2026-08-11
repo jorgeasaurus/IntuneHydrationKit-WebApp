@@ -261,6 +261,17 @@ export function isOwnedWin32App(app: Win32LobApp): boolean {
   return hasFullHydrationMarker && hasWinGetMarker;
 }
 
+export function getWin32AppDisplayNameVariants(displayName: string): string[] {
+  const suffix = " - [IHD]";
+  const trimmedName = displayName.trim();
+  const baseName = trimmedName.toLowerCase().endsWith(suffix.toLowerCase())
+    ? trimmedName.slice(0, -suffix.length).trimEnd()
+    : trimmedName.replace(/^\[IHD\]\s+/i, "");
+
+  return [...new Set([`${baseName}${suffix}`, trimmedName, `[IHD] ${baseName}`, baseName])]
+    .map((name) => name.toLowerCase());
+}
+
 export function isLegacyOwnedWin32App(
   app: Win32LobApp,
   template: Win32AppTemplate
@@ -270,7 +281,9 @@ export function isLegacyOwnedWin32App(
 
   return (
     app["@odata.type"] === "#microsoft.graph.win32LobApp" &&
-    app.displayName.toLowerCase() === template.displayName.toLowerCase() &&
+    getWin32AppDisplayNameVariants(template.displayName).includes(
+      app.displayName.trim().toLowerCase()
+    ) &&
     app.description === fingerprint.description &&
     app.notes === fingerprint.notes &&
     app.publisher === fingerprint.publisher &&

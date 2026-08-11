@@ -186,6 +186,14 @@ describe("createWin32AppFromPackage", () => {
 
     expect(isLegacyOwnedWin32App(legacyApp, SEVEN_ZIP_WIN32_APP)).toBe(true);
     expect(isLegacyOwnedWin32App(
+      { ...legacyApp, displayName: "[IHD] 7-Zip" },
+      SEVEN_ZIP_WIN32_APP
+    )).toBe(true);
+    expect(isLegacyOwnedWin32App(
+      { ...legacyApp, displayName: "Renamed 7-Zip" },
+      SEVEN_ZIP_WIN32_APP
+    )).toBe(false);
+    expect(isLegacyOwnedWin32App(
       { ...legacyApp, setupFilePath: "unrelated-installer.exe" },
       SEVEN_ZIP_WIN32_APP
     )).toBe(false);
