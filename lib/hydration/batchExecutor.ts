@@ -53,7 +53,6 @@ import {
   logConditionalAccessCreateFailureDiagnostics,
   shouldLogConditionalAccessCreateFailure,
 } from "./conditionalAccessBatch";
-import * as Templates from "@/templates";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
 
 function markPreparedTasksCancelled(
@@ -371,14 +370,6 @@ function buildConditionalAccessRequestBody(task: HydrationTask): BuildBodyResult
 
   if (cachedPolicies && Array.isArray(cachedPolicies)) {
     template = (cachedPolicies as ConditionalAccessTemplate[]).find((p) => p.displayName === task.itemName);
-  }
-
-  if (!template) {
-    // Templates.getConditionalAccessPolicyByName returns ConditionalAccessPolicy type
-    const templatePolicy = Templates.getConditionalAccessPolicyByName(task.itemName);
-    if (templatePolicy) {
-      template = templatePolicy as { displayName: string; [key: string]: unknown };
-    }
   }
 
   if (!template) return { type: "error", reason: "Template not found" };
