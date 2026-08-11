@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { act, render, screen, waitFor, within } from '@/__tests__/setup/test-utils'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import { TargetSelectionView } from '@/components/wizard/TargetSelectionView'
 import { useTargetSelectionController } from '@/components/wizard/useTargetSelectionController'
 import { IMPORT_PREFIX } from '@/lib/utils/hydrationMarker'

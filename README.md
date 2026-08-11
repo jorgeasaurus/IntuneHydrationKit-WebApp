@@ -23,7 +23,7 @@ A web-based version of the [IntuneHydrationKit PowerShell module](https://github
 - **Language**: TypeScript (strict mode)
 - **Authentication**: MSAL React (@azure/msal-react)
 - **UI Components**: shadcn/ui (Radix UI + Tailwind CSS)
-- **State Management**: React Context + TanStack Query
+- **State Management**: React Context and local React state
 - **Styling**: Tailwind CSS with dark mode support
 - **Icons**: Lucide React
 - **Notifications**: Sonner

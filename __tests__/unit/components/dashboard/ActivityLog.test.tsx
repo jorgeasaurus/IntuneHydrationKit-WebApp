@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { format } from 'date-fns'
 
-import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
+import { render, screen, waitFor } from '@testing-library/react'
 import { ActivityLog } from '@/components/dashboard/ActivityLog'
 import type { ActivityMessage } from '@/lib/hydration/types'
 

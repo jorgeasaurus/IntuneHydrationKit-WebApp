@@ -438,7 +438,6 @@ const securityHeaders = [
 - useMsalAuthentication for protected routes
 
 **State Management**:
-- TanStack Query (React Query) for server state
 - React Context for app-level state (wizard progress, settings)
 - useState/useReducer for component state
 

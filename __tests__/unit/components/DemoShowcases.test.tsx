@@ -1,8 +1,7 @@
 import React from 'react'
-import { act } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
 import { TerminalDemo } from '@/components/TerminalDemo'
 import { WebAppDemo } from '@/components/WebAppDemo'
 import { WizardDemo } from '@/components/WizardDemo'

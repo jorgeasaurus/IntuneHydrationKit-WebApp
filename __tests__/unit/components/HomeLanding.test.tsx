@@ -2,7 +2,7 @@ import type { AnchorHTMLAttributes, ComponentProps } from 'react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
+import { render, screen } from '@testing-library/react'
 import { HomeLanding } from '@/components/landing/HomeLanding'
 import packageJson from '@/package.json'
 
