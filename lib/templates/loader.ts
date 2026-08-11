@@ -12,7 +12,7 @@ import type { DeviceFilter } from "@/types/graph";
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
 // Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 21; // Include device trust type group and filter templates in cached sets
+const CACHE_VERSION = 22; // Normalize cached device filter platform values
 
 export interface GroupTemplate {
   displayName: string;
