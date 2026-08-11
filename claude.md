@@ -282,7 +282,7 @@ interface HydrationSummary {
 **Template Storage**:
 - Store policy templates as JSON in `public/IntuneTemplates`.
 - Load templates through `lib/templates/loader.ts` before execution.
-- Keep shared types in their Graph domain modules. Do not add TypeScript template mirrors.
+- Keep shared types in their Graph domain modules. Do not add TypeScript mirrors for these policy templates.
 
 **Template Structure**:
 ```json
