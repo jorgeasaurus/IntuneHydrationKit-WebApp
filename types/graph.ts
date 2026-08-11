@@ -82,7 +82,7 @@ export interface ConditionalAccessPolicy {
 }
 
 export interface AppProtectionPolicy {
-  "@odata.type": string;
+  "@odata.type"?: string;
   id?: string;
   displayName: string;
   description: string;

@@ -75,7 +75,6 @@ describe("executeAppProtectionTask", () => {
     > = [
       {
         id: "ios-policy-id",
-        "@odata.type": "#microsoft.graph.iosManagedAppProtection",
         displayName: "[IHD] iOS App Protection",
         description: "Imported by Intune Hydration Kit",
         _platform: "iOS",

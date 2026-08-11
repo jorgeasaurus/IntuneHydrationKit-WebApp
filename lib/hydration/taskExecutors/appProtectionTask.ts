@@ -101,24 +101,30 @@ export async function executeAppProtectionTask(
       return { task, success: true, skipped: false };
     }
 
-    // Determine platform from @odata.type
-    const odataType = policy["@odata.type"];
-    let platform: "iOS" | "android";
+    // Tenant prefetch adds _platform because Graph list responses do not reliably include @odata.type.
+    let platform: "iOS" | "android" | undefined = policy._platform;
 
-    if (odataType === "#microsoft.graph.iosManagedAppProtection") {
-      platform = "iOS";
-    } else if (odataType === "#microsoft.graph.androidManagedAppProtection") {
-      platform = "android";
-    } else {
+    if (!platform) {
+      const odataType = policy["@odata.type"];
+      if (odataType === "#microsoft.graph.iosManagedAppProtection") {
+        platform = "iOS";
+      } else if (odataType === "#microsoft.graph.androidManagedAppProtection") {
+        platform = "android";
+      }
+    }
+
+    if (!platform) {
       // Fallback: check template's @odata.type if policy doesn't have it
       const templateOdataType = template?.["@odata.type"];
       if (templateOdataType === "#microsoft.graph.iosManagedAppProtection") {
         platform = "iOS";
       } else if (templateOdataType === "#microsoft.graph.androidManagedAppProtection") {
         platform = "android";
-      } else {
-        throw new Error(`Unable to determine platform for policy "${policy.displayName}"`);
       }
+    }
+
+    if (!platform) {
+      throw new Error(`Unable to determine platform for policy "${policy.displayName}"`);
     }
 
     // Delete the policy
