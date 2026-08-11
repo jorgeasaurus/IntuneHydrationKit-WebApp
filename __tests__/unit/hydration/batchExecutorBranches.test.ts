@@ -69,12 +69,10 @@ import {
 
 const defaultBatchConfig: BatchConfiguration = {
   defaultBatchSize: 20,
-  maxBatchSize: 20,
   delayBetweenBatches: 1000,
   enableBatching: true,
   categoryBatchSizes: {
     cisBaseline: 15,
-    baseline: 15,
   },
 };
 
