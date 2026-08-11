@@ -189,7 +189,6 @@ describe("useHydrationExecution", () => {
     mockGetBatchConfig.mockReturnValue({
       enableBatching: true,
       defaultBatchSize: 5,
-      maxBatchSize: 20,
       delayBetweenBatches: 0,
     });
     mockIsBatchableCategory.mockImplementation((category: string) => category === "groups");

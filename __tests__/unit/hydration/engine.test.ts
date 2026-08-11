@@ -153,7 +153,6 @@ describe("executeTasks", () => {
     mockGetBatchConfig.mockReturnValue({
       enableBatching: false,
       defaultBatchSize: 20,
-      maxBatchSize: 20,
       delayBetweenBatches: 0,
     });
     mockIsBatchableCategory.mockImplementation((category: string) =>
@@ -202,7 +201,6 @@ describe("executeTasks", () => {
     mockGetBatchConfig.mockReturnValue({
       enableBatching: true,
       defaultBatchSize: 3,
-      maxBatchSize: 20,
       delayBetweenBatches: 0,
     });
     mockGetIntuneGroups.mockResolvedValue([{ id: "existing-group" }]);
@@ -292,7 +290,6 @@ describe("executeTasks", () => {
     mockGetBatchConfig.mockReturnValue({
       enableBatching: true,
       defaultBatchSize: 2,
-      maxBatchSize: 20,
       delayBetweenBatches: 0,
     });
     mockExecuteTasksInBatches.mockResolvedValue([
@@ -324,7 +321,6 @@ describe("executeTasks", () => {
     mockGetBatchConfig.mockReturnValue({
       enableBatching: true,
       defaultBatchSize: 2,
-      maxBatchSize: 20,
       delayBetweenBatches: 0,
     });
     mockExecuteDeletesInParallel.mockResolvedValue([expectSuccess(batchTask)]);
