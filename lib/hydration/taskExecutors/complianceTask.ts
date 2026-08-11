@@ -17,7 +17,6 @@ import {
 } from "../policyCreators";
 import { getCachedTemplates, ComplianceTemplate } from "@/lib/templates/loader";
 import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
-import * as Templates from "@/templates";
 
 type V2ComplianceTemplate = ComplianceTemplate & {
   name?: string;
@@ -57,9 +56,8 @@ export async function executeComplianceTask(
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode, isPreview } = context;
   const requestedName = task.itemName;
-  const normalizedRequestedName = stripImportPrefix(requestedName);
 
-  // Try to get template from cache first, fallback to hardcoded templates
+  // Templates are loaded from the bundled JSON files before execution.
   let template: ComplianceTemplate | CompliancePolicy | undefined;
   const cachedCompliance = getCachedTemplates("compliance");
   if (cachedCompliance && Array.isArray(cachedCompliance)) {
@@ -68,18 +66,11 @@ export async function executeComplianceTask(
     );
   }
 
-  // Fallback to hardcoded templates if not in cache
-  if (!template) {
-    template =
-      Templates.getCompliancePolicyByName(requestedName) ??
-      Templates.getCompliancePolicyByName(normalizedRequestedName);
-  }
-
-  if (!template) {
-    return { task, success: false, skipped: false, error: "Template not found" };
-  }
-
   if (mode === "create") {
+    if (!template) {
+      return { task, success: false, skipped: false, error: "Template not found" };
+    }
+
     if (isV2ComplianceTemplate(template)) {
       const existsInCache = context.cachedV2CompliancePolicies?.some((policy) =>
         namesMatch(policy.name, template.displayName)
@@ -180,10 +171,27 @@ export async function executeComplianceTask(
       };
     }
   } else if (mode === "delete") {
-    if (isV2ComplianceTemplate(template)) {
-      let policy = context.cachedV2CompliancePolicies?.find((existingPolicy) =>
-        namesMatch(existingPolicy.name, template.displayName)
-      );
+    const targetName = template?.displayName ?? requestedName;
+
+    if (!template && !context.cachedV2CompliancePolicies) {
+      try {
+        context.cachedV2CompliancePolicies = await client.getCollection<{
+          id: string;
+          name: string;
+          description?: string;
+        }>("/deviceManagement/compliancePolicies?$select=id,name,description");
+      } catch (error) {
+        console.warn("[Engine:Compliance] V2 policy lookup failed; continuing with V1 deletion", error);
+        context.cachedV2CompliancePolicies = [];
+      }
+    }
+
+    const v2Policy = context.cachedV2CompliancePolicies?.find((existingPolicy) =>
+      namesMatch(existingPolicy.name, targetName)
+    );
+
+    if ((template && isV2ComplianceTemplate(template)) || v2Policy) {
+      let policy = v2Policy;
 
       if (!policy) {
         const allPolicies = await client.getCollection<{ id: string; name: string; description?: string }>(
@@ -191,7 +199,7 @@ export async function executeComplianceTask(
         );
         context.cachedV2CompliancePolicies = allPolicies;
         policy = allPolicies.find((existingPolicy) =>
-          namesMatch(existingPolicy.name, template.displayName)
+          namesMatch(existingPolicy.name, targetName)
         );
       }
 
@@ -230,7 +238,7 @@ export async function executeComplianceTask(
     }
 
     // Check if policy exists first
-    const exists = await compliancePolicyExists(client, template.displayName);
+    const exists = await compliancePolicyExists(client, targetName);
     if (!exists) {
       return { task, success: true, skipped: true, error: "Not found in tenant" };
     }
@@ -242,7 +250,7 @@ export async function executeComplianceTask(
 
     // Delete the policy with 504 verification
     try {
-      const result = await deleteCompliancePolicyByName(client, template.displayName);
+      const result = await deleteCompliancePolicyByName(client, targetName);
 
       // Check if skipped due to active assignments
       if (result.skipped) {
@@ -255,19 +263,19 @@ export async function executeComplianceTask(
 
       // Check if it's a 504 timeout error
       if (errorMessage.includes("504") || errorMessage.includes("Gateway Timeout")) {
-        console.log(`[Engine:Compliance] Got 504 for delete of "${template.displayName}", verifying if policy was deleted...`);
+        console.log(`[Engine:Compliance] Got 504 for delete of "${targetName}", verifying if policy was deleted...`);
 
         // Wait for async deletion to complete
         await new Promise(resolve => setTimeout(resolve, 5000));
 
         // Check if policy was actually deleted despite 504
-        const stillExists = await compliancePolicyExists(client, template.displayName);
+        const stillExists = await compliancePolicyExists(client, targetName);
         if (!stillExists) {
-          console.log(`[Engine:Compliance] Policy "${template.displayName}" was deleted despite 504 - marking as success`);
+          console.log(`[Engine:Compliance] Policy "${targetName}" was deleted despite 504 - marking as success`);
           return { task, success: true, skipped: false };
         }
 
-        console.log(`[Engine:Compliance] Policy "${template.displayName}" still exists after 504 - deletion failed`);
+        console.log(`[Engine:Compliance] Policy "${targetName}" still exists after 504 - deletion failed`);
       }
 
       // Policy not found or not created by hydration kit - skip

@@ -11,7 +11,6 @@ import {
 
 export * from "./filterManifest";
 export * from "./groupManifest";
-export * from "./compliance";
 export * from "./conditionalAccess";
 export * from "./win32Apps";
 export * from "./enrollment";
