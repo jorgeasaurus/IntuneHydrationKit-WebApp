@@ -1,20 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GraphClient } from "@/lib/graph/client";
-import {
-  createAndroidAppProtectionPolicy,
-  createiOSAppProtectionPolicy,
-  normalizeAppProtectionPolicyForCreate,
-} from "@/lib/graph/appProtection";
+import { createAppProtectionPolicy } from "@/lib/graph/appProtection";
 import type { AppProtectionPolicy } from "@/types/graph";
 import androidByodTemplate from "@/public/IntuneTemplates/AppProtection/Android - Baseline - BYOD - App Protection.json";
 import iosByodTemplate from "@/public/IntuneTemplates/AppProtection/iOS - Baseline - BYOD - App Protection.json";
 import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
 
 describe("appProtection create normalization", () => {
-  it("removes export-only Android BYOD fields before create", () => {
-    const normalized = normalizeAppProtectionPolicyForCreate(
+  it("removes export-only Android BYOD fields before create", async () => {
+    const postNoRetry = vi.fn().mockResolvedValue({ id: "android-policy-id" });
+    const client = { postNoRetry } as unknown as GraphClient;
+
+    await createAppProtectionPolicy(
+      client,
       androidByodTemplate as AppProtectionPolicy
     );
+    const normalized = postNoRetry.mock.calls[0][1] as AppProtectionPolicy;
 
     expect(normalized.displayName).toBe("Android - Baseline - BYOD - App Protection");
     expect(normalized.description).toBe(HYDRATION_MARKER);
@@ -39,10 +40,15 @@ describe("appProtection create normalization", () => {
     expect(normalized).not.toHaveProperty("exemptedAppPackages");
   });
 
-  it("removes export-only iOS BYOD fields before create", () => {
-    const normalized = normalizeAppProtectionPolicyForCreate(
+  it("removes export-only iOS BYOD fields before create", async () => {
+    const postNoRetry = vi.fn().mockResolvedValue({ id: "ios-policy-id" });
+    const client = { postNoRetry } as unknown as GraphClient;
+
+    await createAppProtectionPolicy(
+      client,
       iosByodTemplate as AppProtectionPolicy
     );
+    const normalized = postNoRetry.mock.calls[0][1] as AppProtectionPolicy;
 
     expect(normalized.displayName).toBe("iOS - Baseline - BYOD - App Protection");
     expect(normalized.description).toBe(HYDRATION_MARKER);
@@ -67,7 +73,7 @@ describe("appProtection create normalization", () => {
     const postNoRetry = vi.fn().mockResolvedValue({ id: "android-policy-id" });
     const client = { postNoRetry } as unknown as GraphClient;
 
-    await createAndroidAppProtectionPolicy(
+    await createAppProtectionPolicy(
       client,
       androidByodTemplate as AppProtectionPolicy
     );
@@ -86,7 +92,7 @@ describe("appProtection create normalization", () => {
     const postNoRetry = vi.fn().mockResolvedValue({ id: "ios-policy-id" });
     const client = { postNoRetry } as unknown as GraphClient;
 
-    await createiOSAppProtectionPolicy(client, iosByodTemplate as AppProtectionPolicy);
+    await createAppProtectionPolicy(client, iosByodTemplate as AppProtectionPolicy);
 
     expect(postNoRetry).toHaveBeenCalledWith(
       "/deviceAppManagement/iosManagedAppProtections",
@@ -112,7 +118,7 @@ describe("appProtection create normalization", () => {
       ]);
     const client = { postNoRetry, getCollection } as unknown as GraphClient;
 
-    const created = await createAndroidAppProtectionPolicy(
+    const created = await createAppProtectionPolicy(
       client,
       androidByodTemplate as AppProtectionPolicy
     );
