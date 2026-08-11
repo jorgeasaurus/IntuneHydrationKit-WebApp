@@ -27,6 +27,53 @@ export interface FilterTemplate {
 
 type RawFilterTemplate = Omit<FilterTemplate, "platform"> & { platform: string };
 
+interface RawJsonTemplate extends Record<string, unknown> {
+  "@odata.type"?: string;
+  description?: string;
+  displayName?: string;
+  filters?: RawFilterTemplate[];
+  groups?: GroupTemplate[];
+  name?: string;
+  platforms?: string;
+}
+
+interface JsonFileLoaderOptions {
+  basePath?: string;
+  fileLabel?: string;
+  warn?: boolean;
+}
+
+async function loadJsonTemplateFiles<T>(
+  files: readonly string[],
+  normalize: (template: RawJsonTemplate, file: string) => T[],
+  options: JsonFileLoaderOptions = {}
+): Promise<T[]> {
+  const templates: T[] = [];
+  const basePath = options.basePath ?? TEMPLATES_BASE_PATH;
+
+  for (const file of files) {
+    const fileLabel = options.fileLabel ? `${options.fileLabel} ${file}` : file;
+
+    try {
+      const response = await fetch(`${basePath}/${file}`);
+      if (!response.ok) {
+        const message = `Failed to fetch ${fileLabel}: HTTP ${response.status} ${response.statusText}`;
+        if (options.warn) console.warn(message);
+        else console.error(message);
+        continue;
+      }
+
+      templates.push(...normalize(await response.json(), file));
+    } catch (error) {
+      const message = `Error loading ${fileLabel}:`;
+      if (options.warn) console.warn(message, error);
+      else console.error(message, error);
+    }
+  }
+
+  return templates;
+}
+
 function normalizeFilterPlatform(platform: string): FilterTemplate["platform"] {
   switch (platform) {
     case "androidForWork":
@@ -71,20 +118,9 @@ function getTemplateFileName(filePath: string): string {
  * Fetch dynamic groups from local templates
  */
 export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
-  const allGroups: GroupTemplate[] = [];
-
-  for (const file of DYNAMIC_GROUP_TEMPLATE_PATHS) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      if (Array.isArray(data.groups)) {
-        const groups = data.groups.map((group: GroupTemplate) => ({
+  return loadJsonTemplateFiles(DYNAMIC_GROUP_TEMPLATE_PATHS, (data) =>
+    Array.isArray(data.groups)
+      ? data.groups.map((group) => ({
           ...group,
           displayName: group.displayName.startsWith(IMPORT_PREFIX)
             ? group.displayName
@@ -94,15 +130,9 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
               ? group.description
               : `${group.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
-        }));
-        allGroups.push(...groups);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
-    }
-  }
-
-  return allGroups;
+        }))
+      : []
+  );
 }
 
 /**
@@ -144,20 +174,9 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
  * Fetch device filters from local templates
  */
 export async function fetchFilters(): Promise<FilterTemplate[]> {
-  const allFilters: FilterTemplate[] = [];
-
-  for (const file of DEVICE_FILTER_TEMPLATE_PATHS) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      if (data.filters && Array.isArray(data.filters)) {
-        const filters = data.filters.map((filter: RawFilterTemplate) => ({
+  return loadJsonTemplateFiles(DEVICE_FILTER_TEMPLATE_PATHS, (data) =>
+    Array.isArray(data.filters)
+      ? data.filters.map((filter) => ({
           ...filter,
           displayName: addImportPrefix(filter.displayName),
           description: filter.description
@@ -166,15 +185,9 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
               : `${filter.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
           platform: normalizeFilterPlatform(filter.platform),
-        }));
-        allFilters.push(...filters);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
-    }
-  }
-
-  return allFilters;
+        }))
+      : []
+  );
 }
 
 /**
@@ -194,36 +207,22 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
     "Compliance/Linux-Compliance-Strict.json",
   ];
 
-  const allPolicies: ComplianceTemplate[] = [];
-
-  for (const file of complianceFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      // Compliance files contain single policy objects
-      // Some use @odata.type (Windows, iOS, macOS, Android), others use platforms/technologies (Linux)
-      if (data["@odata.type"] || data.platforms) {
-        const policy: ComplianceTemplate = {
-          ...data,
-          displayName: `${IMPORT_PREFIX}${data.displayName}`,
-          description: data.description
-            ? `${data.description} ${HYDRATION_MARKER}`
-            : HYDRATION_MARKER,
-        };
-        allPolicies.push(policy);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+  return loadJsonTemplateFiles(complianceFiles, (data) => {
+    // Compliance files contain single policy objects
+    // Some use @odata.type (Windows, iOS, macOS, Android), others use platforms/technologies (Linux)
+    if (data["@odata.type"] || data.platforms) {
+      const policy: ComplianceTemplate = {
+        ...data,
+        displayName: `${IMPORT_PREFIX}${data.displayName ?? ""}`,
+        description: data.description
+          ? `${data.description} ${HYDRATION_MARKER}`
+          : HYDRATION_MARKER,
+      };
+      return [policy];
     }
-  }
 
-  return allPolicies;
+    return [];
+  });
 }
 
 /**
@@ -254,34 +253,24 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
     "ConditionalAccess/Use application enforced restrictions for O365 apps.json",
   ];
 
-  const allPolicies: ConditionalAccessTemplate[] = [];
+  return loadJsonTemplateFiles(caFiles, (data, file) => {
+    const displayName = data.displayName ?? getTemplateFileName(file);
 
-  for (const file of caFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-      const displayName = data.displayName ?? getTemplateFileName(file);
-
-      // CA policy files contain single policy objects
-      if (displayName) {
-        const policy: ConditionalAccessTemplate = {
-          ...data,
-          displayName: `${IMPORT_PREFIX}${displayName}`,
-          state: "disabled", // CA policies are always created in disabled state
-        };
-        allPolicies.push(policy);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+    // CA policy files contain single policy objects
+    if (displayName) {
+      const policy: ConditionalAccessTemplate = {
+        ...data,
+        displayName: `${IMPORT_PREFIX}${displayName}`,
+        state: "disabled", // CA policies are always created in disabled state
+        conditions: data.conditions,
+        grantControls: data.grantControls,
+        sessionControls: data.sessionControls,
+      };
+      return [policy];
     }
-  }
 
-  return allPolicies;
+    return [];
+  });
 }
 
 /**
@@ -301,35 +290,22 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
     "AppProtection/level-3-enterprise-high-data-protection-iOS.json",
   ];
 
-  const allPolicies: AppProtectionTemplate[] = [];
-
-  for (const file of appProtectionFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      // App Protection files contain single policy objects, not arrays
-      if (data["@odata.type"]) {
-        const policy: AppProtectionTemplate = {
-          ...data,
-          displayName: `${IMPORT_PREFIX}${data.displayName}`,
-          description: data.description
-            ? `${data.description} ${HYDRATION_MARKER}`
-            : HYDRATION_MARKER,
-        };
-        allPolicies.push(policy);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+  return loadJsonTemplateFiles(appProtectionFiles, (data) => {
+    // App Protection files contain single policy objects, not arrays
+    if (data["@odata.type"]) {
+      const policy: AppProtectionTemplate = {
+        ...data,
+        "@odata.type": data["@odata.type"],
+        displayName: `${IMPORT_PREFIX}${data.displayName ?? ""}`,
+        description: data.description
+          ? `${data.description} ${HYDRATION_MARKER}`
+          : HYDRATION_MARKER,
+      };
+      return [policy];
     }
-  }
 
-  return allPolicies;
+    return [];
+  });
 }
 
 /**
@@ -343,32 +319,25 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
     "Windows-Autopilot-Device-Preparation-UserDriven.json",
   ];
 
-  const profiles: unknown[] = [];
-
-  for (const file of enrollmentFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/Enrollment/${file}`);
-      if (!response.ok) {
-        console.warn(`Failed to fetch enrollment profile ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const profile = await response.json();
+  return loadJsonTemplateFiles(
+    enrollmentFiles,
+    (profile) => {
       // Device Preparation uses "name" instead of "displayName"
       const nameField = profile.displayName ? "displayName" : "name";
-      profiles.push({
+      return [{
         ...profile,
-        [nameField]: `${IMPORT_PREFIX}${profile[nameField]}`,
+        [nameField]: `${IMPORT_PREFIX}${profile[nameField] ?? ""}`,
         description: profile.description
           ? `${profile.description} ${HYDRATION_MARKER}`
           : HYDRATION_MARKER,
-      });
-    } catch (error) {
-      console.warn(`Error fetching enrollment profile ${file}:`, error);
+      }];
+    },
+    {
+      basePath: `${TEMPLATES_BASE_PATH}/Enrollment`,
+      fileLabel: "enrollment profile",
+      warn: true,
     }
-  }
-
-  return profiles;
+  );
 }
 
 /**
@@ -379,30 +348,18 @@ export async function fetchNotificationTemplates(): Promise<unknown[]> {
     "Notifications/First-Warning.json",
   ];
 
-  const allTemplates: unknown[] = [];
-
-  for (const file of notificationFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      if (data.displayName) {
-        allTemplates.push({
+  return loadJsonTemplateFiles(notificationFiles, (data) => {
+    if (data.displayName) {
+      return [
+        {
           ...data,
           displayName: `${IMPORT_PREFIX}${data.displayName}`,
-        });
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+        },
+      ];
     }
-  }
 
-  return allTemplates;
+    return [];
+  });
 }
 
 /**
