@@ -1,7 +1,6 @@
-import { act } from '@testing-library/react'
+import { act, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render } from '@/__tests__/setup/test-utils'
 import { DynamicWallpaper } from '@/components/DynamicWallpaper'
 import { AnimatedGridBackground } from '@/components/ui/animated-grid-background'
 

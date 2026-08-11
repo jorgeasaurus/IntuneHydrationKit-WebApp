@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
+import { render, screen } from '@testing-library/react'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 
 describe('radio-group', () => {

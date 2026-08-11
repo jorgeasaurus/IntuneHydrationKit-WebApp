@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
+import { render, screen } from '@testing-library/react'
 import { ProgressBar } from '@/components/dashboard/ProgressBar'
 import type { HydrationTask } from '@/types/hydration'
 
