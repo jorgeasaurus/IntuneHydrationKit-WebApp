@@ -151,9 +151,13 @@ const CONDITIONAL_ACCESS_MARKER_SUFFIXES = [
 ];
 
 function hasConditionalAccessHydrationMarker(displayName: string): boolean {
+  const normalizedDisplayName = displayName.trim().toLowerCase();
+
   return (
     hasHydrationMarker(displayName) ||
-    displayName.trim().toLowerCase().endsWith(" [intune hydration kit]")
+    CONDITIONAL_ACCESS_MARKER_SUFFIXES.some((suffix) =>
+      normalizedDisplayName.endsWith(suffix)
+    )
   );
 }
 
