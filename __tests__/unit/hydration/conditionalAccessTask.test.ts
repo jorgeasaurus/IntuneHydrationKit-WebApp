@@ -5,14 +5,12 @@ import type { HydrationTask } from "@/types/hydration";
 
 const {
   mockGetCachedTemplates,
-  mockGetConditionalAccessPolicyByName,
   mockCreateConditionalAccessPolicy,
   mockDeleteConditionalAccessPolicyByName,
   mockConditionalAccessPolicyExists,
   mockPolicyRequiresPremiumP2,
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
-  mockGetConditionalAccessPolicyByName: vi.fn(),
   mockCreateConditionalAccessPolicy: vi.fn(),
   mockDeleteConditionalAccessPolicyByName: vi.fn(),
   mockConditionalAccessPolicyExists: vi.fn(),
@@ -21,10 +19,6 @@ const {
 
 vi.mock("@/lib/templates/loader", () => ({
   getCachedTemplates: mockGetCachedTemplates,
-}));
-
-vi.mock("@/templates", () => ({
-  getConditionalAccessPolicyByName: mockGetConditionalAccessPolicyByName,
 }));
 
 vi.mock("@/lib/graph/conditionalAccess", () => ({
@@ -63,7 +57,6 @@ describe("executeConditionalAccessTask", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCachedTemplates.mockReturnValue(undefined);
-    mockGetConditionalAccessPolicyByName.mockReturnValue(undefined);
     mockConditionalAccessPolicyExists.mockResolvedValue(false);
     mockPolicyRequiresPremiumP2.mockReturnValue(false);
   });
@@ -235,6 +228,25 @@ describe("executeConditionalAccessTask", () => {
       success: true,
       skipped: false,
     });
+  });
+
+  it("deletes a directly selected policy when no template is cached", async () => {
+    const policyName = "[IHD] Legacy Conditional Access";
+    mockDeleteConditionalAccessPolicyByName.mockResolvedValue(undefined);
+
+    const result = await executeConditionalAccessTask(createTask(policyName, "delete"), {
+      client: createClient(),
+      operationMode: "delete",
+      isPreview: false,
+      stopOnFirstError: false,
+      cachedConditionalAccessPolicies: [{ id: "legacy-ca-id", displayName: policyName }],
+    });
+
+    expect(result).toMatchObject({ success: true, skipped: false });
+    expect(mockDeleteConditionalAccessPolicyByName).toHaveBeenCalledWith(
+      expect.anything(),
+      policyName
+    );
   });
 
   it("turns delete failures into skipped results with the Graph error message", async () => {
