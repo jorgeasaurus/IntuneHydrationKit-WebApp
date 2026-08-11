@@ -98,6 +98,9 @@ describe('ResultsSummary', () => {
     expect(screen.getAllByText('All Windows Devices').length).toBeGreaterThan(0)
     expect(screen.getByText('Errors (1)')).toBeInTheDocument()
     expect(screen.getAllByText('Insufficient privileges').length).toBeGreaterThan(0)
+    expect(screen.getByText('Dynamic Groups')).toBeInTheDocument()
+    expect(screen.getByText('Device Filters')).toBeInTheDocument()
+    expect(screen.getByText('Conditional Access')).toBeInTheDocument()
   })
 
   it('uses high-contrast status colors in the category breakdown', () => {

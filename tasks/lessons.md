@@ -1,5 +1,6 @@
 # Lessons
 
+- Map internal camelCase category IDs to explicit user-facing labels; capitalization alone does not create readable names.
 - Preserve standard technology names and casing in generated labels; generic title casing turns `OData` into a typo.
 - Cache full Graph collections for one execution and update the cache after mutations; use direct recent-object lookups for eventual-consistency retries.
 - Azure Put Block List requests carry XML and must declare an XML content type; payload syntax and request metadata must agree.

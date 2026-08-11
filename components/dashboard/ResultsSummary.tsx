@@ -10,7 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HydrationSummary, HydrationTask } from "@/types/hydration";
+import { HydrationSummary, HydrationTask, TaskCategory } from "@/types/hydration";
 import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle, Eye } from "lucide-react";
 import {
   generateMarkdownReport,
@@ -27,8 +27,22 @@ interface ResultsSummaryProps {
   isPreview?: boolean;
 }
 
+const CATEGORY_DISPLAY_NAMES: Record<TaskCategory, string> = {
+  groups: "Dynamic Groups",
+  filters: "Device Filters",
+  compliance: "Compliance Policies",
+  appProtection: "App Protection",
+  win32Apps: "Win32 Apps",
+  conditionalAccess: "Conditional Access",
+  enrollment: "Enrollment Profiles",
+  notification: "Notifications",
+  baseline: "OpenIntuneBaseline",
+  cisBaseline: "CIS Baselines",
+};
+
 function getCategoryDisplayName(category: string): string {
-  return category.charAt(0).toUpperCase() + category.slice(1);
+  return CATEGORY_DISPLAY_NAMES[category as TaskCategory]
+    ?? category.charAt(0).toUpperCase() + category.slice(1);
 }
 
 function getTaskStatusClassName(status: HydrationTask["status"]): string {
