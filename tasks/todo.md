@@ -3,14 +3,17 @@
 - [x] Inspect normal threads and all historical suppressed comments.
 - [x] Fix the remaining valid `.intunewin` format-message comment with regression coverage.
 - [x] Align the Win32 metadata count with the four shipped templates.
-- [x] Verify, commit, push, and disposition the fix.
+- [x] Make Win32 detection read-only, correct Prism token mapping, and clarify protected-delete results.
+- [x] Verify, commit, push, and disposition all current-head comments.
 - [ ] Complete a clean Copilot review cycle on the latest head.
 - [ ] Squash-merge PR #21 and verify the merged state.
 
 ## Review
 
 - The parser now tells operators that supplied packages need stored ZIP entries without data descriptors; it no longer labels the production path as a proof of concept.
-- Checks passed: 555 tests, type-check, lint, production build, and `git diff --check`.
+- Detection scripts now use WinGet only when it is present and otherwise use read-only registry detection; no detection path downloads or installs dependencies.
+- Protected delete candidates now report the ownership requirement, and PowerShell `class-name` tokens receive the intended syntax color.
+- Checks passed: 557 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, and `git diff --check`.
 
 # Win32 Single-App Selection
 

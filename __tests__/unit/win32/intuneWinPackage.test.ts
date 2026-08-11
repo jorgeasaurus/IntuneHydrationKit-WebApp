@@ -59,5 +59,8 @@ describe("readIntuneWinPackage", () => {
     expect(uninstallScript).toContain(`winget uninstall --id ${template.packageIdentifier} --exact --scope machine --silent`);
     expect(detectionScript).toContain(`$PackageIdentifier = '${template.packageIdentifier}'`);
     expect(detectionScript).toContain("Test-InstalledApplicationRegistry");
+    expect(detectionScript).not.toContain("Install-WinGetSystemBootstrap");
+    expect(detectionScript).not.toContain("Invoke-WebRequest");
+    expect(detectionScript).toContain("$installed = if (-not [string]::IsNullOrWhiteSpace($Winget))");
   });
 });

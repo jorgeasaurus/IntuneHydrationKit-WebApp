@@ -81,98 +81,6 @@ function Get-WinGetExecutablePath {
         return $null
     }
 
-    function Install-WinGetSystemBootstrap {
-        [CmdletBinding()]
-        param()
-
-        function Get-AppInstallerMsixPath {
-            [CmdletBinding()]
-            param(
-                [Parameter(Mandatory)]
-                [string]$Path
-            )
-
-            foreach ($filter in @('AppInstaller*_x64*.msix', 'AppInstaller*.msix')) {
-                $msixPath = Get-ChildItem -Path $Path -Filter $filter -File -ErrorAction SilentlyContinue |
-                    Sort-Object -Property Name -Descending |
-                    Select-Object -First 1
-
-                if ($msixPath) {
-                    return $msixPath
-                }
-            }
-
-            throw 'Unable to locate App Installer MSIX payload inside the downloaded bundle.'
-        }
-
-        function Invoke-WinGetBootstrapDownload {
-            [CmdletBinding()]
-            param(
-                [Parameter(Mandatory)]
-                [string]$Uri,
-
-                [Parameter(Mandatory)]
-                [string]$OutFile
-            )
-
-            $downloadParams = @{
-                Uri        = $Uri
-                OutFile    = $OutFile
-                TimeoutSec = 120
-            }
-
-            if ($PSVersionTable.PSVersion.Major -lt 6) {
-                $downloadParams.UseBasicParsing = $true
-            }
-
-            Invoke-WebRequest @downloadParams
-        }
-
-        $tempRoot = [System.IO.Path]::GetTempPath()
-        if ([string]::IsNullOrWhiteSpace($tempRoot)) {
-            $tempRoot = if ([string]::IsNullOrWhiteSpace($env:TEMP)) { 'C:\Windows\Temp' } else { $env:TEMP }
-        }
-
-        $stagingRoot = Join-Path -Path $tempRoot -ChildPath 'IntuneHydrationKit-WinGetBootstrap'
-        $bundlePath = Join-Path -Path $stagingRoot -ChildPath 'Microsoft.DesktopAppInstaller.msixbundle'
-        $bundleExtractPath = Join-Path -Path $stagingRoot -ChildPath 'bundle'
-        $msixExtractPath = Join-Path -Path $stagingRoot -ChildPath 'appinstaller'
-        $vcRedistPath = Join-Path -Path $stagingRoot -ChildPath 'vc_redist.x64.exe'
-
-        Write-WinGetDetectionLog -Message 'Bootstrapping WinGet for detection.'
-        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-
-        if (Test-Path -Path $stagingRoot) {
-            Remove-Item -Path $stagingRoot -Recurse -Force -ErrorAction SilentlyContinue
-        }
-
-        foreach ($directoryPath in @($stagingRoot, $bundleExtractPath, $msixExtractPath)) {
-            $null = New-Item -Path $directoryPath -ItemType Directory -Force
-        }
-
-        try {
-            Invoke-WinGetBootstrapDownload -Uri 'https://aka.ms/vs/17/release/vc_redist.x64.exe' -OutFile $vcRedistPath
-            $vcRedist = Start-Process -FilePath $vcRedistPath -ArgumentList '/q /norestart' -Wait -PassThru
-            Write-WinGetDetectionLog -Message "VC++ bootstrap exited with code $($vcRedist.ExitCode)."
-        } catch {
-            Write-WinGetDetectionLog -Message "VC++ bootstrap failed: $($_.Exception.Message)" -Level 'WARN'
-        }
-
-        Invoke-WinGetBootstrapDownload -Uri 'https://aka.ms/getwinget' -OutFile $bundlePath
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($bundlePath, $bundleExtractPath)
-        $msixPath = Get-AppInstallerMsixPath -Path $bundleExtractPath
-
-        if (Test-Path -Path $programDataWingetRoot) {
-            Remove-Item -Path $programDataWingetRoot -Recurse -Force -ErrorAction SilentlyContinue
-        }
-
-        $null = New-Item -Path $programDataWingetRoot -ItemType Directory -Force
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($msixPath.FullName, $msixExtractPath)
-        Copy-Item -Path (Join-Path -Path $msixExtractPath -ChildPath '*') -Destination $programDataWingetRoot -Recurse -Force
-        Write-WinGetDetectionLog -Message "Bootstrapped WinGet to '$programDataWingetRoot'."
-    }
-
     if (-not $isSystem) {
         $userWingetExe = Get-UserWinGetExecutablePath
         if (-not [string]::IsNullOrWhiteSpace($userWingetExe)) {
@@ -183,19 +91,14 @@ function Get-WinGetExecutablePath {
             return $programDataWingetExe
         }
 
-        throw 'winget.exe could not be located for this user context. Ensure App Installer is installed for the signed-in user or pre-bootstrap WinGet in SYSTEM context.'
+        return $null
     }
 
     if (Test-WinGetExecutable -Path $programDataWingetExe) {
         return $programDataWingetExe
     }
 
-    Install-WinGetSystemBootstrap
-    if (Test-WinGetExecutable -Path $programDataWingetExe) {
-        return $programDataWingetExe
-    }
-
-    throw 'winget.exe could not be located or bootstrapped successfully for this context.'
+    return $null
 }
 
 function Test-InstalledApplicationRegistry {
@@ -277,7 +180,11 @@ function Test-InstalledApplicationRegistry {
 }
 
 $Winget = Get-WinGetExecutablePath
-$installed = & $Winget list --id "$PackageIdentifier" --exact --accept-source-agreements 2>&1
+$installed = if (-not [string]::IsNullOrWhiteSpace($Winget)) {
+    & $Winget list --id "$PackageIdentifier" --exact --accept-source-agreements 2>&1
+} else {
+    @()
+}
 if ($installed -match $PackageIdentifierPattern) {
     Write-Output "$PackageIdentifier is installed"
     exit 0

@@ -8,7 +8,7 @@ import { FileCode2 } from "lucide-react";
 const TOKEN_CLASSNAMES: Readonly<Record<string, string>> = {
   boolean: "text-orange-300",
   builtin: "text-blue-300",
-  className: "text-yellow-200",
+  "class-name": "text-yellow-200",
   comment: "text-slate-400 italic",
   function: "text-sky-300",
   keyword: "text-fuchsia-300",

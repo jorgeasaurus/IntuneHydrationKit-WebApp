@@ -212,6 +212,29 @@ describe("executeWin32AppTask", () => {
     expect(result).toMatchObject({ success: true, skipped: false });
   });
 
+  it("explains that an unowned matching app is protected from deletion", async () => {
+    vi.useFakeTimers();
+    mockGetWin32LobApps.mockResolvedValue([
+      {
+        id: "unowned-app",
+        displayName: "7-Zip - [IHD]",
+        description: "Managed by another tool",
+      },
+    ]);
+
+    const resultPromise = executeWin32AppTask(
+      { ...task, operation: "delete" },
+      createContext()
+    );
+    await vi.runAllTimersAsync();
+
+    await expect(resultPromise).resolves.toMatchObject({
+      success: true,
+      skipped: true,
+      error: "No matching app owned by Intune Hydration Kit",
+    });
+  });
+
   it("ignores a legacy candidate that disappears before its ownership check", async () => {
     mockGetWin32LobApps.mockResolvedValue([
       {

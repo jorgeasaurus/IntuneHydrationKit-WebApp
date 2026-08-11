@@ -249,7 +249,12 @@ export async function executeWin32AppTask(
   }
 
   if (existingApps.length === 0) {
-    return { task, success: true, skipped: true, error: "Not found in tenant" };
+    return {
+      task,
+      success: true,
+      skipped: true,
+      error: "No matching app owned by Intune Hydration Kit",
+    };
   }
   if (context.isPreview) {
     return { task, success: true, skipped: false };
