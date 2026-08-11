@@ -104,16 +104,23 @@ function generateManifest() {
   console.log('Scanning CIS Baselines directory...');
 
   const jsonFiles = getJsonFiles(CIS_BASELINES_DIR);
+  const existingManifest = fs.existsSync(MANIFEST_PATH)
+    ? JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'))
+    : { files: [] };
+  const existingDisplayNames = new Map(
+    existingManifest.files.map(file => [file.path, file.displayName])
+  );
 
   console.log(`Found ${jsonFiles.length} JSON files`);
 
   const files = jsonFiles.map(filePath => {
     const { category, subcategory, displayName } = parseFilePath(filePath);
+    const webPath = filePath.replace(/\\/g, '/');
     return {
-      path: filePath.replace(/\\/g, '/'), // Normalize path separators for web
+      path: webPath,
       category,
       subcategory,
-      displayName,
+      displayName: existingDisplayNames.get(webPath) || displayName,
     };
   });
 
@@ -133,15 +140,9 @@ function generateManifest() {
         name: CATEGORY_DISPLAY_NAMES[file.category] || file.category,
         description: CATEGORY_DESCRIPTIONS[file.category] || '',
         count: 0,
-        subcategories: {},
       };
     }
     categorySummary[file.category].count++;
-
-    if (!categorySummary[file.category].subcategories[file.subcategory]) {
-      categorySummary[file.category].subcategories[file.subcategory] = 0;
-    }
-    categorySummary[file.category].subcategories[file.subcategory]++;
   }
 
   // Convert to array format
@@ -151,18 +152,12 @@ function generateManifest() {
     name: data.name,
     description: data.description,
     count: data.count,
-    subcategories: Object.entries(data.subcategories).map(([name, count]) => ({
-      name,
-      count,
-    })),
   }));
 
   const manifest = {
-    version: '1.0.0',
-    generatedAt: new Date().toISOString(),
     totalFiles: files.length,
     categories,
-    files,
+    files: files.map(({ path, displayName }) => ({ path, displayName })),
   };
 
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));

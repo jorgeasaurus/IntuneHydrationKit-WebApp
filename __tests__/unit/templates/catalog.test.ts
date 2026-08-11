@@ -72,13 +72,11 @@ vi.mock('@/lib/templates/loader', () => ({
         id: 'WINDOWS',
         name: 'Windows',
         count: 1,
-        policyTypes: [],
       },
       {
         id: 'BYOD',
         name: 'BYOD (Bring Your Own Device)',
         count: 1,
-        policyTypes: [],
       },
     ],
     files: [
@@ -105,7 +103,6 @@ vi.mock('@/lib/templates/loader', () => ({
         name: 'Windows 11 Benchmarks',
         description: 'Windows 11 benchmark templates',
         count: 1,
-        subcategories: [],
       },
     ],
     files: [

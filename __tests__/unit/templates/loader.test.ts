@@ -7,12 +7,14 @@ import {
   fetchBaselinePolicies,
   fetchBaselinePolicyByManifestFile,
   fetchCompliancePolicies,
+  fetchCISBaselineManifest,
   fetchCISBaselinePolicyByManifestFile,
   fetchCISBaselinePoliciesByCategories,
   fetchConditionalAccessPolicies,
   fetchDynamicGroups,
   fetchEnrollmentProfiles,
   fetchFilters,
+  fetchOIBManifest,
   getAllTemplateCacheKeys,
   getCachedTemplates,
   fetchNotificationTemplates,
@@ -519,6 +521,39 @@ describe("template loader", () => {
     );
   });
 
+  it("derives OIB metadata from stored manifest paths", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        statusText: "OK",
+        json: async () => ({
+          totalFiles: 1,
+          platforms: [{ id: "WINDOWS", name: "Windows", count: 1 }],
+          files: [
+            {
+              path: "WINDOWS/IntuneManagement/SettingsCatalog/Policy.json",
+              displayName: "Friendly policy name",
+            },
+          ],
+        }),
+      }))
+    );
+
+    await expect(fetchOIBManifest()).resolves.toEqual(
+      expect.objectContaining({
+        files: [
+          {
+            path: "WINDOWS/IntuneManagement/SettingsCatalog/Policy.json",
+            displayName: "Friendly policy name",
+            platform: "WINDOWS",
+            policyType: "SettingsCatalog",
+          },
+        ],
+      })
+    );
+  });
+
   it("parses UTF-16 LE OIB policies without a BOM", async () => {
     vi.stubGlobal(
       "fetch",
@@ -577,20 +612,14 @@ describe("template loader", () => {
             files: [
               {
                 path: "Windows/Valid Policy.json",
-                platform: "windows",
-                policyType: "settingsCatalog",
                 displayName: "Valid manifest policy",
               },
               {
                 path: "Windows/String Policy.json",
-                platform: "windows",
-                policyType: "settingsCatalog",
                 displayName: "String manifest policy",
               },
               {
                 path: "Windows/Missing Policy.json",
-                platform: "windows",
-                policyType: "settingsCatalog",
                 displayName: "Missing manifest policy",
               },
             ],
@@ -666,6 +695,39 @@ describe("template loader", () => {
         _cisCategory: "8.0 - Windows 11 Benchmarks",
         _cisSubcategory: "Windows 11 - Edge - Machine",
         _cisFilePath: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
+      })
+    );
+  });
+
+  it("derives CIS metadata from stored manifest paths", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        statusText: "OK",
+        json: async () => ({
+          totalFiles: 1,
+          categories: [],
+          files: [
+            {
+              path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
+              displayName: "Friendly CIS name",
+            },
+          ],
+        }),
+      }))
+    );
+
+    await expect(fetchCISBaselineManifest()).resolves.toEqual(
+      expect.objectContaining({
+        files: [
+          {
+            path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
+            displayName: "Friendly CIS name",
+            category: "8.0 - Windows 11 Benchmarks",
+            subcategory: "Windows 11 - Edge - Machine",
+          },
+        ],
       })
     );
   });
@@ -766,8 +828,6 @@ describe("template loader", () => {
           ok: true,
           statusText: "OK",
           json: async () => ({
-            version: "1",
-            generatedAt: "2024-01-01T00:00:00Z",
             totalFiles: 2,
             categories: [
               {
@@ -776,7 +836,6 @@ describe("template loader", () => {
                 name: "Windows 11 Benchmarks",
                 description: "Windows",
                 count: 1,
-                subcategories: [{ name: "Windows 11 - Edge - Machine", count: 1 }],
               },
               {
                 id: "linux",
@@ -784,20 +843,15 @@ describe("template loader", () => {
                 name: "Linux Benchmarks",
                 description: "Linux",
                 count: 1,
-                subcategories: [{ name: "Linux Compliance", count: 1 }],
               },
             ],
             files: [
               {
                 path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
-                category: "8.0 - Windows 11 Benchmarks",
-                subcategory: "Windows 11 - Edge - Machine",
                 displayName: "Windows policy",
               },
               {
                 path: "5.0 - Linux Benchmarks/Linux Compliance/Policy.json",
-                category: "5.0 - Linux Benchmarks",
-                subcategory: "Linux Compliance",
                 displayName: "Linux policy",
               },
             ],
@@ -837,8 +891,6 @@ describe("template loader", () => {
       ok: true,
       statusText: "OK",
       json: async () => ({
-        version: "1",
-        generatedAt: "2024-01-01T00:00:00Z",
         totalFiles: 1,
         categories: [
           {
@@ -847,14 +899,11 @@ describe("template loader", () => {
             name: "Windows 11 Benchmarks",
             description: "Windows",
             count: 1,
-            subcategories: [{ name: "Windows 11 - Edge - Machine", count: 1 }],
           },
         ],
         files: [
           {
             path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
-            category: "8.0 - Windows 11 Benchmarks",
-            subcategory: "Windows 11 - Edge - Machine",
             displayName: "Windows policy",
           },
         ],
