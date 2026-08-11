@@ -281,6 +281,34 @@ describe("executeFilterTask", () => {
     expect(cachedFilters).toHaveLength(0);
   });
 
+  it("deletes a hydrated tenant filter when the template cache has no match", async () => {
+    mockGetCachedTemplates.mockReturnValue(undefined);
+    const client = createClient();
+
+    const result = await executeFilterTask(
+      { ...task, operation: "delete" },
+      {
+        client,
+        operationMode: "delete",
+        isPreview: false,
+        stopOnFirstError: false,
+        cachedFilters: [
+          {
+            id: "legacy-filter-id",
+            "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
+            displayName: "[IHD] Windows Filter",
+            description: "Imported by Intune Hydration Kit",
+            platform: "windows10AndLater",
+            rule: '(device.deviceOSType -eq "Windows")',
+          },
+        ],
+      }
+    );
+
+    expect(result).toMatchObject({ success: true, skipped: false });
+    expect(client.delete).toHaveBeenCalledWith("/deviceManagement/assignmentFilters/legacy-filter-id");
+  });
+
   it("returns an invalid mode error for unsupported operations", async () => {
     mockGetCachedTemplates.mockReturnValue([
       {

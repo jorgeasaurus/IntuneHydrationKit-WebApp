@@ -27,11 +27,11 @@ export async function executeFilterTask(
     template = (cachedFilterTemplates as FilterTemplate[]).find((f) => f.displayName === task.itemName);
   }
 
-  if (!template) {
-    return { task, success: false, skipped: false, error: `Template not found for ${task.itemName}` };
-  }
-
   if (mode === "create") {
+    if (!template) {
+      return { task, success: false, skipped: false, error: `Template not found for ${task.itemName}` };
+    }
+
     // Check if filter already exists using pre-fetched cache
     const existingFilter = context.cachedFilters?.find(
       (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
@@ -78,9 +78,11 @@ export async function executeFilterTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
+    const targetName = template?.displayName ?? task.itemName;
+
     // Check if filter exists in tenant using pre-fetched cache
     const existingFilter = context.cachedFilters?.find(
-      (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
+      (f) => f.displayName.toLowerCase() === targetName.toLowerCase()
     );
 
     if (!existingFilter) {
