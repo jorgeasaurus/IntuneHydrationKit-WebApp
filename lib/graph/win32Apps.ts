@@ -7,6 +7,7 @@ import {
 import { IntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { Win32AppTemplate } from "@/templates/win32Apps";
 import { getAccessToken } from "@/lib/auth/authUtils";
+import { utf8ToBase64 } from "@/lib/utils/base64";
 
 interface Win32LobApp {
   "@odata.type"?: string;
@@ -43,15 +44,6 @@ const UPLOAD_TIMEOUT_MS = 180000;
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-function encodeUtf8AsBase64(value: string): string {
-  const bytes = new TextEncoder().encode(value);
-  let binary = "";
-  for (const byte of bytes) {
-    binary += String.fromCharCode(byte);
-  }
-  return btoa(binary);
 }
 
 function buildWin32LobAppPayload(
@@ -93,7 +85,7 @@ function buildWin32LobAppPayload(
       {
         "@odata.type": "#microsoft.graph.win32LobAppPowerShellScriptRule",
         ruleType: "detection",
-        scriptContent: encodeUtf8AsBase64(detectionScript),
+        scriptContent: utf8ToBase64(detectionScript),
         enforceSignatureCheck: false,
         runAs32Bit: false,
       },

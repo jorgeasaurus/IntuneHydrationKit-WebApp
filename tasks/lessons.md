@@ -1,5 +1,6 @@
 # Lessons
 
+- Convert browser byte arrays to base64 in bounded chunks; repeated single-byte string concatenation adds avoidable time and memory pressure.
 - Legacy ownership fingerprints must accept only the known display-name variants used by discovery; arbitrary renames must not weaken safe-delete checks.
 - Ownership-detail lookups in delete discovery must treat a missing candidate as an expected race, while other Graph errors must still fail the task.
 - A same-origin upload proxy must also require delegated authentication and confirm the exact Graph-issued target before it streams tenant content.

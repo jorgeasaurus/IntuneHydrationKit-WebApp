@@ -12,6 +12,7 @@
 - Checks passed: 553 tests, type-check, lint, production build, direct Playwright popup validation, `git diff --check`, and React Doctor at 100/100.
 - Copilot completed the clean review on `313cc5f` with no comments or suppressed comments; no review threads remain open.
 - The documentation-head review found legacy name-variant drift and obsolete theme lessons; both are corrected and need final review.
+- The next review found repeated byte-string concatenation in script and icon encoding; both paths now use one chunked base64 utility.
 
 # Results Category Contrast
 

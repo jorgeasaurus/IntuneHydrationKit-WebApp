@@ -10,6 +10,7 @@ import {
 import { getWin32AppTemplateByName } from "@/templates/win32Apps";
 import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
+import { bytesToBase64 } from "@/lib/utils/base64";
 
 const DELETE_VISIBILITY_RETRY_DELAYS_MS = [2000, 4000, 8000] as const;
 const RECENT_WIN32_APPS_STORAGE_KEY = "intune-hydration-recent-win32-apps";
@@ -143,11 +144,7 @@ async function fetchOptionalIcon(iconUrl: string | undefined): Promise<string | 
     if (!response.ok) return undefined;
 
     const bytes = new Uint8Array(await response.arrayBuffer());
-    let binary = "";
-    for (const byte of bytes) {
-      binary += String.fromCharCode(byte);
-    }
-    return btoa(binary);
+    return bytesToBase64(bytes);
   } catch {
     return undefined;
   }
