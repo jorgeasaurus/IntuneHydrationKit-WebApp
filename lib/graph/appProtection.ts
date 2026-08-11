@@ -4,7 +4,7 @@
  */
 
 import { GraphClient } from "./client";
-import { AppProtectionPolicy, DeletionResult } from "@/types/graph";
+import { AppProtectionPolicy, DeletionResult, TenantAppProtectionPolicy } from "@/types/graph";
 import { hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 type AppProtectionPlatform = "iOS" | "android";
@@ -158,8 +158,8 @@ function getPlatformEndpoint(platform: AppProtectionPlatform, policyId?: string)
  */
 export async function getiOSAppProtectionPolicies(
   client: GraphClient
-): Promise<AppProtectionPolicy[]> {
-  return client.getCollection<AppProtectionPolicy>(
+): Promise<TenantAppProtectionPolicy[]> {
+  return client.getCollection<TenantAppProtectionPolicy>(
     "/deviceAppManagement/iosManagedAppProtections?$select=id,displayName,description"
   );
 }
@@ -169,8 +169,8 @@ export async function getiOSAppProtectionPolicies(
  */
 export async function getAndroidAppProtectionPolicies(
   client: GraphClient
-): Promise<AppProtectionPolicy[]> {
-  return client.getCollection<AppProtectionPolicy>(
+): Promise<TenantAppProtectionPolicy[]> {
+  return client.getCollection<TenantAppProtectionPolicy>(
     "/deviceAppManagement/androidManagedAppProtections?$select=id,displayName,description"
   );
 }
@@ -181,7 +181,7 @@ export async function getAndroidAppProtectionPolicies(
  */
 export async function getAllAppProtectionPolicies(
   client: GraphClient
-): Promise<AppProtectionPolicy[]> {
+): Promise<TenantAppProtectionPolicy[]> {
   const [iosPolicies, androidPolicies] = await Promise.all([
     getiOSAppProtectionPolicies(client),
     getAndroidAppProtectionPolicies(client),
@@ -199,7 +199,7 @@ export async function getAllAppProtectionPolicies(
  */
 export async function getHydrationKitAppProtectionPolicies(
   client: GraphClient
-): Promise<AppProtectionPolicy[]> {
+): Promise<TenantAppProtectionPolicy[]> {
   const policies = await getAllAppProtectionPolicies(client);
   return policies.filter((policy) => hasHydrationMarker(policy.description));
 }
@@ -221,7 +221,7 @@ export async function getAppProtectionPolicyById(
 export async function getAppProtectionPolicyByName(
   client: GraphClient,
   displayName: string
-): Promise<AppProtectionPolicy | null> {
+): Promise<TenantAppProtectionPolicy | null> {
   const policies = await getAllAppProtectionPolicies(client);
   const found = policies.find(
     (policy) => policy.displayName.toLowerCase() === displayName.toLowerCase()
@@ -333,7 +333,11 @@ async function createAppProtectionPolicyWithRecovery(
       console.warn(
         `[AppProtection] Recovered from create error for "${policyBody.displayName}" by finding the policy in tenant after POST failure.`
       );
-      return recoveredPolicy;
+      return {
+        ...policyBody,
+        ...recoveredPolicy,
+        "@odata.type": policyBody["@odata.type"],
+      };
     }
 
     throw error;

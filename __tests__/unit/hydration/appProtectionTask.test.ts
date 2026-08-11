@@ -3,10 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
 
-const { mockGetCachedTemplates, mockDeleteAppProtectionPolicy, mockGetAppProtectionPolicyByName } = vi.hoisted(() => ({
+const { mockGetCachedTemplates, mockDeleteAppProtectionPolicy } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockDeleteAppProtectionPolicy: vi.fn(),
-  mockGetAppProtectionPolicyByName: vi.fn(),
 }));
 
 vi.mock("@/lib/templates/loader", () => ({
@@ -18,10 +17,6 @@ vi.mock("@/lib/graph/appProtection", () => ({
   deleteAppProtectionPolicy: mockDeleteAppProtectionPolicy,
 }));
 
-vi.mock("@/templates", () => ({
-  getAppProtectionPolicyByName: mockGetAppProtectionPolicyByName,
-}));
-
 import { executeAppProtectionTask } from "@/lib/hydration/taskExecutors/appProtectionTask";
 
 describe("executeAppProtectionTask", () => {
@@ -29,15 +24,34 @@ describe("executeAppProtectionTask", () => {
     vi.clearAllMocks();
   });
 
-  it("deletes prefixed iOS policies even when the template cache is unavailable", async () => {
+  it("returns an error when create mode has no cached template", async () => {
     mockGetCachedTemplates.mockReturnValue(undefined);
-    mockGetAppProtectionPolicyByName
-      .mockReturnValueOnce(undefined)
-      .mockReturnValueOnce({
-        "@odata.type": "#microsoft.graph.iosManagedAppProtection",
-        displayName: "iOS App Protection",
-        description: "Imported by Intune Hydration Kit",
-      });
+
+    const result = await executeAppProtectionTask(
+      {
+        id: "create-ios-app-protection",
+        category: "appProtection",
+        operation: "create",
+        itemName: "[IHD] iOS App Protection",
+        status: "pending",
+      },
+      {
+        client: {} as ExecutionContext["client"],
+        operationMode: "create",
+        isPreview: false,
+        stopOnFirstError: false,
+      }
+    );
+
+    expect(result).toMatchObject({
+      success: false,
+      skipped: false,
+      error: "Template not found for [IHD] iOS App Protection. Reload templates and try again.",
+    });
+  });
+
+  it("deletes prefixed iOS policies from the tenant cache", async () => {
+    mockGetCachedTemplates.mockReturnValue(undefined);
     mockDeleteAppProtectionPolicy.mockResolvedValue({ deleted: true, skipped: false });
 
     const task: HydrationTask = {
@@ -56,27 +70,28 @@ describe("executeAppProtectionTask", () => {
       patch: vi.fn(),
     } as unknown as ExecutionContext["client"];
 
+    const cachedAppProtectionPolicies: NonNullable<
+      ExecutionContext["cachedAppProtectionPolicies"]
+    > = [
+      {
+        id: "ios-policy-id",
+        displayName: "[IHD] iOS App Protection",
+        description: "Imported by Intune Hydration Kit",
+        _platform: "iOS",
+      },
+    ];
     const context: ExecutionContext = {
       client,
       operationMode: "delete",
       isPreview: false,
       stopOnFirstError: false,
-      cachedAppProtectionPolicies: [
-        {
-          id: "ios-policy-id",
-          "@odata.type": "#microsoft.graph.iosManagedAppProtection",
-          displayName: "[IHD] iOS App Protection",
-          description: "Imported by Intune Hydration Kit",
-          _platform: "iOS",
-        },
-      ],
+      cachedAppProtectionPolicies,
     };
 
     const result = await executeAppProtectionTask(task, context);
 
     expect(result).toMatchObject({ success: true, skipped: false });
-    expect(mockGetAppProtectionPolicyByName).toHaveBeenNthCalledWith(1, "[IHD] iOS App Protection");
-    expect(mockGetAppProtectionPolicyByName).toHaveBeenNthCalledWith(2, "iOS App Protection");
     expect(mockDeleteAppProtectionPolicy).toHaveBeenCalledWith(client, "ios-policy-id", "iOS");
+    expect(cachedAppProtectionPolicies).toHaveLength(0);
   });
 });
