@@ -126,6 +126,34 @@ describe("executeCISBaselineTask", () => {
     });
   });
 
+  it("finds a CIS template by its manifest file path", async () => {
+    const policyName = "[IHD] CIS Settings Catalog";
+    const templatePath = "1.0 - Windows/Settings Catalog/CIS Policy.json";
+
+    mockGetCachedTemplates.mockReturnValue([
+      {
+        displayName: policyName,
+        _cisFilePath: templatePath,
+      },
+    ]);
+    mockDetectCISPolicyType.mockReturnValue("SettingsCatalog");
+
+    const result = await executeCISBaselineTask(
+      { ...createTask("Manifest entry"), templatePath },
+      {
+        client: createClient(),
+        operationMode: "create",
+        isPreview: true,
+        stopOnFirstError: false,
+      }
+    );
+
+    expect(result).toMatchObject({ success: true, skipped: false });
+    expect(mockDetectCISPolicyType).toHaveBeenCalledWith(
+      expect.objectContaining({ displayName: policyName, _cisFilePath: templatePath })
+    );
+  });
+
   it("skips unsupported create operations with the endpoint-security specific reason", async () => {
     const policyName = "[IHD] Unsupported Intent";
 
