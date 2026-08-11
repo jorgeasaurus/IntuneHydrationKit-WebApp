@@ -100,6 +100,23 @@ describe('ResultsSummary', () => {
     expect(screen.getAllByText('Insufficient privileges').length).toBeGreaterThan(0)
   })
 
+  it('uses high-contrast status colors in the category breakdown', () => {
+    render(<ResultsSummary summary={summary} tasks={tasks} />)
+
+    const getCategoryTaskRow = (itemName: string): HTMLElement | undefined =>
+      screen
+        .getAllByText(itemName)
+        .map((element) => element.parentElement?.parentElement)
+        .find((element): element is HTMLElement => element?.classList.contains('items-start') ?? false)
+
+    expect(getCategoryTaskRow('All Windows Devices')).toHaveClass(
+      'font-medium',
+      'text-emerald-100'
+    )
+    expect(getCategoryTaskRow('Corporate Devices')).toHaveClass('text-amber-100')
+    expect(getCategoryTaskRow('Block Legacy Auth')).toHaveClass('text-red-100')
+  })
+
   it('downloads markdown, json, and csv reports with generated filenames', async () => {
     const user = userEvent.setup()
     render(<ResultsSummary summary={summary} tasks={tasks} />)

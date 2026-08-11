@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor, within } from '@/__tests__/setup/test-utils'
+import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
 import { TemplateCatalogPage } from '@/components/templates/TemplateCatalogPage'
 
 const loadTemplateDocumentationCatalog = vi.fn()
@@ -199,15 +199,11 @@ describe('TemplateCatalogPage', () => {
     expect(await screen.findByText('Package Identifier')).toBeInTheDocument()
     expect(screen.getByText('7zip.7zip')).toBeInTheDocument()
     expect(screen.getByText('Install Command Line')).toBeInTheDocument()
-    expect(
-      within(screen.getByRole('region', { name: 'Install script' })).getByText(
-        /Install-WinGetPackage \$packageIdentifier/
-      )
-    ).toBeInTheDocument()
-    expect(
-      within(screen.getByRole('region', { name: 'Uninstall script' })).getByText(
-        /Uninstall-WinGetPackage \$packageIdentifier/
-      )
-    ).toBeInTheDocument()
+    expect(await screen.findByRole('region', { name: 'Install script' })).toHaveTextContent(
+      'Install-WinGetPackage $packageIdentifier'
+    )
+    expect(await screen.findByRole('region', { name: 'Uninstall script' })).toHaveTextContent(
+      'Uninstall-WinGetPackage $packageIdentifier'
+    )
   })
 })

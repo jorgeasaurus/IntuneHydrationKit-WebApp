@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -58,6 +59,11 @@ const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_INCREMENT = 120;
 const ACTIVE_FILTER_BUTTON_CLASSNAME =
   "border-black bg-black text-white hover:bg-neutral-900 hover:text-white focus-visible:ring-black dark:border-white/20 dark:bg-black dark:text-white dark:hover:bg-neutral-900 dark:focus-visible:ring-white/40";
+const PowerShellScriptPanel = dynamic(() =>
+  import("@/components/templates/PowerShellScriptPanel").then(
+    (module) => module.PowerShellScriptPanel
+  )
+);
 
 function formatSummaryLabel(key: string): string {
   const label = key
@@ -192,31 +198,6 @@ function getWin32ScriptContents(payload: unknown): Win32ScriptContents | null {
     installScriptContent: record.installScriptContent,
     uninstallScriptContent: record.uninstallScriptContent,
   };
-}
-
-function PowerShellScriptPanel({
-  id,
-  title,
-  content,
-}: {
-  id: string;
-  title: string;
-  content: string;
-}) {
-  return (
-    <section
-      aria-labelledby={id}
-      className="overflow-hidden rounded-2xl border border-border/70 bg-[#050816]"
-    >
-      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-xs font-mono uppercase tracking-[0.24em] text-slate-300">
-        <FileCode2 className="size-3.5" />
-        <h4 id={id}>{title}</h4>
-      </div>
-      <pre className="max-h-[420px] overflow-auto p-4 text-xs leading-6 text-slate-100 selection:bg-white/20">
-        <code className="font-mono">{content}</code>
-      </pre>
-    </section>
-  );
 }
 
 function matchesSearch(item: TemplateDocumentationItem, query: string): boolean {

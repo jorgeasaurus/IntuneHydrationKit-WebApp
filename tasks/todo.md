@@ -1,3 +1,26 @@
+# Results Category Contrast
+
+- [x] Replace theme-dependent task colors with bright colors for the dark glass surface.
+- [x] Add status-color regression coverage.
+- [x] Verify the results category list and project checks.
+
+## Review
+
+- Completed task labels now use high-contrast emerald, amber, and red tints in both themes; status icons use matching surface-safe colors.
+- Sampled task text measures 4.83:1 to 8.60:1 across the supplied blue surface. Focused tests, type-check, lint, production build, and React Doctor at 100/100 pass.
+
+# PowerShell Syntax Highlighting
+
+- [x] Add a lazy PowerShell code renderer with accessible token markup.
+- [x] Apply readable token colors without changing the script panel layout.
+- [x] Add focused component and catalog regression tests.
+- [x] Verify the expanded Win32 template view, bundle split, and project checks.
+
+## Review
+
+- Prism PowerShell highlighting now loads only when a Win32 template expands; the script remains real, selectable text in the existing scroll panels.
+- All 549 tests, type-check, lint, production build, Playwright visual checks, and React Doctor at 100/100 pass.
+
 # Vercel Win32 Upload Origin Recovery
 
 - [x] Reproduce the deployed 403 without forwarding content to Azure or Intune.

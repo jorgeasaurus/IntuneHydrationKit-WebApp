@@ -34,13 +34,13 @@ function getCategoryDisplayName(category: string): string {
 function getTaskStatusClassName(status: HydrationTask["status"]): string {
   switch (status) {
     case "success":
-      return "text-green-700 dark:text-green-300";
+      return "text-emerald-100";
     case "skipped":
-      return "text-amber-700 dark:text-amber-300";
+      return "text-amber-100";
     case "failed":
-      return "text-red-700 dark:text-red-300";
+      return "text-red-100";
     default:
-      return "text-muted-foreground";
+      return "text-slate-100";
   }
 }
 
@@ -208,15 +208,15 @@ export function ResultsSummary({
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1">
-                          <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
+                          <CheckCircle2 className="size-4 text-emerald-200" />
                           <span className="text-sm font-medium">{stats.success}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <MinusCircle className="size-4 text-amber-600 dark:text-amber-400" />
+                          <MinusCircle className="size-4 text-amber-200" />
                           <span className="text-sm font-medium">{stats.skipped}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <XCircle className="size-4 text-red-600 dark:text-red-400" />
+                          <XCircle className="size-4 text-red-200" />
                           <span className="text-sm font-medium">{stats.failed}</span>
                         </div>
                       </div>
@@ -228,7 +228,7 @@ export function ResultsSummary({
                       {categoryTasks.map((task) => (
                         <div
                           key={task.id}
-                          className={`flex items-start gap-2 rounded p-2 text-sm ${getTaskStatusClassName(task.status)}`}
+                          className={`flex items-start gap-2 rounded p-2 text-sm font-medium ${getTaskStatusClassName(task.status)}`}
                         >
                           {task.status === "success" ? (
                             <CheckCircle2 className="mt-0.5 size-3 flex-shrink-0" />
