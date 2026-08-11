@@ -3,18 +3,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GraphClient } from "@/lib/graph/client";
 import {
   createEnrollmentProfile,
-  deleteAutopilotProfileByName,
   deleteEnrollmentProfileByName,
-  deleteAutopilotProfile,
-  deleteDevicePreparationByName,
-  deleteESPConfigurationByName,
-  deleteESPConfiguration,
-  devicePreparationExists,
   enrollmentProfileExists,
-  getAutopilotProfileAssignments,
   getEnrollmentProfileName,
   getEnrollmentProfileType,
-  getESPConfigurationAssignments,
 } from "@/lib/graph/enrollment";
 import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
 import type {
@@ -170,14 +162,20 @@ describe("lib/graph/enrollment", () => {
       displayName: "Unsafe Autopilot Profile",
       description: "Manually created",
     });
-    const getCollection = vi.fn();
+    const getCollection = vi.fn().mockResolvedValue([
+      makeAutopilotProfile({
+        id: "unsafe-id",
+        displayName: "Unsafe Autopilot Profile",
+      }),
+    ]);
     const del = vi.fn();
     const client = { get, getCollection, delete: del } as unknown as GraphClient;
 
-    await expect(deleteAutopilotProfile(client, "unsafe-id")).rejects.toThrow(
+    await expect(
+      deleteEnrollmentProfileByName(client, "Unsafe Autopilot Profile", "autopilot")
+    ).rejects.toThrow(
       'Cannot delete profile "Unsafe Autopilot Profile": Not created by Intune Hydration Kit'
     );
-    expect(getCollection).not.toHaveBeenCalled();
     expect(del).not.toHaveBeenCalled();
   });
 
@@ -186,11 +184,16 @@ describe("lib/graph/enrollment", () => {
       displayName: "Assigned ESP",
       description: HYDRATION_MARKER,
     });
-    const getCollection = vi.fn().mockResolvedValue([{ id: "assignment-1" }]);
+    const getCollection = vi
+      .fn()
+      .mockResolvedValueOnce([makeEspProfile({ displayName: "Assigned ESP" })])
+      .mockResolvedValueOnce([{ id: "assignment-1" }]);
     const del = vi.fn();
     const client = { get, getCollection, delete: del } as unknown as GraphClient;
 
-    await expect(deleteESPConfiguration(client, "esp-id")).rejects.toThrow(
+    await expect(
+      deleteEnrollmentProfileByName(client, "Assigned ESP", "esp")
+    ).rejects.toThrow(
       'Cannot delete ESP configuration "Assigned ESP": Has 1 assignment(s). Remove all assignments before deleting.'
     );
     expect(del).not.toHaveBeenCalled();
@@ -210,19 +213,18 @@ describe("lib/graph/enrollment", () => {
     const del = vi.fn().mockResolvedValue(undefined);
     const client = { getCollection, delete: del } as unknown as GraphClient;
 
-    await deleteDevicePreparationByName(
+    await deleteEnrollmentProfileByName(
       client,
-      "[IHD] Windows Autopilot device preparation - User Driven"
+      "[IHD] Windows Autopilot device preparation - User Driven",
+      "devicePreparation"
     );
 
     expect(del).toHaveBeenCalledWith("/deviceManagement/configurationPolicies/device-prep-id");
   });
 
-  it("reads assignments and deletes enrollment profiles by normalized name", async () => {
+  it("deletes enrollment profiles by normalized name", async () => {
     const getCollection = vi
       .fn()
-      .mockResolvedValueOnce([{ id: "autopilot-assignment" }])
-      .mockResolvedValueOnce([{ id: "esp-assignment" }])
       .mockResolvedValueOnce([
         makeAutopilotProfile({
           id: "autopilot-id",
@@ -250,12 +252,6 @@ describe("lib/graph/enrollment", () => {
     const del = vi.fn().mockResolvedValue(undefined);
     const client = { getCollection, get, delete: del } as unknown as GraphClient;
 
-    await expect(getAutopilotProfileAssignments(client, "autopilot-id")).resolves.toEqual([
-      { id: "autopilot-assignment" },
-    ]);
-    await expect(getESPConfigurationAssignments(client, "esp-id")).resolves.toEqual([
-      { id: "esp-assignment" },
-    ]);
     await deleteEnrollmentProfileByName(
       client,
       "[IHD] Default Autopilot Deployment Profile",
@@ -283,10 +279,14 @@ describe("lib/graph/enrollment", () => {
     } as unknown as GraphClient;
 
     await expect(
-      deleteAutopilotProfileByName(client, "[IHD] Missing Autopilot Profile")
+      deleteEnrollmentProfileByName(
+        client,
+        "[IHD] Missing Autopilot Profile",
+        "autopilot"
+      )
     ).rejects.toThrow('Autopilot profile "[IHD] Missing Autopilot Profile" not found');
     await expect(
-      deleteESPConfigurationByName(client, "[IHD] Missing ESP")
+      deleteEnrollmentProfileByName(client, "[IHD] Missing ESP", "esp")
     ).rejects.toThrow('ESP configuration "[IHD] Missing ESP" not found');
   });
 
@@ -297,7 +297,11 @@ describe("lib/graph/enrollment", () => {
     } as unknown as GraphClient;
 
     await expect(
-      deleteDevicePreparationByName(missingClient, "[IHD] Missing Device Prep")
+      deleteEnrollmentProfileByName(
+        missingClient,
+        "[IHD] Missing Device Prep",
+        "devicePreparation"
+      )
     ).rejects.toThrow('Device Preparation policy "[IHD] Missing Device Prep" not found');
 
     const assignedClient = {
@@ -315,9 +319,10 @@ describe("lib/graph/enrollment", () => {
     } as unknown as GraphClient;
 
     await expect(
-      deleteDevicePreparationByName(
+      deleteEnrollmentProfileByName(
         assignedClient,
-        "[IHD] Windows Autopilot device preparation - User Driven"
+        "[IHD] Windows Autopilot device preparation - User Driven",
+        "devicePreparation"
       )
     ).rejects.toThrow(
       'Cannot delete Device Preparation policy "[IHD] Windows Autopilot device preparation - User Driven": Has 1 assignment(s). Remove all assignments before deleting.'
@@ -330,7 +335,12 @@ describe("lib/graph/enrollment", () => {
       getCollection: vi.fn().mockRejectedValue(new Error("Lookup failed")),
     } as unknown as GraphClient;
 
-    await expect(devicePreparationExists(client, "Broken policy")).resolves.toBe(false);
+    await expect(
+      enrollmentProfileExists(
+        client,
+        makeDevicePreparationProfile({ name: "Broken policy" })
+      )
+    ).resolves.toBe(false);
     expect(errorSpy).toHaveBeenCalledWith(
       "[DevicePreparation] Error checking if policy exists: Broken policy",
       expect.any(Error)

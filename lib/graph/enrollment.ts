@@ -189,21 +189,14 @@ async function createAutopilotProfile(
   );
 }
 
-export async function getAutopilotProfileAssignments(
-  client: GraphClient,
-  profileId: string
-): Promise<unknown[]> {
-  return client.getCollection(`${AUTOPILOT_PATH}/${profileId}/assignments`);
-}
-
-export async function deleteAutopilotProfile(
+async function deleteAutopilotProfile(
   client: GraphClient,
   profileId: string
 ): Promise<void> {
   await deleteEnrollmentEntity(client, AUTOPILOT_PATH, profileId, "profile");
 }
 
-export async function deleteAutopilotProfileByName(
+async function deleteAutopilotProfileByName(
   client: GraphClient,
   displayName: string
 ): Promise<void> {
@@ -253,21 +246,14 @@ async function createESPConfiguration(
   return client.post<EnrollmentStatusPageConfiguration>(ESP_PATH, configBody);
 }
 
-export async function getESPConfigurationAssignments(
-  client: GraphClient,
-  configId: string
-): Promise<unknown[]> {
-  return client.getCollection(`${ESP_PATH}/${configId}/assignments`);
-}
-
-export async function deleteESPConfiguration(
+async function deleteESPConfiguration(
   client: GraphClient,
   configId: string
 ): Promise<void> {
   await deleteEnrollmentEntity(client, ESP_PATH, configId, "ESP configuration");
 }
 
-export async function deleteESPConfigurationByName(
+async function deleteESPConfigurationByName(
   client: GraphClient,
   displayName: string
 ): Promise<void> {
@@ -294,7 +280,7 @@ export function getEnrollmentProfileType(
 // Device Preparation Profiles (Settings Catalog-based)
 // ---------------------------------------------------------------------------
 
-export async function devicePreparationExists(
+async function devicePreparationExists(
   client: GraphClient,
   name: string
 ): Promise<boolean> {
@@ -314,7 +300,7 @@ async function createDevicePreparationProfile(
   return client.post<DevicePreparationProfile>(CONFIG_POLICIES_PATH, payload);
 }
 
-export async function deleteDevicePreparationByName(
+async function deleteDevicePreparationByName(
   client: GraphClient,
   name: string
 ): Promise<void> {
