@@ -56,10 +56,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--hydrate))",
           foreground: "hsl(var(--hydrate-foreground))",
         },
-        terminal: {
-          DEFAULT: "hsl(var(--terminal))",
-          foreground: "hsl(var(--terminal-foreground))",
-        },
         signal: {
           success: "hsl(var(--signal-success))",
           warning: "hsl(var(--signal-warning))",
@@ -81,54 +77,10 @@ const config: Config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
-        "terminal-blink": {
-          "0%, 50%": { opacity: "1" },
-          "51%, 100%": { opacity: "0" },
-        },
-        "data-pulse": {
-          "0%, 100%": { opacity: "0.4" },
-          "50%": { opacity: "1" },
-        },
-        "slide-up": {
-          "0%": { transform: "translateY(20px)", opacity: "0" },
-          "100%": { transform: "translateY(0)", opacity: "1" },
-        },
-        "fade-in": {
-          "0%": { opacity: "0" },
-          "100%": { opacity: "1" },
-        },
-        "counter-increment": {
-          "0%": { transform: "translateY(100%)" },
-          "100%": { transform: "translateY(0)" },
-        },
-        "glow-pulse": {
-          "0%, 100%": { boxShadow: "0 0 20px hsl(var(--hydrate) / 0.3)" },
-          "50%": { boxShadow: "0 0 40px hsl(var(--hydrate) / 0.6)" },
-        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "terminal-blink": "terminal-blink 1s step-end infinite",
-        "data-pulse": "data-pulse 2s ease-in-out infinite",
-        "slide-up": "slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1)",
-        "fade-in": "fade-in 0.4s ease-out",
-        "counter-increment": "counter-increment 0.4s cubic-bezier(0.16, 1, 0.3, 1)",
-        "glow-pulse": "glow-pulse 3s ease-in-out infinite",
-      },
-      backgroundImage: {
-        "grid-pattern": `linear-gradient(hsl(var(--border) / 0.5) 1px, transparent 1px),
-                         linear-gradient(90deg, hsl(var(--border) / 0.5) 1px, transparent 1px)`,
-        "diagonal-lines": `repeating-linear-gradient(
-          -45deg,
-          transparent,
-          transparent 10px,
-          hsl(var(--border) / 0.3) 10px,
-          hsl(var(--border) / 0.3) 11px
-        )`,
-      },
-      backgroundSize: {
-        "grid-40": "40px 40px",
       },
     },
   },
