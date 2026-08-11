@@ -1,44 +1,6 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
-import { CloudEnvironment } from "@/types/hydration";
 import { APP_SETTINGS_STORAGE_KEY, EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
-
-const SUPPORTED_CLOUD_ENVIRONMENT: CloudEnvironment = "global";
-
-// Store the selected cloud environment for the session (always "global")
-let selectedCloudEnvironment: CloudEnvironment = SUPPORTED_CLOUD_ENVIRONMENT;
-
-/**
- * Get the currently selected cloud environment
- */
-export function getSelectedCloudEnvironment(): CloudEnvironment {
-  return selectedCloudEnvironment;
-}
-
-/**
- * Set the cloud environment for the session (always "global").
- */
-export function setSelectedCloudEnvironment(): void {
-  selectedCloudEnvironment = SUPPORTED_CLOUD_ENVIRONMENT;
-  // Also store in sessionStorage for persistence across page reloads
-  if (typeof window !== "undefined") {
-    sessionStorage.setItem("cloudEnvironment", SUPPORTED_CLOUD_ENVIRONMENT);
-  }
-}
-
-/**
- * Load cloud environment from session storage (call on app init).
- * Discards stale sovereign-cloud values persisted by older builds.
- */
-export function loadCloudEnvironmentFromSession(): CloudEnvironment {
-  if (typeof window !== "undefined") {
-    const stored = sessionStorage.getItem("cloudEnvironment");
-    if (stored !== null && stored !== SUPPORTED_CLOUD_ENVIRONMENT) {
-      sessionStorage.removeItem("cloudEnvironment");
-    }
-  }
-  return selectedCloudEnvironment;
-}
 
 /**
  * Get the active account from MSAL.
@@ -102,8 +64,6 @@ export class AuthSessionExpiredError extends Error {
  * Sign in the user (global/commercial cloud only).
  */
 export async function signIn(): Promise<AccountInfo> {
-  setSelectedCloudEnvironment();
-
   const authority = getAuthorityUrl("common");
 
   const response = await msalInstance.loginPopup({
@@ -119,13 +79,12 @@ export async function signIn(): Promise<AccountInfo> {
 }
 
 /**
- * Clear all app data from sessionStorage (tenant results, cloud selection, template caches)
+ * Clear all app data from sessionStorage (tenant results and template caches)
  * Prevents cross-tenant/cross-user data leakage on shared browsers
  */
 function clearSessionData(): void {
   if (typeof window === "undefined") return;
 
-  sessionStorage.removeItem("cloudEnvironment");
   Object.values(EXECUTION_RESULT_STORAGE_KEYS).forEach((key) =>
     sessionStorage.removeItem(key)
   );

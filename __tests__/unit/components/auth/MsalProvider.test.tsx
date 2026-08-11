@@ -18,7 +18,6 @@ vi.mock('@azure/msal-react', () => ({
 }))
 
 vi.mock('@/lib/auth/authUtils', () => ({
-  loadCloudEnvironmentFromSession: vi.fn(() => 'global'),
   signOut: vi.fn(),
 }))
 
