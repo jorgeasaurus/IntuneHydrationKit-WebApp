@@ -231,7 +231,24 @@ describe("executeWin32AppTask", () => {
     await expect(resultPromise).resolves.toMatchObject({
       success: true,
       skipped: true,
-      error: "No matching app owned by Intune Hydration Kit",
+      error: "Matching app is not owned by Intune Hydration Kit",
+    });
+  });
+
+  it("reports that no app exists when delete discovery finds no name match", async () => {
+    vi.useFakeTimers();
+    mockGetWin32LobApps.mockResolvedValue([]);
+
+    const resultPromise = executeWin32AppTask(
+      { ...task, operation: "delete" },
+      createContext()
+    );
+    await vi.runAllTimersAsync();
+
+    await expect(resultPromise).resolves.toMatchObject({
+      success: true,
+      skipped: true,
+      error: "Not found in tenant",
     });
   });
 

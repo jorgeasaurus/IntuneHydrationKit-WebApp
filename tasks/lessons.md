@@ -1,7 +1,7 @@
 # Lessons
 
 - Intune detection scripts must be read-only; if a dependency is unavailable, use a non-mutating fallback instead of bootstrapping software during detection.
-- Safe-delete skip messages must distinguish ownership protection from object absence when discovery filters out unowned matches.
+- Safe-delete discovery must preserve both name-match and ownership results so skip messages distinguish a protected app from an absent app.
 - Prism token types use kebab-case names such as `class-name`; syntax-color maps must match the renderer's token vocabulary.
 - Inventory removals must update metadata fallback counts and include a source-of-truth alignment test.
 - Operator-facing errors must state the current technical constraint and recovery action, not describe the implementation as a proof of concept.

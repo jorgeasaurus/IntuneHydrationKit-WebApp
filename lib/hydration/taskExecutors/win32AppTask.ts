@@ -24,6 +24,11 @@ interface RecentWin32App {
   createdAt: number;
 }
 
+interface OwnedMatchingAppsResult {
+  apps: Win32LobApp[];
+  hasNameMatch: boolean;
+}
+
 function isRecentWin32App(value: unknown): value is RecentWin32App {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
 
@@ -169,7 +174,7 @@ async function getMatchingApps(
 async function getOwnedMatchingApps(
   template: Win32AppTemplate,
   context: ExecutionContext
-): Promise<Win32LobApp[]> {
+): Promise<OwnedMatchingAppsResult> {
   const matchingApps = await getMatchingApps(template, context);
   const ownershipResults = await Promise.all(matchingApps.map(async (app) => {
     if (isOwnedWin32App(app)) return app;
@@ -189,22 +194,27 @@ async function getOwnedMatchingApps(
       throw error;
     }
   }));
-  return ownershipResults.filter((app) => app !== null);
+  return {
+    apps: ownershipResults.filter((app) => app !== null),
+    hasNameMatch: matchingApps.length > 0,
+  };
 }
 
 async function getDeleteCandidates(
   template: Win32AppTemplate,
   context: ExecutionContext
-): Promise<Win32LobApp[]> {
-  let existingApps = await getOwnedMatchingApps(template, context);
+): Promise<OwnedMatchingAppsResult> {
+  let result = await getOwnedMatchingApps(template, context);
+  let hasNameMatch = result.hasNameMatch;
 
   for (const delay of DELETE_VISIBILITY_RETRY_DELAYS_MS) {
-    if (existingApps.length > 0) break;
+    if (result.apps.length > 0) break;
     await sleep(delay);
-    existingApps = await getOwnedMatchingApps(template, context);
+    result = await getOwnedMatchingApps(template, context);
+    hasNameMatch ||= result.hasNameMatch;
   }
 
-  return existingApps;
+  return { apps: result.apps, hasNameMatch };
 }
 
 export async function executeWin32AppTask(
@@ -216,9 +226,10 @@ export async function executeWin32AppTask(
     return { task, success: false, skipped: false, error: "Win32 app template not found" };
   }
 
-  const existingApps = task.operation === "delete"
+  const deleteCandidates = task.operation === "delete"
     ? await getDeleteCandidates(template, context)
-    : await getMatchingApps(template, context);
+    : null;
+  const existingApps = deleteCandidates?.apps ?? await getMatchingApps(template, context);
 
   if (task.operation === "create") {
     if (existingApps.length > 0) {
@@ -253,7 +264,9 @@ export async function executeWin32AppTask(
       task,
       success: true,
       skipped: true,
-      error: "No matching app owned by Intune Hydration Kit",
+      error: deleteCandidates?.hasNameMatch
+        ? "Matching app is not owned by Intune Hydration Kit"
+        : "Not found in tenant",
     };
   }
   if (context.isPreview) {
