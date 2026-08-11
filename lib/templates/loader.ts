@@ -11,9 +11,6 @@ import type { DeviceFilter } from "@/types/graph";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
-// Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 22; // Normalize cached device filter platform values
-
 export interface GroupTemplate {
   displayName: string;
   description: string;
@@ -797,125 +794,21 @@ export async function fetchCISBaselinePoliciesByCategories(
   }
 }
 
-/**
- * In-memory fallback cache for when sessionStorage quota is exceeded
- * This happens when selecting all 717+ CIS baseline items
- */
-const memoryCache = new Map<string, { templates: unknown[]; timestamp: number; version: number }>();
+const TEMPLATE_CACHE_PREFIX = "intune-hydration-templates-";
+const templateCache = new Map<string, unknown[]>();
 
-/**
- * Cache templates in session storage with in-memory fallback
- * Falls back to memory cache when sessionStorage quota is exceeded
- */
 export function cacheTemplates(category: string, templates: unknown[]): void {
-  const cacheData = {
-    templates,
-    timestamp: Date.now(),
-    version: CACHE_VERSION,
-  };
-
-  try {
-    sessionStorage.setItem(
-      `intune-hydration-templates-${category}`,
-      JSON.stringify(cacheData)
-    );
-  } catch (error) {
-    // QuotaExceededError - fall back to in-memory cache
-    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      console.warn(`[Cache] SessionStorage quota exceeded for ${category}, using in-memory cache`);
-      memoryCache.set(`intune-hydration-templates-${category}`, cacheData);
-    } else {
-      console.error(`Error caching ${category} templates:`, error);
-    }
-  }
+  templateCache.set(`${TEMPLATE_CACHE_PREFIX}${category}`, templates);
 }
 
-/**
- * Get cached templates from session storage or in-memory fallback
- * Returns null if cache is expired (> 1 hour) or version mismatch
- */
 export function getCachedTemplates(category: string): unknown[] | null {
-  const cacheKey = `intune-hydration-templates-${category}`;
-  const ONE_HOUR = 60 * 60 * 1000;
-
-  // Helper to validate and return cache data
-  const validateCache = (data: { templates: unknown[]; timestamp: number; version: number }, source: string): unknown[] | null => {
-    // Check cache version - invalidate if mismatch
-    if (data.version !== CACHE_VERSION) {
-      console.log(`[Cache] Invalidating ${category} cache (${source}) - version mismatch (cached: ${data.version}, current: ${CACHE_VERSION})`);
-      return null;
-    }
-
-    // Check age
-    const age = Date.now() - data.timestamp;
-    if (age > ONE_HOUR) {
-      console.log(`[Cache] Invalidating ${category} cache (${source}) - expired (age: ${Math.round(age / 60000)} minutes)`);
-      return null;
-    }
-
-    return data.templates;
-  };
-
-  try {
-    // Try sessionStorage first
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      const data = JSON.parse(cached);
-      const result = validateCache(data, 'sessionStorage');
-      if (result) return result;
-      sessionStorage.removeItem(cacheKey);
-    }
-
-    // Fall back to in-memory cache
-    const memCached = memoryCache.get(cacheKey);
-    if (memCached) {
-      const result = validateCache(memCached, 'memory');
-      if (result) return result;
-      memoryCache.delete(cacheKey);
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error reading cached ${category} templates:`, error);
-    return null;
-  }
+  return templateCache.get(`${TEMPLATE_CACHE_PREFIX}${category}`) ?? null;
 }
 
-/**
- * Clear cached templates for a specific category
- * Used when fresh templates need to be fetched (e.g., when selections change)
- */
 export function clearCategoryCache(category: string): void {
-  const cacheKey = `intune-hydration-templates-${category}`;
-  try {
-    sessionStorage.removeItem(cacheKey);
-    memoryCache.delete(cacheKey);
-    console.log(`[Cache] Cleared cache for ${category}`);
-  } catch (error) {
-    console.error(`Error clearing ${category} cache:`, error);
-  }
+  templateCache.delete(`${TEMPLATE_CACHE_PREFIX}${category}`);
 }
 
-/**
- * Get all template cache keys (from both sessionStorage and in-memory cache)
- * Used when searching for CIS baseline templates across all cached categories
- */
 export function getAllTemplateCacheKeys(): string[] {
-  const keys = new Set<string>();
-
-  // Add sessionStorage keys
-  try {
-    for (const key of Object.keys(sessionStorage)) {
-      if (key.startsWith("intune-hydration-templates-")) {
-        keys.add(key);
-      }
-    }
-  } catch {
-    // Ignore errors
-  }
-
-  // Add in-memory cache keys
-  memoryCache.forEach((_, key) => keys.add(key));
-
-  return Array.from(keys);
+  return Array.from(templateCache.keys());
 }
