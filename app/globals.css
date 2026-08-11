@@ -416,20 +416,9 @@
   color: hsl(var(--hydrate));
 }
 
-.skeleton {
-  background: linear-gradient(90deg, hsl(var(--muted)), hsl(var(--muted-foreground) / 0.18), hsl(var(--muted)));
-  background-size: 200% 100%;
-  animation: skeleton-shimmer 1.5s ease-in-out infinite;
-}
-
 :focus-visible {
   outline: 2px solid hsl(var(--hydrate));
   outline-offset: 3px;
-}
-
-@keyframes skeleton-shimmer {
-  from { background-position: 200% 0; }
-  to { background-position: -200% 0; }
 }
 
 @keyframes terminal-blink {
