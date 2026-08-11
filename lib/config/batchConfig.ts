@@ -23,9 +23,8 @@ export const BATCH_CONFIG: BatchConfiguration = {
   delayBetweenBatches: 1000,
   enableBatching: true,
   categoryBatchSizes: {
-    // CIS baselines write to /deviceManagement/configurationPolicies (settings catalog),
-    // hitting the per-tenant deviceintent.tenant.app.write throttle bucket.
-    // Smaller batches avoid overwhelming this limit.
+    // CIS and OpenIntuneBaseline tasks can write to /deviceManagement/configurationPolicies
+    // and share this override to avoid the per-tenant deviceintent.tenant.app.write limit.
     cisBaseline: 15,
   },
 };
