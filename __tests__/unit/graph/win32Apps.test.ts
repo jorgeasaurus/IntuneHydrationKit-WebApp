@@ -1,4 +1,12 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockGetAccessToken } = vi.hoisted(() => ({
+  mockGetAccessToken: vi.fn(),
+}));
+
+vi.mock("@/lib/auth/authUtils", () => ({
+  getAccessToken: mockGetAccessToken,
+}));
 
 import {
   createWin32AppFromPackage,
@@ -8,6 +16,10 @@ import {
 import { SEVEN_ZIP_WIN32_APP } from "@/templates/win32Apps";
 
 describe("createWin32AppFromPackage", () => {
+  beforeEach(() => {
+    mockGetAccessToken.mockResolvedValue("graph-access-token");
+  });
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -87,7 +99,11 @@ describe("createWin32AppFromPackage", () => {
       "/api/win32-upload",
       expect.objectContaining({
         method: "POST",
-        headers: { "x-intune-upload-url": "https://upload.example/package" },
+        headers: {
+          Authorization: "Bearer graph-access-token",
+          "x-intune-content-file-endpoint": "/deviceAppManagement/mobileApps/app-id/microsoft.graph.win32LobApp/contentVersions/content-id/files/file-id",
+          "x-intune-upload-url": "https://upload.example/package",
+        },
       })
     );
     expect(postNoRetry).toHaveBeenNthCalledWith(
@@ -239,7 +255,11 @@ describe("createWin32AppFromPackage", () => {
       2,
       "/api/win32-upload",
       expect.objectContaining({
-        headers: { "x-intune-upload-url": "https://upload.example/renewed" },
+        headers: {
+          Authorization: "Bearer graph-access-token",
+          "x-intune-content-file-endpoint": "/deviceAppManagement/mobileApps/app-id/microsoft.graph.win32LobApp/contentVersions/content-id/files/file-id",
+          "x-intune-upload-url": "https://upload.example/renewed",
+        },
       })
     );
   });

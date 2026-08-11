@@ -6,6 +6,7 @@ import {
 } from "@/lib/utils/hydrationMarker";
 import { IntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { Win32AppTemplate } from "@/templates/win32Apps";
+import { getAccessToken } from "@/lib/auth/authUtils";
 
 interface Win32LobApp {
   "@odata.type"?: string;
@@ -128,10 +129,19 @@ async function waitForUploadState(
   throw new Error(`Timed out waiting for Win32 content state ${desiredState}.`);
 }
 
-async function uploadToAzureStorage(uploadUri: string, content: Blob): Promise<void> {
+async function uploadToAzureStorage(
+  uploadUri: string,
+  contentFileEndpoint: string,
+  content: Blob
+): Promise<void> {
+  const accessToken = await getAccessToken();
   const response = await fetch("/api/win32-upload", {
     method: "POST",
-    headers: { "x-intune-upload-url": uploadUri },
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "x-intune-content-file-endpoint": contentFileEndpoint,
+      "x-intune-upload-url": uploadUri,
+    },
     body: content,
   });
   if (!response.ok) {
@@ -149,7 +159,7 @@ async function uploadWithRenewal(
   let currentUploadUri = uploadUri;
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
-      await uploadToAzureStorage(currentUploadUri, content);
+      await uploadToAzureStorage(currentUploadUri, contentFileEndpoint, content);
       return;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);

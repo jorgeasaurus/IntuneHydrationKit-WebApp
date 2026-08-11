@@ -5,6 +5,12 @@ const MAX_PACKAGE_SIZE_BYTES = 8 * 1024 * 1024 * 1024;
 const MAX_UPLOAD_ATTEMPTS = 3;
 const RETRY_BASE_DELAY_MS = 5000;
 const BLOCK_ID_INDEX_WIDTH = 8;
+const GRAPH_ENDPOINT = "https://graph.microsoft.com";
+const VALID_UPLOAD_STATES = new Set([
+  "azureStorageUriRequestSuccess",
+  "azureStorageUriRenewalSuccess",
+]);
+const CONTENT_FILE_ENDPOINT_PATTERN = /^\/deviceAppManagement\/mobileApps\/[A-Za-z0-9._~-]+\/microsoft\.graph\.win32LobApp\/contentVersions\/[A-Za-z0-9._~-]+\/files\/[A-Za-z0-9._~-]+$/;
 const AZURE_BLOB_HOST_SUFFIXES = [
   ".blob.core.windows.net",
   ".blob.core.usgovcloudapi.net",
@@ -40,6 +46,68 @@ function hasSameOrigin(request: Request): boolean {
   } catch {
     return false;
   }
+}
+
+type UploadTargetAuthorization =
+  | { authorized: true }
+  | { authorized: false; error: string; status: number };
+
+async function authorizeUploadTarget(
+  request: Request,
+  uploadUrl: string
+): Promise<UploadTargetAuthorization> {
+  const authorization = request.headers.get("authorization");
+  const accessToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  if (!accessToken) {
+    return { authorized: false, error: "Microsoft Graph authentication is required.", status: 401 };
+  }
+
+  const contentFileEndpoint = request.headers.get("x-intune-content-file-endpoint");
+  if (!contentFileEndpoint || !CONTENT_FILE_ENDPOINT_PATTERN.test(contentFileEndpoint)) {
+    return { authorized: false, error: "Invalid Intune content file endpoint.", status: 400 };
+  }
+
+  const graphResponse = await fetch(
+    `${GRAPH_ENDPOINT}/beta${contentFileEndpoint}?$select=azureStorageUri,uploadState`,
+    {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      cache: "no-store",
+    }
+  );
+
+  if (graphResponse.status === 401 || graphResponse.status === 403) {
+    return {
+      authorized: false,
+      error: "Microsoft Graph rejected the upload authorization.",
+      status: graphResponse.status,
+    };
+  }
+  if (!graphResponse.ok) {
+    return { authorized: false, error: "Unable to validate the Intune upload target.", status: 502 };
+  }
+
+  const contentFile = await graphResponse.json().catch(() => null) as {
+    azureStorageUri?: string;
+    uploadState?: string;
+  } | null;
+  if (
+    !contentFile ||
+    contentFile.azureStorageUri !== uploadUrl ||
+    !contentFile.uploadState ||
+    !VALID_UPLOAD_STATES.has(contentFile.uploadState)
+  ) {
+    return {
+      authorized: false,
+      error: "The upload URL does not match the current Intune content target.",
+      status: 403,
+    };
+  }
+
+  return { authorized: true };
 }
 
 function sleep(milliseconds: number): Promise<void> {
@@ -185,6 +253,13 @@ export async function POST(request: Request) {
   }
 
   try {
+    const authorization = await authorizeUploadTarget(request, uploadUrl);
+    if (!authorization.authorized) {
+      return NextResponse.json(
+        { error: authorization.error },
+        { status: authorization.status }
+      );
+    }
     await uploadPackageInBlocks(uploadUrl, request.body);
   } catch (error) {
     return NextResponse.json(

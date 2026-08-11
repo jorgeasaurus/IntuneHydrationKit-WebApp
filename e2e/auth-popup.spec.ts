@@ -1,7 +1,14 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Sign-in", () => {
-  test("opens the Microsoft sign-in window directly from the call to action", async ({ page }) => {
+  test("opens the Microsoft sign-in window directly from the call to action", async ({ context, page }) => {
+    await context.route("https://login.microsoftonline.com/**", async (route) => {
+      await route.fulfill({
+        body: "<!doctype html><title>Microsoft sign-in test target</title>",
+        contentType: "text/html",
+        status: 200,
+      });
+    });
     await page.goto("/");
 
     const popupPromise = page.waitForEvent("popup");
