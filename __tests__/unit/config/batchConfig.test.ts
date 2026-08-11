@@ -12,6 +12,7 @@ describe("lib/config/batchConfig", () => {
       delayBetweenBatches: 1000,
       enableBatching: true,
       categoryBatchSizes: {
+        baseline: 15,
         cisBaseline: 15,
       },
     });

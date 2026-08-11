@@ -6,6 +6,12 @@ describe("date formatting", () => {
 
   it("formats display dates with the existing US English style", () => {
     expect(formatDateTime(date)).toBe("Apr 26, 2026, 9:10 AM");
+    expect(formatDateTime(new Date(2026, 3, 26, 0, 5))).toBe("Apr 26, 2026, 12:05 AM");
+    expect(formatDateTime(new Date(2026, 3, 26, 12, 5))).toBe("Apr 26, 2026, 12:05 PM");
+  });
+
+  it("rejects invalid display dates", () => {
+    expect(() => formatDateTime(new Date(Number.NaN))).toThrow(RangeError);
   });
 
   it("formats clock and filename timestamps with padded values", () => {

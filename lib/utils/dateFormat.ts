@@ -1,13 +1,16 @@
-const dateTimeFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-  timeStyle: "short",
-  hour12: true,
-});
-
 const pad2 = (value: number): string => String(value).padStart(2, "0");
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function formatDateTime(date: Date): string {
-  return dateTimeFormatter.format(date);
+  if (Number.isNaN(date.getTime())) {
+    throw new RangeError("Invalid time value");
+  }
+
+  const hours = date.getHours();
+  const hour = hours % 12 || 12;
+  const period = hours < 12 ? "AM" : "PM";
+
+  return `${MONTH_NAMES[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}, ${hour}:${pad2(date.getMinutes())} ${period}`;
 }
 
 export function formatClockTime(date: Date): string {

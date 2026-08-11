@@ -891,13 +891,14 @@ async function executeBatchGroup(
   const config = getBatchConfig();
   const results: ExecutionResult[] = [];
 
-  // Determine batch size: use smaller size if group contains cisBaseline or baseline tasks
-  const hasThrottleSensitiveTasks = preparedTasks.some(
-    (t) => t.task.category === "cisBaseline" || t.task.category === "baseline"
+  const initialBatchSize = preparedTasks.reduce(
+    (batchSize, preparedTask) => Math.min(
+      batchSize,
+      config.categoryBatchSizes?.[preparedTask.task.category] ?? config.defaultBatchSize
+    ),
+    config.defaultBatchSize
   );
-  const initialBatchSize = hasThrottleSensitiveTasks
-    ? Math.min(config.categoryBatchSizes?.cisBaseline ?? config.defaultBatchSize, config.defaultBatchSize)
-    : config.defaultBatchSize;
+  const usesCategoryBatchSize = initialBatchSize < config.defaultBatchSize;
 
   // Adaptive throttle state - tracks across batches to dynamically adjust delay and size
   let currentBatchDelay = config.delayBetweenBatches;
@@ -909,7 +910,7 @@ async function executeBatchGroup(
   let remainingTasks = [...preparedTasks];
   const maxRetries = 3;
 
-  if (hasThrottleSensitiveTasks) {
+  if (usesCategoryBatchSize) {
     console.log(`[BatchExecutor] Using reduced batch size ${initialBatchSize} for throttle-sensitive categories`);
   }
   console.log(`[BatchExecutor] Processing ${Math.ceil(remainingTasks.length / currentBatchSize)} batch(es) of ${version} requests (batch size: ${currentBatchSize})`);

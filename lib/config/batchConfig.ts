@@ -23,8 +23,8 @@ export const BATCH_CONFIG: BatchConfiguration = Object.freeze({
   delayBetweenBatches: 1000,
   enableBatching: true,
   categoryBatchSizes: Object.freeze({
-    // CIS and OpenIntuneBaseline tasks can write to /deviceManagement/configurationPolicies
-    // and share this override to avoid the per-tenant deviceintent.tenant.app.write limit.
+    // Both categories can write to /deviceManagement/configurationPolicies.
+    baseline: 15,
     cisBaseline: 15,
   }),
 });
