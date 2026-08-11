@@ -613,13 +613,13 @@ describe("batchExecutor branch coverage", () => {
           {
             displayName: "Cached Filter",
             description: "Cached filter description",
-            platform: "windows",
+            platform: "windows10AndLater",
             rule: '(device.deviceOwnership -eq "Company")',
           },
           {
             displayName: "Existing Filter",
             description: "Existing filter description",
-            platform: "windows",
+            platform: "windows10AndLater",
             rule: '(device.deviceOwnership -eq "Personal")',
           },
         ];
@@ -648,7 +648,7 @@ describe("batchExecutor branch coverage", () => {
                 "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
                 displayName: "Cached Filter",
                 description: "Cached filter description. Imported by Intune Hydration Kit",
-                platform: "windows",
+                platform: "windows10AndLater",
                 rule: '(device.deviceOwnership -eq "Company")',
               },
             },
@@ -696,7 +696,7 @@ describe("batchExecutor branch coverage", () => {
           url: "/deviceManagement/assignmentFilters",
           body: expect.objectContaining({
             displayName: "Cached Filter",
-            platform: "windows",
+            platform: "windows10AndLater",
           }),
         }),
       ],
