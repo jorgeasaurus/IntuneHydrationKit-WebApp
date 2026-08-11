@@ -9,7 +9,7 @@ import { Win32AppTemplate } from "@/templates/win32Apps";
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { utf8ToBase64 } from "@/lib/utils/base64";
 
-interface Win32LobApp {
+export interface Win32LobApp {
   "@odata.type"?: string;
   id: string;
   displayName: string;

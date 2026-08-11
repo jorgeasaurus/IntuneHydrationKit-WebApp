@@ -67,6 +67,18 @@ describe("executeWin32AppTask", () => {
     expect(mockCreateWin32AppFromPackage).not.toHaveBeenCalled();
   });
 
+  it("reuses the Win32 app collection across tasks in one execution", async () => {
+    const context = createContext(true);
+
+    await executeWin32AppTask(task, context);
+    await executeWin32AppTask(
+      { ...task, id: "google-chrome", itemName: "Google Chrome - [IHD]" },
+      context
+    );
+
+    expect(mockGetWin32LobApps).toHaveBeenCalledTimes(1);
+  });
+
   it("ignores malformed recent-app session hints", async () => {
     sessionStorage.setItem("intune-hydration-recent-win32-apps", "null");
 
@@ -286,17 +298,23 @@ describe("executeWin32AppTask", () => {
 
   it("retries an immediate delete until a newly created app is visible", async () => {
     vi.useFakeTimers();
-    mockGetWin32LobApps
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        {
-          id: "newly-visible-app",
-          displayName: "7-Zip - [IHD]",
-          description: "Imported by Intune Hydration Kit",
-          notes: "Imported from WinGet",
-        },
-      ]);
+    mockGetWin32LobApps.mockResolvedValue([]);
+    sessionStorage.setItem("intune-hydration-recent-win32-apps", JSON.stringify({
+      "7-zip - [ihd]": {
+        id: "newly-visible-app",
+        displayName: "7-Zip - [IHD]",
+        createdAt: Date.now(),
+      },
+    }));
     const context = createContext();
+    vi.mocked(context.client.get)
+      .mockRejectedValueOnce(Object.assign(new Error("Resource not found"), { status: 404 }))
+      .mockResolvedValueOnce({
+        id: "newly-visible-app",
+        displayName: "7-Zip - [IHD]",
+        description: "Imported by Intune Hydration Kit",
+        notes: "Imported from WinGet",
+      });
 
     const resultPromise = executeWin32AppTask(
       { ...task, operation: "delete" },
@@ -305,7 +323,8 @@ describe("executeWin32AppTask", () => {
     await vi.advanceTimersByTimeAsync(2000);
     const result = await resultPromise;
 
-    expect(mockGetWin32LobApps).toHaveBeenCalledTimes(2);
+    expect(mockGetWin32LobApps).toHaveBeenCalledTimes(1);
+    expect(context.client.get).toHaveBeenCalledTimes(2);
     expect(context.client.delete).toHaveBeenCalledWith(
       "/deviceAppManagement/mobileApps/newly-visible-app",
       "beta"

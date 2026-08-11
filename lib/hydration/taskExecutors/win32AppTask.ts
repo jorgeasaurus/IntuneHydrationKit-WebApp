@@ -7,6 +7,7 @@ import {
   isLegacyOwnedWin32App,
   isOwnedWin32App,
 } from "@/lib/graph/win32Apps";
+import type { Win32LobApp } from "@/lib/graph/win32Apps";
 import { getWin32AppTemplateByName } from "@/templates/win32Apps";
 import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
@@ -15,8 +16,6 @@ import { bytesToBase64 } from "@/lib/utils/base64";
 const DELETE_VISIBILITY_RETRY_DELAYS_MS = [2000, 4000, 8000] as const;
 const RECENT_WIN32_APPS_STORAGE_KEY = "intune-hydration-recent-win32-apps";
 const RECENT_WIN32_APP_TTL_MS = 60 * 60 * 1000;
-
-type Win32LobApp = Awaited<ReturnType<typeof getWin32LobApps>>[number];
 
 interface RecentWin32App {
   id: string;
@@ -111,8 +110,12 @@ async function getRecentOwnedApp(
     if (displayNameVariants.has(app.displayName.toLowerCase()) && isOwnedWin32App(app)) {
       return app;
     }
-  } catch {
-    // The object may have been removed outside this session; discard the hint.
+  } catch (error) {
+    const graphError = error as { status?: number; code?: string };
+    if (graphError.status === 404 || graphError.code?.toLowerCase() === "resourcenotfound") {
+      // Keep a recent creation hint because Intune may not expose the new app immediately.
+      return null;
+    }
   }
 
   forgetRecentWin32App(displayName);
@@ -161,7 +164,10 @@ async function getMatchingApps(
 ): Promise<Win32LobApp[]> {
   const recentApp = await getRecentOwnedApp(template.displayName, context);
   const displayNameVariants = new Set(getWin32AppDisplayNameVariants(template.displayName));
-  const matchingApps = (await getWin32LobApps(context.client)).filter((app) =>
+  if (!context.cachedWin32LobApps) {
+    context.cachedWin32LobApps = await getWin32LobApps(context.client);
+  }
+  const matchingApps = context.cachedWin32LobApps.filter((app) =>
     displayNameVariants.has(app.displayName.toLowerCase())
   );
 
@@ -255,6 +261,9 @@ export async function executeWin32AppTask(
       detectionScript,
       iconBase64
     );
+    if (context.cachedWin32LobApps && app.displayName) {
+      context.cachedWin32LobApps.push(app);
+    }
     rememberRecentWin32App({ id: app.id, displayName: template.displayName });
     return { task, success: true, skipped: false, createdId: app.id };
   }
@@ -279,6 +288,12 @@ export async function executeWin32AppTask(
     ),
     Promise.resolve()
   );
+  const deletedIds = new Set(existingApps.map((app) => app.id));
+  if (context.cachedWin32LobApps) {
+    context.cachedWin32LobApps = context.cachedWin32LobApps.filter(
+      (app) => !deletedIds.has(app.id)
+    );
+  }
   forgetRecentWin32App(template.displayName);
   return { task, success: true, skipped: false };
 }

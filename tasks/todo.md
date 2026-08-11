@@ -9,6 +9,7 @@
 - [x] Centralize the Graph base URL in a server-safe endpoint module.
 - [x] Remove per-block copies from server-side Azure uploads.
 - [x] Send the Azure block list with an XML content type.
+- [x] Cache Win32 collection discovery across one execution.
 - [x] Verify, commit, push, and disposition all current-head comments.
 - [ ] Complete a clean Copilot review cycle on the latest head.
 - [ ] Squash-merge PR #21 and verify the merged state.
@@ -23,6 +24,8 @@
 - The Graph client and Win32 upload authorization now use the same server-safe endpoint helper.
 - Azure block uploads now reuse one 6 MB buffer and send full or tail views without per-block copies.
 - Azure block-list commits now declare the XML body as `application/xml`.
+- Win32 discovery fetches the full Graph collection once per execution; recent-object lookups preserve eventual-consistency retries, and create/delete mutations update the cache.
+- Checks passed: 560 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
 - Checks passed: 559 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
 
 # Win32 Single-App Selection

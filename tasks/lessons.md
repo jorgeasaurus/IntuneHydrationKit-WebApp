@@ -1,5 +1,6 @@
 # Lessons
 
+- Cache full Graph collections for one execution and update the cache after mutations; use direct recent-object lookups for eventual-consistency retries.
 - Azure Put Block List requests carry XML and must declare an XML content type; payload syntax and request metadata must agree.
 - Pass reusable `Uint8Array` views to block-upload requests; `slice()` adds one full block allocation for every upload.
 - Keep service base URLs in server-safe modules shared by browser clients and server routes; do not couple endpoint constants to browser-only authentication code.
