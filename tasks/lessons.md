@@ -1,5 +1,6 @@
 # Lessons
 
+- Every item-selectable category must be included in wizard-state persistence and have single-item queue tests for create and delete modes.
 - When a proof-of-concept app leaves the inventory, remove its template, documentation entry, tests, package, icon, and wrapper assets together.
 - Convert browser byte arrays to base64 in bounded chunks; repeated single-byte string concatenation adds avoidable time and memory pressure.
 - Legacy ownership fingerprints must accept only the known display-name variants used by discovery; arbitrary renames must not weaken safe-delete checks.

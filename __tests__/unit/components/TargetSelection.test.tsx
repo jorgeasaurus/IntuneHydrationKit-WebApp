@@ -304,9 +304,10 @@ describe('TargetSelection', () => {
 
     useWizardStateMock.mockReturnValue({
       state: createState({
-        selectedTargets: ['groups'],
+        selectedTargets: ['groups', 'win32Apps'],
         categorySelections: {
           groups: { selectedItems: [`${IMPORT_PREFIX}Windows Devices`] },
+          win32Apps: { selectedItems: ['7-Zip - [IHD]'] },
         },
       }),
       setSelectedTargets,
@@ -321,10 +322,11 @@ describe('TargetSelection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Review Selection' }))
 
-    expect(setSelectedTargets).toHaveBeenCalledWith(['groups'])
+    expect(setSelectedTargets).toHaveBeenCalledWith(['groups', 'win32Apps'])
     expect(setSelectedCISCategories).toHaveBeenCalledWith([])
     expect(setCategorySelections).toHaveBeenCalledWith({
       groups: { selectedItems: [`${IMPORT_PREFIX}Windows Devices`] },
+      win32Apps: { selectedItems: ['7-Zip - [IHD]'] },
     })
     expect(setBaselineSelection).not.toHaveBeenCalled()
     expect(nextStep).toHaveBeenCalledTimes(1)

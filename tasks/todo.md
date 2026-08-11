@@ -1,3 +1,17 @@
+# Win32 Single-App Selection
+
+- [x] Trace the selected Win32 item from Target Selection into task queue construction.
+- [x] Persist Win32 item selections in wizard state.
+- [x] Add create-mode and delete-mode single-item queue regressions.
+- [x] Run focused and full verification.
+- [x] Commit and push the fix to PR #21.
+
+## Review
+
+- Root cause: Target Selection omitted `win32Apps` when it persisted item-level selections, so queue construction received no item filter and selected every template.
+- The persisted selection and queue now contain only the chosen app in both create and delete modes.
+- Checks passed: 554 tests, type-check, lint, production build, and `git diff --check`.
+
 # Remove PowerShell Win32 Proof of Concept
 
 - [x] Map the PowerShell app template, catalog entry, tests, and bundled assets.
