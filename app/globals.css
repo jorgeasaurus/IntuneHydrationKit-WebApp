@@ -346,11 +346,6 @@
   transition: width 0.5s ease-out;
 }
 
-.progress-glow-indicator {
-  background: linear-gradient(90deg, hsl(var(--hydrate)), #8dd5ff);
-  box-shadow: 0 0 18px hsl(var(--hydrate) / 0.48);
-}
-
 .badge-status {
   display: inline-flex;
   align-items: center;
