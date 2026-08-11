@@ -5,6 +5,7 @@
 - [x] Align the Win32 metadata count with the four shipped templates.
 - [x] Make Win32 detection read-only, correct Prism token mapping, and clarify protected-delete results.
 - [x] Distinguish protected delete matches from absent apps.
+- [x] Remove redundant full-payload copies from `.intunewin` parsing.
 - [x] Verify, commit, push, and disposition all current-head comments.
 - [ ] Complete a clean Copilot review cycle on the latest head.
 - [ ] Squash-merge PR #21 and verify the merged state.
@@ -15,7 +16,8 @@
 - Detection scripts now use WinGet only when it is present and otherwise use read-only registry detection; no detection path downloads or installs dependencies.
 - Protected delete candidates now report the ownership requirement, and PowerShell `class-name` tokens receive the intended syntax color.
 - Delete discovery now preserves whether any app name matched, so absent apps report `Not found in tenant` while unowned matches report the ownership protection.
-- Checks passed: 558 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
+- `.intunewin` ZIP entries now remain views over the package buffer, and the encrypted-content view goes directly to `Blob` without another full-payload slice.
+- Checks passed: 559 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
 
 # Win32 Single-App Selection
 

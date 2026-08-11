@@ -18,7 +18,7 @@ export interface IntuneWinPackage {
 
 interface ZipEntry {
   name: string;
-  content: Uint8Array;
+  content: Uint8Array<ArrayBuffer>;
 }
 
 const LOCAL_FILE_HEADER = 0x04034b50;
@@ -51,7 +51,7 @@ function readStoredZipEntries(packageBytes: ArrayBuffer): ZipEntry[] {
 
     entries.push({
       name: textDecoder.decode(bytes.subarray(offset + 30, offset + 30 + nameLength)),
-      content: bytes.slice(contentStart, contentEnd),
+      content: bytes.subarray(contentStart, contentEnd),
     });
     offset = contentEnd;
   }
@@ -99,12 +99,7 @@ export async function readIntuneWinPackage(file: Blob | ArrayBuffer): Promise<In
   }
 
   return {
-    encryptedContent: new Blob([
-      encryptedContent.content.buffer.slice(
-        encryptedContent.content.byteOffset,
-        encryptedContent.content.byteOffset + encryptedContent.content.byteLength
-      ) as ArrayBuffer,
-    ]),
+    encryptedContent: new Blob([encryptedContent.content]),
     encryptedContentName,
     setupFile: requiredXmlValue(document, "SetupFile"),
     unencryptedContentSize: requiredPositiveInteger(document, "UnencryptedContentSize"),

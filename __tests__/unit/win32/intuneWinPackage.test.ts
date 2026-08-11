@@ -1,11 +1,15 @@
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { getWin32AppTemplates } from "@/templates/win32Apps";
 
 describe("readIntuneWinPackage", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("describes the required ZIP format when an entry is compressed", async () => {
     const packageBytes = new ArrayBuffer(30);
     const view = new DataView(packageBytes);
@@ -36,6 +40,31 @@ describe("readIntuneWinPackage", () => {
       profileIdentifier: "ProfileVersion1",
       fileDigestAlgorithm: "SHA256",
     });
+  });
+
+  it("passes an encrypted-content view directly to Blob without copying the package buffer", async () => {
+    const template = getWin32AppTemplates()[0];
+    const packageBytes = readFileSync(join(process.cwd(), `public${template.packageUrl}`));
+    const packageBuffer = packageBytes.buffer.slice(
+      packageBytes.byteOffset,
+      packageBytes.byteOffset + packageBytes.byteLength
+    ) as ArrayBuffer;
+    const blobParts: BlobPart[][] = [];
+    const NativeBlob = Blob;
+
+    class CapturingBlob extends NativeBlob {
+      constructor(parts?: BlobPart[], options?: BlobPropertyBag) {
+        blobParts.push(parts ?? []);
+        super(parts, options);
+      }
+    }
+
+    vi.stubGlobal("Blob", CapturingBlob);
+    await readIntuneWinPackage(packageBuffer);
+
+    const encryptedContentPart = blobParts[0][0];
+    expect(encryptedContentPart).toBeInstanceOf(Uint8Array);
+    expect((encryptedContentPart as Uint8Array).buffer).toBe(packageBuffer);
   });
 
   it.each(getWin32AppTemplates())("ships only the PowerShell module's WinGet wrapper source files for $displayName", (template) => {
