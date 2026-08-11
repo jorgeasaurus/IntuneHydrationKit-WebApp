@@ -4,7 +4,7 @@
  */
 
 import { HydrationSummary, HydrationTask, BatchExecutionStats } from "@/types/hydration";
-import { format } from "date-fns";
+import { formatClockTime, formatFileTimestamp } from "@/lib/utils/dateFormat";
 
 function formatUtcDateTime(date: Date): string {
   return date.toISOString().replace("T", " ").slice(0, 19);
@@ -86,7 +86,7 @@ export function generateMarkdownReport(
     markdown += `## Warnings\n\n`;
     markdown += `The following policies were created but require manual configuration:\n\n`;
     for (const warning of summary.warnings) {
-      const warningTime = format(warning.timestamp, "HH:mm:ss");
+      const warningTime = formatClockTime(warning.timestamp);
       markdown += `- **[${warningTime}]** ${warning.task}: ${warning.message}\n`;
     }
     markdown += `\n`;
@@ -96,7 +96,7 @@ export function generateMarkdownReport(
   if (summary.errors.length > 0) {
     markdown += `## Errors\n\n`;
     for (const error of summary.errors) {
-      const errorTime = format(error.timestamp, "HH:mm:ss");
+      const errorTime = formatClockTime(error.timestamp);
       markdown += `- **[${errorTime}]** ${error.task}: ${error.message}\n`;
     }
     markdown += `\n`;
@@ -368,6 +368,6 @@ export function generateReportFilename(
   operationMode: string,
   fileFormat: "md" | "json" | "csv"
 ): string {
-  const timestamp = format(new Date(), "yyyy-MM-dd-HHmmss");
+  const timestamp = formatFileTimestamp(new Date());
   return `intune-hydration-${operationMode}-${timestamp}.${fileFormat}`;
 }

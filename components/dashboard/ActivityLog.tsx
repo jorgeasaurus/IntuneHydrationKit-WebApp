@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityMessage } from "@/lib/hydration/types";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatClockTime } from "@/lib/utils/dateFormat";
 import {
   Info,
   CheckCircle2,
@@ -75,7 +75,7 @@ export function ActivityLog({ messages, className }: ActivityLogProps) {
                   {MESSAGE_ICONS[msg.type]}
                 </span>
                 <span className="flex-shrink-0 text-slate-300">
-                  [{format(msg.timestamp, "HH:mm:ss")}]
+                  [{formatClockTime(msg.timestamp)}]
                 </span>
                 <span className="break-words">{msg.message}</span>
               </div>

@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { format } from 'date-fns'
 
 import { render, screen, waitFor, within } from '@testing-library/react'
 import { ActivityLog } from '@/components/dashboard/ActivityLog'
 import type { ActivityMessage } from '@/lib/hydration/types'
+import { formatClockTime } from '@/lib/utils/dateFormat'
 
 const messages: ActivityMessage[] = [
   {
@@ -52,7 +52,7 @@ describe('ActivityLog', () => {
 
     expect(screen.getByText('Activity Log')).toBeInTheDocument()
     expect(screen.getByText('Connecting to Microsoft Graph')).toBeInTheDocument()
-    expect(screen.getByText(`[${format(messages[0].timestamp, 'HH:mm:ss')}]`)).toBeInTheDocument()
+    expect(screen.getByText(`[${formatClockTime(messages[0].timestamp)}]`)).toBeInTheDocument()
     expect(container.querySelector('.activity-shell')).toBeTruthy()
 
     const scroller = container.querySelector('.overflow-y-auto') as HTMLDivElement
@@ -97,7 +97,7 @@ describe('ActivityLog', () => {
       expect(row.querySelector('svg')).toHaveClass(iconClass)
 
       const timestamp = within(row).getByText(
-        `[${format(messages[index].timestamp, 'HH:mm:ss')}]`
+        `[${formatClockTime(messages[index].timestamp)}]`
       )
       expect(timestamp).toHaveClass('text-slate-300')
       expect(timestamp).not.toHaveClass('opacity-60')
