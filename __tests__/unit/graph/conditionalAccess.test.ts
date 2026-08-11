@@ -172,4 +172,29 @@ describe("conditionalAccess graph helpers", () => {
       "/identity/conditionalAccess/policies/safe"
     );
   });
+
+  it("prefers the current marker when duplicate legacy names exist", async () => {
+    const legacy = createPolicy({
+      id: "legacy",
+      displayName: "Duplicate policy [Imported by Intune-Hydration-Kit]",
+    });
+    const current = createPolicy({
+      id: "current",
+      displayName: "Duplicate policy [Imported by Intune Hydration Kit]",
+    });
+    const client = {
+      getCollection: vi.fn().mockResolvedValue([legacy, current]),
+      get: vi.fn().mockResolvedValue(current),
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as const;
+
+    await deleteConditionalAccessPolicyByName(client as never, "Duplicate policy");
+
+    expect(client.get).toHaveBeenCalledWith(
+      "/identity/conditionalAccess/policies/current"
+    );
+    expect(client.delete).toHaveBeenCalledWith(
+      "/identity/conditionalAccess/policies/current"
+    );
+  });
 });

@@ -168,6 +168,21 @@ function normalizeConditionalAccessPolicyName(displayName: string): string {
   return normalized.trim();
 }
 
+function getConditionalAccessNamePriority(
+  policyName: string,
+  requestedName: string
+): number {
+  const normalizedPolicyName = policyName.trim().toLowerCase();
+  const normalizedRequestedName = requestedName.trim().toLowerCase();
+
+  if (normalizedPolicyName === normalizedRequestedName) return 0;
+  if (normalizedPolicyName.endsWith(` [${HYDRATION_MARKER.toLowerCase()}]`)) return 1;
+  if (normalizedPolicyName.startsWith(IMPORT_PREFIX.toLowerCase())) return 2;
+  if (normalizedPolicyName.endsWith(` [${HYDRATION_MARKER_LEGACY.toLowerCase()}]`)) return 3;
+  if (normalizedPolicyName.endsWith(" [intune hydration kit]")) return 4;
+  return 5;
+}
+
 /**
  * Get a conditional access policy by display name
  */
@@ -178,12 +193,25 @@ async function getConditionalAccessPolicyByName(
   const policies = await getAllConditionalAccessPolicies(client);
   const normalizedName = normalizeConditionalAccessPolicyName(displayName);
 
-  const found = policies.find(
+  const matches = policies.filter(
     (policy) =>
       hasHydrationMarker(policy.displayName) &&
       normalizeConditionalAccessPolicyName(policy.displayName) === normalizedName
   );
-  return found || null;
+
+  matches.sort((left, right) => {
+    const priorityDifference =
+      getConditionalAccessNamePriority(left.displayName, displayName) -
+      getConditionalAccessNamePriority(right.displayName, displayName);
+    if (priorityDifference !== 0) return priorityDifference;
+
+    const nameDifference = left.displayName.localeCompare(right.displayName);
+    if (nameDifference !== 0) return nameDifference;
+
+    return (left.id ?? "").localeCompare(right.id ?? "");
+  });
+
+  return matches[0] ?? null;
 }
 
 /**
