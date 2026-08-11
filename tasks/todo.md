@@ -8,7 +8,8 @@
 ## Review
 
 - Commit `06c3622` removes the live identity-provider dependency from the popup test and requires Graph-authorized, exact-target validation before the Win32 proxy streams content.
-- Checks passed: 552 tests, type-check, lint, production build, direct Playwright popup validation, `git diff --check`, and React Doctor at 100/100.
+- The next review found a delete-discovery race; missing legacy candidates are now ignored while other Graph failures still stop the task.
+- Checks passed: 553 tests, type-check, lint, production build, direct Playwright popup validation, `git diff --check`, and React Doctor at 100/100.
 
 # Results Category Contrast
 

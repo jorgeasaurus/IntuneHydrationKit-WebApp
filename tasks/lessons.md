@@ -1,5 +1,6 @@
 # Lessons
 
+- Ownership-detail lookups in delete discovery must treat a missing candidate as an expected race, while other Graph errors must still fail the task.
 - A same-origin upload proxy must also require delegated authentication and confirm the exact Graph-issued target before it streams tenant content.
 - Authentication popup tests must intercept the identity-provider navigation; the redirect contract does not require live external network access.
 - Create-mode duplicate checks must consider all name matches; ownership markers restrict delete mutations, not existence detection.

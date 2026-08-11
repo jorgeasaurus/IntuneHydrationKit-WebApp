@@ -212,6 +212,38 @@ describe("executeWin32AppTask", () => {
     expect(result).toMatchObject({ success: true, skipped: false });
   });
 
+  it("ignores a legacy candidate that disappears before its ownership check", async () => {
+    mockGetWin32LobApps.mockResolvedValue([
+      {
+        id: "current-app",
+        displayName: "7-Zip - [IHD]",
+        description: "Imported by Intune Hydration Kit",
+        notes: "Imported from WinGet",
+      },
+      {
+        id: "missing-legacy-app",
+        displayName: "[IHD] 7-Zip",
+        description: "Imported by Intune-Hydration-Kit",
+        notes: "File archiver utility",
+      },
+    ]);
+    const context = createContext();
+    vi.mocked(context.client.get).mockRejectedValue(
+      Object.assign(new Error("Resource not found"), { status: 404 })
+    );
+
+    await expect(executeWin32AppTask(
+      { ...task, operation: "delete" },
+      context
+    )).resolves.toMatchObject({ success: true, skipped: false });
+
+    expect(context.client.delete).toHaveBeenCalledTimes(1);
+    expect(context.client.delete).toHaveBeenCalledWith(
+      "/deviceAppManagement/mobileApps/current-app",
+      "beta"
+    );
+  });
+
   it("retries an immediate delete until a newly created app is visible", async () => {
     vi.useFakeTimers();
     mockGetWin32LobApps

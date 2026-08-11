@@ -188,11 +188,19 @@ async function getOwnedMatchingApps(
     if (isOwnedWin32App(app)) return app;
     if (!template.legacyOwnership) return null;
 
-    const appDetails = await context.client.get<typeof app>(
-      `/deviceAppManagement/mobileApps/${app.id}`,
-      "beta"
-    );
-    return isLegacyOwnedWin32App(appDetails, template) ? appDetails : null;
+    try {
+      const appDetails = await context.client.get<typeof app>(
+        `/deviceAppManagement/mobileApps/${app.id}`,
+        "beta"
+      );
+      return isLegacyOwnedWin32App(appDetails, template) ? appDetails : null;
+    } catch (error) {
+      const graphError = error as { status?: number; code?: string };
+      if (graphError.status === 404 || graphError.code?.toLowerCase() === "resourcenotfound") {
+        return null;
+      }
+      throw error;
+    }
   }));
   return ownershipResults.filter((app) => app !== null);
 }
