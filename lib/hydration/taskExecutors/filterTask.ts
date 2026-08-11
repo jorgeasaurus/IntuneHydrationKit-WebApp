@@ -9,7 +9,6 @@ import { ExecutionContext, ExecutionResult } from "../types";
 import { createFilter } from "@/lib/graph/filters";
 import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { getCachedTemplates, FilterTemplate } from "@/lib/templates/loader";
-import * as Templates from "@/templates";
 
 /**
  * Execute a filter task (create or delete)
@@ -20,17 +19,12 @@ export async function executeFilterTask(
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode, isPreview } = context;
 
-  // Try to get template from cache first, fallback to hardcoded templates
+  // Templates are loaded from the bundled JSON files before execution.
   let template: FilterTemplate | DeviceFilter | undefined;
   const cachedFilterTemplates = getCachedTemplates("filters");
 
   if (cachedFilterTemplates && Array.isArray(cachedFilterTemplates)) {
     template = (cachedFilterTemplates as FilterTemplate[]).find((f) => f.displayName === task.itemName);
-  }
-
-  // Fallback to hardcoded templates if not in cache
-  if (!template) {
-    template = Templates.getDeviceFilterByName(task.itemName);
   }
 
   if (!template) {

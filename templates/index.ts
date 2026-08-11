@@ -9,7 +9,6 @@ import {
   STATIC_GROUP_TEMPLATE_COUNT,
 } from "./groupManifest";
 
-export * from "./filters";
 export * from "./filterManifest";
 export * from "./groupManifest";
 export * from "./compliance";

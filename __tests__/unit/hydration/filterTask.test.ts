@@ -3,18 +3,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
 
-const { mockGetCachedTemplates, mockGetDeviceFilterByName, mockCreateFilter } = vi.hoisted(() => ({
+const { mockGetCachedTemplates, mockCreateFilter } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
-  mockGetDeviceFilterByName: vi.fn(),
   mockCreateFilter: vi.fn(),
 }));
 
 vi.mock("@/lib/templates/loader", () => ({
   getCachedTemplates: mockGetCachedTemplates,
-}));
-
-vi.mock("@/templates", () => ({
-  getDeviceFilterByName: mockGetDeviceFilterByName,
 }));
 
 vi.mock("@/lib/graph/filters", () => ({
@@ -46,7 +41,6 @@ describe("executeFilterTask", () => {
 
   it("returns an error when no matching filter template exists", async () => {
     mockGetCachedTemplates.mockReturnValue(undefined);
-    mockGetDeviceFilterByName.mockReturnValue(undefined);
 
     const result = await executeFilterTask(task, {
       client: createClient(),
@@ -146,29 +140,6 @@ describe("executeFilterTask", () => {
       })
     );
   });
-
-  it("uses fallback templates during preview create without mutating Graph", async () => {
-    mockGetCachedTemplates.mockReturnValue(undefined);
-    mockGetDeviceFilterByName.mockReturnValue({
-      "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-      displayName: "[IHD] Windows Filter",
-      description: "Imported by Intune Hydration Kit",
-      platform: "windows10AndLater",
-      rule: '(device.deviceOSType -eq "Windows")',
-    });
-
-    const result = await executeFilterTask(task, {
-      client: createClient(),
-      operationMode: "create",
-      isPreview: true,
-      stopOnFirstError: false,
-    });
-
-    expect(result).toMatchObject({ success: true, skipped: false });
-    expect(mockCreateFilter).not.toHaveBeenCalled();
-  });
-
-
 
   it("skips delete when the filter is not cached in the tenant", async () => {
     mockGetCachedTemplates.mockReturnValue([

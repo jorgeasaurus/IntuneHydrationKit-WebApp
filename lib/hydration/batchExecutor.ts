@@ -328,10 +328,6 @@ function buildFilterRequestBody(task: HydrationTask, context: ExecutionContext):
     template = (cachedFilterTemplates as FilterTemplate[]).find((f) => f.displayName === task.itemName);
   }
 
-  if (!template) {
-    template = Templates.getDeviceFilterByName(task.itemName);
-  }
-
   if (!template) return { type: "error", reason: "Template not found" };
 
   // Check if already exists in cache
