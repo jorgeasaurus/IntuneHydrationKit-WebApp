@@ -12,7 +12,6 @@ import {
 export * from "./filterManifest";
 export * from "./groupManifest";
 export * from "./win32Apps";
-export * from "./enrollment";
 
 /**
  * Template metadata for UI display

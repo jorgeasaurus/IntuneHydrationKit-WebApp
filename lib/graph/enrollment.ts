@@ -6,7 +6,6 @@
 
 import { GraphClient } from "./client";
 import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
-import type { DevicePreparationProfile } from "@/templates/enrollment";
 
 const AUTOPILOT_PATH = "/deviceManagement/windowsAutopilotDeploymentProfiles";
 const ESP_PATH = "/deviceManagement/deviceEnrollmentConfigurations";
@@ -112,6 +111,23 @@ export interface EnrollmentStatusPageConfiguration {
   trackInstallProgressForAutopilotOnly?: boolean;
   disableUserStatusTrackingAfterFirstUser?: boolean;
   priority?: number;
+}
+
+/**
+ * Windows Autopilot device preparation profile.
+ */
+export interface DevicePreparationProfile {
+  id?: string;
+  name: string;
+  description: string;
+  settings: Array<Record<string, unknown>>;
+  roleScopeTagIds: string[];
+  platforms: string;
+  technologies: string;
+  templateReference: {
+    templateId: string;
+  };
+  [key: string]: unknown;
 }
 
 /**
