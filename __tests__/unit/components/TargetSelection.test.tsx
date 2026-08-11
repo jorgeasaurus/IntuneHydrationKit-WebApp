@@ -290,7 +290,7 @@ describe('TargetSelection', () => {
     expect(screen.getByLabelText('CIS Intune Baselines')).toBeChecked()
     expect(screen.getByLabelText('App Protection')).not.toBeChecked()
 
-    expect(await screen.findByText('Total: 7 categories (11 items)')).toBeInTheDocument()
+    expect(await screen.findByText('Total: 7 categories (10 items)')).toBeInTheDocument()
 
     await user.click(within(getCategoryRegion('Select OpenIntuneBaseline Policies')).getByText('Windows'))
     expect(await screen.findByLabelText('Windows Baseline')).toBeChecked()
@@ -478,13 +478,13 @@ describe('TargetSelection', () => {
       expect(fetchCISBaselineManifestMock).toHaveBeenCalled()
     })
 
-    expect(screen.getByText('Total: 9 categories (18 items)')).toBeInTheDocument()
+    expect(screen.getByText('Total: 9 categories (17 items)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review Selection' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Deselect All' }))
 
     await waitFor(() => {
-      expect(screen.queryByText('Total: 9 categories (18 items)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Total: 9 categories (17 items)')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
     })
   })

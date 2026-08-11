@@ -139,15 +139,6 @@ export const MOZILLA_FIREFOX_WIN32_APP = createWinGetStarterApp({
   manifestPath: "manifests/m/Mozilla/Firefox",
 });
 
-export const POWERSHELL_WIN32_APP = createWinGetStarterApp({
-  id: "powershell",
-  packageIdentifier: "Microsoft.PowerShell",
-  displayName: "PowerShell",
-  publisher: "Microsoft Corporation",
-  description: "Starter-pack WinGet template for PowerShell Win32 packaging.",
-  manifestPath: "manifests/m/Microsoft/PowerShell",
-});
-
 export const VISUAL_STUDIO_CODE_WIN32_APP = createWinGetStarterApp({
   id: "visual-studio-code",
   packageIdentifier: "Microsoft.VisualStudioCode",
@@ -162,7 +153,6 @@ const WIN32_APP_TEMPLATES = [
   SEVEN_ZIP_WIN32_APP,
   GOOGLE_CHROME_WIN32_APP,
   MOZILLA_FIREFOX_WIN32_APP,
-  POWERSHELL_WIN32_APP,
   VISUAL_STUDIO_CODE_WIN32_APP,
 ] as const;
 

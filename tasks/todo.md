@@ -1,3 +1,15 @@
+# Remove PowerShell Win32 Proof of Concept
+
+- [x] Map the PowerShell app template, catalog entry, tests, and bundled assets.
+- [x] Remove the PowerShell app without changing required PowerShell-based Win32 implementation details.
+- [x] Run focused and full project verification.
+- [x] Commit and push the removal to PR #21.
+
+## Review
+
+- Removed the PowerShell template, package, icon, install script, uninstall script, and detection script; the Win32 catalog now contains four apps.
+- Checks passed: 552 tests, type-check, lint, production build, and `git diff --check`.
+
 # Suppressed Copilot Comment
 
 - [x] Inspect the suppressed PR #21 comment and validate it against the latest head.

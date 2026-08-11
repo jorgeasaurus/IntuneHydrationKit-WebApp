@@ -1,5 +1,6 @@
 # Lessons
 
+- When a proof-of-concept app leaves the inventory, remove its template, documentation entry, tests, package, icon, and wrapper assets together.
 - Convert browser byte arrays to base64 in bounded chunks; repeated single-byte string concatenation adds avoidable time and memory pressure.
 - Legacy ownership fingerprints must accept only the known display-name variants used by discovery; arbitrary renames must not weaken safe-delete checks.
 - Ownership-detail lookups in delete discovery must treat a missing candidate as an expected race, while other Graph errors must still fail the task.

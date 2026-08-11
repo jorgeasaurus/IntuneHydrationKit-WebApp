@@ -149,10 +149,10 @@ describe('template catalog', () => {
   it('builds a catalog from loader-backed sources and manifests', async () => {
     const catalog = await loadTemplateDocumentationCatalog()
 
-    expect(catalog.totalCount).toBe(16)
+    expect(catalog.totalCount).toBe(15)
     expect(catalog.categories.find((category) => category.id === 'groups')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'notification')?.count).toBe(1)
-    expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(5)
+    expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(4)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'cisBaseline')?.count).toBe(1)
 
@@ -177,7 +177,6 @@ describe('template catalog', () => {
       '7-Zip - [IHD]',
       'Google Chrome - [IHD]',
       'Mozilla Firefox - [IHD]',
-      'PowerShell - [IHD]',
       'Visual Studio Code - [IHD]',
     ])
 
