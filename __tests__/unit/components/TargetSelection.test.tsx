@@ -67,21 +67,17 @@ function createState(overrides: Partial<WizardState> = {}): WizardState {
 
 function createOIBManifest(): OIBManifest {
   return {
-    version: '1.0.0',
-    generatedAt: '2026-04-27T00:00:00.000Z',
     totalFiles: 2,
     platforms: [
       {
         id: 'WINDOWS',
         name: 'Windows',
         count: 1,
-        policyTypes: [{ type: 'Settings Catalog', description: 'Settings', count: 1 }],
       },
       {
         id: 'MACOS',
         name: 'macOS',
         count: 1,
-        policyTypes: [{ type: 'Settings Catalog', description: 'Settings', count: 1 }],
       },
     ],
     files: [
@@ -103,8 +99,6 @@ function createOIBManifest(): OIBManifest {
 
 function createCISManifest(): CISBaselineManifest {
   return {
-    version: '1.0.0',
-    generatedAt: '2026-04-27T00:00:00.000Z',
     totalFiles: 2,
     categories: [
       {
@@ -113,7 +107,6 @@ function createCISManifest(): CISBaselineManifest {
         name: 'Windows 11 Benchmarks',
         description: 'Windows hardening',
         count: 1,
-        subcategories: [{ name: 'Windows', count: 1 }],
       },
       {
         id: 'cis-apple',
@@ -121,7 +114,6 @@ function createCISManifest(): CISBaselineManifest {
         name: 'Apple Benchmarks',
         description: 'Apple hardening',
         count: 1,
-        subcategories: [{ name: 'Apple', count: 1 }],
       },
     ],
     files: [
@@ -561,21 +553,17 @@ describe('TargetSelection', () => {
     const user = userEvent.setup()
 
     fetchOIBManifestMock.mockResolvedValueOnce({
-      version: '2.0.0',
-      generatedAt: '2026-04-27T00:00:00.000Z',
       totalFiles: 3,
       platforms: [
         {
           id: 'WINDOWS',
           name: 'Windows',
           count: 2,
-          policyTypes: [{ type: 'Settings Catalog', description: 'Settings', count: 2 }],
         },
         {
           id: 'MACOS',
           name: 'macOS',
           count: 1,
-          policyTypes: [{ type: 'Settings Catalog', description: 'Settings', count: 1 }],
         },
       ],
       files: [
@@ -634,8 +622,6 @@ describe('TargetSelection', () => {
     const user = userEvent.setup()
 
     fetchCISBaselineManifestMock.mockResolvedValueOnce({
-      version: '2.0.0',
-      generatedAt: '2026-04-27T00:00:00.000Z',
       totalFiles: 3,
       categories: [
         {
@@ -644,7 +630,6 @@ describe('TargetSelection', () => {
           name: 'Windows 11 Benchmarks',
           description: 'Windows hardening',
           count: 2,
-          subcategories: [{ name: 'Windows', count: 2 }],
         },
         {
           id: 'cis-apple',
@@ -652,7 +637,6 @@ describe('TargetSelection', () => {
           name: 'Apple Benchmarks',
           description: 'Apple hardening',
           count: 1,
-          subcategories: [{ name: 'Apple', count: 1 }],
         },
       ],
       files: [
@@ -752,8 +736,6 @@ describe('TargetSelection', () => {
       },
     ])
     fetchCISBaselineManifestMock.mockResolvedValueOnce({
-      version: '1.0.0',
-      generatedAt: '2026-04-27T00:00:00.000Z',
       totalFiles: 2,
       categories: [
         {
@@ -762,7 +744,6 @@ describe('TargetSelection', () => {
           name: 'Windows 11 Benchmarks',
           description: 'Windows hardening',
           count: 1,
-          subcategories: [{ name: 'Windows', count: 1 }],
         },
         {
           id: 'cis-apple',
@@ -770,7 +751,6 @@ describe('TargetSelection', () => {
           name: 'macOS Benchmarks',
           description: 'macOS hardening',
           count: 1,
-          subcategories: [{ name: 'macOS', count: 1 }],
         },
       ],
       files: [

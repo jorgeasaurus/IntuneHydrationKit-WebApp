@@ -412,18 +412,11 @@ export async function fetchNotificationTemplates(): Promise<unknown[]> {
  * OpenIntuneBaseline manifest types
  */
 export interface OIBManifest {
-  version: string;
-  generatedAt: string;
   totalFiles: number;
   platforms: Array<{
     id: string;
     name: string;
     count: number;
-    policyTypes: Array<{
-      type: string;
-      description: string;
-      count: number;
-    }>;
   }>;
   files: OIBManifestFile[];
 }
@@ -450,6 +443,38 @@ export interface BaselinePolicy {
 }
 
 const OIB_PATH = "/IntuneTemplates/OpenIntuneBaseline";
+const OIB_POLICY_TYPE_FOLDERS = new Set([
+  "SettingsCatalog",
+  "CompliancePolicies",
+  "AppProtection",
+  "DeviceConfiguration",
+  "UpdatePolicies",
+  "DriverUpdateProfiles",
+]);
+
+interface StoredManifestFile {
+  path: string;
+  displayName: string;
+}
+
+interface StoredOIBManifest extends Omit<OIBManifest, "files"> {
+  files: StoredManifestFile[];
+}
+
+function getManifestPathParts(filePath: string): string[] {
+  return filePath.replace(/\\/g, "/").split("/");
+}
+
+function enrichOIBManifestFile(file: StoredManifestFile): OIBManifestFile {
+  const pathParts = getManifestPathParts(file.path);
+
+  return {
+    ...file,
+    platform: pathParts[0] ?? "",
+    policyType:
+      pathParts.slice(1, -1).find((part) => OIB_POLICY_TYPE_FOLDERS.has(part)) ?? "",
+  };
+}
 
 /**
  * Parse JSON that may be UTF-16 LE or UTF-8 encoded
@@ -537,7 +562,11 @@ export async function fetchOIBManifest(): Promise<OIBManifest | null> {
       console.warn("OpenIntuneBaseline manifest not found. Run: node scripts/generate-oib-manifest.js");
       return null;
     }
-    return await response.json();
+    const manifest = await response.json() as StoredOIBManifest;
+    return {
+      ...manifest,
+      files: manifest.files.map(enrichOIBManifestFile),
+    };
   } catch (error) {
     console.error("Error fetching OIB manifest:", error);
     return null;
@@ -680,15 +709,9 @@ export interface CISBaselineManifestCategory {
   name: string;
   description: string;
   count: number;
-  subcategories: Array<{
-    name: string;
-    count: number;
-  }>;
 }
 
 export interface CISBaselineManifest {
-  version: string;
-  generatedAt: string;
   totalFiles: number;
   categories: CISBaselineManifestCategory[];
   files: CISBaselineManifestFile[];
@@ -701,6 +724,20 @@ export interface CISBaselineManifestFile {
   displayName: string;
 }
 
+interface StoredCISBaselineManifest extends Omit<CISBaselineManifest, "files"> {
+  files: StoredManifestFile[];
+}
+
+function enrichCISManifestFile(file: StoredManifestFile): CISBaselineManifestFile {
+  const pathParts = getManifestPathParts(file.path);
+
+  return {
+    ...file,
+    category: pathParts[0] ?? "",
+    subcategory: pathParts[1] ?? "",
+  };
+}
+
 /**
  * Fetch the CIS baselines manifest (for category selection UI)
  */
@@ -711,7 +748,11 @@ export async function fetchCISBaselineManifest(): Promise<CISBaselineManifest | 
       console.warn("CIS Baselines manifest not found. Run the build script to generate it.");
       return null;
     }
-    return await response.json();
+    const manifest = await response.json() as StoredCISBaselineManifest;
+    return {
+      ...manifest,
+      files: manifest.files.map(enrichCISManifestFile),
+    };
   } catch (error) {
     console.error("Error fetching CIS baseline manifest:", error);
     return null;
