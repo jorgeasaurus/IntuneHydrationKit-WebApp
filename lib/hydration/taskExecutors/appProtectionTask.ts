@@ -11,7 +11,6 @@ import {
   deleteAppProtectionPolicy,
 } from "@/lib/graph/appProtection";
 import { getCachedTemplates, AppProtectionTemplate } from "@/lib/templates/loader";
-import * as Templates from "@/templates";
 
 function stripImportPrefix(name: string): string {
   return name.replace(/^\[ihd\]\s/i, "");
@@ -39,22 +38,14 @@ export async function executeAppProtectionTask(
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode, isPreview } = context;
   const requestedName = task.itemName;
-  const normalizedRequestedName = stripImportPrefix(requestedName);
 
-  // Try to get template from cache first, fallback to hardcoded templates
+  // Templates are loaded from the bundled JSON files before execution.
   let template: AppProtectionTemplate | AppProtectionPolicy | undefined;
   const cachedAppProtection = getCachedTemplates("appProtection");
   if (cachedAppProtection && Array.isArray(cachedAppProtection)) {
     template = (cachedAppProtection as AppProtectionTemplate[]).find((ap) =>
       namesMatch(ap.displayName, requestedName)
     );
-  }
-
-  // Fallback to hardcoded templates if not in cache
-  if (!template) {
-    template =
-      Templates.getAppProtectionPolicyByName(requestedName) ??
-      Templates.getAppProtectionPolicyByName(normalizedRequestedName);
   }
 
   if (mode === "create") {
