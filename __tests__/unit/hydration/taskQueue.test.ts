@@ -6,6 +6,7 @@ const {
   mockGetCompliancePolicies,
   mockGetConditionalAccessPolicies,
   mockGetAppProtectionPolicies,
+  mockGetWin32AppTemplates,
   mockFetchDynamicGroups,
   mockFetchStaticGroups,
   mockFetchFilters,
@@ -25,6 +26,7 @@ const {
   mockGetCompliancePolicies: vi.fn(),
   mockGetConditionalAccessPolicies: vi.fn(),
   mockGetAppProtectionPolicies: vi.fn(),
+  mockGetWin32AppTemplates: vi.fn(),
   mockFetchDynamicGroups: vi.fn(),
   mockFetchStaticGroups: vi.fn(),
   mockFetchFilters: vi.fn(),
@@ -56,6 +58,7 @@ vi.mock("@/templates", () => ({
   getCompliancePolicies: mockGetCompliancePolicies,
   getConditionalAccessPolicies: mockGetConditionalAccessPolicies,
   getAppProtectionPolicies: mockGetAppProtectionPolicies,
+  getWin32AppTemplates: mockGetWin32AppTemplates,
 }));
 
 vi.mock("@/lib/templates/loader", () => ({
@@ -92,6 +95,12 @@ describe("taskQueue", () => {
     mockGetCompliancePolicies.mockReturnValue([{ displayName: "Compliance A" }]);
     mockGetConditionalAccessPolicies.mockReturnValue([{ displayName: "CA A" }]);
     mockGetAppProtectionPolicies.mockReturnValue([{ displayName: "App Protection A" }]);
+    mockGetWin32AppTemplates.mockReturnValue([
+      { displayName: "7-Zip - [IHD]" },
+      { displayName: "Google Chrome - [IHD]" },
+      { displayName: "Mozilla Firefox - [IHD]" },
+      { displayName: "Visual Studio Code - [IHD]" },
+    ]);
     mockGetCachedTemplates.mockReturnValue(undefined);
     mockFetchDynamicGroups.mockResolvedValue([]);
     mockFetchStaticGroups.mockResolvedValue([]);
@@ -238,6 +247,26 @@ describe("taskQueue", () => {
       "Filter Missing",
     ]);
   });
+
+  it.each(["create", "delete"] as const)(
+    "builds only the selected Win32 app task in %s mode",
+    async (operationMode) => {
+      const tasks = await buildTaskQueueAsync(["win32Apps"], operationMode, {
+        categorySelections: {
+          win32Apps: {
+            selectedItems: ["Google Chrome - [IHD]"],
+          },
+        },
+      });
+
+      expect(tasks).toHaveLength(1);
+      expect(tasks[0]).toMatchObject({
+        category: "win32Apps",
+        operation: operationMode,
+        itemName: "Google Chrome - [IHD]",
+      });
+    }
+  );
 
   it("builds async delete tasks from filtered baseline selections using the template name first", async () => {
     mockFetchBaselinePolicies.mockResolvedValue([

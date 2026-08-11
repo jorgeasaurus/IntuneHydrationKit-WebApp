@@ -40,6 +40,7 @@ const CATEGORY_LABELS: Partial<Record<TaskCategory, string>> = {
   filters: "Device Filters",
   compliance: "Compliance Policies",
   appProtection: "App Protection Policies",
+  win32Apps: "Win32 Apps",
   conditionalAccess: "Conditional Access Policies",
   enrollment: "Enrollment Profiles",
   baseline: "OpenIntuneBaseline Policies",
@@ -93,6 +94,9 @@ export function buildTaskQueue(
         break;
       case "appProtection":
         items = Templates.getAppProtectionPolicies();
+        break;
+      case "win32Apps":
+        items = [...Templates.getWin32AppTemplates()];
         break;
       case "enrollment":
         // Enrollment profiles not yet implemented in templates
@@ -284,6 +288,17 @@ export async function buildTaskQueueAsync(
             }
 
             items = policies;
+            cacheTemplates(category, items);
+          }
+          break;
+        case "win32Apps":
+          {
+            const appSelection = options?.categorySelections?.win32Apps;
+            const templates = [...Templates.getWin32AppTemplates()];
+            const selectedAppNames = new Set(appSelection?.selectedItems);
+            items = selectedAppNames.size
+              ? templates.filter((template) => selectedAppNames.has(template.displayName))
+              : templates;
             cacheTemplates(category, items);
           }
           break;

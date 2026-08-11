@@ -57,7 +57,11 @@ function markVantaCanvas(container: HTMLElement): void {
   });
 }
 
-export function DynamicWallpaper(): React.ReactNode {
+type DynamicWallpaperProps = {
+  landing?: boolean;
+};
+
+export function DynamicWallpaper({ landing = false }: DynamicWallpaperProps): React.ReactNode {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,7 +100,7 @@ export function DynamicWallpaper(): React.ReactNode {
       ref={containerRef}
       aria-hidden="true"
       tabIndex={-1}
-      className="dynamic-wallpaper"
+      className={landing ? "dynamic-wallpaper dynamic-wallpaper--landing" : "dynamic-wallpaper"}
     >
       <div className="dynamic-wallpaper__scrim" />
     </div>

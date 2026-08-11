@@ -1,5 +1,30 @@
 # Lessons
 
+- Map internal camelCase category IDs to explicit user-facing labels; capitalization alone does not create readable names.
+- Preserve standard technology names and casing in generated labels; generic title casing turns `OData` into a typo.
+- Cache full Graph collections for one execution and update the cache after mutations; use direct recent-object lookups for eventual-consistency retries.
+- Azure Put Block List requests carry XML and must declare an XML content type; payload syntax and request metadata must agree.
+- Pass reusable `Uint8Array` views to block-upload requests; `slice()` adds one full block allocation for every upload.
+- Keep service base URLs in server-safe modules shared by browser clients and server routes; do not couple endpoint constants to browser-only authentication code.
+- Parse large package payloads with `Uint8Array.subarray` views and pass those views directly to consumers; avoid full-size intermediate buffer copies.
+- Intune detection scripts must be read-only; if a dependency is unavailable, use a non-mutating fallback instead of bootstrapping software during detection.
+- Safe-delete discovery must preserve both name-match and ownership results so skip messages distinguish a protected app from an absent app.
+- Prism token types use kebab-case names such as `class-name`; syntax-color maps must match the renderer's token vocabulary.
+- Inventory removals must update metadata fallback counts and include a source-of-truth alignment test.
+- Operator-facing errors must state the current technical constraint and recovery action, not describe the implementation as a proof of concept.
+- Every item-selectable category must be included in wizard-state persistence and have single-item queue tests for create and delete modes.
+- When a proof-of-concept app leaves the inventory, remove its template, documentation entry, tests, package, icon, and wrapper assets together.
+- Convert browser byte arrays to base64 in bounded chunks; repeated single-byte string concatenation adds avoidable time and memory pressure.
+- Legacy ownership fingerprints must accept only the known display-name variants used by discovery; arbitrary renames must not weaken safe-delete checks.
+- Ownership-detail lookups in delete discovery must treat a missing candidate as an expected race, while other Graph errors must still fail the task.
+- A same-origin upload proxy must also require delegated authentication and confirm the exact Graph-issued target before it streams tenant content.
+- Authentication popup tests must intercept the identity-provider navigation; the redirect contract does not require live external network access.
+- Create-mode duplicate checks must consider all name matches; ownership markers restrict delete mutations, not existence detection.
+- Result status colors must be selected for the dark glass surface itself; light-theme color variants can still render over the shared blue wallpaper.
+- Script documentation panels must use language-aware syntax tokens; plain monochrome source is hard to scan even when its base text contrast passes.
+- Same-origin API checks behind Vercel must account for the explicitly configured public deployment origin as well as the runtime request URL; branch aliases and immutable deployment hostnames can legitimately diverge.
+- A Vercel preview is not authentication-ready merely because its Entra redirect URI is registered; verify the deployed MSAL client ID, exact runtime redirect, and any Vercel access-protection redirect through the real sign-in initiation path.
+- When a user says a README status is obsolete, remove the full stale section and refresh its supporting visual in the same change.
 - When a tenant-only Graph create error cannot be fully reproduced locally, add scoped failure diagnostics at the Graph response boundary so the next generic 400 includes task, endpoint, API version, response body, and sanitized payload.
 - For Microsoft Graph batch errors, preserve `error.innerError.message`; Graph often puts the actionable cause there while the outer message stays generic.
 - For ARIA boolean attributes, avoid undefined-returning expressions; use explicit booleans so axe tooling sees valid `true`/`false` values.
@@ -14,10 +39,43 @@
 - Template documentation category cards should not display live fraction counts; stale manifest counts create visual noise and make category quality look broken.
 - Category-card buttons in stretched CSS grids need explicit top alignment; short descriptions can otherwise appear vertically centered next to taller cards.
 - Playwright e2e should use a dedicated local port by default; reusing any existing localhost server can accidentally validate the wrong app.
-- Theme toggles must prefer a persisted non-system app setting over `next-themes` reporting `system`; otherwise dark settings on a light OS can never cycle back to light.
-- For theme regressions, verify the visible screen state with Playwright screenshots and computed styles; HTML class/storage assertions alone can miss a dark-looking light mode.
 - If a UI already computes progress from source-of-truth data, use that computed value for the visual indicator; step-specific width classes drift when the step list changes.
 - For Edge/webhint diagnostics, avoid JSX `style` props for progress widths; prefer native progress elements or stylesheet-driven rendering tied to the computed value.
 - If static accessibility tooling flags JSX expressions in ARIA attributes, render literal `aria-*` values in explicit branches and omit irrelevant ARIA attributes.
+- When a user asks to preserve an existing background treatment, improve readability through text and content surfaces; do not solve it by changing or obscuring the background itself.
+- When changing a landing-page foreground token, audit inherited navigation labels and muted copy inside light surfaces; they may need explicit surface-level colors.
+- Demo windows rendered inside a themed landing page need their own foreground scope; otherwise inherited outer-copy colors can make their simulated app content unreadable.
+- Theme-aware hover states need their own contrast audit; a foreground token that works over the wallpaper may fail over a pale navigation surface.
+- Status badges on pale surfaces must use a local dark label color rather than an outer landing-copy token.
+- Alerts placed directly over the shared wallpaper need an opaque card surface and explicit foreground; translucent semantic tints alone are not readable enough.
+- When displaying a timestamp in a forced timezone, include that timezone in the visible label so users are not led to assume it is local time.
 - When bundled template files change, bump the template cache version so existing browser caches cannot hide newly shipped templates.
 - When a review calls out source-of-truth drift, remove the duplicated model before opening the PR instead of relying only on sync tests.
+- When a product ad is asked to show the app, capture and animate real product views at the requested viewport instead of recreating representative UI.
+- When a requested product-ad theme changes, recapture every visible product view in that theme rather than recoloring or mixing screenshots.
+- When an ad is redirected from mobile to desktop, replace the embedded product capture treatment rather than reusing mobile screens inside a different frame.
+- When a user supplies a deployment artifact, use that exact artifact in the proof of concept and preserve the metadata needed to upload it correctly.
+- When a client-side workflow receives a pre-signed Azure Blob upload URL, include the scoped Blob Storage origin in CSP `connect-src` and validate the browser’s actual upload path.
+- A CSP allowlist does not overcome Azure Blob CORS. Route browser uploads through a same-origin, host-validated server endpoint when the signed Blob URL lacks CORS headers.
+- For Intune Win32 uploads, a successful Azure single-blob PUT is insufficient: use the Graph-compatible Azure block upload plus block-list commit before submitting file-encryption metadata.
+- When an app supports only one cloud, do not put a confirmation dialog between a sign-in CTA and `loginPopup`; start the popup from the original click and validate the Entra client ID first.
+- When consolidating diverged worktrees, checkpoint the dirty feature work first, merge it into a branch based on the newer product work, and regenerate dependency metadata after resolving package changes.
+- Public build-time identity configuration must have an intentional fallback or be provisioned to every preview environment; otherwise branch deployments can emit invalid OAuth requests with an empty client ID.
+- Before changing authentication code for a missing local client ID, compare ignored environment files across worktrees; each worktree needs its own `.env.local` and Git will not carry it during consolidation.
+- After switching worktrees, ensure a single server owns the test port; mixed IPv4/IPv6 listeners can serve incompatible Next.js chunk manifests from different directories.
+- When a fixed dark visual system replaces theme classes, replace `dark:`-dependent semantic text with explicit foreground colors on success, warning, and error surfaces.
+- Preview and dry-run callouts also need explicit light foregrounds after dark-theme variants are removed.
+- Preserve an explicitly requested visual effect unless the user asks to replace it; scope restyling to the surrounding surfaces.
+- Check action-label fit at the narrowest supported viewport and use compact mobile labels when needed.
+- Removing navigation decoration must not remove the structural border the user still expects.
+- Shared surface classes must not override positioning owned by portaled overlays.
+- When web work is intended to prove parity with the PowerShell module, copy the module's generated wrapper, payload, detection, and upload behavior instead of adapting an unrelated installer package.
+- Destructive wizard alerts over the blue wallpaper need a dark opaque surface with pale foreground text; saturated red text on translucent blue is not legible enough.
+- Live-run acknowledgement panels need explicit light label, supporting copy, and checkbox colors; inherited blue foregrounds disappear against the blue wallpaper.
+- When a visual fix passes an injected preview but the real wizard still shows retired colors, verify the compiled route and use a scoped component class; an approximation can miss stale bundles or theme precedence.
+- Interactive MSAL Playwright tests must start on the exact registered redirect origin; `127.0.0.1` and `localhost` are different origins, so mixing them strands the popup callback.
+- Intune's Win32 collection can hide a newly committed app for more than 15 seconds; preserve the created object ID, re-fetch and ownership-validate it directly, and keep collection polling only as a fallback.
+- Preview-result notices on the fixed dark theme must use one explicit dark surface and explicit pale icon, title, and body colors; light-mode utility backgrounds can otherwise pair with inherited white text.
+- When replacing a proof-of-concept ownership format, preserve a narrowly fingerprinted migration path for objects created by the previous format so safe delete mode can still clean them up.
+- Site-wide navigation should reuse the landing hero's responsive container and gutters; an independent max-width will drift across breakpoints.
+- Avoid rectangular guide lines behind a focal demo window; they read as an unintended backplate even when their fill is transparent.

@@ -85,13 +85,39 @@ describe('ResultsSummary', () => {
   it('renders preview-specific labels, successful items, and errors', () => {
     render(<ResultsSummary summary={summary} tasks={tasks} isPreview />)
 
-    expect(screen.getByText('Preview Mode')).toBeInTheDocument()
+    const previewTitle = screen.getByText('Preview Mode')
+    const previewDescription = screen.getByText(/This is a preview of what would happen/i)
+    const previewAlert = previewTitle.closest('[role="alert"]')
+    expect(previewAlert).toHaveClass('bg-slate-950/95', 'border-sky-300/60', 'text-slate-100')
+    expect(previewTitle).toHaveClass('text-slate-50')
+    expect(previewDescription).toHaveClass('text-slate-200')
+    expect(previewAlert?.querySelector('svg')).toHaveClass('!text-sky-200')
     expect(screen.getByText('Would Create')).toBeInTheDocument()
     expect(screen.getByText('33%')).toBeInTheDocument()
     expect(screen.getAllByText(/Items That Would Be Created/i).length).toBeGreaterThan(0)
     expect(screen.getAllByText('All Windows Devices').length).toBeGreaterThan(0)
     expect(screen.getByText('Errors (1)')).toBeInTheDocument()
     expect(screen.getAllByText('Insufficient privileges').length).toBeGreaterThan(0)
+    expect(screen.getByText('Dynamic Groups')).toBeInTheDocument()
+    expect(screen.getByText('Device Filters')).toBeInTheDocument()
+    expect(screen.getByText('Conditional Access')).toBeInTheDocument()
+  })
+
+  it('uses high-contrast status colors in the category breakdown', () => {
+    render(<ResultsSummary summary={summary} tasks={tasks} />)
+
+    const getCategoryTaskRow = (itemName: string): HTMLElement | undefined =>
+      screen
+        .getAllByText(itemName)
+        .map((element) => element.parentElement?.parentElement)
+        .find((element): element is HTMLElement => element?.classList.contains('items-start') ?? false)
+
+    expect(getCategoryTaskRow('All Windows Devices')).toHaveClass(
+      'font-medium',
+      'text-emerald-100'
+    )
+    expect(getCategoryTaskRow('Corporate Devices')).toHaveClass('text-amber-100')
+    expect(getCategoryTaskRow('Block Legacy Auth')).toHaveClass('text-red-100')
   })
 
   it('downloads markdown, json, and csv reports with generated filenames', async () => {

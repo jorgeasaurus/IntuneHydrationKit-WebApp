@@ -52,8 +52,12 @@ describe('OperationModeSelection', () => {
     await user.click(screen.getByRole('radio', { name: /delete/i }))
     await user.click(screen.getByRole('radio', { name: /live/i }))
 
-    expect(screen.getByText('Delete mode is live')).toBeInTheDocument()
-    expect(screen.getByText(/Conditional Access policies must be disabled/i)).toBeInTheDocument()
+    const warningTitle = screen.getByText('Delete mode is live')
+    const warningDescription = screen.getByText(/Conditional Access policies must be disabled/i)
+    const warning = screen.getByRole('alert')
+    expect(warningTitle).toHaveClass('text-red-200')
+    expect(warningDescription).toHaveClass('text-slate-100/90')
+    expect(warning).toHaveClass('bg-slate-950/90', 'border-red-400/70')
     expectRemovedSummaryCardsToBeAbsent()
 
     await user.click(screen.getByRole('button', { name: 'Choose Operation Mode' }))

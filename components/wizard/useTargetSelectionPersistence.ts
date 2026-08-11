@@ -45,6 +45,7 @@ function buildCategorySelections({
       else if (target === "compliance") selections.compliance = categorySelection;
       else if (target === "conditionalAccess") selections.conditionalAccess = categorySelection;
       else if (target === "appProtection") selections.appProtection = categorySelection;
+      else if (target === "win32Apps") selections.win32Apps = categorySelection;
       else if (target === "enrollment") selections.enrollment = categorySelection;
     }
   }

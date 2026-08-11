@@ -19,13 +19,6 @@ export const REQUIRED_SCOPES = [
 ];
 
 /**
- * Get the Graph API endpoint (global/commercial cloud only)
- */
-export function getGraphEndpoint(): string {
-  return "https://graph.microsoft.com";
-}
-
-/**
  * Get the authority URL for a tenant (global/commercial cloud only)
  */
 export function getAuthorityUrl(tenantId: string = "common"): string {
@@ -35,11 +28,12 @@ export function getAuthorityUrl(tenantId: string = "common"): string {
 /**
  * MSAL configuration for authentication
  */
-// Prefer the configured redirect URI; otherwise fall back to the current origin in the
-// browser so a missing env var doesn't silently point production sign-in at localhost.
+// Interactive browser flows must return to the origin that initiated them. This keeps
+// branch aliases and custom domains from inheriting a stale build-time redirect URI.
 const redirectUri =
+  (typeof window !== "undefined" ? window.location.origin : undefined) ||
   process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI ||
-  (typeof window !== "undefined" ? window.location.origin : "http://localhost:3000");
+  "http://localhost:3000";
 
 export const msalConfig: Configuration = {
   auth: {
@@ -80,6 +74,18 @@ export const msalConfig: Configuration = {
     },
   },
 };
+
+/**
+ * Returns a clear operator-facing error before MSAL attempts an invalid interactive flow.
+ */
+export function getMsalConfigurationError(): string | null {
+  const clientId = msalConfig.auth.clientId?.trim();
+  if (!clientId || clientId === "your-client-id-here") {
+    return "Microsoft Entra sign-in is not configured. Set NEXT_PUBLIC_MSAL_CLIENT_ID and restart the app.";
+  }
+
+  return null;
+}
 
 /**
  * Scopes for login request

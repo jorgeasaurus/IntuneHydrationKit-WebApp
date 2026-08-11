@@ -10,7 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HydrationSummary, HydrationTask } from "@/types/hydration";
+import { HydrationSummary, HydrationTask, TaskCategory } from "@/types/hydration";
 import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle, Eye } from "lucide-react";
 import {
   generateMarkdownReport,
@@ -27,20 +27,34 @@ interface ResultsSummaryProps {
   isPreview?: boolean;
 }
 
+const CATEGORY_DISPLAY_NAMES: Record<TaskCategory, string> = {
+  groups: "Dynamic Groups",
+  filters: "Device Filters",
+  compliance: "Compliance Policies",
+  appProtection: "App Protection",
+  win32Apps: "Win32 Apps",
+  conditionalAccess: "Conditional Access",
+  enrollment: "Enrollment Profiles",
+  notification: "Notifications",
+  baseline: "OpenIntuneBaseline",
+  cisBaseline: "CIS Baselines",
+};
+
 function getCategoryDisplayName(category: string): string {
-  return category.charAt(0).toUpperCase() + category.slice(1);
+  return CATEGORY_DISPLAY_NAMES[category as TaskCategory]
+    ?? category.charAt(0).toUpperCase() + category.slice(1);
 }
 
 function getTaskStatusClassName(status: HydrationTask["status"]): string {
   switch (status) {
     case "success":
-      return "text-green-700 dark:text-green-300";
+      return "text-emerald-100";
     case "skipped":
-      return "text-amber-700 dark:text-amber-300";
+      return "text-amber-100";
     case "failed":
-      return "text-red-700 dark:text-red-300";
+      return "text-red-100";
     default:
-      return "text-muted-foreground";
+      return "text-slate-100";
   }
 }
 
@@ -108,10 +122,10 @@ export function ResultsSummary({
     <div className="space-y-6">
       {/* Preview Mode Banner */}
       {isPreview && (
-        <Alert className="border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/30">
-          <Eye className="size-4" />
-          <AlertTitle>Preview Mode</AlertTitle>
-          <AlertDescription>
+        <Alert className="border-sky-300/60 bg-slate-950/95 text-slate-100 shadow-xl shadow-slate-950/25 backdrop-blur-md">
+          <Eye className="size-4 !text-sky-200" />
+          <AlertTitle className="text-slate-50">Preview Mode</AlertTitle>
+          <AlertDescription className="text-slate-200">
             This is a preview of what would happen. No changes were made to your tenant.
             {summary.operationMode === "create"
               ? " Items marked as 'Would Create' do not exist in your tenant yet."
@@ -208,15 +222,15 @@ export function ResultsSummary({
                       </div>
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-1">
-                          <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
+                          <CheckCircle2 className="size-4 text-emerald-200" />
                           <span className="text-sm font-medium">{stats.success}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <MinusCircle className="size-4 text-amber-600 dark:text-amber-400" />
+                          <MinusCircle className="size-4 text-amber-200" />
                           <span className="text-sm font-medium">{stats.skipped}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <XCircle className="size-4 text-red-600 dark:text-red-400" />
+                          <XCircle className="size-4 text-red-200" />
                           <span className="text-sm font-medium">{stats.failed}</span>
                         </div>
                       </div>
@@ -228,7 +242,7 @@ export function ResultsSummary({
                       {categoryTasks.map((task) => (
                         <div
                           key={task.id}
-                          className={`flex items-start gap-2 rounded p-2 text-sm ${getTaskStatusClassName(task.status)}`}
+                          className={`flex items-start gap-2 rounded p-2 text-sm font-medium ${getTaskStatusClassName(task.status)}`}
                         >
                           {task.status === "success" ? (
                             <CheckCircle2 className="mt-0.5 size-3 flex-shrink-0" />

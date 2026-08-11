@@ -18,6 +18,7 @@ const CATEGORY_DISPLAY_NAMES: Record<TaskCategory, string> = {
   filters: "Device Filters",
   compliance: "Compliance Policies",
   appProtection: "App Protection",
+  win32Apps: "Win32 Apps",
   conditionalAccess: "Conditional Access",
   enrollment: "Enrollment Profiles",
   notification: "Notifications",

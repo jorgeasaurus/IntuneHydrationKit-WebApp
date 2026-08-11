@@ -1,16 +1,13 @@
 "use client";
 
-import { useState } from "react";
 import { useIsAuthenticated } from "@azure/msal-react";
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
 import Link from "next/link";
+import { NavigationBrand } from "@/components/NavigationBrand";
 import { Button } from "@/components/ui/button";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
-import { CloudEnvironmentSelector } from "@/components/CloudEnvironmentSelector";
 import { useWizardState } from "@/hooks/useWizardState";
-import { LIGHT_DARK_THEME_CYCLE, ThemeToggle } from "@/components/ThemeToggle";
 import { Terminal, Github } from "lucide-react";
 
 export function Navigation() {
@@ -18,16 +15,9 @@ export function Navigation() {
   const pathname = usePathname();
   const router = useRouter();
   const { resetWizard } = useWizardState();
-  const [showCloudSelector, setShowCloudSelector] = useState(false);
-
   const getSectionHref = (hash: string) => (pathname === "/" ? hash : `/${hash}`);
 
-  const handleSignInClick = () => {
-    setShowCloudSelector(true);
-  };
-
-  const handleCloudSelect = async () => {
-    setShowCloudSelector(false);
+  const handleSignInClick = async () => {
     try {
       await signIn();
       toast.success("Successfully signed in!");
@@ -37,10 +27,6 @@ export function Navigation() {
       toast.error("Failed to sign in. Please try again.");
       console.error("Sign in error:", error);
     }
-  };
-
-  const handleCloudSelectorCancel = () => {
-    setShowCloudSelector(false);
   };
 
   const handleGetStarted = () => {
@@ -54,35 +40,14 @@ export function Navigation() {
 
   return (
     <>
-      {/* Industrial Navigation Bar */}
       <div className="fixed top-0 left-0 right-0 z-50">
-        {/* Top accent line */}
         <div className="h-[2px] bg-gradient-to-r from-transparent via-hydrate to-transparent" />
 
-        <nav className="nav-industrial">
-          <div className="container mx-auto px-4 sm:px-6">
-            <div className="flex items-center justify-between h-16">
+        <div className="container mx-auto px-4 sm:px-6">
+          <nav className="nav-industrial">
+            <div className="flex h-16 items-center justify-between px-4 sm:px-6">
               {/* Logo and Brand */}
-              <Link
-                href="/"
-                className="flex items-center gap-3 group"
-              >
-                <div className="relative">
-                  <Image
-                    src="/IHTLogoClear.png"
-                    alt="Intune Hydration Kit"
-                    width={144}
-                    height={169}
-                    className="h-9 w-auto transition-transform group-hover:scale-105"
-                    style={{ width: "auto" }}
-                  />
-                  {/* Glow effect on hover */}
-                  <div className="absolute inset-0 bg-hydrate/20 rounded-full blur-lg opacity-0 group-hover:opacity-100 transition-opacity" />
-                </div>
-                <span className="landing-nav-brand hidden sm:block font-bold text-xl leading-tight tracking-tight">
-                  Intune Hydration Kit
-                </span>
-              </Link>
+              <NavigationBrand showWordmark />
 
               {/* Navigation Links */}
               <div className="hidden md:flex items-center gap-8">
@@ -111,8 +76,6 @@ export function Navigation() {
                 >
                   <Github className="size-5" />
                 </a>
-                <ThemeToggle themes={LIGHT_DARK_THEME_CYCLE} />
-
                 {/* Terminal Status Indicator */}
                 <div className="landing-nav-status hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
                   <span className={`size-2 rounded-full ${isAuthenticated ? 'bg-signal-success' : 'bg-muted-foreground'}`} />
@@ -125,7 +88,7 @@ export function Navigation() {
                 <Button
                   onClick={handleGetStarted}
                   variant="outline"
-                  className="landing-nav-action h-9 rounded-md border-2 px-4 text-sm font-semibold"
+                  className="nav-action h-9 rounded-md border-2 px-4 text-sm font-semibold"
                 >
                   {isAuthenticated ? (
                     <>
@@ -151,19 +114,11 @@ export function Navigation() {
                 </Button>
               </div>
             </div>
-          </div>
-        </nav>
+          </nav>
+        </div>
 
-        {/* Bottom border with accent */}
-        <div className="h-px bg-border" />
       </div>
 
-      {/* Cloud Environment Selector Dialog */}
-      <CloudEnvironmentSelector
-        open={showCloudSelector}
-        onSelect={handleCloudSelect}
-        onCancel={handleCloudSelectorCancel}
-      />
     </>
   );
 }

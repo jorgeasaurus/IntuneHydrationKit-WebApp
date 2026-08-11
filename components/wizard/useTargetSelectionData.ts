@@ -14,6 +14,7 @@ import {
   type CISBaselineManifest,
 } from "@/lib/templates/loader";
 import type { CategoryItem } from "@/components/wizard/targetSelectionModel";
+import { getWin32AppTemplates } from "@/templates";
 
 async function fetchCategoryData(category: TaskCategory): Promise<CategoryItem[]> {
   switch (category) {
@@ -66,6 +67,12 @@ async function fetchCategoryData(category: TaskCategory): Promise<CategoryItem[]
         subtype: "Autopilot",
       }));
     }
+    case "win32Apps":
+      return getWin32AppTemplates().map((app) => ({
+        displayName: app.displayName,
+        description: `${app.publisher} ${app.version}`,
+        subtype: "Windows",
+      }));
     default:
       return [];
   }

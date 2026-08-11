@@ -11,6 +11,7 @@ import {
   AppProtectionPolicy,
 } from "@/types/graph";
 import { BaselinePolicy } from "@/lib/templates/loader";
+import type { Win32LobApp } from "@/lib/graph/win32Apps";
 
 /**
  * Activity message for status updates
@@ -46,6 +47,7 @@ export interface ExecutionContext {
   cachedAppProtectionPolicies?: AppProtectionPolicy[];
   cachedIntuneGroups?: DeviceGroup[];
   cachedFilters?: DeviceFilter[];
+  cachedWin32LobApps?: Win32LobApp[];
   // Cached Settings Catalog policies for delete operations (fetched once, reused for all deletes)
   cachedSettingsCatalogPolicies?: Array<{ id: string; name: string; description?: string }>;
   // Cached Driver Update Profiles for delete operations

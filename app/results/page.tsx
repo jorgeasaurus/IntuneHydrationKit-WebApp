@@ -3,7 +3,7 @@
 
 import { useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
+import { AppNavigation } from "@/components/AppNavigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Home, RefreshCcw, AlertTriangle } from "lucide-react";
@@ -132,38 +132,29 @@ export default function ResultsPage() {
   return (
     <ProtectedRoute>
       <div className="min-h-screen relative z-10">
-        <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="container mx-auto p-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Image
-                src="/IHTLogoClear.png"
-                alt="Intune Hydration Kit"
-                width={144}
-                height={169}
-                className="h-10 w-auto"
-                style={{ width: "auto" }}
-              />
-              <div>
-                <h1 className="text-2xl font-bold">Execution Results</h1>
-                <p className="text-sm text-muted-foreground">
-                  {summary
-                    ? `${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)} operation completed`
-                    : "Loading results…"}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" onClick={() => router.push("/")}>
-                <Home className="size-4 mr-2" />
-                Home
+        <AppNavigation
+          eyebrow={(
+            <span className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
+              Run evidence
+            </span>
+          )}
+          title="Execution Results"
+          description={summary
+            ? `${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)} operation completed`
+            : "Loading results…"}
+          actions={(
+            <>
+              <Button variant="outline" onClick={() => router.push("/")} className="size-9 px-0 sm:w-auto sm:px-3">
+                <Home className="size-4 sm:mr-2" />
+                <span className="sr-only sm:not-sr-only">Home</span>
               </Button>
-              <Button onClick={handleStartNew}>
-                <RefreshCcw className="size-4 mr-2" />
-                Start New Hydration
+              <Button onClick={handleStartNew} className="nav-action size-9 px-0 sm:w-auto sm:px-4">
+                <RefreshCcw className="size-4 sm:mr-2" />
+                <span className="sr-only sm:not-sr-only">Start New Hydration</span>
               </Button>
-            </div>
-          </div>
-        </header>
+            </>
+          )}
+        />
 
         <main className="container mx-auto px-4 py-8 max-w-7xl">
           {error ? (

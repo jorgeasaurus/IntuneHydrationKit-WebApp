@@ -1,6 +1,6 @@
 {
   "name": "intune-hydration-kit-webapp",
-  "version": "2.6.1",
+  "version": "2.6.4",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -15,7 +15,9 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "npx react-doctor@latest",
+    "video:studio": "remotion studio video/index.ts",
+    "video:render": "remotion render video/index.ts IntuneHydrationKit-Ad out/intune-hydration-kit-ad.mp4"
   },
   "dependencies": {
     "@azure/msal-browser": "^3.30.0",
@@ -38,7 +40,8 @@
     "framer-motion": "^12.29.0",
     "lucide-react": "^0.468.0",
     "next": "^15.1.6",
-    "next-themes": "^0.4.6",
+    "prism-react-renderer": "^2.4.1",
+    "prismjs": "^1.30.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "sonner": "^1.7.3",
@@ -49,6 +52,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@remotion/cli": "^4.0.498",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.1",
     "@testing-library/user-event": "^14.6.1",
@@ -64,6 +68,7 @@
     "jsdom": "^27.4.0",
     "msw": "^2.12.7",
     "postcss": "^8.5.15",
+    "remotion": "^4.0.498",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
     "vitest": "^4.1.10"

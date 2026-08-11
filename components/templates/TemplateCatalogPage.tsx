@@ -4,6 +4,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
@@ -26,6 +27,7 @@ import {
   loadTemplateDocumentationCatalog,
   loadTemplateDocumentationPayload,
   getPlatformFilterOrder,
+  TEMPLATE_DOCUMENTATION_CATEGORY_ORDER,
   TemplateDocumentationCatalog,
   TemplateDocumentationItem,
 } from "@/lib/templates/catalog";
@@ -48,31 +50,35 @@ type PayloadState = {
   error?: string;
 };
 
-const CATEGORY_ORDER: TaskCategory[] = [
-  "groups",
-  "filters",
-  "compliance",
-  "appProtection",
-  "conditionalAccess",
-  "enrollment",
-  "notification",
-  "baseline",
-  "cisBaseline",
-];
+interface Win32ScriptContents {
+  installScriptContent: string;
+  uninstallScriptContent: string;
+}
 
 const INITIAL_VISIBLE_ITEMS = 60;
 const VISIBLE_ITEMS_INCREMENT = 120;
 const ACTIVE_FILTER_BUTTON_CLASSNAME =
   "border-black bg-black text-white hover:bg-neutral-900 hover:text-white focus-visible:ring-black dark:border-white/20 dark:bg-black dark:text-white dark:hover:bg-neutral-900 dark:focus-visible:ring-white/40";
+const PowerShellScriptPanel = dynamic(() =>
+  import("@/components/templates/PowerShellScriptPanel").then(
+    (module) => module.PowerShellScriptPanel
+  )
+);
 
 function formatSummaryLabel(key: string): string {
-  return key
+  if (key === "@odata.type") {
+    return "OData type";
+  }
+
+  const label = key
     .replace(/^@/, "")
     .replace(/^_+/, "")
     .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
     .replace(/_/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 function formatSummaryValue(value: unknown): string {
@@ -103,6 +109,14 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
   const record = payload as Record<string, unknown>;
   const preferredKeys = [
     "@odata.type",
+    "packageIdentifier",
+    "publisher",
+    "version",
+    "setupFilePath",
+    "installCommandLine",
+    "uninstallCommandLine",
+    "applicableArchitectures",
+    "allowAvailableUninstall",
     "state",
     "membershipRule",
     "rule",
@@ -124,6 +138,8 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
     "_cisCategory",
     "_cisSubcategory",
     "_cisFilePath",
+    "installScriptContent",
+    "uninstallScriptContent",
   ]);
 
   const highlights: Array<{ label: string; value: string }> = [];
@@ -169,6 +185,25 @@ function buildHighlights(payload: unknown): Array<{ label: string; value: string
   return highlights.slice(0, 8);
 }
 
+function getWin32ScriptContents(payload: unknown): Win32ScriptContents | null {
+  if (!payload || typeof payload !== "object") {
+    return null;
+  }
+
+  const record = payload as Record<string, unknown>;
+  if (
+    typeof record.installScriptContent !== "string" ||
+    typeof record.uninstallScriptContent !== "string"
+  ) {
+    return null;
+  }
+
+  return {
+    installScriptContent: record.installScriptContent,
+    uninstallScriptContent: record.uninstallScriptContent,
+  };
+}
+
 function matchesSearch(item: TemplateDocumentationItem, query: string): boolean {
   const haystack = [
     item.displayName,
@@ -211,7 +246,10 @@ export function TemplateCatalogPage() {
         setCatalog(result);
         setVisibleItems(
           Object.fromEntries(
-            CATEGORY_ORDER.map((category) => [category, INITIAL_VISIBLE_ITEMS])
+            TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.map((category) => [
+              category,
+              INITIAL_VISIBLE_ITEMS,
+            ])
           )
         );
       } catch (loadError) {
@@ -279,7 +317,9 @@ export function TemplateCatalogPage() {
       groups.set(item.category, items);
     }
 
-    return CATEGORY_ORDER.reduce<Array<{ category: TaskCategory; items: TemplateDocumentationItem[] }>>(
+    return TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.reduce<
+      Array<{ category: TaskCategory; items: TemplateDocumentationItem[] }>
+    >(
       (orderedGroups, category) => {
         const items = groups.get(category);
         if (items?.length) {
@@ -383,8 +423,8 @@ export function TemplateCatalogPage() {
                         <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
                           This catalog shows the actual transformed templates the web app imports,
                           including the <span className="font-mono text-foreground">[IHD]</span> prefix
-                          and hydration marker. Browse by category, search by keyword, and open raw JSON
-                          only when you need the full object.
+                          and hydration marker. Browse by category, search by keyword, and open raw
+                          payloads and Win32 scripts only when you need the full details.
                         </p>
                       </div>
                     </div>
@@ -410,7 +450,7 @@ export function TemplateCatalogPage() {
                           On-demand loading
                         </div>
                         <div className="mt-2 text-sm text-muted-foreground">
-                          Large baseline catalogs stay fast because heavy payloads are fetched only after expansion.
+                          Large baseline payloads and Win32 scripts are fetched only after expansion.
                         </div>
                       </div>
                     </div>
@@ -625,7 +665,7 @@ export function TemplateCatalogPage() {
                             </div>
                             <div className="mt-2 text-sm leading-6 text-muted-foreground">
                               Summaries show the import-ready payload. Expand any row to inspect the exact JSON
-                              the app will use.
+                              and Win32 wrapper scripts the app will use.
                             </div>
                           </div>
                           <Button asChild variant="outline">
@@ -708,6 +748,9 @@ export function TemplateCatalogPage() {
                                         {renderedItems.map((item) => {
                                           const payloadState = payloadStates[item.id];
                                           const highlights = buildHighlights(payloadState?.data);
+                                          const win32Scripts = getWin32ScriptContents(
+                                            payloadState?.data
+                                          );
 
                                           return (
                                             <AccordionItem
@@ -816,6 +859,21 @@ export function TemplateCatalogPage() {
                                                             </div>
                                                           ))}
                                                         </div>
+                                                      </div>
+                                                    ) : null}
+
+                                                    {win32Scripts ? (
+                                                      <div className="grid gap-4 xl:grid-cols-2">
+                                                        <PowerShellScriptPanel
+                                                          id={`${item.id}-install-script`}
+                                                          title="Install script"
+                                                          content={win32Scripts.installScriptContent}
+                                                        />
+                                                        <PowerShellScriptPanel
+                                                          id={`${item.id}-uninstall-script`}
+                                                          title="Uninstall script"
+                                                          content={win32Scripts.uninstallScriptContent}
+                                                        />
                                                       </div>
                                                     ) : null}
 

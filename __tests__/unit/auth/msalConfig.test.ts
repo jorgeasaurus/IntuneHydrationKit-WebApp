@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LogLevel } from "@azure/msal-browser";
 
 const mocks = vi.hoisted(() => {
@@ -42,8 +42,13 @@ describe("msalConfig", () => {
     mocks.constructorSpy.mockClear();
   });
 
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
   it("returns the correct graph endpoint and authority URL for the global cloud", async () => {
-    const { getAuthorityUrl, getGraphEndpoint } = await importModule();
+    const { getAuthorityUrl } = await importModule();
+    const { getGraphEndpoint } = await import("@/lib/graph/endpoints");
 
     expect(getGraphEndpoint()).toBe("https://graph.microsoft.com");
     expect(getAuthorityUrl()).toBe("https://login.microsoftonline.com/common");
@@ -64,6 +69,26 @@ describe("msalConfig", () => {
     expect(module.msalConfig.auth.authority).toBe("https://login.microsoftonline.com/common");
     expect(module.msalConfig.auth.redirectUri).toBe("http://localhost:3000");
     expect(module.msalConfig.auth.postLogoutRedirectUri).toBe("http://localhost:3000");
+  });
+
+  it("uses the initiating browser origin instead of a stale configured redirect", async () => {
+    vi.stubEnv(
+      "NEXT_PUBLIC_MSAL_REDIRECT_URI",
+      "https://www.intunehydrationkit.com"
+    );
+
+    const module = await importModule();
+
+    expect(module.msalConfig.auth.redirectUri).toBe(window.location.origin);
+    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(window.location.origin);
+  });
+
+  it("explains when the Entra client ID is missing", async () => {
+    vi.stubEnv("NEXT_PUBLIC_MSAL_CLIENT_ID", "");
+    const module = await importModule();
+
+    expect(module.getMsalConfigurationError()).toContain("NEXT_PUBLIC_MSAL_CLIENT_ID");
+
   });
 
   it("routes logger messages to the expected console method and skips PII logs", async () => {

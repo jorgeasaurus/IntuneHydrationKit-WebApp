@@ -73,7 +73,8 @@ describe('ReviewConfirm', () => {
     const user = userEvent.setup()
     render(<ReviewConfirm />)
 
-    expect(screen.getByText('Preview mode')).toBeInTheDocument()
+    expect(screen.getByText('Preview mode')).toHaveClass('text-sky-50')
+    expect(screen.getByText(/Preview mode will check/)).toHaveClass('text-sky-100')
     expect(screen.getByRole('button', { name: 'Preview Create' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Preview Create' }))
@@ -105,6 +106,14 @@ describe('ReviewConfirm', () => {
     expect(screen.getByText('Conditional Access reminder')).toBeInTheDocument()
     expect(screen.getByText('Conditional access license missing')).toBeInTheDocument()
     expect(screen.getByText('Tenant has custom naming policies')).toBeInTheDocument()
+    const acknowledgementLabel = screen.getByText('I understand this run will modify my Intune tenant')
+    const acknowledgementDescription = screen.getByText(/^This operation will/i)
+    const acknowledgement = acknowledgementLabel.closest('.live-acknowledgement')
+    expect(acknowledgementLabel).toHaveClass('live-acknowledgement__title')
+    expect(acknowledgementDescription).toHaveClass('live-acknowledgement__copy')
+    expect(acknowledgement).toHaveClass('live-acknowledgement')
+    expect(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
+      .toHaveClass('live-acknowledgement__checkbox')
 
     await user.click(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
     expect(startButton).toBeEnabled()

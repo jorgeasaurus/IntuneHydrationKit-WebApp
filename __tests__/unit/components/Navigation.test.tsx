@@ -22,7 +22,7 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('next/image', () => ({
-  default: (props: React.ImgHTMLAttributes<HTMLImageElement>) => <img {...props} alt={props.alt ?? ''} />,
+  default: () => null,
 }))
 
 vi.mock('next/link', () => ({
@@ -48,21 +48,6 @@ vi.mock('@/hooks/useWizardState', () => ({
   useWizardState: () => ({ resetWizard }),
 }))
 
-vi.mock('@/components/ThemeToggle', () => ({
-  LIGHT_DARK_THEME_CYCLE: ['light', 'dark'],
-  ThemeToggle: () => <div data-testid="theme-toggle" />,
-}))
-
-vi.mock('@/components/CloudEnvironmentSelector', () => ({
-  CloudEnvironmentSelector: ({ open, onSelect, onCancel }: { open: boolean; onSelect: () => void; onCancel: () => void }) =>
-    open ? (
-      <div data-testid="cloud-selector">
-        <button onClick={() => onSelect()}>Choose Global</button>
-        <button onClick={onCancel}>Cancel Sign In</button>
-      </div>
-    ) : null,
-}))
-
 describe('Navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -76,11 +61,17 @@ describe('Navigation', () => {
 
     render(<Navigation />)
 
+    expect(screen.getByRole('navigation').parentElement).toHaveClass(
+      'container',
+      'mx-auto',
+      'px-4',
+      'sm:px-6',
+    )
     expect(screen.getByText('OFFLINE')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Intune Hydration Kit home' })).toHaveAttribute('href', '/')
     expect(screen.getByRole('link', { name: 'Features' })).toHaveAttribute('href', '#features')
 
     await user.click(screen.getByRole('button', { name: /sign in/i }))
-    await user.click(screen.getByRole('button', { name: 'Choose Global' }))
 
     await waitFor(() => {
       expect(signIn).toHaveBeenCalled()
@@ -116,7 +107,6 @@ describe('Navigation', () => {
     render(<Navigation />)
 
     await user.click(screen.getByRole('button', { name: /sign in/i }))
-    await user.click(screen.getByRole('button', { name: 'Choose Global' }))
 
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith('Failed to sign in. Please try again.')

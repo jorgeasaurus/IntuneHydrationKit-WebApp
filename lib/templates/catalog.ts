@@ -14,6 +14,8 @@ import {
   CISBaselineManifestFile,
   OIBManifestFile,
 } from "@/lib/templates/loader";
+import { getWin32AppTemplates } from "@/templates/win32Apps";
+import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { TaskCategory } from "@/types/hydration";
 
 export interface TemplateDocumentationCategorySummary {
@@ -38,10 +40,16 @@ type CISPayloadSource = {
   file: CISBaselineManifestFile;
 };
 
+type Win32PayloadSource = {
+  kind: "win32";
+  template: Win32AppTemplate;
+};
+
 export type TemplateDocumentationPayloadSource =
   | InlinePayloadSource
   | OIBPayloadSource
-  | CISPayloadSource;
+  | CISPayloadSource
+  | Win32PayloadSource;
 
 export interface TemplateDocumentationItem {
   id: string;
@@ -62,17 +70,18 @@ export interface TemplateDocumentationCatalog {
   totalCount: number;
 }
 
-const CATEGORY_ORDER: TaskCategory[] = [
+export const TEMPLATE_DOCUMENTATION_CATEGORY_ORDER = [
   "groups",
   "filters",
   "compliance",
   "appProtection",
+  "win32Apps",
   "conditionalAccess",
   "enrollment",
   "notification",
   "baseline",
   "cisBaseline",
-];
+] as const satisfies readonly TaskCategory[];
 
 const CATEGORY_METADATA: Record<
   TaskCategory,
@@ -93,6 +102,10 @@ const CATEGORY_METADATA: Record<
   appProtection: {
     label: "App Protection",
     description: "Mobile application management templates for Android and iOS/iPadOS.",
+  },
+  win32Apps: {
+    label: "Win32 Apps",
+    description: "Packaged Windows applications that install through Intune.",
   },
   conditionalAccess: {
     label: "Conditional Access",
@@ -154,6 +167,24 @@ function cisPayloadSource(file: CISBaselineManifestFile): CISPayloadSource {
   };
 }
 
+function win32PayloadSource(template: Win32AppTemplate): Win32PayloadSource {
+  return {
+    kind: "win32",
+    template,
+  };
+}
+
+async function fetchScriptContent(url: string, label: string): Promise<string> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(
+      `Unable to load the ${label} from ${url}: ${response.status} ${response.statusText}`
+    );
+  }
+
+  return response.text();
+}
+
 function createItemId(category: TaskCategory, seed: string): string {
   return `${category}:${seed}`;
 }
@@ -161,7 +192,8 @@ function createItemId(category: TaskCategory, seed: string): string {
 function sortItems(items: TemplateDocumentationItem[]): TemplateDocumentationItem[] {
   return items.toSorted((left, right) => {
     const categoryDiff =
-      CATEGORY_ORDER.indexOf(left.category) - CATEGORY_ORDER.indexOf(right.category);
+      TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.indexOf(left.category) -
+      TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.indexOf(right.category);
     if (categoryDiff !== 0) {
       return categoryDiff;
     }
@@ -412,6 +444,22 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     };
   });
 
+  const win32AppItems: TemplateDocumentationItem[] = getWin32AppTemplates().map((app) => ({
+    id: createItemId("win32Apps", app.id),
+    category: "win32Apps",
+    categoryLabel: CATEGORY_METADATA.win32Apps.label,
+    displayName: app.displayName,
+    description: normalizeDescription(
+      app.description,
+      "Packaged Windows application imported by Intune Hydration Kit."
+    ),
+    subcategory: "WinGet Package",
+    platform: "Windows",
+    itemType: "Windows app (Win32)",
+    sourcePath: app.packageUrl,
+    payloadSource: win32PayloadSource(app),
+  }));
+
   const baselineItems: TemplateDocumentationItem[] = (oibManifest?.files ?? []).map((file) => ({
     id: createItemId("baseline", file.path),
     category: "baseline",
@@ -455,6 +503,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ...filterItems,
     ...complianceItems,
     ...appProtectionItems,
+    ...win32AppItems,
     ...conditionalAccessItems,
     ...enrollmentItems,
     ...notificationItems,
@@ -462,7 +511,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ...cisItems,
   ]);
 
-  const categories = CATEGORY_ORDER.map((category) =>
+  const categories = TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.map((category) =>
     getCategorySummary(
       category,
       items.filter((item) => item.category === category)
@@ -486,6 +535,19 @@ export async function loadTemplateDocumentationPayload(
       return fetchBaselinePolicyByManifestFile(item.payloadSource.file);
     case "cis":
       return fetchCISBaselinePolicyByManifestFile(item.payloadSource.file);
+    case "win32": {
+      const template = item.payloadSource.template;
+      const [installScriptContent, uninstallScriptContent] = await Promise.all([
+        fetchScriptContent(template.installScriptUrl, "Win32 install script"),
+        fetchScriptContent(template.uninstallScriptUrl, "Win32 uninstall script"),
+      ]);
+
+      return {
+        ...template,
+        installScriptContent,
+        uninstallScriptContent,
+      };
+    }
     default:
       return null;
   }

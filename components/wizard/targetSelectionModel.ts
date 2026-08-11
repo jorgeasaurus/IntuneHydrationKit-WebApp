@@ -94,7 +94,7 @@ export const OS_PLATFORM_FILTERS = [
 export type OSPlatformFilterId = typeof OS_PLATFORM_FILTERS[number]["id"];
 
 export const PLATFORM_CATEGORIES: Record<OSPlatformFilterId, TaskCategory[]> = {
-  windows: ["groups", "filters", "baseline", "compliance", "enrollment", "conditionalAccess", "cisBaseline"],
+  windows: ["groups", "filters", "baseline", "compliance", "enrollment", "win32Apps", "conditionalAccess", "cisBaseline"],
   macos: ["groups", "filters", "baseline", "compliance", "cisBaseline"],
   ios: ["groups", "filters", "baseline", "compliance", "appProtection", "cisBaseline"],
   android: ["groups", "filters", "baseline", "compliance", "appProtection", "cisBaseline"],

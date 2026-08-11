@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import {
   loadTemplateDocumentationCatalog,
@@ -8,6 +8,7 @@ import {
   fetchBaselinePolicyByManifestFile,
   fetchCISBaselinePolicyByManifestFile,
 } from '@/lib/templates/loader'
+import { getWin32AppTemplates, TEMPLATE_METADATA } from '@/templates'
 
 vi.mock('@/lib/templates/loader', () => ({
   fetchDynamicGroups: vi.fn().mockResolvedValue([
@@ -125,16 +126,38 @@ vi.mock('@/lib/templates/loader', () => ({
 }))
 
 describe('template catalog', () => {
+  it('keeps Win32 metadata aligned with the shipped template inventory', () => {
+    expect(TEMPLATE_METADATA.win32Apps.count).toBe(getWin32AppTemplates().length)
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: RequestInfo | URL) => {
+        const url = String(input)
+        const operation = url.includes('/Install-') ? 'Install' : 'Uninstall'
+        return Promise.resolve(
+          new Response(
+            `$packageIdentifier = '7zip.7zip'\n${operation}-WinGetPackage $packageIdentifier`,
+            { status: 200 }
+          )
+        )
+      })
+    )
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('builds a catalog from loader-backed sources and manifests', async () => {
     const catalog = await loadTemplateDocumentationCatalog()
 
-    expect(catalog.totalCount).toBe(11)
+    expect(catalog.totalCount).toBe(15)
     expect(catalog.categories.find((category) => category.id === 'groups')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'notification')?.count).toBe(1)
+    expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(4)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'cisBaseline')?.count).toBe(1)
 
@@ -153,6 +176,46 @@ describe('template catalog', () => {
     const cisItem = catalog.items.find((item) => item.category === 'cisBaseline')
     expect(cisItem?.subcategory).toBe('Windows 11 - Intune Benchmarks')
     expect(cisItem?.description).toBe('Windows 11 benchmark templates')
+
+    const win32Items = catalog.items.filter((item) => item.category === 'win32Apps')
+    expect(win32Items.map((item) => item.displayName)).toEqual([
+      '7-Zip - [IHD]',
+      'Google Chrome - [IHD]',
+      'Mozilla Firefox - [IHD]',
+      'Visual Studio Code - [IHD]',
+    ])
+
+    const win32Item = win32Items.find((item) => item.displayName === '7-Zip - [IHD]')
+    expect(win32Item).toMatchObject({
+      displayName: '7-Zip - [IHD]',
+      itemType: 'Windows app (Win32)',
+      platform: 'Windows',
+      sourcePath: '/win32-apps/7-zip.intunewin',
+      subcategory: 'WinGet Package',
+    })
+
+    await expect(loadTemplateDocumentationPayload(win32Item!)).resolves.toMatchObject({
+      packageIdentifier: '7zip.7zip',
+      setupFilePath: 'Install-WinGetPackage.ps1',
+      installScriptContent: expect.stringContaining('Install-WinGetPackage'),
+      uninstallScriptContent: expect.stringContaining('Uninstall-WinGetPackage'),
+    })
+    expect(fetch).toHaveBeenNthCalledWith(1, '/win32-apps/7-zip/Install-WinGetPackage.ps1')
+    expect(fetch).toHaveBeenNthCalledWith(2, '/win32-apps/7-zip/Uninstall-WinGetPackage.ps1')
+  })
+
+  it('identifies a Win32 script asset that cannot be loaded', async () => {
+    const catalog = await loadTemplateDocumentationCatalog()
+    const win32Item = catalog.items.find(
+      (item) => item.displayName === 'Google Chrome - [IHD]'
+    )
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }))
+      .mockResolvedValueOnce(new Response('uninstall', { status: 200 }))
+
+    await expect(loadTemplateDocumentationPayload(win32Item!)).rejects.toThrow(
+      'Unable to load the Win32 install script from /win32-apps/google-chrome/Install-WinGetPackage.ps1: 404 Not Found'
+    )
   })
 
   it('returns inline payloads directly and defers manifest-backed payloads', async () => {

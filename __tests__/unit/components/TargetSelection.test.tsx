@@ -286,10 +286,11 @@ describe('TargetSelection', () => {
     expect(screen.getByLabelText('OpenIntuneBaseline')).toBeChecked()
     expect(screen.getByLabelText('Compliance Policies')).toBeChecked()
     expect(screen.getByLabelText('Enrollment Profiles')).toBeChecked()
+    expect(screen.getByLabelText('Win32 Apps')).toBeChecked()
     expect(screen.getByLabelText('CIS Intune Baselines')).toBeChecked()
     expect(screen.getByLabelText('App Protection')).not.toBeChecked()
 
-    expect(await screen.findByText('Total: 6 categories (6 items)')).toBeInTheDocument()
+    expect(await screen.findByText('Total: 7 categories (10 items)')).toBeInTheDocument()
 
     await user.click(within(getCategoryRegion('Select OpenIntuneBaseline Policies')).getByText('Windows'))
     expect(await screen.findByLabelText('Windows Baseline')).toBeChecked()
@@ -303,9 +304,10 @@ describe('TargetSelection', () => {
 
     useWizardStateMock.mockReturnValue({
       state: createState({
-        selectedTargets: ['groups'],
+        selectedTargets: ['groups', 'win32Apps'],
         categorySelections: {
           groups: { selectedItems: [`${IMPORT_PREFIX}Windows Devices`] },
+          win32Apps: { selectedItems: ['7-Zip - [IHD]'] },
         },
       }),
       setSelectedTargets,
@@ -320,10 +322,11 @@ describe('TargetSelection', () => {
 
     await user.click(screen.getByRole('button', { name: 'Review Selection' }))
 
-    expect(setSelectedTargets).toHaveBeenCalledWith(['groups'])
+    expect(setSelectedTargets).toHaveBeenCalledWith(['groups', 'win32Apps'])
     expect(setSelectedCISCategories).toHaveBeenCalledWith([])
     expect(setCategorySelections).toHaveBeenCalledWith({
       groups: { selectedItems: [`${IMPORT_PREFIX}Windows Devices`] },
+      win32Apps: { selectedItems: ['7-Zip - [IHD]'] },
     })
     expect(setBaselineSelection).not.toHaveBeenCalled()
     expect(nextStep).toHaveBeenCalledTimes(1)
@@ -477,13 +480,13 @@ describe('TargetSelection', () => {
       expect(fetchCISBaselineManifestMock).toHaveBeenCalled()
     })
 
-    expect(screen.getByText('Total: 8 categories (13 items)')).toBeInTheDocument()
+    expect(screen.getByText('Total: 9 categories (17 items)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review Selection' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Deselect All' }))
 
     await waitFor(() => {
-      expect(screen.queryByText('Total: 8 categories (13 items)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Total: 9 categories (17 items)')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
     })
   })

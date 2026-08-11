@@ -11,8 +11,8 @@ vi.mock('next/navigation', () => ({
 }))
 
 vi.mock('next/dynamic', () => ({
-  default: () => function MockDynamicWallpaper() {
-    return <div data-testid="dynamic-wallpaper" />
+  default: () => function MockDynamicWallpaper({ landing }: { landing?: boolean }) {
+    return <div className={landing ? 'dynamic-wallpaper--landing' : undefined} data-testid="dynamic-wallpaper" />
   },
 }))
 
@@ -66,7 +66,9 @@ describe('RouteWallpaper', () => {
 
     // The deferred (idle) load has resolved, swapping the static surface for
     // the animated wallpaper.
-    expect(screen.getByTestId('dynamic-wallpaper')).toBeInTheDocument()
+    expect(screen.getByTestId('dynamic-wallpaper')).toHaveClass(
+      'dynamic-wallpaper--landing'
+    )
   })
 
   it('mounts the animated wallpaper on the wizard route', () => {
@@ -74,7 +76,9 @@ describe('RouteWallpaper', () => {
 
     render(<RouteWallpaper />)
 
-    expect(screen.getByTestId('dynamic-wallpaper')).toBeInTheDocument()
+    expect(screen.getByTestId('dynamic-wallpaper')).not.toHaveClass(
+      'dynamic-wallpaper--landing'
+    )
   })
 
   it('mounts the animated wallpaper on dashboard and results routes', () => {
@@ -106,7 +110,9 @@ describe('RouteWallpaper', () => {
 
     // The static gradient surface is the permanent state — the heavy animated
     // wallpaper chunk is never mounted.
-    expect(container.querySelector('.dynamic-wallpaper')).toBeTruthy()
+    expect(container.querySelector('.dynamic-wallpaper')).toHaveClass(
+      'dynamic-wallpaper--landing'
+    )
     expect(screen.queryByTestId('dynamic-wallpaper')).not.toBeInTheDocument()
   })
 })

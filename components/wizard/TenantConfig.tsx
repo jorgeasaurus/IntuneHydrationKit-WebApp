@@ -421,12 +421,12 @@ export function TenantConfig(): React.JSX.Element {
             )}
 
             {prerequisiteStatus === "success" && prerequisiteResult && (
-              <Alert className="border-green-500/30 bg-green-500/10">
-                <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
-                <AlertTitle className="text-green-800 dark:text-green-200">
+              <Alert className="border-emerald-300/45 bg-emerald-500/18 text-emerald-50">
+                <CheckCircle2 className="size-4 text-emerald-200" />
+                <AlertTitle className="text-emerald-50">
                   All prerequisites met
                 </AlertTitle>
-                <AlertDescription className="text-green-700 dark:text-green-300">
+                <AlertDescription className="text-emerald-100">
                   Validation passed. You have the baseline licensing needed to continue with this
                   wizard.
                 </AlertDescription>

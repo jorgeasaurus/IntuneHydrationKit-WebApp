@@ -1,3 +1,258 @@
+# PR #21 Final Copilot Review and Merge
+
+- [x] Inspect normal threads and all historical suppressed comments.
+- [x] Fix the remaining valid `.intunewin` format-message comment with regression coverage.
+- [x] Align the Win32 metadata count with the four shipped templates.
+- [x] Make Win32 detection read-only, correct Prism token mapping, and clarify protected-delete results.
+- [x] Distinguish protected delete matches from absent apps.
+- [x] Remove redundant full-payload copies from `.intunewin` parsing.
+- [x] Centralize the Graph base URL in a server-safe endpoint module.
+- [x] Remove per-block copies from server-side Azure uploads.
+- [x] Send the Azure block list with an XML content type.
+- [x] Cache Win32 collection discovery across one execution.
+- [x] Render the standard `OData type` label casing in template summaries.
+- [x] Render readable results labels for every known task category.
+- [x] Verify, commit, push, and disposition all current-head comments.
+- [ ] Complete a clean Copilot review cycle on the latest head.
+- [ ] Squash-merge PR #21 and verify the merged state.
+
+## Review
+
+- The parser now tells operators that supplied packages need stored ZIP entries without data descriptors; it no longer labels the production path as a proof of concept.
+- Detection scripts now use WinGet only when it is present and otherwise use read-only registry detection; no detection path downloads or installs dependencies.
+- Protected delete candidates now report the ownership requirement, and PowerShell `class-name` tokens receive the intended syntax color.
+- Delete discovery now preserves whether any app name matched, so absent apps report `Not found in tenant` while unowned matches report the ownership protection.
+- `.intunewin` ZIP entries now remain views over the package buffer, and the encrypted-content view goes directly to `Blob` without another full-payload slice.
+- The Graph client and Win32 upload authorization now use the same server-safe endpoint helper.
+- Azure block uploads now reuse one 6 MB buffer and send full or tail views without per-block copies.
+- Azure block-list commits now declare the XML body as `application/xml`.
+- Win32 discovery fetches the full Graph collection once per execution; recent-object lookups preserve eventual-consistency retries, and create/delete mutations update the cache.
+- Template summaries preserve the standard `OData type` casing instead of generic title casing.
+- Results category headers use readable product labels such as `Win32 Apps`, `App Protection`, and `Conditional Access`.
+- Checks passed: 560 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
+- Checks passed: 559 tests, PowerShell parsing for all four detection scripts, type-check, lint, production build, React Doctor 100/100, and `git diff --check`.
+
+# Win32 Single-App Selection
+
+- [x] Trace the selected Win32 item from Target Selection into task queue construction.
+- [x] Persist Win32 item selections in wizard state.
+- [x] Add create-mode and delete-mode single-item queue regressions.
+- [x] Run focused and full verification.
+- [x] Commit and push the fix to PR #21.
+
+## Review
+
+- Root cause: Target Selection omitted `win32Apps` when it persisted item-level selections, so queue construction received no item filter and selected every template.
+- The persisted selection and queue now contain only the chosen app in both create and delete modes.
+- Checks passed: 554 tests, type-check, lint, production build, and `git diff --check`.
+
+# Remove PowerShell Win32 Proof of Concept
+
+- [x] Map the PowerShell app template, catalog entry, tests, and bundled assets.
+- [x] Remove the PowerShell app without changing required PowerShell-based Win32 implementation details.
+- [x] Run focused and full project verification.
+- [x] Commit and push the removal to PR #21.
+
+## Review
+
+- Removed the PowerShell template, package, icon, install script, uninstall script, and detection script; the Win32 catalog now contains four apps.
+- Checks passed: 552 tests, type-check, lint, production build, and `git diff --check`.
+
+# Suppressed Copilot Comment
+
+- [x] Inspect the suppressed PR #21 comment and validate it against the latest head.
+- [x] Fix valid feedback and add focused regression coverage.
+- [x] Verify, push, reply, and resolve the handled thread.
+- [ ] Complete a clean Copilot review cycle on the new head.
+
+## Review
+
+- Commit `06c3622` removes the live identity-provider dependency from the popup test and requires Graph-authorized, exact-target validation before the Win32 proxy streams content.
+- The next review found a delete-discovery race; missing legacy candidates are now ignored while other Graph failures still stop the task.
+- Checks passed: 553 tests, type-check, lint, production build, direct Playwright popup validation, `git diff --check`, and React Doctor at 100/100.
+- Copilot completed the clean review on `313cc5f` with no comments or suppressed comments; no review threads remain open.
+- The documentation-head review found legacy name-variant drift and obsolete theme lessons; both are corrected and need final review.
+- The next review found repeated byte-string concatenation in script and icon encoding; both paths now use one chunked base64 utility.
+
+# Results Category Contrast
+
+- [x] Replace theme-dependent task colors with bright colors for the dark glass surface.
+- [x] Add status-color regression coverage.
+- [x] Verify the results category list and project checks.
+
+## Review
+
+- Completed task labels now use high-contrast emerald, amber, and red tints in both themes; status icons use matching surface-safe colors.
+- Sampled task text measures 4.83:1 to 8.60:1 across the supplied blue surface. Focused tests, type-check, lint, production build, and React Doctor at 100/100 pass.
+
+# PowerShell Syntax Highlighting
+
+- [x] Add a lazy PowerShell code renderer with accessible token markup.
+- [x] Apply readable token colors without changing the script panel layout.
+- [x] Add focused component and catalog regression tests.
+- [x] Verify the expanded Win32 template view, bundle split, and project checks.
+
+## Review
+
+- Prism PowerShell highlighting now loads only when a Win32 template expands; the script remains real, selectable text in the existing scroll panels.
+- All 549 tests, type-check, lint, production build, Playwright visual checks, and React Doctor at 100/100 pass.
+
+# Vercel Win32 Upload Origin Recovery
+
+- [x] Reproduce the deployed 403 without forwarding content to Azure or Intune.
+- [x] Add a regression for branch-alias and immutable-deployment origin divergence.
+- [x] Accept only the request origin or explicitly configured deployment origin.
+- [x] Verify locally and against the redeployed Vercel endpoint, then commit and push.
+
+## Review
+
+- The immutable deployment hostname reproduced the report's 403 when paired with the browser-facing `dev` origin; the route now permits that explicitly configured deployment origin without trusting forwarded headers.
+- The regression failed before the fix and passes after it; focused tests, cross-origin rejection, lint, type-check, production build, whitespace, and the safe deployed endpoint probe pass.
+
+# Dev Deployment Sign-in Recovery
+
+- [x] Reproduce the deployed sign-in failure and capture the redirect/configuration path.
+- [x] Compare the dev deployment environment and access protection with local and production behavior.
+- [x] Implement the smallest durable fix and add regression coverage.
+- [x] Verify sign-in initiation on the deployed dev alias, then commit and push the repair.
+
+## Review
+
+- The `dev` preview inherited the global production redirect because its branch override remained scoped to the retired pre-rename branch.
+- Browser auth now uses the initiating origin, `dev` has an explicit Vercel preview override, and focused auth tests, the popup redirect assertion, lint, type-check, production build, and whitespace checks pass.
+
+# PR #21 Copilot Review Loop
+
+- [x] Inspect authentication, PR metadata, review counts, and unresolved threads.
+- [x] Address every valid Copilot thread with focused tests and verification.
+- [x] Push fixes, reply to and resolve handled threads, then request a fresh review.
+- [x] Repeat until Copilot reviews the latest head with no new actionable feedback.
+
+## Review
+
+- Replaced the landing client bundle's package-manifest import with a build-time version constant sourced from `package.json` in Next and Vitest configuration.
+- Verified the focused landing tests, lint, type-check, production build, and whitespace before completing the clean review cycle.
+
+# Dev Branch Rename and Deployment
+
+- [x] Rename the current remote branch to `dev` and preserve the ready-PR path.
+- [x] Realign the local branch and upstream tracking.
+- [x] Deploy and verify the exact Vercel `git-dev` alias.
+- [x] Record final PR, deployment, and workspace state.
+
+## Review
+
+- GitHub closed legacy PR #20 during the server-side rename because its head ref remained bound to the retired branch name; ready replacement PR #21 targets `main` from `dev` with the same 2.6.4 changes.
+- Local `dev` tracks `origin/dev`; the requested Vercel branch alias is the deployment verification target.
+
+# Win32 Script Content in Template Docs
+
+- [x] Load each Win32 install and uninstall wrapper when its template is expanded.
+- [x] Show both scripts as readable PowerShell while retaining them in the raw payload.
+- [x] Add catalog and UI regression coverage for script content and failures.
+- [x] Run project/browser checks and refresh PR #20.
+
+## Review
+
+- Script assets remain out of the initial catalog bundle and load only for the expanded Win32 item.
+- Checks passed: focused catalog/UI/package tests, full test suite (72 files, 546 tests), type-check, production build, browser content assertions, visual review, `git diff --check`, React Doctor, GitGuardian, and Vercel.
+
+# Expanded Win32 Starter Pack
+
+- [x] Add Google Chrome, Mozilla Firefox, PowerShell, and Visual Studio Code definitions.
+- [x] Generate module-equivalent wrappers, icons, and `.intunewin` packages.
+- [x] Expand catalog, package, preview, create, and delete coverage.
+- [x] Run project checks, commit, push, and verify PR #20.
+
+## Review
+
+- Added four WinGet-based Win32 apps through the shared 7-Zip execution path.
+- Wrapper scripts match the PowerShell module generators for all four apps.
+- Checks passed: focused Win32/catalog/selection tests, full test suite (72 files, 545 tests), type-check, production build, browser catalog verification, `git diff --check`, React Doctor, GitGuardian, and Vercel.
+
+# PR #20 Copilot Review Loop
+
+- [x] Capture the initial Copilot state and actionable threads.
+- [x] Fix Win32 asset diagnostics and remove the arbitrary package-size ceiling.
+- [x] Run focused checks, commit, and push the fixes.
+- [x] Resolve handled threads and request a fresh Copilot review.
+- [ ] Verify a new clean Copilot review cycle.
+
+## Review
+
+- Resolved four Copilot threads: Win32 asset diagnostics, package-size limit, Remotion type import, and Azure upload redirects.
+- Checks passed: focused Win32 upload and task-executor tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+- Copilot completed two re-review cycles: the first found two issues; the second review on `b28c568` produced no new comments.
+- A subsequent review found the upload route buffered whole packages. It now streams 6 MB blocks with an 8 GB limit and fixed-width block IDs; a final re-review is pending.
+
+# README Status and Screenshot Refresh
+
+- [x] Remove the obsolete development-status section.
+- [x] Capture and add a current landing-page screenshot.
+- [ ] Verify the README image path and documentation diff.
+
+## Review
+
+- Removed the obsolete phase-based development-status section.
+- Replaced `LandingPage.jpeg` with a current 1550×972 landing-page capture and updated its alt text.
+- Checks passed: README status search, image-path and dimensions check, visual inspection, and `git diff --check`.
+- Merged and pushed as documentation-only commit `fefe788` on `main`.
+
+# Proprietary License Transition
+
+- [x] Add a proprietary commercial EULA for future releases.
+- [x] Replace MIT and free/open-source product claims with the proprietary licensing position.
+- [x] Verify no MIT licensing references remain and run documentation checks.
+- [x] Commit and merge only the proprietary-license changes into `main`.
+
+## Review
+
+- Replaced the README, landing footer, FAQ, and project-specification MIT claims with proprietary commercial licensing language.
+- Added `LICENSE` with a commercial EULA: evaluation only; production and other commercial use require a separately purchased written license.
+- Checks passed: focused landing-page test, `npm run type-check`, `git diff --check`, and an MIT-reference search.
+- Merged as licensing-only commit `705e7f0` on `main`; focused React Doctor scan scored 100/100.
+
+# Landing Version Alignment
+
+- [x] Read the PowerShell module version.
+- [x] Update landing-page version references and regression coverage.
+- [x] Run focused verification and record results.
+
+## Review
+
+- Landing badge and supporting copy now display the PowerShell module version, v1.3.0.
+- Checks passed: `npm run test:run -- __tests__/unit/components/HomeLanding.test.tsx`, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# PowerShell Group and Filter Parity
+
+- [x] Compare the PowerShell and web group/filter inventories.
+- [x] Add missing web templates, manifests, counts, and coverage.
+- [x] Run focused tests, type-check, and build; record results.
+
+## Review
+
+- Added the three Microsoft Entra device-trust dynamic groups and four Windows device-trust filters from PowerShell module v1.3.0.
+- Both loader and static-fallback paths are aligned; cache version bumped to invalidate stale browser templates.
+- Checks passed: focused template tests, `npm run type-check`, `npm run test:run` (70 files, 512 tests), `npm run build`, `git diff --check`, and source-file parity.
+
+# Intune Hydration Kit Social Ad
+
+- [x] Define a short-form vertical ad storyboard grounded in current product capabilities.
+- [x] Add a self-contained Remotion composition and render entry point.
+- [x] Render and visually inspect the illustrative MP4.
+- [x] Capture actual local product views at a dark mobile viewport.
+- [x] Replace the illustrative UI in the ad and render the updated MP4.
+- [x] Capture the dark desktop landing page at key real-product views.
+- [x] Recreate the product scenes as desktop browser captures and render the updated MP4.
+
+## Review
+
+- Illustrative version completed; replacing it with real mobile product captures.
+- Revised version uses real 390×844 dark-mode landing and template-catalog captures in the product scenes.
+- Checks passed: `npm run type-check`, rendered MP4, and visual review of both product scenes.
+- Desktop recreation uses real 1440×900 dark-mode landing captures for the hero/live-run and operating-model scenes.
+- Upstream Remotion markup/render guidance used: frame-driven animations, `staticFile()`/`Img` assets, still-frame review, and full render.
+
 # GitHub Issue #16 Investigation
 
 - [x] Retrieve issue #16 details, discussion, and linked work.
@@ -733,3 +988,493 @@
 - Copilot cycles 1 and 2 produced four actionable test-coverage comments; all were fixed, replied to, and resolved.
 - Copilot cycle 3 reviewed functional head `e34450c` and produced no new comments.
 - Checks passed: focused OperationMode tests, `npm run type-check`, Vercel, React Doctor, GitGuardian, and `git diff --check`.
+
+# Make Choices Unmistakable
+
+- [x] Replace the operation choice cards with keyboard-accessible radio groups.
+- [x] Add visible focus treatment and accessible labels for task filtering controls.
+- [x] Add focused regression coverage and verify the affected UI.
+
+## Review
+
+- Operation and execution cards are now focusable radio controls with keyboard selection and clear checked states.
+- Task search, status, and category filters now have accessible names.
+- Checks passed: focused component tests, `npm run type-check`, and `npm run build`.
+
+# Shared Dark Wallpaper, Readable Light UI
+
+- [x] Restore the original dark wallpaper treatment as the shared backdrop.
+- [x] Improve light-mode contrast through foreground and surface styling only.
+- [x] Verify the shared backdrop and light-mode readability through focused and project checks.
+
+## Review
+
+- Both themes now share the original dark water scrim; the wallpaper is not altered by the light theme.
+- Light mode uses high-contrast outer text and more opaque pale content surfaces with dark text for readable scanning.
+- Checks passed: focused landing/wallpaper tests, `npm run type-check`, clean `npm run build`, and `git diff --check`.
+
+# Landing Contrast Follow-up
+
+- [x] Set readable foreground colors for the light navigation brand and status area.
+- [x] Set readable muted copy on the light final CTA surface.
+- [x] Verify the focused landing behavior and project checks.
+
+## Review
+
+- The navigation brand, status, and CTA description now use dark foregrounds on their pale light-mode surfaces.
+- The shared dark water wallpaper remains untouched.
+- Checks passed: focused landing/navigation tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Landing Demo Contrast Follow-up
+
+- [x] Scope readable foreground and muted text to the simulated app window.
+- [x] Verify the demo cycle and project checks.
+
+## Review
+
+- The simulated app browser now renders dark foreground and muted text on its pale light-mode surfaces.
+- The shared wallpaper remains unchanged.
+- Checks passed: focused demo/landing tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Navigation Hover Contrast
+
+- [x] Keep light-mode navigation hover text dark enough for the pale header.
+- [x] Verify the navigation and project checks.
+
+## Review
+
+- Light-mode navigation hover text now uses the deep blue accent; dark mode retains the light hover treatment.
+- Checks passed: focused navigation tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Status Badge Contrast
+
+- [x] Use a readable light-mode label color for informational status badges.
+- [x] Verify the landing checks.
+
+## Review
+
+- Informational badges now use a deep blue label on their pale light-mode surface.
+- Checks passed: focused landing test, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# Conditional Access Alert Contrast
+
+- [x] Use an opaque, readable warning surface for Conditional Access follow-up alerts.
+- [x] Verify the results and wizard checks.
+
+## Review
+
+- Conditional Access alerts now use opaque card surfaces, clear foreground text, and amber warning icons over the wallpaper.
+- Checks passed: focused results/wizard tests, `npm run type-check`, `npm run build`, and `git diff --check`.
+
+# React Doctor 100
+
+- [x] Fetch and follow the current React Doctor triage playbook.
+- [x] Fix all React Doctor findings until the full scan scores 100.
+- [x] Run regression and project validation checks.
+
+## Review
+
+- React Doctor 0.9.8 full-project scan: 57 to 100, with zero errors or warnings.
+- Fixed lifecycle cleanup, pure state transitions, deterministic server/client time formatting, animation performance, and repeated lookup issues.
+- Checks passed: focused demo test, full test suite (514 tests), type check, production build, and `git diff --check`.
+
+# Thermonuclear Review Fix Loop
+
+- [x] Review the full current branch diff and record actionable findings.
+- [x] Fix every confirmed finding and run focused checks.
+- [x] Re-review the changed scope until it has zero findings.
+- [x] Run final project validation.
+
+## Round 1 findings
+
+1. Keep the shared compact radio primitive separate from selectable card layout.
+2. Pair the wallpaper media-query listener with the exact matching cleanup API.
+
+## Round 2 finding
+
+1. Keep generic light-mode button hover text on the control-text token.
+
+## Review
+
+- Three review rounds completed. The final fresh review had zero findings.
+- The fixes restored compact-radio ownership, matched wallpaper listener teardown, added card-radio focus treatment, simplified validation-progress cleanup, and corrected light hover contrast.
+- Checks passed: focused component tests, full test suite (514 tests), type check, production build, React Doctor (100/100), and `git diff --check`.
+
+# GitHub Copilot Review Loop
+
+- [x] Inspect pull-request review state and address valid feedback.
+- [x] Push verified fixes and resolve handled review threads.
+- [x] Request and verify a clean new Copilot review cycle.
+
+## Review
+
+- Copilot identified one valid progress-completion race. It was fixed, tested, replied to, and resolved.
+- Two follow-up Copilot review cycles completed. The final cycle reviewed `c0eb626` and added no actionable threads.
+- Checks passed: full test suite (515 tests), type check, production build, changed-scope React Doctor (100/100), matching local and remote heads, and `git diff --check`.
+
+# Website Version Revision
+
+- [x] Increase the website version from 2.6.0 to 2.6.1.
+- [x] Add the pull-request version-increment merge requirement.
+
+# PR #19 Copilot Review Refresh
+
+- [x] Record the latest pull-request review state and request a new Copilot review for the 2.6.1 head.
+- [x] Address and verify any new actionable feedback.
+- [x] Confirm a clean Copilot review is anchored to the latest commit.
+
+## Review
+
+- Copilot review `PRR_kwDOQzwR3c8AAAABI3Nklw` completed on `1a298fd` with no actionable comments or unresolved threads.
+- The only suppressed suggestion concerns an existing UTC timestamp label and is outside the version-update scope.
+- Checks passed: package metadata consistency, `git diff --check`, and matching local/remote PR heads.
+
+# Suppressed Review Follow-up
+
+- [x] Make the prerequisite-validation timestamp's UTC timezone explicit.
+- [x] Add focused regression coverage and update PR #19.
+
+## Review
+
+- The prerequisite timestamp now visibly states UTC and retains an explicit locale/timezone formatter for deterministic rendering.
+- Checks passed: focused TenantConfig test, type check, production build, changed-line React Doctor scan, and `git diff --check`.
+
+# Suppressed Copilot Feedback Follow-up
+
+- [x] Make terminal-demo progress reach 100% after the final command.
+- [x] Format the UTC validation timestamp in the operator's runtime locale.
+- [x] Add regression coverage and verify the focused changed scope.
+
+## Review
+
+- Four valid suppressed findings were fixed across two commits: `12800e7` and `8885123`.
+- Copilot review `PRR_kwDOQzwR3c8AAAABI3UpFw` completed on `8885123` with no actionable comments or unresolved threads.
+- The remaining suppressed wallpaper suggestion conflicts with the requested same-treatment light/dark wallpaper and was intentionally not applied.
+- Checks passed: focused component tests (8 tests), type check, production build, changed-line React Doctor scans, `git diff --check`, and matching local/remote heads.
+
+# Win32 App Proof of Concept
+
+- [x] Identify one PowerShell-module Win32 app that can be represented safely in the web app.
+- [x] Add the minimal template and Graph task path for that app.
+- [x] Add focused coverage and validate the proof of concept.
+
+## Review
+
+- Uses the supplied 7-Zip 25.01 `.intunewin` package, including its Intune encryption metadata.
+- Checks passed: focused tests, type check, lint, and whitespace validation.
+
+# Thermonuclear Review: Win32 App Proof of Concept
+
+- [x] Review the branch diff against `origin/main` and record actionable findings.
+- [x] Fix each actionable finding and run focused verification.
+- [x] Repeat the strict review until it has zero findings, then run final validation.
+
+## Review
+
+- Moved app-specific metadata into the Win32 template, reject malformed package-size metadata, clean up a failed app upload, use the no-retry create boundary, and keep outer and encrypted package names distinct.
+- Final strict review found no remaining structural, boundary, or maintainability issues in the branch scope.
+
+# Win32 Upload Commit Failure
+
+- [x] Match the module's Azure block-upload and block-list protocol in the same-origin upload proxy.
+- [x] Cover the protocol with a focused route test and verify the Win32 upload path.
+
+## Review
+
+- The proxy now uploads each package block and explicitly commits the Azure block list before Graph receives the encryption metadata.
+- Checks passed: focused Win32 tests, type check, lint, production build, and whitespace validation.
+
+# Win32 Catalog Visibility
+
+- [x] Include shipped Win32 app templates in the template-documentation catalog.
+- [x] Add a catalog regression test and verify the catalog UI source.
+
+## Review
+
+- The 7-Zip proof-of-concept is now discoverable under Win32 Apps with its import-ready template payload.
+- Checks passed: focused catalog tests, type check, lint, production build, and whitespace validation.
+
+# Sign-in Popup Investigation
+
+- [x] Reproduce the unauthenticated browser flow through the cloud confirmation dialog.
+- [x] Start the Global-cloud MSAL popup directly from every sign-in call to action.
+- [x] Add regression coverage and verify the authenticated entry point.
+
+## Review
+
+- The redundant Global-cloud confirmation was the extra interaction before MSAL could receive the browser click. Sign-in now starts directly from the call to action.
+- A missing Entra client ID now displays an actionable configuration error instead of creating an invalid authorization request.
+- Checks passed: focused authentication/component tests, direct Chrome popup verification, type check, lint, production build, and whitespace validation.
+
+# Worktree Consolidation
+
+- [x] Checkpoint the Glass UI worktree without absorbing task bookkeeping.
+- [x] Create a combined branch from the Win32 work and merge the Glass UI checkpoint.
+- [x] Resolve integration conflicts, revise the version, and run the full verification suite.
+
+## Review
+
+- Combined branch: `codex/consolidate-win32-glass-ui`, version 2.6.3.
+- Checks passed: 515 tests, type check, lint, production build, whitespace validation, and Chrome verification of the glass landing surface plus direct Entra popup.
+
+# Entra Client ID Regression
+
+- [x] Restore the missing local Entra environment configuration to the Glass UI worktree.
+- [x] Verify the generated authorization URL includes `client_id` from that restored configuration.
+
+## Review
+
+- The Glass UI worktree was missing its ignored `.env.local`; the regular environment-driven configuration is restored and the temporary fallback was removed.
+- Checks passed: direct Chrome test against the restarted Glass UI server confirms the authorization URL includes `client_id`.
+
+# Wizard Chunk Recovery
+
+- [x] Identify the server/worktree conflict serving stale wizard assets on port 3000.
+- [x] Rebuild the current branch's generated Next.js cache and verify the wizard route in Chrome.
+
+## Review
+
+- A stale Glass UI server was also bound to port 3000 over IPv6, while the consolidated worktree used IPv4.
+- The stale generated cache was moved to `.next-stale-chunk-recovery`; the replacement server is the sole port-3000 listener and Chrome loaded `/wizard` without a chunk error.
+
+# Prerequisite Banner Contrast
+
+- [x] Give the successful prerequisite banner explicit Glass UI foreground colors.
+- [x] Add a regression assertion and verify the wizard component.
+
+## Review
+
+- The prerequisite-success icon, title, and description now use explicit light emerald foregrounds that remain readable over the dark Glass surface.
+- Checks passed: focused component test, type check, lint, clean production build, and whitespace validation.
+
+# Preview Callout Contrast
+
+- [x] Give the preview-mode callout explicit Glass UI foreground colors.
+- [x] Run focused and project verification, then record results.
+
+## Review
+
+- Preview mode now uses explicit light sky foregrounds over a slightly stronger blue surface, so its status and description remain readable in the fixed Glass UI theme.
+- Checks passed: focused component test, type check, lint, clean production build, and whitespace validation.
+
+# Glass UI Site-wide Restyle
+
+- [x] Inspect the SPXC reference and map its visual primitives to the landing page.
+- [x] Replace the landing theme with the strict glass system over the retained Vanta water effect.
+- [x] Add responsive and reduced-transparency fallbacks.
+- [x] Verify the landing page with tests, build, and desktop/mobile screenshots.
+- [x] Apply the approved visual system to the remaining product surfaces.
+
+## Review
+
+- Retained the Vanta water effect after user correction; glass panels and navigation now use the SPXC/blog visual language.
+- Applied the glass system to the wizard, dashboard, results, template catalog, navigation, dialogs, controls, status cards, and progress surfaces.
+- Checks passed: full tests, type check, production build, desktop/mobile Chrome checks, and reduced-transparency coverage.
+
+# Thermonuclear Review Fix Loop: Glass UI Site-wide
+
+- [x] Inspect the current branch diff and establish review scope.
+- [x] Run strict review rounds and fix every actionable finding.
+- [x] Verify the final changed scope and browser behavior.
+
+## Review
+
+- Centralized shared glass rules, removed the obsolete multi-theme system, and replaced stale theme end-to-end checks.
+- Three review rounds completed; the final round had no findings.
+
+# Glass UI Responsive Follow-ups
+
+- [x] Make hero action labels fit narrow phone layouts.
+- [x] Scan public routes and authenticated headers for equivalent risks.
+- [x] Remove the requested landing navigation decoration without disturbing its structural border.
+
+## Review
+
+- Compact labels prevent horizontal overflow at 320px and 393px while preserving full desktop labels.
+- Wizard, dashboard, results, and pre-flight actions now stack or use accessible icon-only controls on phones.
+
+# Dialog Positioning Fix
+
+- [x] Preserve the glass-dialog appearance without overriding its viewport positioning.
+- [x] Add a browser regression test for a centered dialog and verify it in Chrome.
+
+## Review
+
+- The shared Glass surface selector no longer changes Radix dialog positioning from fixed to relative.
+- Checks passed: focused component test, direct Chrome viewport-center check, type check, lint, and whitespace validation.
+
+# Glass Worktree Final Consolidation
+
+- [x] Confirm the Glass commit is already an ancestor of the combined main-directory branch.
+- [x] Preserve remaining Glass-only task notes and local lessons in the main directory.
+- [x] Retire the redundant Glass worktree and verify the main directory remains healthy.
+
+## Review
+
+- All committed Glass UI work is present in `codex/consolidate-win32-glass-ui`; the former Glass branch had no unique commits.
+- Matching local Entra and Vercel configuration was confirmed before retirement, and the Glass-only task history was preserved here.
+- The redundant worktree was unregistered, its port-3300 server stopped, and its remaining generated directory moved to Trash for recovery.
+
+# PowerShell WinGet Win32 Parity
+
+- [x] Trace the module's 7-Zip template, generated wrapper, package, Graph payload, and upload flow.
+- [x] Replace the mismatched PSADT proof of concept with the module-equivalent WinGet package behavior.
+- [x] Add parity and regression coverage for the package, commands, detection, and content publishing path.
+- [x] Run focused and full verification, then record the result.
+
+## Review
+
+- The web proof now generates and ships the module's WinGet install, uninstall, and detection wrappers for `7zip.7zip`, including SYSTEM bootstrap behavior and ownership metadata.
+- The obsolete PSADT/MSI package was retired; Intune now receives the module-equivalent commands, PowerShell detection rule, icon, requirements, and encrypted content package.
+- Upload parity includes transient retries, sovereign Azure Blob hosts, and Graph SAS renewal; icon failures remain non-blocking and duplicate owned apps are handled safely.
+- Checks passed: 524 tests, type check, lint, production build, zero-finding parity review, static-asset requests on port 3000, and whitespace validation.
+
+# Delete Warning Contrast
+
+- [x] Give the live-delete warning an opaque dark surface and explicit high-contrast foregrounds.
+- [x] Add a regression assertion and verify the wizard locally.
+
+## Review
+
+- The warning now uses a near-opaque slate panel, pale body copy, light red heading, and stronger red border while leaving the wallpaper unchanged.
+- Checks passed: focused component test, type check, rendered Chrome screenshot, and whitespace validation.
+
+# Live Acknowledgement Contrast
+
+- [x] Give the live-run acknowledgement panel and checkbox explicit high-contrast colors.
+- [x] Add regression coverage and verify the rendered treatment.
+
+## Review
+
+- The acknowledgement panel now uses an opaque slate surface, white label, light supporting copy, and a bright checkbox border/check state while preserving the wallpaper.
+- Checks passed: focused component test, type check, rendered Chrome screenshot, and whitespace validation.
+
+# Live Acknowledgement Contrast Regression
+
+- [x] Confirm the source and compiled wizard bundle no longer use the retired blue-on-blue treatment.
+- [x] Replace utility-dependent colors with a scoped high-contrast Glass UI variant.
+- [x] Verify the real rendered panel and complete project checks.
+
+## Review
+
+- The live acknowledgement now owns an opaque near-black surface, white title, pale copy, and bright checkbox styling through a scoped component class.
+- Computed browser colors and the rendered Chrome screenshot passed; 526 tests, type check, lint, production build, React Doctor 100/100, and whitespace validation passed.
+
+# Win32 Delete Ownership Diagnosis
+
+- [x] Use Lokka to inspect the tenant's 7-Zip mobile-app records and ownership metadata.
+- [x] Fix the safe delete matcher for the confirmed metadata shape.
+- [x] Add regression coverage and complete project verification.
+
+## Review
+
+- Lokka confirmed the tenant record is the original PSADT proof app, which has the hydration marker but predates the WinGet ownership notes required by the current safe delete matcher.
+- The migration path accepts only the exact observed legacy metadata fingerprint; current WinGet ownership rules remain unchanged for all other apps.
+- Checks passed: 526 tests, type check, lint, production build, React Doctor 100/100, zero-finding safety review, and whitespace validation.
+# Sitewide Landing-Style Navigation
+
+- [x] Create one shared app navigation shell with landing-page pill styling.
+- [x] Migrate wizard, dashboard, and results without losing contextual controls.
+- [x] Verify desktop/mobile behavior across landing, templates, wizard, dashboard, and results.
+- [x] Run focused and full project checks.
+
+## Review
+
+- Wizard, dashboard, and results now share the landing page's pill geometry, glass fill, border, blur, shadow, logo treatment, and compact contextual actions.
+- Playwright confirmed matching computed styling at desktop width and zero horizontal overflow at 390px; 528 tests, lint, type check, production build, React Doctor 100/100, and whitespace validation passed.
+
+# Thermonuclear Review Fix Loop
+
+- [x] Review the current branch diff against its merge base with full thermonuclear strictness.
+- [x] Fix every actionable structural or maintainability finding.
+- [x] Repeat the review until a fresh round returns zero findings.
+- [x] Run focused and full validation and record the clean result.
+
+## Review
+
+- Round 1 removed five root causes: version drift, duplicated navigation branding, unsafe session-cache parsing, repeated Win32 template resolution, and an obsolete direct-Blob CSP allowance.
+- Round 2 moved Win32 content-version and content-file creates onto the existing non-retrying Graph boundary; round 3 returned zero findings.
+- Checks passed: 529 tests, lint, type check, production build, React Doctor 100/100, Playwright landing/wizard verification, and whitespace validation.
+
+# Win32 Template Documentation
+
+- [x] Reproduce the missing Win32 template entry and trace the catalog/filter path.
+- [x] Add the Win32 app to Template Docs through the canonical catalog model.
+- [x] Add regression coverage for category, platform, summary, and payload inspection.
+- [x] Verify the rendered page and complete project checks.
+
+## Review
+
+- Template Docs now renders the 7-Zip proof app under Win32 Apps with its package source, WinGet metadata, commands, requirements, and raw import payload.
+- The page and catalog share one category order, preventing future template categories from disappearing during grouped rendering.
+- Checks passed: 529 tests, lint, type check, production build, React Doctor 100/100, rendered Playwright verification, and whitespace validation.
+
+# Stale Branch Cleanup
+
+- [x] Audit local branches, remote branches, worktrees, and merged PR history.
+- [x] Delete every stale branch while preserving `main` and the current branch.
+- [x] Prune and verify the final local and GitHub branch lists.
+
+## Review
+
+- Local and GitHub now contain only `main` and `codex/consolidate-win32-glass-ui`.
+
+# Preview Results Notice Contrast
+
+- [x] Replace the pale preview notice with an explicit dark, high-contrast surface.
+- [x] Add focused regression assertions for all visible notice colors.
+- [x] Verify the real results screen in Playwright and complete project checks.
+
+## Review
+
+- The preview notice now uses a near-black surface, white title, pale supporting copy, sky icon, and visible sky border while leaving the wallpaper unchanged.
+- Playwright computed-color verification and screenshot inspection passed; 527 tests, lint, type check, production build, React Doctor 100/100, and whitespace validation passed.
+
+# Live 7-Zip Create/Delete Playwright Validation
+
+- [x] Sign in through a persistent headed Playwright browser.
+- [x] Create only the 7-Zip proof app and verify the result.
+- [x] Delete only the 7-Zip proof app and verify the final tenant state.
+- [x] Capture the browser evidence and document the result.
+
+## Review
+
+- Playwright reproduced Intune collection lag after creation, then verified the exact created ID handoff fixes immediate deletion while retaining ownership validation and list retries.
+- Final live cycle: created 1, deleted 1, skipped 0, failed 0. A final read-only delete preview reported `Not found in tenant`.
+- Checks passed: 527 tests, lint, type check, production build, React Doctor 100/100, and whitespace validation.
+
+# Site-wide Navigation Width
+
+- [x] Match both shared navigation variants to the landing hero container.
+- [x] Add regression coverage for the shared responsive frame.
+- [x] Verify landing, templates, wizard, dashboard, and results at desktop and mobile widths.
+- [x] Run project checks and record the result.
+
+## Review
+
+- Public and application navigation now use the landing hero's responsive container and gutters instead of an independent 1120px cap.
+- Browser measurements matched exactly at desktop and mobile widths with no horizontal overflow.
+- Checks passed: 529 tests, lint, type check, production build, React Doctor 100/100, screenshot inspection, and whitespace validation.
+
+# Landing Demo Backplate Removal
+
+- [x] Remove the rectangular decorative layer behind the live-run demo.
+- [x] Add regression coverage that preserves the demo without the backplate.
+- [x] Verify the desktop landing composition and run focused checks.
+
+## Review
+
+- Removed the absolute border backplate while preserving the preview strip, demo window, and soft glow.
+- Checks passed: focused landing tests, type check, lint, production build, screenshot inspection, and whitespace validation.
+
+# Version 2.6.4 Ready PR
+
+- [x] Rev the website patch version to 2.6.4.
+- [x] Stage only the accumulated product changes and exclude local artifacts.
+- [x] Commit, push, and open a ready PR against `main`.
+- [x] Verify the published PR metadata and checks.
+
+## Review
+
+- Ready PR #20 targets `main` from `codex/consolidate-win32-glass-ui` with website version 2.6.4.
+- Local validation passed: 529 tests, lint, type check, production build, React Doctor 100/100, browser verification, and whitespace validation.
