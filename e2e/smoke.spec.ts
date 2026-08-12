@@ -87,11 +87,15 @@ test.describe("Landing Page", () => {
     expect(githubBox).not.toBeNull();
     expect(signInBox).not.toBeNull();
 
-    expect(navigationBox!.x).toBeLessThanOrEqual(24);
-    expect(navigationBox!.x + navigationBox!.width).toBeGreaterThanOrEqual(1211);
+    const clientWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    expect(navigationBox!.x).toBeGreaterThanOrEqual(0);
+    expect(navigationBox!.x + navigationBox!.width).toBeLessThanOrEqual(clientWidth + 1);
+    expect(navigationBox!.width).toBeGreaterThan(clientWidth * 0.9);
     expect(brandBox!.x + brandBox!.width).toBeLessThan(featuresBox!.x);
     expect(templateDocsBox!.x + templateDocsBox!.width).toBeLessThan(githubBox!.x);
-    expect(signInBox!.x + signInBox!.width).toBeLessThanOrEqual(1211);
+    expect(signInBox!.x + signInBox!.width).toBeLessThanOrEqual(
+      navigationBox!.x + navigationBox!.width + 1
+    );
   });
 
   test("uses the compact navigation before the full link set can fit", async ({ page }) => {
@@ -107,7 +111,7 @@ test.describe("Landing Page", () => {
       client: document.documentElement.clientWidth,
       scroll: document.documentElement.scrollWidth,
     }));
-    expect(pageWidth.scroll).toBe(pageWidth.client);
+    expect(pageWidth.scroll - pageWidth.client).toBeLessThanOrEqual(1);
   });
 
   test("template page nav links return to landing sections", async ({ page }) => {

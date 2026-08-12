@@ -13,6 +13,7 @@
 - The stepped `container` width constrained the bar at 1235 px, and the `md` link breakpoint caused horizontal overflow from 768 through 960 px.
 - The navigation now uses a fluid 2xl shell and shows the full link set only at 1024 px and wider.
 - Checks passed: 510 unit tests, two Playwright viewport regressions, type-check, lint, production build, visual inspection, and `git diff --check`.
+- Copilot review replaced hard-coded viewport edges with client-width-relative assertions and allowed one pixel for browser rounding.
 
 # Landing Hero Intermediate-Width Overlap
 
