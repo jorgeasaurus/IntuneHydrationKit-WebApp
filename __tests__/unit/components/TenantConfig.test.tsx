@@ -123,6 +123,24 @@ describe('TenantConfig', () => {
     })
   })
 
+  it('binds prerequisite validation to the active account and blocks continue until it passes', async () => {
+    validatePrerequisites.mockReturnValue(new Promise(() => {}))
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    await waitFor(() => {
+      expect(createGraphClient).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        homeAccountId: 'home-tenant-123',
+      })
+    })
+    expect(screen.getByRole('button', { name: 'Use Tenant Configuration' })).toBeDisabled()
+  })
+
   it('formats the validation timestamp in the operator locale and labels its UTC timezone', async () => {
     const languageSpy = vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-DE')
     const prerequisiteResult: PrerequisiteCheckResult = {

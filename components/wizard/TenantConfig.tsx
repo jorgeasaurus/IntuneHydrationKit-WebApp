@@ -117,7 +117,14 @@ export function TenantConfig(): React.JSX.Element {
       }
       setPrerequisiteStatus("checking");
 
-      const graphClient = createGraphClient();
+      if (!activeAccount) {
+        throw new AuthSessionExpiredError();
+      }
+
+      const graphClient = createGraphClient({
+        tenantId: activeAccount.tenantId,
+        homeAccountId: activeAccount.homeAccountId,
+      });
       const result = await validatePrerequisites(graphClient);
       setPrerequisiteResult(result);
       setWizardPrerequisiteResult(result);
@@ -131,7 +138,7 @@ export function TenantConfig(): React.JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [setWizardPrerequisiteResult]);
+  }, [activeAccount, setWizardPrerequisiteResult]);
 
   useEffect(() => {
     if (accounts.length === 0) {
@@ -165,16 +172,22 @@ export function TenantConfig(): React.JSX.Element {
   }
 
   function handleContinue(): void {
+    if (!activeAccount || prerequisiteStatus === "checking" || prerequisiteResult?.isValid !== true) {
+      return;
+    }
+
     setTenantConfig({
       tenantId,
-      accountHomeId: activeAccount?.homeAccountId ?? "",
+      accountHomeId: activeAccount.homeAccountId,
       tenantName: tenantName || undefined,
       cloudEnvironment: "global",
     });
     nextStep();
   }
 
-  const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
+  const isValid = Boolean(
+    activeAccount && tenantId && prerequisiteStatus !== "checking" && prerequisiteResult?.isValid === true
+  );
   const validatedAt = useMemo(() => {
     if (!prerequisiteResult?.timestamp || !userLocale) {
       return null;

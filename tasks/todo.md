@@ -10,6 +10,7 @@
 
 - Regression coverage now protects the Conditional Access fast-delete exclusion, fail-closed assignment checks, and account binding for Graph requests.
 - Checks passed: focused unit tests, type-check, lint, production build, and `git diff --check`.
+- Copilot review identified unbound prerequisite validation and a pending-validation continue gate; remediation is in progress.
 
 # Landing Hero Intermediate-Width Overlap
 
