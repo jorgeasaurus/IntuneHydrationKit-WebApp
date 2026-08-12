@@ -84,7 +84,7 @@ function createWizardState(overrides: Partial<WizardState> = {}): WizardState {
     currentStep: 5,
     tenantConfig: {
       tenantId: "tenant-123",
-      accountHomeId: "home-tenant-123",
+      homeAccountId: "home-tenant-123",
       tenantName: "Contoso",
       cloudEnvironment: "global",
     },

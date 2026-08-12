@@ -30,6 +30,7 @@
 - Copilot review identified and verified fixes for unbound prerequisite validation and the pending-validation continue gate.
 - Copilot review identified and verified non-retryable handling for authentication session failures.
 - Copilot review identified and verified sequential Conditional Access batch deletion and active-account recovery guidance.
+- The production release review aligned tenant configuration with MSAL's `homeAccountId` name.
 
 # Landing Hero Intermediate-Width Overlap
 

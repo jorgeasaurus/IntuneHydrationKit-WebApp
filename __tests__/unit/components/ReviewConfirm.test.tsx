@@ -49,7 +49,7 @@ function createState(overrides: Partial<WizardState> = {}): WizardState {
     operationMode: 'create',
     tenantConfig: {
       tenantId: 'tenant-123',
-      accountHomeId: 'home-tenant-123',
+      homeAccountId: 'home-tenant-123',
       tenantName: 'Contoso',
       cloudEnvironment: 'global',
     },

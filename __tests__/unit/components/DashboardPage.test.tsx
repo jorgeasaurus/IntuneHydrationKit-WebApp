@@ -30,7 +30,7 @@ vi.mock('@/hooks/useWizardState', () => ({
       selectedCISCategories: [],
       tenantConfig: {
         tenantId: 'tenant-id',
-        accountHomeId: 'home-tenant-id',
+        homeAccountId: 'home-tenant-id',
         tenantName: 'Delete Test Tenant',
       },
     },

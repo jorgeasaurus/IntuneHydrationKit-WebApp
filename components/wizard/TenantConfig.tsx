@@ -179,7 +179,7 @@ export function TenantConfig(): React.JSX.Element {
 
     setTenantConfig({
       tenantId,
-      accountHomeId: activeAccount.homeAccountId,
+      homeAccountId: activeAccount.homeAccountId,
       tenantName: tenantName || undefined,
       cloudEnvironment: "global",
     });

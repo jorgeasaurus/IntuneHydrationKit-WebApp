@@ -40,7 +40,7 @@ describe("useWizardState", () => {
     act(() => {
       result.current.setTenantConfig({
         tenantId: "11111111-1111-1111-1111-111111111111",
-        accountHomeId: "home-account-id",
+        homeAccountId: "home-account-id",
         tenantName: "Contoso",
         cloudEnvironment: "global",
       });
@@ -70,7 +70,7 @@ describe("useWizardState", () => {
       currentStep: 1,
       tenantConfig: {
         tenantId: "11111111-1111-1111-1111-111111111111",
-        accountHomeId: "home-account-id",
+        homeAccountId: "home-account-id",
         tenantName: "Contoso",
         cloudEnvironment: "global",
       },

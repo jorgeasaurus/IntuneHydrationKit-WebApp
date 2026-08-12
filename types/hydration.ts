@@ -114,7 +114,7 @@ export interface LicenseCheck {
 
 export interface TenantConfig {
   tenantId: string;
-  accountHomeId: string;
+  homeAccountId: string;
   tenantName?: string;
   cloudEnvironment: CloudEnvironment;
 }
