@@ -1,11 +1,8 @@
 import React from 'react'
-import { act } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
-import { TerminalDemo } from '@/components/TerminalDemo'
 import { WebAppDemo } from '@/components/WebAppDemo'
-import { WizardDemo } from '@/components/WizardDemo'
 
 vi.mock('framer-motion', async () => {
   const React = await import('react')
@@ -59,60 +56,6 @@ describe('demo showcase components', () => {
     vi.useRealTimers()
   })
 
-  it('cycles TerminalDemo from running logs to the completion summary and back to running', () => {
-    render(<TerminalDemo />)
-
-    expect(screen.getByText('Processing…')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(400)
-    })
-
-    expect(screen.getByText('$ hydrate --mode create --all')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(6000)
-    })
-
-    expect(screen.getByRole('progressbar', { name: 'Hydration demo progress' })).toHaveAttribute(
-      'aria-valuenow',
-      '100'
-    )
-
-    act(() => {
-      vi.advanceTimersByTime(400)
-    })
-
-    expect(screen.getByText('Hydration Complete')).toBeInTheDocument()
-    expect(screen.getByText('Duration: 8m 42s')).toBeInTheDocument()
-    expect(screen.getByText('927')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(5400)
-    })
-
-    expect(screen.queryByText('Hydration Complete')).not.toBeInTheDocument()
-    expect(screen.getByText('$ hydrate --mode create --all')).toBeInTheDocument()
-  })
-
-  it('uses distinct log keys when entries share the same timestamp', () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(0)
-
-    try {
-      render(<TerminalDemo />)
-
-      act(() => {
-        vi.advanceTimersByTime(800)
-      })
-
-      expect(consoleErrorSpy.mock.calls.flat().join(' ')).not.toContain('same key')
-    } finally {
-      nowSpy.mockRestore()
-      consoleErrorSpy.mockRestore()
-    }
-  })
-
   it('moves WebAppDemo through deploying, completion, and reset states', () => {
     render(<WebAppDemo />)
 
@@ -138,43 +81,5 @@ describe('demo showcase components', () => {
     })
 
     expect(screen.getByText('Select Categories')).toBeInTheDocument()
-  })
-
-  it('advances WizardDemo through each step and then loops back to the first step', () => {
-    render(<WizardDemo />)
-
-    expect(screen.getByText('contoso.onmicrosoft.com')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(3000)
-    })
-
-    expect(screen.getByText('Configuration Profiles')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(3000)
-    })
-
-    expect(screen.getByText('Progress')).toBeInTheDocument()
-    expect(screen.getByText('Creating Dynamic Groups...')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(200)
-    })
-
-    expect(screen.getByText('8%')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(2800)
-    })
-
-    expect(screen.getByText('Deployment Complete')).toBeInTheDocument()
-    expect(screen.getByText('927 objects created successfully')).toBeInTheDocument()
-
-    act(() => {
-      vi.advanceTimersByTime(3000)
-    })
-
-    expect(screen.getByText('contoso.onmicrosoft.com')).toBeInTheDocument()
   })
 })

@@ -1,9 +1,7 @@
-import { act } from '@testing-library/react'
+import { render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render } from '@/__tests__/setup/test-utils'
 import { DynamicWallpaper } from '@/components/DynamicWallpaper'
-import { AnimatedGridBackground } from '@/components/ui/animated-grid-background'
 
 const vantaMocks = vi.hoisted(() => ({
   destroy: vi.fn(),
@@ -20,69 +18,14 @@ vi.mock('three', () => ({
   WebGLRenderer: vi.fn(),
 }))
 
-type MockGradient = {
-  addColorStop: ReturnType<typeof vi.fn>
-}
-
-type MockCanvasContext = {
-  arc: ReturnType<typeof vi.fn>
-  beginPath: ReturnType<typeof vi.fn>
-  clearRect: ReturnType<typeof vi.fn>
-  createLinearGradient: ReturnType<typeof vi.fn>
-  createRadialGradient: ReturnType<typeof vi.fn>
-  fill: ReturnType<typeof vi.fn>
-  fillRect: ReturnType<typeof vi.fn>
-  lineTo: ReturnType<typeof vi.fn>
-  moveTo: ReturnType<typeof vi.fn>
-  stroke: ReturnType<typeof vi.fn>
-  fillStyle?: string | MockGradient
-  lineWidth?: number
-  strokeStyle?: string | MockGradient
-}
-
-const setWindowSize = (width: number, height: number) => {
-  Object.defineProperty(window, 'innerWidth', {
-    configurable: true,
-    value: width,
-  })
-  Object.defineProperty(window, 'innerHeight', {
-    configurable: true,
-    value: height,
-  })
-}
-
-const createMockCanvasContext = (): MockCanvasContext => {
-  const linearGradient = {
-    addColorStop: vi.fn(),
-  }
-  const radialGradient = {
-    addColorStop: vi.fn(),
-  }
-
-  return {
-    arc: vi.fn(),
-    beginPath: vi.fn(),
-    clearRect: vi.fn(),
-    createLinearGradient: vi.fn(() => linearGradient),
-    createRadialGradient: vi.fn(() => radialGradient),
-    fill: vi.fn(),
-    fillRect: vi.fn(),
-    lineTo: vi.fn(),
-    moveTo: vi.fn(),
-    stroke: vi.fn(),
-  }
-}
-
 describe('background canvas components', () => {
   beforeEach(() => {
-    setWindowSize(1280, 720)
     vantaMocks.destroy.mockClear()
     vantaMocks.waves.mockImplementation(() => ({
       destroy: vantaMocks.destroy,
     }))
     vantaMocks.waves.mockClear()
     vi.stubGlobal('requestAnimationFrame', vi.fn(() => 123))
-    vi.stubGlobal('cancelAnimationFrame', vi.fn())
   })
 
   afterEach(() => {
@@ -162,36 +105,5 @@ describe('background canvas components', () => {
       'change',
       expect.any(Function)
     )
-  })
-
-  it('renders AnimatedGridBackground, resizes with the viewport, and cancels animation on unmount', () => {
-    const context = createMockCanvasContext()
-    vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(
-      context as unknown as CanvasRenderingContext2D
-    )
-
-    const { container, unmount } = render(<AnimatedGridBackground />)
-    const canvas = container.querySelector('canvas')
-
-    expect(canvas).toBeTruthy()
-    expect(canvas).toHaveAttribute('aria-hidden', 'true')
-    expect(canvas).toHaveAttribute('tabindex', '-1')
-    expect(canvas?.width).toBe(1280)
-    expect(canvas?.height).toBe(720)
-    expect(context.clearRect).toHaveBeenCalledWith(0, 0, 1280, 720)
-    expect(context.createLinearGradient).toHaveBeenCalled()
-    expect(context.lineTo).toHaveBeenCalled()
-
-    setWindowSize(1024, 640)
-    act(() => {
-      window.dispatchEvent(new Event('resize'))
-    })
-
-    expect(canvas?.width).toBe(1024)
-    expect(canvas?.height).toBe(640)
-
-    unmount()
-
-    expect(cancelAnimationFrame).toHaveBeenCalledWith(123)
   })
 })

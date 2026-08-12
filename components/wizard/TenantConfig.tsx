@@ -21,7 +21,7 @@ import {
 } from "lucide-react";
 import { createGraphClient } from "@/lib/graph/client";
 import { validatePrerequisites } from "@/lib/graph/prerequisites";
-import { getSelectedCloudEnvironment, AuthSessionExpiredError } from "@/lib/auth/authUtils";
+import { AuthSessionExpiredError } from "@/lib/auth/authUtils";
 
 const CLOUD_ENVIRONMENT_LABEL = "Global (Commercial)";
 
@@ -164,11 +164,10 @@ export function TenantConfig(): React.JSX.Element {
   }
 
   function handleContinue(): void {
-    const cloudEnv = getSelectedCloudEnvironment();
     setTenantConfig({
       tenantId,
       tenantName: tenantName || undefined,
-      cloudEnvironment: cloudEnv,
+      cloudEnvironment: "global",
     });
     nextStep();
   }

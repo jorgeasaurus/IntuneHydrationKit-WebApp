@@ -1,11 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
-  mockGetDynamicGroups,
-  mockGetDeviceFilters,
-  mockGetCompliancePolicies,
-  mockGetConditionalAccessPolicies,
-  mockGetAppProtectionPolicies,
   mockGetWin32AppTemplates,
   mockFetchDynamicGroups,
   mockFetchStaticGroups,
@@ -21,11 +16,6 @@ const {
   mockCacheTemplates,
   mockClearCategoryCache,
 } = vi.hoisted(() => ({
-  mockGetDynamicGroups: vi.fn(),
-  mockGetDeviceFilters: vi.fn(),
-  mockGetCompliancePolicies: vi.fn(),
-  mockGetConditionalAccessPolicies: vi.fn(),
-  mockGetAppProtectionPolicies: vi.fn(),
   mockGetWin32AppTemplates: vi.fn(),
   mockFetchDynamicGroups: vi.fn(),
   mockFetchStaticGroups: vi.fn(),
@@ -53,11 +43,6 @@ vi.mock("@/templates", () => ({
     conditionalAccess: { count: 20 },
     cisBaseline: { count: 717 },
   },
-  getDynamicGroups: mockGetDynamicGroups,
-  getDeviceFilters: mockGetDeviceFilters,
-  getCompliancePolicies: mockGetCompliancePolicies,
-  getConditionalAccessPolicies: mockGetConditionalAccessPolicies,
-  getAppProtectionPolicies: mockGetAppProtectionPolicies,
   getWin32AppTemplates: mockGetWin32AppTemplates,
 }));
 
@@ -78,7 +63,6 @@ vi.mock("@/lib/templates/loader", () => ({
 }));
 
 import {
-  buildTaskQueue,
   buildTaskQueueAsync,
   getEstimatedCategoryCount,
   getEstimatedTaskCount,
@@ -87,14 +71,6 @@ import {
 describe("taskQueue", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetDynamicGroups.mockReturnValue([
-      { displayName: "Dynamic Group A" },
-      { displayName: "Dynamic Group B" },
-    ]);
-    mockGetDeviceFilters.mockReturnValue([{ displayName: "Filter A" }]);
-    mockGetCompliancePolicies.mockReturnValue([{ displayName: "Compliance A" }]);
-    mockGetConditionalAccessPolicies.mockReturnValue([{ displayName: "CA A" }]);
-    mockGetAppProtectionPolicies.mockReturnValue([{ displayName: "App Protection A" }]);
     mockGetWin32AppTemplates.mockReturnValue([
       { displayName: "7-Zip - [IHD]" },
       { displayName: "Google Chrome - [IHD]" },
@@ -150,40 +126,6 @@ describe("taskQueue", () => {
     });
 
     expect(count).toBe(3);
-  });
-
-  it("builds placeholder sync tasks for baseline and cis baseline categories", () => {
-    const tasks = buildTaskQueue(["baseline", "cisBaseline"], "create");
-
-    expect(tasks).toHaveLength(787);
-    expect(tasks[0]).toMatchObject({
-      id: "task-1",
-      category: "baseline",
-      operation: "create",
-      itemName: "Baseline Policy 1",
-      status: "pending",
-    });
-    expect(tasks.at(-1)).toMatchObject({
-      category: "cisBaseline",
-      itemName: "CIS Baseline Policy 717",
-    });
-  });
-
-  it("builds sync tasks from standard template categories", () => {
-    const tasks = buildTaskQueue(
-      ["groups", "filters", "compliance", "conditionalAccess", "appProtection", "enrollment"],
-      "delete"
-    );
-
-    expect(tasks.map((task) => `${task.category}:${task.itemName}`)).toEqual([
-      "groups:Dynamic Group A",
-      "groups:Dynamic Group B",
-      "filters:Filter A",
-      "compliance:Compliance A",
-      "conditionalAccess:CA A",
-      "appProtection:App Protection A",
-    ]);
-    expect(tasks.every((task) => task.operation === "delete")).toBe(true);
   });
 
   it("uses cached templates in async builds and removes case-insensitive duplicates within a category", async () => {

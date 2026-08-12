@@ -7,11 +7,9 @@
 import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hydrationMarker";
 import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filterManifest";
 import { DYNAMIC_GROUP_TEMPLATE_PATHS } from "@/templates/groupManifest";
+import type { DeviceFilter } from "@/types/graph";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
-
-// Cache version - increment this when templates change to invalidate old caches
-const CACHE_VERSION = 21; // Include device trust type group and filter templates in cached sets
 
 export interface GroupTemplate {
   displayName: string;
@@ -23,8 +21,71 @@ export interface GroupTemplate {
 export interface FilterTemplate {
   displayName: string;
   description: string;
-  platform: string;
+  platform: DeviceFilter["platform"];
   rule: string;
+}
+
+type RawFilterTemplate = Omit<FilterTemplate, "platform"> & { platform: string };
+
+interface RawJsonTemplate extends Record<string, unknown> {
+  "@odata.type"?: string;
+  description?: string;
+  displayName?: string;
+  filters?: RawFilterTemplate[];
+  groups?: GroupTemplate[];
+  name?: string;
+  platforms?: string;
+}
+
+interface JsonFileLoaderOptions {
+  basePath?: string;
+  fileLabel?: string;
+  warn?: boolean;
+}
+
+async function loadJsonTemplateFiles<T>(
+  files: readonly string[],
+  normalize: (template: RawJsonTemplate, file: string) => T[],
+  options: JsonFileLoaderOptions = {}
+): Promise<T[]> {
+  const templates: T[] = [];
+  const basePath = options.basePath ?? TEMPLATES_BASE_PATH;
+
+  for (const file of files) {
+    const fileLabel = options.fileLabel ? `${options.fileLabel} ${file}` : file;
+
+    try {
+      const response = await fetch(`${basePath}/${file}`);
+      if (!response.ok) {
+        const message = `Failed to fetch ${fileLabel}: HTTP ${response.status} ${response.statusText}`;
+        if (options.warn) console.warn(message);
+        else console.error(message);
+        continue;
+      }
+
+      templates.push(...normalize(await response.json(), file));
+    } catch (error) {
+      const message = `Error loading ${fileLabel}:`;
+      if (options.warn) console.warn(message, error);
+      else console.error(message, error);
+    }
+  }
+
+  return templates;
+}
+
+function normalizeFilterPlatform(platform: string): FilterTemplate["platform"] {
+  switch (platform) {
+    case "androidForWork":
+      return "android";
+    case "android":
+    case "iOS":
+    case "macOS":
+    case "windows10AndLater":
+      return platform;
+    default:
+      throw new Error(`Unsupported device filter platform: ${platform}`);
+  }
 }
 
 export interface ComplianceTemplate {
@@ -57,20 +118,9 @@ function getTemplateFileName(filePath: string): string {
  * Fetch dynamic groups from local templates
  */
 export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
-  const allGroups: GroupTemplate[] = [];
-
-  for (const file of DYNAMIC_GROUP_TEMPLATE_PATHS) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      if (Array.isArray(data.groups)) {
-        const groups = data.groups.map((group: GroupTemplate) => ({
+  return loadJsonTemplateFiles(DYNAMIC_GROUP_TEMPLATE_PATHS, (data) =>
+    Array.isArray(data.groups)
+      ? data.groups.map((group) => ({
           ...group,
           displayName: group.displayName.startsWith(IMPORT_PREFIX)
             ? group.displayName
@@ -80,15 +130,9 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
               ? group.description
               : `${group.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
-        }));
-        allGroups.push(...groups);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
-    }
-  }
-
-  return allGroups;
+        }))
+      : []
+  );
 }
 
 /**
@@ -130,34 +174,20 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
  * Fetch device filters from local templates
  */
 export async function fetchFilters(): Promise<FilterTemplate[]> {
-  const allFilters: FilterTemplate[] = [];
-
-  for (const file of DEVICE_FILTER_TEMPLATE_PATHS) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      if (data.filters && Array.isArray(data.filters)) {
-        const filters = data.filters.map((filter: FilterTemplate) => ({
+  return loadJsonTemplateFiles(DEVICE_FILTER_TEMPLATE_PATHS, (data) =>
+    Array.isArray(data.filters)
+      ? data.filters.map((filter) => ({
           ...filter,
-          displayName: `${IMPORT_PREFIX}${filter.displayName}`,
+          displayName: addImportPrefix(filter.displayName),
           description: filter.description
-            ? `${filter.description} ${HYDRATION_MARKER}`
+            ? filter.description.includes(HYDRATION_MARKER)
+              ? filter.description
+              : `${filter.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
-        }));
-        allFilters.push(...filters);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
-    }
-  }
-
-  return allFilters;
+          platform: normalizeFilterPlatform(filter.platform),
+        }))
+      : []
+  );
 }
 
 /**
@@ -177,36 +207,22 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
     "Compliance/Linux-Compliance-Strict.json",
   ];
 
-  const allPolicies: ComplianceTemplate[] = [];
-
-  for (const file of complianceFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      // Compliance files contain single policy objects
-      // Some use @odata.type (Windows, iOS, macOS, Android), others use platforms/technologies (Linux)
-      if (data["@odata.type"] || data.platforms) {
-        const policy: ComplianceTemplate = {
-          ...data,
-          displayName: `${IMPORT_PREFIX}${data.displayName}`,
-          description: data.description
-            ? `${data.description} ${HYDRATION_MARKER}`
-            : HYDRATION_MARKER,
-        };
-        allPolicies.push(policy);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+  return loadJsonTemplateFiles(complianceFiles, (data) => {
+    // Compliance files contain single policy objects
+    // Some use @odata.type (Windows, iOS, macOS, Android), others use platforms/technologies (Linux)
+    if (data["@odata.type"] || data.platforms) {
+      const policy: ComplianceTemplate = {
+        ...data,
+        displayName: `${IMPORT_PREFIX}${data.displayName ?? ""}`,
+        description: data.description
+          ? `${data.description} ${HYDRATION_MARKER}`
+          : HYDRATION_MARKER,
+      };
+      return [policy];
     }
-  }
 
-  return allPolicies;
+    return [];
+  });
 }
 
 /**
@@ -237,34 +253,24 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
     "ConditionalAccess/Use application enforced restrictions for O365 apps.json",
   ];
 
-  const allPolicies: ConditionalAccessTemplate[] = [];
+  return loadJsonTemplateFiles(caFiles, (data, file) => {
+    const displayName = data.displayName ?? getTemplateFileName(file);
 
-  for (const file of caFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-      const displayName = data.displayName ?? getTemplateFileName(file);
-
-      // CA policy files contain single policy objects
-      if (displayName) {
-        const policy: ConditionalAccessTemplate = {
-          ...data,
-          displayName: `${IMPORT_PREFIX}${displayName}`,
-          state: "disabled", // CA policies are always created in disabled state
-        };
-        allPolicies.push(policy);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+    // CA policy files contain single policy objects
+    if (displayName) {
+      const policy: ConditionalAccessTemplate = {
+        ...data,
+        displayName: `${IMPORT_PREFIX}${displayName}`,
+        state: "disabled", // CA policies are always created in disabled state
+        conditions: data.conditions,
+        grantControls: data.grantControls,
+        sessionControls: data.sessionControls,
+      };
+      return [policy];
     }
-  }
 
-  return allPolicies;
+    return [];
+  });
 }
 
 /**
@@ -284,35 +290,22 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
     "AppProtection/level-3-enterprise-high-data-protection-iOS.json",
   ];
 
-  const allPolicies: AppProtectionTemplate[] = [];
-
-  for (const file of appProtectionFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      // App Protection files contain single policy objects, not arrays
-      if (data["@odata.type"]) {
-        const policy: AppProtectionTemplate = {
-          ...data,
-          displayName: `${IMPORT_PREFIX}${data.displayName}`,
-          description: data.description
-            ? `${data.description} ${HYDRATION_MARKER}`
-            : HYDRATION_MARKER,
-        };
-        allPolicies.push(policy);
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+  return loadJsonTemplateFiles(appProtectionFiles, (data) => {
+    // App Protection files contain single policy objects, not arrays
+    if (data["@odata.type"]) {
+      const policy: AppProtectionTemplate = {
+        ...data,
+        "@odata.type": data["@odata.type"],
+        displayName: `${IMPORT_PREFIX}${data.displayName ?? ""}`,
+        description: data.description
+          ? `${data.description} ${HYDRATION_MARKER}`
+          : HYDRATION_MARKER,
+      };
+      return [policy];
     }
-  }
 
-  return allPolicies;
+    return [];
+  });
 }
 
 /**
@@ -326,32 +319,25 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
     "Windows-Autopilot-Device-Preparation-UserDriven.json",
   ];
 
-  const profiles: unknown[] = [];
-
-  for (const file of enrollmentFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/Enrollment/${file}`);
-      if (!response.ok) {
-        console.warn(`Failed to fetch enrollment profile ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const profile = await response.json();
+  return loadJsonTemplateFiles(
+    enrollmentFiles,
+    (profile) => {
       // Device Preparation uses "name" instead of "displayName"
       const nameField = profile.displayName ? "displayName" : "name";
-      profiles.push({
+      return [{
         ...profile,
-        [nameField]: `${IMPORT_PREFIX}${profile[nameField]}`,
+        [nameField]: `${IMPORT_PREFIX}${profile[nameField] ?? ""}`,
         description: profile.description
           ? `${profile.description} ${HYDRATION_MARKER}`
           : HYDRATION_MARKER,
-      });
-    } catch (error) {
-      console.warn(`Error fetching enrollment profile ${file}:`, error);
+      }];
+    },
+    {
+      basePath: `${TEMPLATES_BASE_PATH}/Enrollment`,
+      fileLabel: "enrollment profile",
+      warn: true,
     }
-  }
-
-  return profiles;
+  );
 }
 
 /**
@@ -362,48 +348,29 @@ export async function fetchNotificationTemplates(): Promise<unknown[]> {
     "Notifications/First-Warning.json",
   ];
 
-  const allTemplates: unknown[] = [];
-
-  for (const file of notificationFiles) {
-    try {
-      const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
-      if (!response.ok) {
-        console.error(`Failed to fetch ${file}: ${response.statusText}`);
-        continue;
-      }
-
-      const data = await response.json();
-
-      if (data.displayName) {
-        allTemplates.push({
+  return loadJsonTemplateFiles(notificationFiles, (data) => {
+    if (data.displayName) {
+      return [
+        {
           ...data,
           displayName: `${IMPORT_PREFIX}${data.displayName}`,
-        });
-      }
-    } catch (error) {
-      console.error(`Error fetching ${file}:`, error);
+        },
+      ];
     }
-  }
 
-  return allTemplates;
+    return [];
+  });
 }
 
 /**
  * OpenIntuneBaseline manifest types
  */
 export interface OIBManifest {
-  version: string;
-  generatedAt: string;
   totalFiles: number;
   platforms: Array<{
     id: string;
     name: string;
     count: number;
-    policyTypes: Array<{
-      type: string;
-      description: string;
-      count: number;
-    }>;
   }>;
   files: OIBManifestFile[];
 }
@@ -430,6 +397,38 @@ export interface BaselinePolicy {
 }
 
 const OIB_PATH = "/IntuneTemplates/OpenIntuneBaseline";
+const OIB_POLICY_TYPE_FOLDERS = new Set([
+  "SettingsCatalog",
+  "CompliancePolicies",
+  "AppProtection",
+  "DeviceConfiguration",
+  "UpdatePolicies",
+  "DriverUpdateProfiles",
+]);
+
+interface StoredManifestFile {
+  path: string;
+  displayName: string;
+}
+
+interface StoredOIBManifest extends Omit<OIBManifest, "files"> {
+  files: StoredManifestFile[];
+}
+
+function getManifestPathParts(filePath: string): string[] {
+  return filePath.replace(/\\/g, "/").split("/");
+}
+
+function enrichOIBManifestFile(file: StoredManifestFile): OIBManifestFile {
+  const pathParts = getManifestPathParts(file.path);
+
+  return {
+    ...file,
+    platform: pathParts[0] ?? "",
+    policyType:
+      pathParts.slice(1, -1).find((part) => OIB_POLICY_TYPE_FOLDERS.has(part)) ?? "",
+  };
+}
 
 /**
  * Parse JSON that may be UTF-16 LE or UTF-8 encoded
@@ -517,7 +516,11 @@ export async function fetchOIBManifest(): Promise<OIBManifest | null> {
       console.warn("OpenIntuneBaseline manifest not found. Run: node scripts/generate-oib-manifest.js");
       return null;
     }
-    return await response.json();
+    const manifest = await response.json() as StoredOIBManifest;
+    return {
+      ...manifest,
+      files: manifest.files.map(enrichOIBManifestFile),
+    };
   } catch (error) {
     console.error("Error fetching OIB manifest:", error);
     return null;
@@ -565,63 +568,6 @@ export async function fetchBaselinePolicyByManifestFile(
   return transformOIBPolicy(policy as Record<string, unknown>, file);
 }
 
-/**
- * CIS Intune Baselines category structure
- */
-export interface CISBaselineCategory {
-  name: string;
-  path: string;
-  subcategories: string[];
-}
-
-export const CIS_BASELINE_CATEGORIES: CISBaselineCategory[] = [
-  {
-    name: "Android Benchmarks",
-    path: "1.0 - Android Benchmarks",
-    subcategories: ["Android Compliance", "Android Enterprise for Intune"],
-  },
-  {
-    name: "Apple Benchmarks",
-    path: "2.0 - Apple Benchmarks",
-    subcategories: ["Apple MacOS Compliance", "Apple MacOS for Intune", "Apple iOS Benchmarks", "Apple iOS Compliance"],
-  },
-  {
-    name: "Browser Benchmarks",
-    path: "3.0 - Browser Benchmarks",
-    subcategories: ["Google Chrome", "Microsoft Edge"],
-  },
-  {
-    name: "CIS Benchmarks",
-    path: "4.0 - CIS Benchmarks",
-    subcategories: ["CIS -  Intune for Windows 11 Benchmarks", "CIS - Apple Intune for MacOS 15"],
-  },
-  {
-    name: "Linux Benchmarks",
-    path: "5.0 - Linux Benchmarks",
-    subcategories: ["Linux Compliance"],
-  },
-  {
-    name: "Microsoft Endpoint Security",
-    path: "6.0 - Microsoft Endpoint Security Benchmarks",
-    subcategories: ["Microsoft Endpoint Security Antivirus", "Microsoft Endpoint Security Firewall"],
-  },
-  {
-    name: "Visual Studio Benchmarks",
-    path: "7.0 - Visual Studio Benchmarks",
-    subcategories: ["VS Code for Enterprise", "Visual Studio Enterprise 2017", "Visual Studio Enterprise 2019", "Visual Studio Enterprise 2022", "Visual Studio Professional 2017", "Visual Studio Professional 2019", "Visual Studio Professional 2022", "VisualStudio.com"],
-  },
-  {
-    name: "Windows 11 Benchmarks",
-    path: "8.0 - Windows 11 Benchmarks",
-    subcategories: ["Windows 11 - BitLocker", "Windows 11 - Edge - Machine", "Windows 11 - Intune Benchmarks", "Windows 11 - Microsoft 365 Apps"],
-  },
-  {
-    name: "Windows Cloud PC & AVD",
-    path: "9.0 - Windows Cloud PC and AVD",
-    subcategories: ["Azure Virtual Desktop", "Windows 365 Cloud PC"],
-  },
-];
-
 const CIS_BASELINES_PATH = "/CISIntuneBaselines";
 
 /**
@@ -660,15 +606,9 @@ export interface CISBaselineManifestCategory {
   name: string;
   description: string;
   count: number;
-  subcategories: Array<{
-    name: string;
-    count: number;
-  }>;
 }
 
 export interface CISBaselineManifest {
-  version: string;
-  generatedAt: string;
   totalFiles: number;
   categories: CISBaselineManifestCategory[];
   files: CISBaselineManifestFile[];
@@ -681,6 +621,20 @@ export interface CISBaselineManifestFile {
   displayName: string;
 }
 
+interface StoredCISBaselineManifest extends Omit<CISBaselineManifest, "files"> {
+  files: StoredManifestFile[];
+}
+
+function enrichCISManifestFile(file: StoredManifestFile): CISBaselineManifestFile {
+  const pathParts = getManifestPathParts(file.path);
+
+  return {
+    ...file,
+    category: pathParts[0] ?? "",
+    subcategory: pathParts[1] ?? "",
+  };
+}
+
 /**
  * Fetch the CIS baselines manifest (for category selection UI)
  */
@@ -691,7 +645,11 @@ export async function fetchCISBaselineManifest(): Promise<CISBaselineManifest | 
       console.warn("CIS Baselines manifest not found. Run the build script to generate it.");
       return null;
     }
-    return await response.json();
+    const manifest = await response.json() as StoredCISBaselineManifest;
+    return {
+      ...manifest,
+      files: manifest.files.map(enrichCISManifestFile),
+    };
   } catch (error) {
     console.error("Error fetching CIS baseline manifest:", error);
     return null;
@@ -793,125 +751,21 @@ export async function fetchCISBaselinePoliciesByCategories(
   }
 }
 
-/**
- * In-memory fallback cache for when sessionStorage quota is exceeded
- * This happens when selecting all 717+ CIS baseline items
- */
-const memoryCache = new Map<string, { templates: unknown[]; timestamp: number; version: number }>();
+const TEMPLATE_CACHE_PREFIX = "intune-hydration-templates-";
+const templateCache = new Map<string, unknown[]>();
 
-/**
- * Cache templates in session storage with in-memory fallback
- * Falls back to memory cache when sessionStorage quota is exceeded
- */
 export function cacheTemplates(category: string, templates: unknown[]): void {
-  const cacheData = {
-    templates,
-    timestamp: Date.now(),
-    version: CACHE_VERSION,
-  };
-
-  try {
-    sessionStorage.setItem(
-      `intune-hydration-templates-${category}`,
-      JSON.stringify(cacheData)
-    );
-  } catch (error) {
-    // QuotaExceededError - fall back to in-memory cache
-    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-      console.warn(`[Cache] SessionStorage quota exceeded for ${category}, using in-memory cache`);
-      memoryCache.set(`intune-hydration-templates-${category}`, cacheData);
-    } else {
-      console.error(`Error caching ${category} templates:`, error);
-    }
-  }
+  templateCache.set(`${TEMPLATE_CACHE_PREFIX}${category}`, templates);
 }
 
-/**
- * Get cached templates from session storage or in-memory fallback
- * Returns null if cache is expired (> 1 hour) or version mismatch
- */
 export function getCachedTemplates(category: string): unknown[] | null {
-  const cacheKey = `intune-hydration-templates-${category}`;
-  const ONE_HOUR = 60 * 60 * 1000;
-
-  // Helper to validate and return cache data
-  const validateCache = (data: { templates: unknown[]; timestamp: number; version: number }, source: string): unknown[] | null => {
-    // Check cache version - invalidate if mismatch
-    if (data.version !== CACHE_VERSION) {
-      console.log(`[Cache] Invalidating ${category} cache (${source}) - version mismatch (cached: ${data.version}, current: ${CACHE_VERSION})`);
-      return null;
-    }
-
-    // Check age
-    const age = Date.now() - data.timestamp;
-    if (age > ONE_HOUR) {
-      console.log(`[Cache] Invalidating ${category} cache (${source}) - expired (age: ${Math.round(age / 60000)} minutes)`);
-      return null;
-    }
-
-    return data.templates;
-  };
-
-  try {
-    // Try sessionStorage first
-    const cached = sessionStorage.getItem(cacheKey);
-    if (cached) {
-      const data = JSON.parse(cached);
-      const result = validateCache(data, 'sessionStorage');
-      if (result) return result;
-      sessionStorage.removeItem(cacheKey);
-    }
-
-    // Fall back to in-memory cache
-    const memCached = memoryCache.get(cacheKey);
-    if (memCached) {
-      const result = validateCache(memCached, 'memory');
-      if (result) return result;
-      memoryCache.delete(cacheKey);
-    }
-
-    return null;
-  } catch (error) {
-    console.error(`Error reading cached ${category} templates:`, error);
-    return null;
-  }
+  return templateCache.get(`${TEMPLATE_CACHE_PREFIX}${category}`) ?? null;
 }
 
-/**
- * Clear cached templates for a specific category
- * Used when fresh templates need to be fetched (e.g., when selections change)
- */
 export function clearCategoryCache(category: string): void {
-  const cacheKey = `intune-hydration-templates-${category}`;
-  try {
-    sessionStorage.removeItem(cacheKey);
-    memoryCache.delete(cacheKey);
-    console.log(`[Cache] Cleared cache for ${category}`);
-  } catch (error) {
-    console.error(`Error clearing ${category} cache:`, error);
-  }
+  templateCache.delete(`${TEMPLATE_CACHE_PREFIX}${category}`);
 }
 
-/**
- * Get all template cache keys (from both sessionStorage and in-memory cache)
- * Used when searching for CIS baseline templates across all cached categories
- */
 export function getAllTemplateCacheKeys(): string[] {
-  const keys = new Set<string>();
-
-  // Add sessionStorage keys
-  try {
-    for (const key of Object.keys(sessionStorage)) {
-      if (key.startsWith("intune-hydration-templates-")) {
-        keys.add(key);
-      }
-    }
-  } catch {
-    // Ignore errors
-  }
-
-  // Add in-memory cache keys
-  memoryCache.forEach((_, key) => keys.add(key));
-
-  return Array.from(keys);
+  return Array.from(templateCache.keys());
 }

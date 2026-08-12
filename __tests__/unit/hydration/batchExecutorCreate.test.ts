@@ -6,12 +6,10 @@ import type { HydrationTask } from "@/types/hydration";
 const {
   mockGetCachedTemplates,
   mockGetAllTemplateCacheKeys,
-  mockGetConditionalAccessPolicyByName,
   mockDetectCISPolicyType,
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockGetAllTemplateCacheKeys: vi.fn(),
-  mockGetConditionalAccessPolicyByName: vi.fn(),
   mockDetectCISPolicyType: vi.fn(),
 }));
 
@@ -21,14 +19,6 @@ vi.mock("@/lib/templates/loader", async () => {
     ...actual,
     getAllTemplateCacheKeys: mockGetAllTemplateCacheKeys,
     getCachedTemplates: mockGetCachedTemplates,
-  };
-});
-
-vi.mock("@/templates", async () => {
-  const actual = await vi.importActual("@/templates");
-  return {
-    ...actual,
-    getConditionalAccessPolicyByName: mockGetConditionalAccessPolicyByName,
   };
 });
 
@@ -56,7 +46,6 @@ function mockConditionalAccessTemplate(template: ConditionalAccessTemplate): voi
     }
     return undefined;
   });
-  mockGetConditionalAccessPolicyByName.mockReturnValue(undefined);
 }
 
 function accountRecoveryConditionalAccessTemplate(policyName: string): ConditionalAccessTemplate {
@@ -202,7 +191,6 @@ describe("executeTasksInBatches", () => {
       }
       return undefined;
     });
-    mockGetConditionalAccessPolicyByName.mockReturnValue(undefined);
     mockDetectCISPolicyType.mockReturnValue("SecurityIntent");
     mockGetAllTemplateCacheKeys.mockReturnValue([
       "intune-hydration-templates-cisBaseline-cis-endpoint-security",

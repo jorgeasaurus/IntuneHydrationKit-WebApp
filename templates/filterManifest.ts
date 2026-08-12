@@ -1,8 +1,7 @@
 /**
  * Lightweight device filter template manifest.
  *
- * Keep this module free of JSON imports so client paths that only fetch
- * templates over HTTP do not bundle the static fallback data.
+ * Client components use this file for counts without loading template JSON.
  */
 
 export const DEVICE_FILTER_TEMPLATE_MANIFEST = [

@@ -6,7 +6,7 @@ import {
   initializeMsal,
   msalInstance,
 } from "@/lib/auth/msalConfig";
-import { loadCloudEnvironmentFromSession, signOut } from "@/lib/auth/authUtils";
+import { signOut } from "@/lib/auth/authUtils";
 import { useEffect, useState } from "react";
 
 interface MsalProviderProps {
@@ -65,9 +65,6 @@ export function MsalProvider({ children }: MsalProviderProps) {
   const [initError, setInitError] = useState<Error | null>(null);
 
   useEffect(() => {
-    // Restore (and sanitize) the persisted cloud environment before any token calls
-    loadCloudEnvironmentFromSession();
-
     const configurationError = getMsalConfigurationError();
     if (configurationError) {
       const error = new Error(configurationError);

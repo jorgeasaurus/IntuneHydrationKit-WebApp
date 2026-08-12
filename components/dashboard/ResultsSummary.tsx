@@ -19,7 +19,7 @@ import {
   downloadReport,
   generateReportFilename,
 } from "@/lib/hydration/reporter";
-import { format } from "date-fns";
+import { formatDateTime } from "@/lib/utils/dateFormat";
 
 interface ResultsSummaryProps {
   summary: HydrationSummary;
@@ -140,7 +140,7 @@ export function ResultsSummary({
           <CardTitle>{isPreview ? "Preview" : "Execution"} Summary</CardTitle>
           <CardDescription>
             {isPreview ? "Preview of " : ""}{summary.operationMode}{" "}
-            operation {isPreview ? "completed" : "completed"} on {format(summary.endTime, "PPp")}
+            operation {isPreview ? "completed" : "completed"} on {formatDateTime(summary.endTime)}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -182,11 +182,11 @@ export function ResultsSummary({
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Started</p>
-              <p className="text-lg font-medium">{format(summary.startTime, "PPp")}</p>
+              <p className="text-lg font-medium">{formatDateTime(summary.startTime)}</p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-lg font-medium">{format(summary.endTime, "PPp")}</p>
+              <p className="text-lg font-medium">{formatDateTime(summary.endTime)}</p>
             </div>
           </div>
         </CardContent>
@@ -344,7 +344,7 @@ export function ResultsSummary({
                     {error.message}
                   </p>
                   <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                    {format(error.timestamp, "PPp")}
+                    {formatDateTime(error.timestamp)}
                   </p>
                 </div>
               ))}

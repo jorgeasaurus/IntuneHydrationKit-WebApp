@@ -2,14 +2,13 @@
 
 <#
 .SYNOPSIS
-Checks a tenant for duplicate Intune Hydration Kit objects after create operations.
+Checks a tenant for leftover or duplicate Intune Hydration Kit objects.
 
 .DESCRIPTION
 Connects to Microsoft Graph and queries the main Intune Hydration Kit object
 categories. Any object with an [IHD] display-name/name prefix or the
-"Imported by Intune Hydration Kit" description marker is grouped by normalized
-name within its category. Groups with more than one matching object are reported
-as duplicates.
+"Imported by Intune Hydration Kit" description marker is reported as a leftover
+or grouped by normalized name to find duplicates.
 
 Conditional Access policies are matched by [IHD] prefix only because they do
 not support descriptions.
@@ -17,14 +16,20 @@ not support descriptions.
 .PARAMETER TenantId
 Microsoft Entra tenant ID to query.
 
+.PARAMETER Check
+Selects the deletion-state or duplicate-state check.
+
 .PARAMETER UseDeviceCode
 Uses device-code authentication instead of the default interactive browser flow.
 
 .PARAMETER IncludeItems
-Includes the matching duplicate item details in the returned object output.
+Includes matching item details in the returned object output.
 
 .EXAMPLE
-./scripts/Test-IHDDuplicateState.ps1 -TenantId '00000000-0000-0000-0000-000000000000' -UseDeviceCode
+./scripts/Test-IHDTenantState.ps1 -TenantId '00000000-0000-0000-0000-000000000000' -Check Deletion -UseDeviceCode
+
+.EXAMPLE
+./scripts/Test-IHDTenantState.ps1 -TenantId '00000000-0000-0000-0000-000000000000' -Check Duplicates -UseDeviceCode
 #>
 
 [CmdletBinding()]
@@ -32,6 +37,10 @@ param(
     [Parameter(Mandatory)]
     [ValidatePattern('^[0-9a-fA-F-]{36}$')]
     [string]$TenantId,
+
+    [Parameter(Mandatory)]
+    [ValidateSet('Deletion', 'Duplicates')]
+    [string]$Check,
 
     [switch]$UseDeviceCode,
 
@@ -195,7 +204,7 @@ function Get-IHDSum {
     return [int]$measure.Sum
 }
 
-function Get-IHDDuplicateCategoryResult {
+function Get-IHDCategoryResult {
     [CmdletBinding()]
     param(
         [Parameter(Mandatory)]
@@ -207,6 +216,10 @@ function Get-IHDDuplicateCategoryResult {
         [Parameter(Mandatory)]
         [ValidateSet('displayName', 'name')]
         [string]$NameProperty,
+
+        [Parameter(Mandatory)]
+        [ValidateSet('Deletion', 'Duplicates')]
+        [string]$Check,
 
         [string]$DescriptionProperty = 'description',
 
@@ -233,15 +246,30 @@ function Get-IHDDuplicateCategoryResult {
                     continue
                 }
 
-                [PSCustomObject]@{
+                $match = [ordered]@{
                     Id             = [string]((Get-IHDPropertyValue -InputObject $item -PropertyName 'id') ?? '')
                     Name           = $name
-                    NormalizedName = Normalize-IHDName -Name $name
                     Description    = $description
                     State          = [string]((Get-IHDPropertyValue -InputObject $item -PropertyName 'state') ?? '')
                 }
+
+                if ($Check -eq 'Duplicates') {
+                    $match.NormalizedName = Normalize-IHDName -Name $name
+                }
+
+                [PSCustomObject]$match
             }
         )
+
+        if ($Check -eq 'Deletion') {
+            return [PSCustomObject]@{
+                PSTypeName = 'IntuneHydrationKit.DeletionCheck.CategoryResult'
+                Category   = $Category
+                Count      = $matches.Count
+                Items      = $matches
+                Error      = $null
+            }
+        }
 
         $duplicateGroups = @(
             $matches |
@@ -268,6 +296,17 @@ function Get-IHDDuplicateCategoryResult {
     }
     catch {
         Write-Warning "Failed to query $Category`: $($_.Exception.Message)"
+
+        if ($Check -eq 'Deletion') {
+            return [PSCustomObject]@{
+                PSTypeName = 'IntuneHydrationKit.DeletionCheck.CategoryResult'
+                Category   = $Category
+                Count      = 0
+                Items      = @()
+                Error      = $_.Exception.Message
+            }
+        }
+
         [PSCustomObject]@{
             PSTypeName          = 'IntuneHydrationKit.DuplicateCheck.CategoryResult'
             Category            = $Category
@@ -302,6 +341,7 @@ $results = @(foreach ($category in $categoryChecks) {
         Category     = $category.Category
         Uri          = $category.Uri
         NameProperty = $category.NameProperty
+        Check        = $Check
     }
 
     if ($category.ContainsKey('DescriptionProperty')) {
@@ -312,8 +352,55 @@ $results = @(foreach ($category in $categoryChecks) {
         $params.NameOnly = $true
     }
 
-    Get-IHDDuplicateCategoryResult @params
+    Get-IHDCategoryResult @params
 })
+
+if ($Check -eq 'Deletion') {
+    $summary = @(foreach ($result in $results) {
+        [PSCustomObject]@{
+            Category      = $result.Category
+            LeftoverCount = $result.Count
+            Status        = if ($result.Error) { 'Error' } elseif ($result.Count -eq 0) { 'Clear' } else { 'LeftoversFound' }
+            Error         = $result.Error
+        }
+    })
+
+    $leftoverCount = Get-IHDSum -InputObject $summary -PropertyName 'LeftoverCount'
+    $allDeleted = (@($summary | Where-Object { $_.Status -eq 'LeftoversFound' })).Count -eq 0 -and
+        (@($summary | Where-Object { $_.Status -eq 'Error' })).Count -eq 0
+
+    Write-Host ''
+    Write-Host 'Intune Hydration Kit deletion check' -ForegroundColor Cyan
+    Write-Host "Tenant: $TenantId"
+    Write-Host ''
+    $summary | Format-Table -AutoSize | Out-Host
+
+    if ($leftoverCount -gt 0) {
+        Write-Host ''
+        Write-Host 'Leftover items:' -ForegroundColor Yellow
+        foreach ($result in $results | Where-Object { $_.Count -gt 0 }) {
+            Write-Host ''
+            Write-Host "[$($result.Category)]" -ForegroundColor Yellow
+            foreach ($item in $result.Items) {
+                if ([string]::IsNullOrWhiteSpace($item.State)) {
+                    Write-Host " - $($item.Name) [$($item.Id)]"
+                }
+                else {
+                    Write-Host " - $($item.Name) [$($item.Id)] (state: $($item.State))"
+                }
+            }
+        }
+    }
+
+    return [PSCustomObject]@{
+        PSTypeName     = 'IntuneHydrationKit.DeletionCheck.Summary'
+        TenantId       = $TenantId
+        AllDeleted     = $allDeleted
+        TotalLeftovers = $leftoverCount
+        Categories     = $summary
+        Results        = if ($IncludeItems) { $results } else { @() }
+    }
+}
 
 $summary = @(foreach ($result in $results) {
     [PSCustomObject]@{

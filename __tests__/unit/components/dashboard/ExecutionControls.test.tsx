@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@/__tests__/setup/test-utils'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ExecutionControls } from '@/components/dashboard/ExecutionControls'
 import type { BatchProgress, HydrationTask } from '@/types/hydration'
@@ -71,6 +71,8 @@ describe('ExecutionControls', () => {
     expect(screen.getByText('Batch Processing Active')).toBeInTheDocument()
     expect(screen.getByText(/Batch 2 of 4/i)).toBeInTheDocument()
     expect(screen.getByText(/5 items\/batch \(beta\)/i)).toBeInTheDocument()
+    expect(screen.getByRole('progressbar', { name: 'Batch progress' })).toHaveAttribute('value', '2')
+    expect(screen.getByRole('progressbar', { name: 'Batch progress' })).toHaveAttribute('max', '4')
     expect(screen.getByText('8s')).toBeInTheDocument()
     expect(screen.getByText('4s')).toBeInTheDocument()
 

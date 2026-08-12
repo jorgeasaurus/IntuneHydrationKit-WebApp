@@ -5,7 +5,6 @@ import type { HydrationTask } from "@/types/hydration";
 
 const {
   mockGetCachedTemplates,
-  mockGetCompliancePolicyByName,
   mockCreateCompliancePolicy,
   mockDeleteCompliancePolicyByName,
   mockCompliancePolicyExists,
@@ -13,7 +12,6 @@ const {
   mockV2CompliancePolicyExists,
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
-  mockGetCompliancePolicyByName: vi.fn(),
   mockCreateCompliancePolicy: vi.fn(),
   mockDeleteCompliancePolicyByName: vi.fn(),
   mockCompliancePolicyExists: vi.fn(),
@@ -23,10 +21,6 @@ const {
 
 vi.mock("@/lib/templates/loader", () => ({
   getCachedTemplates: mockGetCachedTemplates,
-}));
-
-vi.mock("@/templates", () => ({
-  getCompliancePolicyByName: mockGetCompliancePolicyByName,
 }));
 
 vi.mock("@/lib/graph/compliance", () => ({
@@ -66,7 +60,6 @@ describe("executeComplianceTask", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCachedTemplates.mockReturnValue(undefined);
-    mockGetCompliancePolicyByName.mockReturnValue(undefined);
     mockCompliancePolicyExists.mockResolvedValue(false);
     mockV2CompliancePolicyExists.mockResolvedValue(false);
   });
@@ -173,7 +166,7 @@ describe("executeComplianceTask", () => {
     expect(mockCreateV2CompliancePolicy).not.toHaveBeenCalled();
   });
 
-  it("supports preview creates for V1 policies resolved via the stripped prefix fallback", async () => {
+  it("supports preview creates for V1 policies loaded from JSON", async () => {
     const policyName = "[IHD] Windows Compliance";
     const template = {
       "@odata.type": "#microsoft.graph.windows10CompliancePolicy",
@@ -181,9 +174,7 @@ describe("executeComplianceTask", () => {
       description: "Imported by Intune Hydration Kit",
     };
 
-    mockGetCompliancePolicyByName.mockImplementation((name: string) =>
-      name === "Windows Compliance" ? template : undefined
-    );
+    mockGetCachedTemplates.mockReturnValue([template]);
 
     const result = await executeComplianceTask(createTask(policyName), {
       client: createClient(),
@@ -404,6 +395,27 @@ describe("executeComplianceTask", () => {
       skipped: true,
       error: "Policy has 2 active assignment(s)",
     });
+  });
+
+  it("deletes a directly selected V1 policy when V2 discovery fails", async () => {
+    const policyName = "[IHD] Legacy Windows Compliance";
+    const client = createClient();
+    vi.mocked(client.getCollection).mockRejectedValue(new Error("V2 discovery failed"));
+    mockCompliancePolicyExists.mockResolvedValue(true);
+    mockDeleteCompliancePolicyByName.mockResolvedValue({ skipped: false });
+
+    const result = await executeComplianceTask(createTask(policyName, "delete"), {
+      client,
+      operationMode: "delete",
+      isPreview: false,
+      stopOnFirstError: false,
+    });
+
+    expect(result).toMatchObject({ success: true, skipped: false });
+    expect(client.getCollection).toHaveBeenCalledWith(
+      "/deviceManagement/compliancePolicies?$select=id,name,description"
+    );
+    expect(mockDeleteCompliancePolicyByName).toHaveBeenCalledWith(client, policyName);
   });
 
   it("marks V1 deletes successful after a 504 when verification shows the policy is gone", async () => {

@@ -1,14 +1,13 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
+import { render, screen, waitFor } from '@testing-library/react'
 import { TenantConfig } from '@/components/wizard/TenantConfig'
 import { WizardProvider, useWizardState } from '@/hooks/useWizardState'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
 const validatePrerequisites = vi.fn()
 const createGraphClient = vi.fn()
-const getSelectedCloudEnvironment = vi.fn(() => 'global')
 
 vi.mock('@azure/msal-react', () => ({
   useMsal: () => ({
@@ -28,7 +27,6 @@ vi.mock('@/lib/auth/authUtils', async () => {
   const actual = await vi.importActual('@/lib/auth/authUtils')
   return {
     ...actual,
-    getSelectedCloudEnvironment: () => getSelectedCloudEnvironment(),
     AuthSessionExpiredError: class AuthSessionExpiredError extends Error {},
   }
 })
@@ -58,7 +56,6 @@ function WizardHarness() {
 describe('TenantConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks()
-    getSelectedCloudEnvironment.mockReturnValue('global')
   })
 
   it('keeps the health checklist state when navigating away and back', async () => {
