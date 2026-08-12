@@ -1,3 +1,20 @@
+# Navigation at 1235 x 1214
+
+- [x] Reproduce the navigation defect on `main` at 1235 x 1214.
+- [x] Identify the responsive breakpoint and layout cause.
+- [x] Fix the navigation without changing desktop or mobile behavior.
+- [x] Add viewport regression coverage.
+- [x] Run focused tests, type-check, lint, production build, and visual verification.
+- [x] Increment the website version.
+- [x] Retarget the pull request against `dev`.
+
+## Review
+
+- The stepped `container` width constrained the bar at 1235 px, and the `md` link breakpoint caused horizontal overflow from 768 through 960 px.
+- The navigation now uses a fluid 2xl shell and shows the full link set only at 1024 px and wider.
+- Checks passed on the merged `dev` state: 518 unit tests, two Playwright viewport regressions, type-check, lint, production build, visual inspection, and `git diff --check`.
+- Copilot review replaced hard-coded viewport edges with client-width-relative assertions and allowed one pixel for browser rounding.
+
 # Security Control Remediation
 
 - [x] Revalidate the delete and tenant identity findings on `dev`.
