@@ -8,7 +8,7 @@
 
 - The two-column preview now begins at 1280px. At 1067px, the compact preview follows the hero content instead of intruding beside it.
 - Checks passed: focused unit and Playwright tests, type-check, lint, production build, and React Doctor (100/100).
-- Thermonuclear review-fix loop completed in one round with zero actionable findings; full validation passed.
+- One strict review cycle found no actionable issues. Full validation passed.
 
 # Win32 Detection Scripts in Template Docs
 

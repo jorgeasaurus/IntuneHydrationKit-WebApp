@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes, ComponentProps } from 'react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@/__tests__/setup/test-utils'
 import { HomeLanding } from '@/components/landing/HomeLanding'
@@ -43,14 +43,15 @@ function renderLanding(overrides: Partial<ComponentProps<typeof HomeLanding>> = 
 describe('HomeLanding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      value: vi.fn().mockReturnValue({
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
         matches: true,
         addEventListener: vi.fn(),
         removeEventListener: vi.fn(),
-      }),
-    })
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('renders the current app version with product proof and core sections', () => {
@@ -91,14 +92,11 @@ describe('HomeLanding', () => {
   it('supports legacy media-query listeners for the desktop demo', () => {
     const addListener = vi.fn()
 
-    Object.defineProperty(window, 'matchMedia', {
-      configurable: true,
-      value: vi.fn().mockReturnValue({
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
         matches: false,
         addListener,
         removeListener: vi.fn(),
-      }),
-    })
+    }))
 
     renderLanding()
 
