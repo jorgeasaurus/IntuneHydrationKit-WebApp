@@ -200,9 +200,9 @@ test.describe("Glass visual system", () => {
     );
     expect(
       await page.evaluate(
-        (storageKey) => localStorage.getItem(storageKey),
+        (storageKey) => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
         APP_SETTINGS_STORAGE_KEY
       )
-    ).toBe('{"stopOnFirstError":false,"demoMode":false}');
+    ).toEqual({ stopOnFirstError: false, demoMode: false });
   });
 });

@@ -1610,5 +1610,6 @@
 ## Review
 
 - The first Copilot review on `ab524fe` generated no comments or review threads.
-- No fixes or thread resolutions were required.
-- A final documentation-head review is pending after this checklist update.
+- The review on `0a2443d` generated no threads and one valid suppressed comment about an order-sensitive JSON assertion.
+- The smoke test now parses stored settings before it compares the object shape.
+- A final review is pending on the fix commit.
