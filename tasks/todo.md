@@ -1,3 +1,34 @@
+# README Visual Refresh
+
+- [x] Define a restrained README visual system that matches the product.
+- [x] Refresh the header, navigation, features, workflow, and content hierarchy.
+- [x] Verify Markdown structure, image references, links, and the final diff.
+- [x] Increment the website version for the pull request.
+- [x] Commit and push the intended files, then open a draft pull request to `main`.
+- [x] Verify the published pull request metadata.
+
+## Review
+
+- Added a centered brand header, product badges, section links, a clickable hero image, capability and coverage tables, a technology summary, a compact update log, a four-stage workflow, and a branded footer.
+- Removed decorative emoji and kept the existing technical content and product image.
+- All five section anchors, local images, local document links, and `git diff --check` passed.
+- The website version is 2.6.45.
+- Draft PR #65 targets `main` from `agent/readme-visual-refresh` with only the intended six files.
+- Type-check, lint, and React Doctor at 100/100 passed before publication.
+- Copilot review cycle 1 found two Simplified Technical English issues in the new README text; the wording audit corrected both comments and related changed text.
+- Copilot review cycle 2 found no new comments. Its valid suppressed count note led to the removal of duplicated template totals; the conditional remote-badge note does not apply to this public GitHub README.
+
+# README Site Image Refresh
+
+- [x] Audit the README and repository for site image references.
+- [x] Replace the old landing page image with `NewPage.png`.
+- [x] Remove the obsolete site image and verify the final README reference.
+
+## Review
+
+- The README now shows `NewPage.png`, and the obsolete `LandingPage.jpeg` file and reference are removed.
+- Image existence, repository references, and `git diff --check` passed.
+
 # Navigation at 1235 x 1214
 
 - [x] Reproduce the navigation defect on `main` at 1235 x 1214.
