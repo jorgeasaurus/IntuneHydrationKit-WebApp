@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@/__tests__/setup/test-utils'
+import { render, screen, waitFor } from '@testing-library/react'
 import { Navigation } from '@/components/Navigation'
 
 const push = vi.fn()

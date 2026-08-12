@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Pause, Play, Square, Download, Layers } from "lucide-react";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
-import { format } from "date-fns";
-import { Progress } from "@/components/ui/progress";
+import { formatDateTime } from "@/lib/utils/dateFormat";
 
 interface ExecutionControlsProps {
   tasks: HydrationTask[];
@@ -102,9 +101,11 @@ export function ExecutionControls({
                   {batchProgress.itemsInBatch} items/batch ({batchProgress.apiVersion})
                 </span>
               </div>
-              <Progress
-                value={(batchProgress.currentBatch / batchProgress.totalBatches) * 100}
-                className="h-2 bg-blue-200 dark:bg-blue-900"
+              <progress
+                aria-label="Batch progress"
+                value={batchProgress.currentBatch}
+                max={batchProgress.totalBatches}
+                className="h-2 w-full overflow-hidden rounded-full bg-blue-200 accent-blue-600 dark:bg-blue-900 dark:accent-blue-400 [&::-moz-progress-bar]:bg-blue-600 dark:[&::-moz-progress-bar]:bg-blue-400 [&::-webkit-progress-bar]:bg-blue-200 dark:[&::-webkit-progress-bar]:bg-blue-900 [&::-webkit-progress-value]:bg-blue-600 dark:[&::-webkit-progress-value]:bg-blue-400"
               />
               <p className="text-xs text-blue-500 dark:text-blue-400">
                 Processing {batchProgress.itemsInBatch} items in parallel via Graph API $batch endpoint
@@ -133,12 +134,12 @@ export function ExecutionControls({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">Started</p>
-            <p className="font-medium">{format(startTime, "PPp")}</p>
+            <p className="font-medium">{formatDateTime(startTime)}</p>
           </div>
           {isCompleted && (
             <div>
               <p className="text-muted-foreground">Completed</p>
-              <p className="font-medium">{endTime ? format(endTime, "PPp") : "Completed"}</p>
+              <p className="font-medium">{endTime ? formatDateTime(endTime) : "Completed"}</p>
             </div>
           )}
         </div>

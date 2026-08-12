@@ -58,10 +58,7 @@ import {
   AuthSessionExpiredError,
   getAccessToken,
   getActiveAccount,
-  getSelectedCloudEnvironment,
   isAuthenticated,
-  loadCloudEnvironmentFromSession,
-  setSelectedCloudEnvironment,
   signIn,
   signOut,
 } from "@/lib/auth/authUtils";
@@ -79,32 +76,11 @@ describe("authUtils", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
-    setSelectedCloudEnvironment();
     mocks.getAuthorityUrl.mockImplementation((tenantId: string) =>
       `https://authority.example/global/${tenantId}`
     );
     mocks.msalInstance.getAllAccounts.mockReturnValue([]);
     mocks.msalInstance.getActiveAccount.mockReturnValue(null);
-  });
-
-  it("stores the global cloud environment in session storage", () => {
-    setSelectedCloudEnvironment();
-
-    expect(getSelectedCloudEnvironment()).toBe("global");
-    expect(window.sessionStorage.getItem("cloudEnvironment")).toBe("global");
-  });
-
-  it("discards stale sovereign cloud values from session storage", () => {
-    window.sessionStorage.setItem("cloudEnvironment", "china");
-
-    expect(loadCloudEnvironmentFromSession()).toBe("global");
-    expect(window.sessionStorage.getItem("cloudEnvironment")).toBeNull();
-  });
-
-  it("ignores invalid cloud environments from session storage", () => {
-    window.sessionStorage.setItem("cloudEnvironment", "toString");
-
-    expect(loadCloudEnvironmentFromSession()).toBe("global");
   });
 
   it("prefers the MSAL active account over the first cached account", () => {
@@ -196,7 +172,6 @@ describe("authUtils", () => {
 
     await expect(signIn()).resolves.toEqual(account);
 
-    expect(getSelectedCloudEnvironment()).toBe("global");
     expect(mocks.getAuthorityUrl).toHaveBeenCalledWith("common");
     expect(mocks.msalInstance.loginPopup).toHaveBeenCalledWith({
       authority: "https://authority.example/global/common",

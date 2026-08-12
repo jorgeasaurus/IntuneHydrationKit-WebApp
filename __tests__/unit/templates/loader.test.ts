@@ -7,12 +7,14 @@ import {
   fetchBaselinePolicies,
   fetchBaselinePolicyByManifestFile,
   fetchCompliancePolicies,
+  fetchCISBaselineManifest,
   fetchCISBaselinePolicyByManifestFile,
   fetchCISBaselinePoliciesByCategories,
   fetchConditionalAccessPolicies,
   fetchDynamicGroups,
   fetchEnrollmentProfiles,
   fetchFilters,
+  fetchOIBManifest,
   getAllTemplateCacheKeys,
   getCachedTemplates,
   fetchNotificationTemplates,
@@ -220,8 +222,14 @@ describe("template loader", () => {
               {
                 displayName: "Android Corporate",
                 description: "Android filter",
-                platform: "android",
+                platform: "androidForWork",
                 rule: '(device.osVersion -contains "14")',
+              },
+              {
+                displayName: "[IHD] Android Personal",
+                description: "Android personal filter Imported by Intune Hydration Kit",
+                platform: "android",
+                rule: '(device.deviceOwnership -eq "Personal")',
               },
             ],
           }),
@@ -254,6 +262,12 @@ describe("template loader", () => {
         description: "Android filter Imported by Intune Hydration Kit",
         platform: "android",
         rule: '(device.osVersion -contains "14")',
+      },
+      {
+        displayName: "[IHD] Android Personal",
+        description: "Android personal filter Imported by Intune Hydration Kit",
+        platform: "android",
+        rule: '(device.deviceOwnership -eq "Personal")',
       },
     ]);
     expect(errorSpy).toHaveBeenCalled();
@@ -414,60 +428,16 @@ describe("template loader", () => {
     expect(errorSpy).toHaveBeenCalled();
   });
 
-  it("falls back to in-memory cache when sessionStorage quota is exceeded", () => {
-    const quotaError = new DOMException("Quota exceeded", "QuotaExceededError");
+  it("stores, lists, and clears templates in the module cache", () => {
+    cacheTemplates("module-test", [{ displayName: "Cached Policy" }]);
 
-    vi.spyOn(sessionStorage, "setItem").mockImplementation(() => {
-      throw quotaError;
-    });
-
-    cacheTemplates("quota-test", [{ displayName: "Cached Policy" }]);
-
-    expect(getCachedTemplates("quota-test")).toEqual([
+    expect(getCachedTemplates("module-test")).toEqual([
       { displayName: "Cached Policy" },
     ]);
-    expect(getAllTemplateCacheKeys()).toContain("intune-hydration-templates-quota-test");
+    expect(getAllTemplateCacheKeys()).toContain("intune-hydration-templates-module-test");
 
-    clearCategoryCache("quota-test");
-    expect(getCachedTemplates("quota-test")).toBeNull();
-  });
-
-  it("invalidates expired or version-mismatched session cache entries", () => {
-    sessionStorage.setItem(
-      "intune-hydration-templates-expired-test",
-      JSON.stringify({
-        templates: [{ displayName: "Old Policy" }],
-        timestamp: Date.now() - (2 * 60 * 60 * 1000),
-        version: 20,
-      })
-    );
-
-    sessionStorage.setItem(
-      "intune-hydration-templates-version-test",
-      JSON.stringify({
-        templates: [{ displayName: "Wrong Version Policy" }],
-        timestamp: Date.now(),
-        version: 18,
-      })
-    );
-
-    sessionStorage.setItem(
-      "intune-hydration-templates-filters",
-      JSON.stringify({
-        templates: [{ displayName: "[IHD] Windows - Dell Devices" }],
-        timestamp: Date.now(),
-        version: 19,
-      })
-    );
-
-    expect(getCachedTemplates("expired-test")).toBeNull();
-    expect(sessionStorage.getItem("intune-hydration-templates-expired-test")).toBeNull();
-
-    expect(getCachedTemplates("version-test")).toBeNull();
-    expect(sessionStorage.getItem("intune-hydration-templates-version-test")).toBeNull();
-
-    expect(getCachedTemplates("filters")).toBeNull();
-    expect(sessionStorage.getItem("intune-hydration-templates-filters")).toBeNull();
+    clearCategoryCache("module-test");
+    expect(getCachedTemplates("module-test")).toBeNull();
   });
 
   it("transforms OIB manifest files using the policy name and manifest metadata", async () => {
@@ -503,6 +473,39 @@ describe("template loader", () => {
         _oibPlatform: "windows",
         _oibPolicyType: "settingsCatalog",
         _oibFilePath: "Windows/Edge Policy.json",
+      })
+    );
+  });
+
+  it("derives OIB metadata from stored manifest paths", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        statusText: "OK",
+        json: async () => ({
+          totalFiles: 1,
+          platforms: [{ id: "WINDOWS", name: "Windows", count: 1 }],
+          files: [
+            {
+              path: "WINDOWS/IntuneManagement/SettingsCatalog/Policy.json",
+              displayName: "Friendly policy name",
+            },
+          ],
+        }),
+      }))
+    );
+
+    await expect(fetchOIBManifest()).resolves.toEqual(
+      expect.objectContaining({
+        files: [
+          {
+            path: "WINDOWS/IntuneManagement/SettingsCatalog/Policy.json",
+            displayName: "Friendly policy name",
+            platform: "WINDOWS",
+            policyType: "SettingsCatalog",
+          },
+        ],
       })
     );
   });
@@ -565,20 +568,14 @@ describe("template loader", () => {
             files: [
               {
                 path: "Windows/Valid Policy.json",
-                platform: "windows",
-                policyType: "settingsCatalog",
                 displayName: "Valid manifest policy",
               },
               {
                 path: "Windows/String Policy.json",
-                platform: "windows",
-                policyType: "settingsCatalog",
                 displayName: "String manifest policy",
               },
               {
                 path: "Windows/Missing Policy.json",
-                platform: "windows",
-                policyType: "settingsCatalog",
                 displayName: "Missing manifest policy",
               },
             ],
@@ -654,6 +651,39 @@ describe("template loader", () => {
         _cisCategory: "8.0 - Windows 11 Benchmarks",
         _cisSubcategory: "Windows 11 - Edge - Machine",
         _cisFilePath: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
+      })
+    );
+  });
+
+  it("derives CIS metadata from stored manifest paths", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({
+        ok: true,
+        statusText: "OK",
+        json: async () => ({
+          totalFiles: 1,
+          categories: [],
+          files: [
+            {
+              path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
+              displayName: "Friendly CIS name",
+            },
+          ],
+        }),
+      }))
+    );
+
+    await expect(fetchCISBaselineManifest()).resolves.toEqual(
+      expect.objectContaining({
+        files: [
+          {
+            path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
+            displayName: "Friendly CIS name",
+            category: "8.0 - Windows 11 Benchmarks",
+            subcategory: "Windows 11 - Edge - Machine",
+          },
+        ],
       })
     );
   });
@@ -754,8 +784,6 @@ describe("template loader", () => {
           ok: true,
           statusText: "OK",
           json: async () => ({
-            version: "1",
-            generatedAt: "2024-01-01T00:00:00Z",
             totalFiles: 2,
             categories: [
               {
@@ -764,7 +792,6 @@ describe("template loader", () => {
                 name: "Windows 11 Benchmarks",
                 description: "Windows",
                 count: 1,
-                subcategories: [{ name: "Windows 11 - Edge - Machine", count: 1 }],
               },
               {
                 id: "linux",
@@ -772,20 +799,15 @@ describe("template loader", () => {
                 name: "Linux Benchmarks",
                 description: "Linux",
                 count: 1,
-                subcategories: [{ name: "Linux Compliance", count: 1 }],
               },
             ],
             files: [
               {
                 path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
-                category: "8.0 - Windows 11 Benchmarks",
-                subcategory: "Windows 11 - Edge - Machine",
                 displayName: "Windows policy",
               },
               {
                 path: "5.0 - Linux Benchmarks/Linux Compliance/Policy.json",
-                category: "5.0 - Linux Benchmarks",
-                subcategory: "Linux Compliance",
                 displayName: "Linux policy",
               },
             ],
@@ -825,8 +847,6 @@ describe("template loader", () => {
       ok: true,
       statusText: "OK",
       json: async () => ({
-        version: "1",
-        generatedAt: "2024-01-01T00:00:00Z",
         totalFiles: 1,
         categories: [
           {
@@ -835,14 +855,11 @@ describe("template loader", () => {
             name: "Windows 11 Benchmarks",
             description: "Windows",
             count: 1,
-            subcategories: [{ name: "Windows 11 - Edge - Machine", count: 1 }],
           },
         ],
         files: [
           {
             path: "8.0 - Windows 11 Benchmarks/Windows 11 - Edge - Machine/Policy.json",
-            category: "8.0 - Windows 11 Benchmarks",
-            subcategory: "Windows 11 - Edge - Machine",
             displayName: "Windows policy",
           },
         ],
@@ -853,44 +870,6 @@ describe("template loader", () => {
 
     await expect(fetchCISBaselinePoliciesByCategories(["android"])).resolves.toEqual([]);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
-
-  it("removes expired in-memory cache entries after a quota fallback", () => {
-    vi.spyOn(Date, "now")
-      .mockReturnValueOnce(0)
-      .mockReturnValue(2 * 60 * 60 * 1000);
-
-    vi.spyOn(sessionStorage, "setItem").mockImplementation(() => {
-      throw new DOMException("Quota exceeded", "QuotaExceededError");
-    });
-
-    cacheTemplates("memory-expired", [{ displayName: "Old cached item" }]);
-
-    expect(getCachedTemplates("memory-expired")).toBeNull();
-    expect(getAllTemplateCacheKeys()).not.toContain(
-      "intune-hydration-templates-memory-expired"
-    );
-  });
-
-  it("returns null when cached template JSON cannot be parsed", () => {
-    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
-
-    sessionStorage.setItem("intune-hydration-templates-invalid-json", "{");
-
-    expect(getCachedTemplates("invalid-json")).toBeNull();
-    expect(errorSpy).toHaveBeenCalled();
-  });
-
-  it("returns an empty cache key list when sessionStorage keys cannot be read", () => {
-    vi.spyOn(Object, "keys").mockImplementation((value: object) => {
-      if (value === sessionStorage) {
-        throw new Error("unavailable");
-      }
-
-      return Reflect.ownKeys(value).filter((key): key is string => typeof key === "string");
-    });
-
-    expect(getAllTemplateCacheKeys()).toEqual([]);
   });
 
   it("returns no CIS baseline policies when the manifest cannot be fetched", async () => {

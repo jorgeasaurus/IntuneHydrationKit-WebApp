@@ -14,7 +14,6 @@ import {
 import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
 import { normalizeName } from "../utils";
-import * as Templates from "@/templates";
 
 function findCachedConditionalAccessPolicy(
   displayName: string,
@@ -45,38 +44,36 @@ export async function executeConditionalAccessTask(
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode, isPreview } = context;
 
-  // Try to get template from cache first, fallback to hardcoded templates
+  // Templates are loaded from the bundled JSON files before execution.
   let template: ConditionalAccessTemplate | ConditionalAccessPolicy | undefined;
   const cachedCA = getCachedTemplates("conditionalAccess");
   if (cachedCA && Array.isArray(cachedCA)) {
     template = (cachedCA as ConditionalAccessTemplate[]).find((ca) => ca.displayName === task.itemName);
   }
 
-  // Fallback to hardcoded templates if not in cache
-  if (!template) {
-    template = Templates.getConditionalAccessPolicyByName(task.itemName);
-  }
+  if (mode === "create") {
+    if (!template) {
+      return { task, success: false, skipped: false, error: "Template not found" };
+    }
 
-  if (!template) {
-    return { task, success: false, skipped: false, error: "Template not found" };
-  }
+    // Check if tenant has Entra ID Premium P1 license (required for ALL CA policies)
+    if (context.hasConditionalAccessLicense === false) {
+      console.log(
+        `[Conditional Access] Skipped: ${template.displayName} - no Entra ID Premium (P1) license`
+      );
+      return {
+        task,
+        success: true,
+        skipped: true,
+        error: "No Entra ID Premium (P1) license",
+      };
+    }
 
-  // Check if tenant has Entra ID Premium P1 license (required for ALL CA policies)
-  if (mode === "create" && context.hasConditionalAccessLicense === false) {
-    console.log(
-      `[Conditional Access] Skipped: ${template.displayName} - no Entra ID Premium (P1) license`
-    );
-    return {
-      task,
-      success: true,
-      skipped: true,
-      error: "No Entra ID Premium (P1) license",
-    };
-  }
-
-  // Check if policy requires Premium P2 and tenant doesn't have it (PowerShell parity)
-  if (mode === "create" && context.hasPremiumP2License === false) {
-    if (policyRequiresPremiumP2(template as ConditionalAccessPolicy)) {
+    // Check if policy requires Premium P2 and tenant doesn't have it (PowerShell parity)
+    if (
+      context.hasPremiumP2License === false &&
+      policyRequiresPremiumP2(template as ConditionalAccessPolicy)
+    ) {
       console.log(
         `[Conditional Access] Skipped: ${template.displayName} - requires Azure AD Premium P2 license (uses risk-based conditions)`
       );
@@ -87,9 +84,7 @@ export async function executeConditionalAccessTask(
         error: "Requires Premium P2 license",
       };
     }
-  }
 
-  if (mode === "create") {
     const existingPolicy = findCachedConditionalAccessPolicy(
       template.displayName,
       context.cachedConditionalAccessPolicies
@@ -142,14 +137,15 @@ export async function executeConditionalAccessTask(
       createdId: created.id,
     };
   } else if (mode === "delete") {
+    const targetName = template?.displayName ?? task.itemName;
     const existingPolicy = findCachedConditionalAccessPolicy(
-      template.displayName,
+      targetName,
       context.cachedConditionalAccessPolicies
     );
 
     if (!existingPolicy) {
       // If no cache, check via API
-      const exists = await conditionalAccessPolicyExists(client, template.displayName);
+      const exists = await conditionalAccessPolicyExists(client, targetName);
       if (!exists) {
         return { task, success: true, skipped: true, error: "Not found in tenant" };
       }
@@ -162,7 +158,7 @@ export async function executeConditionalAccessTask(
 
     // Delete the policy (must be disabled first)
     try {
-      await deleteConditionalAccessPolicyByName(client, template.displayName);
+      await deleteConditionalAccessPolicyByName(client, targetName);
       return { task, success: true, skipped: false };
     } catch (error) {
       // Policy not found or not created by hydration kit - skip

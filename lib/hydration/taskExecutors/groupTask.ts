@@ -8,7 +8,6 @@ import { DeviceGroup } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
 import { createGroup, deleteGroupByName } from "@/lib/graph/groups";
 import { getCachedTemplates, GroupTemplate } from "@/lib/templates/loader";
-import * as Templates from "@/templates";
 
 /**
  * Execute a group task (create or delete)
@@ -19,17 +18,12 @@ export async function executeGroupTask(
 ): Promise<ExecutionResult> {
   const { client, operationMode: mode, isPreview } = context;
 
-  // Try to get template from cache first, fallback to hardcoded templates
+  // Templates are loaded from the bundled JSON files before execution.
   let template: GroupTemplate | DeviceGroup | undefined;
   const cachedGroups = getCachedTemplates("groups");
 
   if (cachedGroups && Array.isArray(cachedGroups)) {
     template = (cachedGroups as GroupTemplate[]).find((g) => g.displayName === task.itemName);
-  }
-
-  // Fallback to hardcoded templates if not in cache
-  if (!template) {
-    template = Templates.getDynamicGroupByName(task.itemName);
   }
 
   if (!template) {

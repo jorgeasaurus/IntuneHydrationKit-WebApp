@@ -38,6 +38,8 @@ import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
 
+const TASK_DELAY_MS = 2000;
+
 /**
  * Helper to emit status updates to UI
  */
@@ -80,7 +82,6 @@ export type { ExecutionContext, ExecutionResult, CISPolicyType, BuildTaskQueueOp
 export { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 export { detectCISPolicyType } from "./policyDetection";
 export {
-  buildTaskQueue,
   buildTaskQueueAsync,
   getEstimatedTaskCount,
   getEstimatedCategoryCount,
@@ -186,6 +187,49 @@ async function executeTask(
   }
 }
 
+async function executeSequentialTasks(
+  tasks: HydrationTask[],
+  context: ExecutionContext,
+  results: ExecutionResult[],
+  cancelAllRemaining = false
+): Promise<void> {
+  for (let taskIndex = 0; taskIndex < tasks.length; taskIndex++) {
+    const task = tasks[taskIndex];
+
+    if (context.shouldCancel?.()) {
+      console.log("[Execute Tasks] Execution cancelled by user");
+      if (cancelAllRemaining) {
+        cancelRemainingTasks(tasks, taskIndex, results);
+        break;
+      }
+      markTaskCancelled(task, results);
+      continue;
+    }
+
+    const pauseResult = await waitWhilePaused(context);
+    if (pauseResult === "cancelled") {
+      console.log("[Execute Tasks] Execution cancelled while paused");
+      if (cancelAllRemaining) {
+        cancelRemainingTasks(tasks, taskIndex, results);
+        break;
+      }
+      markTaskCancelled(task, results);
+      continue;
+    }
+
+    const result = await executeTask(task, context);
+    results.push(result);
+
+    if (context.stopOnFirstError && !result.success && !result.skipped) {
+      break;
+    }
+
+    if (taskIndex < tasks.length - 1) {
+      await sleepWithExecutionControl(TASK_DELAY_MS, context);
+    }
+  }
+}
+
 /**
  * Execute a queue of tasks sequentially with delays
  */
@@ -194,7 +238,6 @@ export async function executeTasks(
   context: ExecutionContext
 ): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
-  const TASK_DELAY_MS = 2000; // 2 second delay between tasks
 
   emitStatus(context, `Checking tenant for existing resources (${tasks.length} items selected)...`, "info", "prefetch");
 
@@ -465,40 +508,7 @@ export async function executeTasks(
       }
     }
 
-    // Execute non-batchable tasks sequentially
-    for (let taskIndex = 0; taskIndex < nonBatchableTasks.length; taskIndex++) {
-      const task = nonBatchableTasks[taskIndex];
-
-      // Check for cancellation before starting task
-      if (context.shouldCancel?.()) {
-        console.log("[Execute Tasks] Execution cancelled by user");
-        task.status = "skipped";
-        task.error = "Cancelled by user";
-        results.push({ task, success: false, skipped: true, error: "Cancelled by user" });
-        continue;
-      }
-
-      // Handle pause
-      const pauseResult = await waitWhilePaused(context);
-      if (pauseResult === "cancelled") {
-        console.log("[Execute Tasks] Execution cancelled while paused");
-        markTaskCancelled(task, results);
-        continue;
-      }
-
-      const result = await executeTask(task, context);
-      results.push(result);
-
-      // Stop on first error if configured
-      if (context.stopOnFirstError && !result.success && !result.skipped) {
-        break;
-      }
-
-      // Add delay between tasks to avoid API throttling
-      if (taskIndex < nonBatchableTasks.length - 1) {
-        await sleepWithExecutionControl(TASK_DELAY_MS, context);
-      }
-    }
+    await executeSequentialTasks(nonBatchableTasks, context, results);
 
     return results;
   }
@@ -529,40 +539,7 @@ export async function executeTasks(
       }
     }
 
-    // Execute non-batchable tasks sequentially
-    for (let taskIndex = 0; taskIndex < nonBatchableTasks.length; taskIndex++) {
-      const task = nonBatchableTasks[taskIndex];
-
-      // Check for cancellation before starting task
-      if (context.shouldCancel?.()) {
-        console.log("[Execute Tasks] Execution cancelled by user");
-        task.status = "skipped";
-        task.error = "Cancelled by user";
-        results.push({ task, success: false, skipped: true, error: "Cancelled by user" });
-        continue;
-      }
-
-      // Handle pause
-      const pauseResult = await waitWhilePaused(context);
-      if (pauseResult === "cancelled") {
-        console.log("[Execute Tasks] Execution cancelled while paused");
-        markTaskCancelled(task, results);
-        continue;
-      }
-
-      const result = await executeTask(task, context);
-      results.push(result);
-
-      // Stop on first error if configured
-      if (context.stopOnFirstError && !result.success && !result.skipped) {
-        break;
-      }
-
-      // Add delay between tasks to avoid API throttling
-      if (taskIndex < nonBatchableTasks.length - 1) {
-        await sleepWithExecutionControl(TASK_DELAY_MS, context);
-      }
-    }
+    await executeSequentialTasks(nonBatchableTasks, context, results);
 
     return results;
   }
@@ -573,39 +550,7 @@ export async function executeTasks(
     console.log(`[Execute Tasks] Preview mode - sequential execution, no Graph mutations`);
   }
 
-  for (let taskIndex = 0; taskIndex < tasks.length; taskIndex++) {
-    const task = tasks[taskIndex];
-
-    // Check for cancellation before starting task
-    if (context.shouldCancel?.()) {
-      console.log("[Execute Tasks] Execution cancelled by user");
-      // Mark remaining tasks as skipped AND record them in results so
-      // the summary/report reflects the cancelled work
-      cancelRemainingTasks(tasks, taskIndex, results);
-      break;
-    }
-
-    // Handle pause
-    const pauseResult = await waitWhilePaused(context);
-    if (pauseResult === "cancelled") {
-      console.log("[Execute Tasks] Execution cancelled while paused");
-      cancelRemainingTasks(tasks, taskIndex, results);
-      break;
-    }
-
-    const result = await executeTask(task, context);
-    results.push(result);
-
-    // Stop on first error if configured
-    if (context.stopOnFirstError && !result.success && !result.skipped) {
-      break;
-    }
-
-    // Add delay between tasks to avoid API throttling
-    if (taskIndex < tasks.length - 1) {
-      await sleepWithExecutionControl(TASK_DELAY_MS, context);
-    }
-  }
+  await executeSequentialTasks(tasks, context, results, true);
 
   return results;
 }

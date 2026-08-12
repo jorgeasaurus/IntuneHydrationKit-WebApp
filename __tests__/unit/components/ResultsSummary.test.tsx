@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
+import { render, screen } from '@testing-library/react'
 import { ResultsSummary } from '@/components/dashboard/ResultsSummary'
 import type { HydrationSummary, HydrationTask } from '@/types/hydration'
 

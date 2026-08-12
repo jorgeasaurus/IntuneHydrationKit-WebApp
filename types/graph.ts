@@ -90,3 +90,13 @@ export interface AppProtectionPolicy {
   _platform?: "iOS" | "android";
   [key: string]: unknown;
 }
+
+/** App protection policy returned by Graph collection endpoints. */
+export interface TenantAppProtectionPolicy {
+  "@odata.type"?: string;
+  id?: string;
+  displayName: string;
+  description: string;
+  _platform?: "iOS" | "android";
+  [key: string]: unknown;
+}

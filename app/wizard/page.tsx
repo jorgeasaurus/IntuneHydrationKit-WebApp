@@ -11,7 +11,8 @@ import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SettingsModal } from "@/components/SettingsModal";
 import { TenantConfig } from "@/components/wizard/TenantConfig";
 import { OperationModeSelection } from "@/components/wizard/OperationMode";
-import { TargetSelection } from "@/components/wizard/TargetSelection";
+import { TargetSelectionView } from "@/components/wizard/TargetSelectionView";
+import { useTargetSelectionController } from "@/components/wizard/useTargetSelectionController";
 import { ReviewConfirm } from "@/components/wizard/ReviewConfirm";
 import { Button } from "@/components/ui/button";
 import { useWizardState } from "@/hooks/useWizardState";
@@ -68,6 +69,12 @@ const WIZARD_STEPS = [
   },
 ] as const;
 
+function TargetSelectionStep() {
+  const model = useTargetSelectionController();
+
+  return <TargetSelectionView model={model} />;
+}
+
 function WizardContent() {
   const { state, setCurrentStep } = useWizardState();
   const { accounts } = useMsal();
@@ -117,7 +124,7 @@ function WizardContent() {
     ) : state.currentStep === 2 ? (
       <OperationModeSelection />
     ) : state.currentStep === 3 ? (
-      <TargetSelection />
+      <TargetSelectionStep />
     ) : state.currentStep === 4 ? (
       <ReviewConfirm />
     ) : null;

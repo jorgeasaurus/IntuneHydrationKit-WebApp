@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, within } from '@/__tests__/setup/test-utils'
+import { render, screen, within } from '@testing-library/react'
 import { OperationModeSelection } from '@/components/wizard/OperationMode'
 import type { WizardState } from '@/types/hydration'
 

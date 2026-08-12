@@ -75,30 +75,36 @@ const PLATFORM_DISPLAY_NAMES = {
   'WINDOWS365': 'Windows 365 Cloud PC',
 };
 
-// Map policy types to descriptions
-const POLICY_TYPE_DESCRIPTIONS = {
-  'SettingsCatalog': 'Settings Catalog configuration policies',
-  'CompliancePolicies': 'Device compliance policies',
-  'AppProtection': 'App protection policies (MAM)',
-  'DeviceConfiguration': 'Device configuration profiles',
-  'UpdatePolicies': 'Windows Update for Business rings',
-  'DriverUpdateProfiles': 'Windows driver update profiles',
-};
+function getExistingDisplayNames() {
+  if (!fs.existsSync(MANIFEST_PATH)) return new Map();
+
+  try {
+    const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf8'));
+    if (!Array.isArray(manifest.files)) return new Map();
+
+    return new Map(manifest.files.map(file => [file.path, file.displayName]));
+  } catch {
+    console.warn('Existing manifest is invalid. Display-name aliases cannot be retained.');
+    return new Map();
+  }
+}
 
 function generateManifest() {
   console.log('Scanning OpenIntuneBaseline directory...');
 
   const jsonFiles = getJsonFiles(OIB_DIR);
+  const existingDisplayNames = getExistingDisplayNames();
 
   console.log(`Found ${jsonFiles.length} JSON files`);
 
   const files = jsonFiles.map(filePath => {
     const { platform, policyType, displayName } = parseFilePath(filePath);
+    const webPath = filePath.replace(/\\/g, '/');
     return {
-      path: filePath.replace(/\\/g, '/'), // Normalize path separators for web
+      path: webPath,
       platform,
       policyType,
-      displayName,
+      displayName: existingDisplayNames.get(webPath) || displayName,
     };
   });
 
@@ -116,15 +122,9 @@ function generateManifest() {
       platformSummary[file.platform] = {
         name: PLATFORM_DISPLAY_NAMES[file.platform] || file.platform,
         count: 0,
-        policyTypes: {},
       };
     }
     platformSummary[file.platform].count++;
-
-    if (!platformSummary[file.platform].policyTypes[file.policyType]) {
-      platformSummary[file.platform].policyTypes[file.policyType] = 0;
-    }
-    platformSummary[file.platform].policyTypes[file.policyType]++;
   }
 
   // Convert to array format
@@ -132,19 +132,12 @@ function generateManifest() {
     id,
     name: data.name,
     count: data.count,
-    policyTypes: Object.entries(data.policyTypes).map(([type, count]) => ({
-      type,
-      description: POLICY_TYPE_DESCRIPTIONS[type] || type,
-      count,
-    })),
   }));
 
   const manifest = {
-    version: '1.0.0',
-    generatedAt: new Date().toISOString(),
     totalFiles: files.length,
     platforms,
-    files,
+    files: files.map(({ path, displayName }) => ({ path, displayName })),
   };
 
   fs.writeFileSync(MANIFEST_PATH, JSON.stringify(manifest, null, 2));
@@ -156,9 +149,6 @@ function generateManifest() {
   console.log('\nPlatform breakdown:');
   for (const plat of platforms) {
     console.log(`  ${plat.name}: ${plat.count} files`);
-    for (const pt of plat.policyTypes) {
-      console.log(`    - ${pt.type}: ${pt.count}`);
-    }
   }
 }
 

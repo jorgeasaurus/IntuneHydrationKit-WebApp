@@ -3,8 +3,8 @@
 import { useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityMessage } from "@/lib/hydration/types";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
+import { formatClockTime } from "@/lib/utils/dateFormat";
 import {
   Info,
   CheckCircle2,
@@ -20,19 +20,19 @@ interface ActivityLogProps {
 }
 
 const MESSAGE_ICONS: Record<ActivityMessage["type"], React.ReactNode> = {
-  info: <Info className="size-3.5 text-blue-500" />,
-  progress: <Loader2 className="size-3.5 text-blue-500 animate-spin" />,
-  success: <CheckCircle2 className="size-3.5 text-green-500" />,
-  warning: <AlertTriangle className="size-3.5 text-amber-500" />,
-  error: <XCircle className="size-3.5 text-red-500" />,
+  info: <Info className="size-3.5 text-slate-200" />,
+  progress: <Loader2 className="size-3.5 animate-spin text-sky-200" />,
+  success: <CheckCircle2 className="size-3.5 text-emerald-200" />,
+  warning: <AlertTriangle className="size-3.5 text-amber-200" />,
+  error: <XCircle className="size-3.5 text-red-200" />,
 };
 
 const MESSAGE_COLORS: Record<ActivityMessage["type"], string> = {
-  info: "text-muted-foreground",
-  progress: "text-blue-600 dark:text-blue-400",
-  success: "text-green-600 dark:text-green-400",
-  warning: "text-amber-600 dark:text-amber-400",
-  error: "text-red-600 dark:text-red-400",
+  info: "text-slate-100",
+  progress: "text-sky-200",
+  success: "text-emerald-200",
+  warning: "text-amber-200",
+  error: "text-red-200",
 };
 
 export function ActivityLog({ messages, className }: ActivityLogProps) {
@@ -59,7 +59,7 @@ export function ActivityLog({ messages, className }: ActivityLogProps) {
       </CardHeader>
       <CardContent className="pt-0">
         <div
-          className="h-[200px] overflow-y-auto rounded-md border bg-muted/30 p-3"
+          className="h-[200px] overflow-y-auto rounded-md border bg-slate-950/80 p-3"
           ref={scrollRef}
         >
           <div className="space-y-1.5 font-mono text-xs">
@@ -74,8 +74,8 @@ export function ActivityLog({ messages, className }: ActivityLogProps) {
                 <span className="flex-shrink-0 mt-0.5">
                   {MESSAGE_ICONS[msg.type]}
                 </span>
-                <span className="text-muted-foreground opacity-60 flex-shrink-0">
-                  [{format(msg.timestamp, "HH:mm:ss")}]
+                <span className="flex-shrink-0 text-slate-300">
+                  [{formatClockTime(msg.timestamp)}]
                 </span>
                 <span className="break-words">{msg.message}</span>
               </div>

@@ -7,7 +7,7 @@ import { AppNavigation } from "@/components/AppNavigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Home, RefreshCcw, AlertTriangle } from "lucide-react";
-import { ResultsSummary } from "@/components/dashboard";
+import { ResultsSummary } from "@/components/dashboard/ResultsSummary";
 import { HydrationSummary, HydrationTask } from "@/types/hydration";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useWizardState } from "@/hooks/useWizardState";

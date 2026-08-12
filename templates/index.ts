@@ -9,15 +9,9 @@ import {
   STATIC_GROUP_TEMPLATE_COUNT,
 } from "./groupManifest";
 
-export * from "./groups";
-export * from "./filters";
 export * from "./filterManifest";
 export * from "./groupManifest";
-export * from "./compliance";
-export * from "./conditionalAccess";
-export * from "./appProtection";
 export * from "./win32Apps";
-export * from "./enrollment";
 
 /**
  * Template metadata for UI display
@@ -141,10 +135,3 @@ export const CIS_CATEGORY_METADATA = {
     count: 20,
   },
 } as const;
-
-/**
- * Get total count of all templates
- */
-export function getTotalTemplateCount(): number {
-  return Object.values(TEMPLATE_METADATA).reduce((sum, meta) => sum + meta.count, 0);
-}

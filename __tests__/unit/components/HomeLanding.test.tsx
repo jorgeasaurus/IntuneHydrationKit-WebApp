@@ -1,8 +1,8 @@
 import type { AnchorHTMLAttributes, ComponentProps } from 'react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@/__tests__/setup/test-utils'
+import { render, screen } from '@testing-library/react'
 import { HomeLanding } from '@/components/landing/HomeLanding'
 import packageJson from '@/package.json'
 
@@ -43,6 +43,15 @@ function renderLanding(overrides: Partial<ComponentProps<typeof HomeLanding>> = 
 describe('HomeLanding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+    }))
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
   })
 
   it('renders the current app version with product proof and core sections', () => {
@@ -78,6 +87,20 @@ describe('HomeLanding', () => {
 
     await user.click(screen.getAllByRole('button', { name: /Launch Wizard|Continue/i })[0])
     expect(onContinue).toHaveBeenCalledTimes(1)
+  })
+
+  it('supports legacy media-query listeners for the desktop demo', () => {
+    const addListener = vi.fn()
+
+    vi.stubGlobal('matchMedia', vi.fn().mockReturnValue({
+        matches: false,
+        addListener,
+        removeListener: vi.fn(),
+    }))
+
+    renderLanding()
+
+    expect(addListener).toHaveBeenCalledTimes(1)
   })
 
 })

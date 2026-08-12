@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render } from '@/__tests__/setup/test-utils'
+import { render } from '@testing-library/react'
 import { Toaster } from '@/components/ui/sonner'
 
 interface SonnerMockProps {
