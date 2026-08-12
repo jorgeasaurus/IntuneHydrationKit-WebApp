@@ -12,6 +12,7 @@ const createGraphClient = vi.fn()
 vi.mock('@azure/msal-react', () => ({
   useMsal: () => ({
     accounts: [{ tenantId: 'tenant-123', username: 'operator@contoso.com' }],
+    instance: { getActiveAccount: () => ({ tenantId: 'tenant-123', homeAccountId: 'home-tenant-123', username: 'operator@contoso.com' }) },
   }),
 }))
 

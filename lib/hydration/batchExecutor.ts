@@ -1251,7 +1251,7 @@ function updateCacheAfterCreate(
 export function isBatchableCategory(category: string): boolean {
   // Compliance re-enabled for batch - using smaller batch size and proper retry handling
   // PowerShell reference implementation uses batch successfully
-  return ["groups", "filters", "compliance", "conditionalAccess", "baseline", "cisBaseline"].includes(category);
+  return ["groups", "filters", "compliance", "baseline", "cisBaseline"].includes(category);
 }
 
 // ============================================================================
@@ -1649,14 +1649,14 @@ function getAssignmentEndpoint(
 
 /**
  * Check if a resource has active assignments
- * Returns the assignment count, or 0 if assignments can't be checked
+ * Returns the assignment count, or null when assignment state can't be checked.
  */
 async function checkResourceAssignments(
   context: ExecutionContext,
   category: string,
   resourceId: string,
   endpointType?: BaselineEndpointType
-): Promise<number> {
+): Promise<number | null> {
   // Skip assignment checks in preview mode - they're read-only but slow
   if (context.isPreview) {
     return 0;
@@ -1673,9 +1673,9 @@ async function checkResourceAssignments(
     const response = await context.client.get<{ value: Array<{ id: string }> }>(assignmentEndpoint);
     return response.value?.length ?? 0;
   } catch (error) {
-    // If we can't check assignments, log and continue (don't block deletion)
+    // A failed assignment read is unsafe for a destructive operation.
     console.log(`[BatchExecutor:DELETE] Could not check assignments: ${error instanceof Error ? error.message : String(error)}`);
-    return 0;
+    return null;
   }
 }
 
@@ -1753,6 +1753,9 @@ async function prepareTaskForDeleteBatch(
     resource.id,
     resource.endpointType
   );
+  if (assignmentCount === null) {
+    return { type: "skip", reason: "Could not verify active assignments - deletion skipped" };
+  }
   if (assignmentCount > 0) {
     console.log(`[BatchExecutor:DELETE] ○ Has assignments: "${task.itemName}" (${assignmentCount} assignment(s))`);
     return { type: "skip", reason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting` };
@@ -2251,6 +2254,16 @@ export async function executeDeletesInParallel(
       continue;
     }
 
+    if (task.category === "conditionalAccess") {
+      preparedTasks.push({
+        task,
+        deleteUrl: null,
+        apiVersion: "beta",
+        skipReason: "Conditional Access deletion must use the sequential safety check",
+      });
+      continue;
+    }
+
     // Check for active assignments - skip deletion if policy is assigned
     const assignmentCount = await checkResourceAssignments(
       context,
@@ -2258,6 +2271,15 @@ export async function executeDeletesInParallel(
       resourceInfo.id,
       resourceInfo.endpointType
     );
+    if (assignmentCount === null) {
+      preparedTasks.push({
+        task,
+        deleteUrl: null,
+        apiVersion: "beta",
+        skipReason: "Could not verify active assignments - deletion skipped",
+      });
+      continue;
+    }
     if (assignmentCount > 0) {
       preparedTasks.push({
         task,

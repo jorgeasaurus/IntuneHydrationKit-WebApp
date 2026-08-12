@@ -3,11 +3,16 @@ import { describe, expect, it, vi } from "vitest";
 import {
   executeDeleteTasksInBatches,
   executeDeletesInParallel,
+  isBatchableCategory,
 } from "@/lib/hydration/batchExecutor";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
 
 describe("executeDeletesInParallel", () => {
+  it("keeps Conditional Access out of batch execution", () => {
+    expect(isBatchableCategory("conditionalAccess")).toBe(false);
+  });
+
   it("deletes baseline group policy configurations when they exist in the group policy cache", async () => {
     const task: HydrationTask = {
       id: "baseline-group-policy-delete",
@@ -19,7 +24,7 @@ describe("executeDeletesInParallel", () => {
 
     const client = {
       delete: vi.fn().mockResolvedValue(undefined),
-      get: vi.fn(),
+      get: vi.fn().mockResolvedValue({ value: [] }),
       post: vi.fn(),
       getCollection: vi.fn(),
       patch: vi.fn(),
@@ -60,7 +65,7 @@ describe("executeDeletesInParallel", () => {
 
     const client = {
       delete: vi.fn().mockResolvedValue(undefined),
-      get: vi.fn(),
+      get: vi.fn().mockResolvedValue({ value: [] }),
       post: vi.fn(),
       getCollection: vi.fn(),
       patch: vi.fn(),
@@ -133,7 +138,7 @@ describe("executeDeletesInParallel", () => {
     );
   });
 
-  it("deletes conditional access policies that are marked only by the [IHD] prefix", async () => {
+  it("skips conditional access policies in the parallel delete path", async () => {
     const task: HydrationTask = {
       id: "conditional-access-delete",
       category: "conditionalAccess",
@@ -166,11 +171,49 @@ describe("executeDeletesInParallel", () => {
     const results = await executeDeletesInParallel([task], context);
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toMatchObject({ success: true, skipped: false });
-    expect(client.delete).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/ca-policy-id",
-      "beta"
-    );
+    expect(results[0]).toMatchObject({
+      success: false,
+      skipped: true,
+      error: "Conditional Access deletion must use the sequential safety check",
+    });
+    expect(client.delete).not.toHaveBeenCalled();
+  });
+
+  it("skips deletion when assignment lookup fails", async () => {
+    const task: HydrationTask = {
+      id: "assigned-policy-read-failure",
+      category: "baseline",
+      operation: "delete",
+      itemName: "Assigned settings policy",
+      status: "pending",
+    };
+    const client = {
+      delete: vi.fn(),
+      get: vi.fn().mockRejectedValue(new Error("Graph unavailable")),
+      post: vi.fn(),
+      getCollection: vi.fn(),
+      patch: vi.fn(),
+    } as unknown as ExecutionContext["client"];
+    const context: ExecutionContext = {
+      client,
+      operationMode: "delete",
+      isPreview: false,
+      stopOnFirstError: false,
+      cachedSettingsCatalogPolicies: [{
+        id: "assigned-policy-id",
+        name: "Assigned settings policy",
+        description: "Imported by Intune Hydration Kit",
+      }],
+    };
+
+    const results = await executeDeletesInParallel([task], context);
+
+    expect(results).toEqual([expect.objectContaining({
+      success: false,
+      skipped: true,
+      error: "Could not verify active assignments - deletion skipped",
+    })]);
+    expect(client.delete).not.toHaveBeenCalled();
   });
 
   it("deletes Linux compliance policies from the V2 compliance cache", async () => {

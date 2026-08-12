@@ -56,6 +56,7 @@ vi.mock("@/lib/auth/msalConfig", () => ({
 
 import {
   AuthSessionExpiredError,
+  assertActiveAccountMatches,
   getAccessToken,
   getActiveAccount,
   isAuthenticated,
@@ -99,6 +100,20 @@ describe("authUtils", () => {
 
   it("returns null when no active account exists", () => {
     expect(getActiveAccount()).toBeNull();
+  });
+
+  it("rejects an active account that differs from the confirmed account", () => {
+    mocks.msalInstance.getActiveAccount.mockReturnValue(account);
+
+    expect(() => assertActiveAccountMatches("other-tenant", account.homeAccountId)).toThrow(
+      "The active account changed"
+    );
+  });
+
+  it("accepts the confirmed active account", () => {
+    mocks.msalInstance.getActiveAccount.mockReturnValue(account);
+
+    expect(assertActiveAccountMatches(account.tenantId, account.homeAccountId)).toEqual(account);
   });
 
   it("throws an auth session error when requesting a token without an account", async () => {

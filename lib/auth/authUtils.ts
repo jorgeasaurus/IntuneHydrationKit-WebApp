@@ -11,6 +11,20 @@ export function getActiveAccount(): AccountInfo | null {
   return msalInstance.getActiveAccount() ?? msalInstance.getAllAccounts()[0] ?? null;
 }
 
+/** Require the active account to match the account confirmed in the wizard. */
+export function assertActiveAccountMatches(
+  tenantId: string,
+  homeAccountId: string
+): AccountInfo {
+  const account = getActiveAccount();
+  if (!account || account.tenantId !== tenantId || account.homeAccountId !== homeAccountId) {
+    throw new AuthSessionExpiredError(
+      "The active account changed. Return to tenant configuration and confirm the active account before continuing."
+    );
+  }
+  return account;
+}
+
 /**
  * Acquire an access token silently
  * Falls back to interactive login if silent acquisition fails (timeout, interaction required)

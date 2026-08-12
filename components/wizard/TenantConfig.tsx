@@ -95,7 +95,7 @@ export function TenantConfig(): React.JSX.Element {
     setPrerequisiteResult: setWizardPrerequisiteResult,
     nextStep,
   } = useWizardState();
-  const { accounts } = useMsal();
+  const { accounts, instance } = useMsal();
   const [isLoading, setIsLoading] = useState(false);
   const [prerequisiteStatus, setPrerequisiteStatus] =
     useState<PrerequisiteCheckStatus>(
@@ -105,8 +105,9 @@ export function TenantConfig(): React.JSX.Element {
     useState<PrerequisiteCheckResult | null>(state.prerequisiteResult ?? null);
   const userLocale = useSyncExternalStore(subscribeToUserLocale, getUserLocale, getServerLocale);
 
-  const tenantId = accounts.length > 0 ? accounts[0].tenantId : "";
-  const operatorUsername = accounts[0]?.username || "Not signed in";
+  const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
+  const tenantId = activeAccount?.tenantId ?? "";
+  const operatorUsername = activeAccount?.username || "Not signed in";
   const tenantName = prerequisiteResult?.organization?.displayName || "";
 
   const runPrerequisiteValidation = useCallback(async (showLoadingState: boolean): Promise<void> => {
@@ -166,6 +167,7 @@ export function TenantConfig(): React.JSX.Element {
   function handleContinue(): void {
     setTenantConfig({
       tenantId,
+      accountHomeId: activeAccount?.homeAccountId ?? "",
       tenantName: tenantName || undefined,
       cloudEnvironment: "global",
     });
