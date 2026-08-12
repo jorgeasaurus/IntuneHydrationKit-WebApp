@@ -192,7 +192,10 @@ export function useHydrationExecution() {
       executionRun.cancelled = false;
 
       // Create Graph client
-      const client = createGraphClient();
+      const client = createGraphClient({
+        tenantId: state.tenantConfig.tenantId,
+        homeAccountId: state.tenantConfig.homeAccountId,
+      });
 
       // Task update callback for all task events
       const updateTask = (task: HydrationTask) => {

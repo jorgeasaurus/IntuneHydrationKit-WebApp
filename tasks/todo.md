@@ -1,3 +1,37 @@
+# Navigation at 1235 x 1214
+
+- [x] Reproduce the navigation defect on `main` at 1235 x 1214.
+- [x] Identify the responsive breakpoint and layout cause.
+- [x] Fix the navigation without changing desktop or mobile behavior.
+- [x] Add viewport regression coverage.
+- [x] Run focused tests, type-check, lint, production build, and visual verification.
+- [x] Increment the website version.
+- [x] Retarget the pull request against `dev`.
+
+## Review
+
+- The stepped `container` width constrained the bar at 1235 px, and the `md` link breakpoint caused horizontal overflow from 768 through 960 px.
+- The navigation now uses a fluid 2xl shell and shows the full link set only at 1024 px and wider.
+- Checks passed on the merged `dev` state: 518 unit tests, two Playwright viewport regressions, type-check, lint, production build, visual inspection, and `git diff --check`.
+- Copilot review replaced hard-coded viewport edges with client-width-relative assertions and allowed one pixel for browser rounding.
+
+# Security Control Remediation
+
+- [x] Revalidate the delete and tenant identity findings on `dev`.
+- [x] Keep Conditional Access deletion on the state-validating sequential path.
+- [x] Fail closed when assignment checks cannot complete.
+- [x] Bind Graph requests to the confirmed active MSAL account.
+- [x] Add focused regression coverage and run verification.
+
+## Review
+
+- Regression coverage now protects the Conditional Access fast-delete exclusion, fail-closed assignment checks, and account binding for Graph requests.
+- Checks passed: focused unit tests, type-check, lint, production build, and `git diff --check`.
+- Copilot review identified and verified fixes for unbound prerequisite validation and the pending-validation continue gate.
+- Copilot review identified and verified non-retryable handling for authentication session failures.
+- Copilot review identified and verified sequential Conditional Access batch deletion and active-account recovery guidance.
+- The production release review aligned tenant configuration with MSAL's `homeAccountId` name.
+
 # Landing Hero Intermediate-Width Overlap
 
 - [x] Reproduce the 1067px-wide landing layout and identify the constrained desktop grid.

@@ -84,6 +84,7 @@ function createWizardState(overrides: Partial<WizardState> = {}): WizardState {
     currentStep: 5,
     tenantConfig: {
       tenantId: "tenant-123",
+      homeAccountId: "home-tenant-123",
       tenantName: "Contoso",
       cloudEnvironment: "global",
     },
@@ -261,7 +262,10 @@ describe("useHydrationExecution", () => {
       await result.current.startExecution();
     });
 
-    expect(mockCreateGraphClient).toHaveBeenCalled();
+    expect(mockCreateGraphClient).toHaveBeenCalledWith({
+      tenantId: "tenant-123",
+      homeAccountId: "home-tenant-123",
+    });
     expect(mockBuildTaskQueueAsync).toHaveBeenCalledWith(
       ["groups", "enrollment"],
       "create",

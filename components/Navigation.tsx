@@ -43,14 +43,14 @@ export function Navigation() {
       <div className="fixed top-0 left-0 right-0 z-50">
         <div className="h-[2px] bg-gradient-to-r from-transparent via-hydrate to-transparent" />
 
-        <div className="container mx-auto px-4 sm:px-6">
+        <div className="mx-auto w-full max-w-screen-2xl px-4 sm:px-6">
           <nav className="nav-industrial">
             <div className="flex h-16 items-center justify-between px-4 sm:px-6">
               {/* Logo and Brand */}
               <NavigationBrand showWordmark />
 
               {/* Navigation Links */}
-              <div className="hidden md:flex items-center gap-8">
+              <div className="hidden items-center gap-8 lg:flex">
                 <Link href={getSectionHref("#features")} className="nav-link text-sm font-medium">
                   Features
                 </Link>
