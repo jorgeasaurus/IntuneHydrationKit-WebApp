@@ -1,3 +1,30 @@
+# README Visual Refresh
+
+- [x] Define a restrained README visual system that matches the product.
+- [x] Refresh the header, navigation, features, workflow, and content hierarchy.
+- [x] Verify Markdown structure, image references, links, and the final diff.
+- [x] Increment the website version for the pull request.
+- [ ] Commit and push the intended files, then open a draft pull request to `main`.
+- [ ] Verify the published pull request metadata.
+
+## Review
+
+- Added a centered brand header, product badges, section links, a clickable hero image, capability and coverage tables, a technology summary, a compact update log, a four-stage workflow, and a branded footer.
+- Removed decorative emoji and kept the existing technical content and product image.
+- All five section anchors, local images, local document links, and `git diff --check` passed.
+- The website version is 2.6.45.
+
+# README Site Image Refresh
+
+- [x] Audit the README and repository for site image references.
+- [x] Replace the old landing page image with `NewPage.png`.
+- [x] Remove the obsolete site image and verify the final README reference.
+
+## Review
+
+- The README now shows `NewPage.png`, and the obsolete `LandingPage.jpeg` file and reference are removed.
+- Image existence, repository references, and `git diff --check` passed.
+
 # Navigation at 1235 x 1214
 
 - [x] Reproduce the navigation defect on `main` at 1235 x 1214.

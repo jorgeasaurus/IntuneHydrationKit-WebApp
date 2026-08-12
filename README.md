@@ -1,32 +1,64 @@
-# Intune Hydration Kit - Web Application
+<p align="center">
+  <img src="./public/IHTLogoClear.png" alt="Intune Hydration Kit logo" width="104" />
+</p>
 
-A web-based version of the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit) that enables IT administrators to bootstrap Microsoft Intune tenants with best-practice configurations through an intuitive browser interface.
+<h1 align="center">Intune Hydration Kit</h1>
 
-![Current Intune Hydration Kit landing page](./LandingPage.jpeg)
+<p align="center">
+  <strong>A guided Microsoft Graph console for repeatable Intune tenant deployments.</strong>
+</p>
 
-## Features
+<p align="center">
+  Bootstrap best-practice configurations, preview every change, and keep clear evidence of each run.
+</p>
 
-- **Streamlined 4-Step Wizard**: Guided configuration process from tenant setup to execution
-- **MSAL Authentication**: Secure authentication with Microsoft Entra ID
-- **Cloud Support**: The web app currently supports Global (Commercial); use the PowerShell module for US Government, Germany, and China tenants
-- **Local Templates**: 182+ pre-built templates bundled with the app (no external dependencies)
-- **Template Catalog**: Browse every importable item and inspect the import-ready JSON payloads at `/templates`
-- **Safety First**: Built-in safeguards prevent accidental deletions
-- **Real-time Progress**: Live updates during policy deployment with pause/resume/cancel controls
-- **Comprehensive Coverage**: Deploy 47 groups, 29 filters, 10 compliance policies, 10 app protection policies, 20 conditional access policies, and more
-- **Optimized Performance**: Pre-fetch optimization reduces API calls by 90% for App Protection operations
-- **Execution Control**: Pause, resume, or cancel operations mid-execution
+<p align="center">
+  <img alt="Global commercial cloud" src="https://img.shields.io/badge/cloud-Global%20commercial-0ea5e9?style=flat-square&logo=microsoftazure&logoColor=white" />
+  <img alt="Commercial license" src="https://img.shields.io/badge/license-commercial-075985?style=flat-square" />
+  <img alt="Next.js 15" src="https://img.shields.io/badge/Next.js-15-111827?style=flat-square&logo=nextdotjs" />
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-2563eb?style=flat-square&logo=typescript&logoColor=white" />
+  <img alt="Microsoft Graph" src="https://img.shields.io/badge/Microsoft%20Graph-delegated-0ea5e9?style=flat-square&logo=microsoft" />
+</p>
 
-## Tech Stack
+<p align="center">
+  <a href="#why-intune-hydration-kit">Why this app</a> ·
+  <a href="#getting-started">Quick start</a> ·
+  <a href="#wizard-workflow">Workflow</a> ·
+  <a href="#security-considerations">Security</a> ·
+  <a href="#deployment">Deployment</a>
+</p>
 
-- **Framework**: Next.js 15 (App Router)
-- **Language**: TypeScript (strict mode)
-- **Authentication**: MSAL React (@azure/msal-react)
-- **UI Components**: shadcn/ui (Radix UI + Tailwind CSS)
-- **State Management**: React Context and local React state
-- **Styling**: Tailwind CSS with dark mode support
-- **Icons**: Lucide React
-- **Notifications**: Sonner
+<br />
+
+[![Current Intune Hydration Kit landing page](./NewPage.png)](./NewPage.png)
+
+## Why Intune Hydration Kit
+
+The web app brings the proven workflow from the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit) to administrators who prefer a guided browser interface.
+
+| Guided deployment | Guarded by default | Operator evidence |
+| --- | --- | --- |
+| A focused four-stage wizard takes you from tenant sign-in to execution. | Ownership markers, assignment checks, and disabled Conditional Access policies protect destructive operations. | Preview mode, live status, execution logs, and downloadable reports show what changed. |
+| **Deployment intelligence** | **Local template catalog** | **Execution control** |
+| Existing-object checks and tenant caches keep each run focused on work that can succeed. | Browse import-ready payloads and load 182+ bundled templates without a GitHub API dependency. | Pause, resume, or cancel a run while the sequential queue limits Graph throttling. |
+
+### Coverage at a glance
+
+| Dynamic groups | Device filters | Compliance | App protection | Conditional Access |
+| ---: | ---: | ---: | ---: | ---: |
+| 47 | 29 | 10 | 10 | 20 |
+
+The web app supports Global commercial tenants. Use the PowerShell module for US Government, Germany, and China tenants.
+
+## Built with
+
+| Layer | Technology |
+| --- | --- |
+| Application | Next.js 15 App Router and TypeScript strict mode |
+| Authentication | MSAL React with delegated Microsoft Graph access |
+| Interface | shadcn/ui, Radix UI, Tailwind CSS, and Lucide React |
+| State | React Context and local React state |
+| Feedback | Sonner notifications and live task status |
 
 ## Prerequisites
 
@@ -37,11 +69,11 @@ A web-based version of the [IntuneHydrationKit PowerShell module](https://github
 
 ## Required Microsoft Graph API Permissions
 
-> **📋 Requested Microsoft Graph Permissions**
+> **Required Microsoft Graph permissions**
 >
 > These scopes are required to read policies, assignments, groups, filters, and related Intune objects.
 >
-> **Delegated Permissions:**
+> **Delegated permissions:**
 >
 > - `DeviceManagementConfiguration.ReadWrite.All`
 > - `DeviceManagementServiceConfig.ReadWrite.All`
@@ -56,7 +88,7 @@ A web-based version of the [IntuneHydrationKit PowerShell module](https://github
 > - `LicenseAssignment.Read.All`
 > - `Organization.Read.All`
 >
-> **Note:** Admin consent is required for these permissions.
+> **Important:** Admin consent is required for these permissions.
 
 ## Getting Started
 
@@ -109,32 +141,16 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## Recent Updates
+## Recent updates
 
 ### January 2026
 
-**Wizard Simplification**
-- Reduced wizard from 5 steps to 4 by removing OpenIntuneBaseline configuration
-- All templates now load instantly from local `public/IntuneTemplates/` directory
-- No external GitHub API dependencies for template loading
-
-**App Protection Policies**
-- Updated to 10 App Protection policies (added 2 BYOD baseline templates)
-- Implemented pre-fetch optimization reducing API calls by 90%
-- Added PowerShell module parity for policy creation
-- Fixed platform detection for iOS vs Android policies
-
-**Execution Improvements**
-- Added execution lock to prevent duplicate runs in React Strict Mode
-- Implemented pause/resume/cancel controls
-- Added success items display in results summary
-- Cache versioning for automatic invalidation on template updates
-
-**UI Enhancements**
-- Added application favicon
-- Improved mobile responsiveness
-- Enhanced dark mode support
-- Real-time task status updates
+| Area | Update |
+| --- | --- |
+| Wizard | Reduced the workflow to four stages and moved template loading to the local catalog. |
+| App protection | Added 10 policies, PowerShell module parity, platform detection, and a 90% reduction in API requests. |
+| Execution | Added duplicate-run protection, pause and resume controls, cancellation, and cache versioning. |
+| Interface | Improved mobile layouts, dark mode, live task status, and application branding. |
 
 ## Available Scripts
 
@@ -175,32 +191,14 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Wizard Workflow
 
-The application guides you through a streamlined 4-step process:
+The application uses a focused four-stage process.
 
-### Step 1: Tenant Configuration
-- Enter your Tenant ID and optional display name
-- Use the Global (Commercial) cloud environment in the web app
-- Authenticate with Microsoft Entra ID
-
-### Step 2: Operation Mode
-- **Create**: Deploy new configurations (skips if already exists)
-- **Delete**: Remove configurations created by this tool (with safety checks)
-- **Preview**: See what would be deployed without making changes
-
-### Step 3: Target Selection
-Select which policy categories to deploy:
-- **Dynamic Groups** (47 items) - Device categorization groups
-- **Device Filters** (29 items) - Assignment filters for targeting
-- **Compliance Policies** (10 items) - Platform-specific compliance rules
-- **App Protection** (10 items) - MAM policies for iOS and Android
-- **Conditional Access** (20 items) - Zero Trust access policies
-- **Enrollment Profiles** (3 items) - Autopilot and DEP profiles
-
-### Step 4: Review & Confirm
-- Review all selections
-- View estimated object count
-- Confirm understanding of tenant modifications
-- Start execution
+| Stage | Purpose | Result |
+| ---: | --- | --- |
+| **01** | **Connect** — Enter the tenant, confirm the Global commercial cloud, and sign in with Microsoft Entra ID. | A verified tenant session. |
+| **02** | **Choose an operation** — Select Create, Preview, or Delete. | Explicit mutation intent. |
+| **03** | **Select targets** — Choose policy categories and individual templates. | A scoped execution queue. |
+| **04** | **Review and run** — Check object counts, confirm the operation, and start execution. | Live progress and a downloadable report. |
 
 ## Configuration
 
@@ -254,14 +252,14 @@ This application requires a platform that supports Next.js SSR/SSG and cannot be
 
 ### Recommended Platforms
 
-1. **Vercel** ⭐ (Recommended)
+1. **Vercel** (recommended)
    - Zero-configuration deployment
    - Automatic HTTPS and global CDN
    - Perfect Next.js optimization
    - Free tier available
    - Deploy: `vercel --prod`
 
-2. **Azure Static Web Apps** ⭐
+2. **Azure Static Web Apps**
    - Microsoft ecosystem integration
    - Seamless Entra ID integration
    - Built-in authentication providers
@@ -323,7 +321,7 @@ This software is proprietary. Evaluation is permitted only under the terms in
 the [Commercial End User License Agreement](LICENSE); production and other
 commercial use require a separately purchased written license.
 
-## Related Projects
+## Related projects
 
 - [IntuneHydrationKit PowerShell Module](https://github.com/jorgeasaurus/IntuneHydrationKit)
 - [OpenIntuneBaseline](https://github.com/jorgeasaurus/OpenIntuneBaseline)
@@ -337,4 +335,11 @@ For issues and questions:
 
 ---
 
-**Note**: This is a web interface for the IntuneHydrationKit. Power users can continue using the PowerShell module for automation scenarios.
+<p align="center">
+  <img src="./public/IHTLogoClear.png" alt="Intune Hydration Kit" width="48" />
+</p>
+
+<p align="center">
+  <strong>Guided in the browser. Scriptable in PowerShell.</strong><br />
+  Power users can continue to use the PowerShell module for automation scenarios.
+</p>
