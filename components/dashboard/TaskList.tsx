@@ -21,7 +21,7 @@ interface TaskListProps {
 
 const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
   success: <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />,
-  failed: <XCircle className="size-4 text-red-600 dark:text-red-400" />,
+  failed: <XCircle className="size-4 text-red-200" />,
   running: <Loader2 className="size-4 text-blue-600 dark:text-blue-400 animate-spin" />,
   pending: <Circle className="size-4 text-gray-400" />,
   skipped: <Ban className="size-4 text-amber-600 dark:text-amber-400" />,
