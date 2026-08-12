@@ -1,3 +1,15 @@
+# Landing Hero Intermediate-Width Overlap
+
+- [x] Reproduce the 1067px-wide landing layout and identify the constrained desktop grid.
+- [x] Keep the landing hero stacked until both columns fit without overlap.
+- [x] Add a 1067px viewport regression and run targeted validation.
+
+## Review
+
+- The two-column preview now begins at 1280px. At 1067px, the compact preview follows the hero content instead of intruding beside it.
+- Checks passed: focused unit and Playwright tests, type-check, lint, production build, and React Doctor (100/100).
+- One strict review cycle found no actionable issues. Full validation passed.
+
 # Win32 Detection Scripts in Template Docs
 
 - [x] Trace the current lazy Win32 script-loading and documentation path.
