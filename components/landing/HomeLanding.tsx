@@ -59,8 +59,13 @@ function useDesktopDemo(): boolean {
     const updateVisibility = () => setShowDesktopDemo(mediaQuery.matches);
 
     updateVisibility();
-    mediaQuery.addEventListener("change", updateVisibility);
-    return () => mediaQuery.removeEventListener("change", updateVisibility);
+    if (typeof mediaQuery.addEventListener === "function") {
+      mediaQuery.addEventListener("change", updateVisibility);
+      return () => mediaQuery.removeEventListener("change", updateVisibility);
+    }
+
+    mediaQuery.addListener(updateVisibility);
+    return () => mediaQuery.removeListener(updateVisibility);
   }, []);
 
   return showDesktopDemo;
@@ -260,27 +265,25 @@ function Hero({
             </div>
           </div>
 
-          {showDesktopDemo && (
-            <div className="landing-demo-column relative">
-              <div className="relative mx-auto max-w-2xl">
-                <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
-                  <div>
-                    <p className="font-mono text-xs uppercase text-muted-foreground">
-                      Live run preview
-                    </p>
-                    <p className="text-sm font-semibold">
-                      Scope, execute, report
-                    </p>
-                  </div>
-                  <span className="badge-status badge-info text-[10px]">
-                    <span className="status-dot status-dot-info" />
-                    Hydrate
-                  </span>
+          <div className="landing-demo-column relative hidden min-h-[465px] xl:block">
+            <div className="relative mx-auto max-w-2xl">
+              <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
+                <div>
+                  <p className="font-mono text-xs uppercase text-muted-foreground">
+                    Live run preview
+                  </p>
+                  <p className="text-sm font-semibold">
+                    Scope, execute, report
+                  </p>
                 </div>
-                <WebAppDemo />
+                <span className="badge-status badge-info text-[10px]">
+                  <span className="status-dot status-dot-info" />
+                  Hydrate
+                </span>
               </div>
+              {showDesktopDemo && <WebAppDemo />}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </section>

@@ -88,4 +88,21 @@ describe('HomeLanding', () => {
     expect(onContinue).toHaveBeenCalledTimes(1)
   })
 
+  it('supports legacy media-query listeners for the desktop demo', () => {
+    const addListener = vi.fn()
+
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockReturnValue({
+        matches: false,
+        addListener,
+        removeListener: vi.fn(),
+      }),
+    })
+
+    renderLanding()
+
+    expect(addListener).toHaveBeenCalledTimes(1)
+  })
+
 })
