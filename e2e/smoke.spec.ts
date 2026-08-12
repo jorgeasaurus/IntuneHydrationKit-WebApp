@@ -68,6 +68,48 @@ test.describe("Landing Page", () => {
     await expect(page.locator(".landing-mobile-preview")).toBeVisible();
   });
 
+  test("keeps the complete navigation inside the 1235px viewport", async ({ page }) => {
+    await page.setViewportSize({ width: 1235, height: 1214 });
+    await page.goto("/");
+
+    const navigation = page.getByRole("navigation");
+    const navigationBox = await navigation.boundingBox();
+    const brandBox = await page.getByRole("link", { name: "Intune Hydration Kit home" }).boundingBox();
+    const featuresBox = await page.getByRole("link", { name: "Features" }).boundingBox();
+    const templateDocsBox = await navigation.getByRole("link", { name: "Template Docs" }).boundingBox();
+    const githubBox = await page.getByRole("link", { name: "GitHub Repository" }).boundingBox();
+    const signInBox = await navigation.getByRole("button", { name: "Sign In" }).boundingBox();
+
+    expect(navigationBox).not.toBeNull();
+    expect(brandBox).not.toBeNull();
+    expect(featuresBox).not.toBeNull();
+    expect(templateDocsBox).not.toBeNull();
+    expect(githubBox).not.toBeNull();
+    expect(signInBox).not.toBeNull();
+
+    expect(navigationBox!.x).toBeLessThanOrEqual(24);
+    expect(navigationBox!.x + navigationBox!.width).toBeGreaterThanOrEqual(1211);
+    expect(brandBox!.x + brandBox!.width).toBeLessThan(featuresBox!.x);
+    expect(templateDocsBox!.x + templateDocsBox!.width).toBeLessThan(githubBox!.x);
+    expect(signInBox!.x + signInBox!.width).toBeLessThanOrEqual(1211);
+  });
+
+  test("uses the compact navigation before the full link set can fit", async ({ page }) => {
+    await page.setViewportSize({ width: 960, height: 900 });
+    await page.goto("/");
+
+    const navigation = page.getByRole("navigation");
+    await expect(page.getByRole("link", { name: "Features" })).toBeHidden();
+    await expect(page.getByRole("link", { name: "GitHub Repository" })).toBeVisible();
+    await expect(navigation.getByRole("button", { name: "Sign In" })).toBeVisible();
+
+    const pageWidth = await page.evaluate(() => ({
+      client: document.documentElement.clientWidth,
+      scroll: document.documentElement.scrollWidth,
+    }));
+    expect(pageWidth.scroll).toBe(pageWidth.client);
+  });
+
   test("template page nav links return to landing sections", async ({ page }) => {
     await page.goto("/templates");
 

@@ -1,3 +1,19 @@
+# Navigation at 1235 x 1214
+
+- [x] Reproduce the navigation defect on `main` at 1235 x 1214.
+- [x] Identify the responsive breakpoint and layout cause.
+- [x] Fix the navigation without changing desktop or mobile behavior.
+- [x] Add viewport regression coverage.
+- [x] Run focused tests, type-check, lint, production build, and visual verification.
+- [x] Increment the website version.
+- [ ] Open a pull request against `main`.
+
+## Review
+
+- The stepped `container` width constrained the bar at 1235 px, and the `md` link breakpoint caused horizontal overflow from 768 through 960 px.
+- The navigation now uses a fluid 2xl shell and shows the full link set only at 1024 px and wider.
+- Checks passed: 510 unit tests, two Playwright viewport regressions, type-check, lint, production build, visual inspection, and `git diff --check`.
+
 # Landing Hero Intermediate-Width Overlap
 
 - [x] Reproduce the 1067px-wide landing layout and identify the constrained desktop grid.
