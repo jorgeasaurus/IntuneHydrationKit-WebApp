@@ -867,7 +867,7 @@ export function TemplateCatalogPage() {
                                                     ) : null}
 
                                                     {win32Scripts ? (
-                                                      <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+                                                      <div className="space-y-4">
                                                         <PowerShellScriptPanel
                                                           id={`${item.id}-detection-script`}
                                                           title="Detection script"

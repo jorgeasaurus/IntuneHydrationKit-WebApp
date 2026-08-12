@@ -204,14 +204,19 @@ describe('TemplateCatalogPage', () => {
     expect(await screen.findByText('Package Identifier')).toBeInTheDocument()
     expect(screen.getByText('7zip.7zip')).toBeInTheDocument()
     expect(screen.getByText('Install Command Line')).toBeInTheDocument()
-    expect(await screen.findByRole('region', { name: 'Detection script' })).toHaveTextContent(
+    const detectionScript = await screen.findByRole('region', { name: 'Detection script' })
+    const installScript = await screen.findByRole('region', { name: 'Install script' })
+    const uninstallScript = await screen.findByRole('region', { name: 'Uninstall script' })
+
+    expect(detectionScript).toHaveTextContent(
       'Detect-WinGetPackage $packageIdentifier'
     )
-    expect(await screen.findByRole('region', { name: 'Install script' })).toHaveTextContent(
-      'Install-WinGetPackage $packageIdentifier'
-    )
-    expect(await screen.findByRole('region', { name: 'Uninstall script' })).toHaveTextContent(
+    expect(installScript).toHaveTextContent('Install-WinGetPackage $packageIdentifier')
+    expect(uninstallScript).toHaveTextContent(
       'Uninstall-WinGetPackage $packageIdentifier'
     )
+    expect(detectionScript.parentElement).toHaveClass('space-y-4')
+    expect(installScript.parentElement).toBe(detectionScript.parentElement)
+    expect(uninstallScript.parentElement).toBe(detectionScript.parentElement)
   })
 })
