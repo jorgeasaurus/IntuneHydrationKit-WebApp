@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen, waitFor } from '@testing-library/react'
 import { TenantConfig } from '@/components/wizard/TenantConfig'
+import { SettingsProvider } from '@/hooks/useSettings'
 import { WizardProvider, useWizardState } from '@/hooks/useWizardState'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
@@ -57,9 +58,20 @@ function WizardHarness() {
   )
 }
 
+function TenantConfigHarness() {
+  return (
+    <SettingsProvider>
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    </SettingsProvider>
+  )
+}
+
 describe('TenantConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    localStorage.clear()
   })
 
   it('keeps the health checklist state when navigating away and back', async () => {
@@ -95,11 +107,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockResolvedValue(prerequisiteResult)
     const user = userEvent.setup()
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect((await screen.findAllByText('Contoso')).length).toBeGreaterThan(0)
     expect(await screen.findByText('All prerequisites met')).toBeInTheDocument()
@@ -129,11 +137,7 @@ describe('TenantConfig', () => {
   it('binds prerequisite validation to the active account and blocks continue until it passes', async () => {
     validatePrerequisites.mockReturnValue(new Promise(() => {}))
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     await waitFor(() => {
       expect(createGraphClient).toHaveBeenCalledWith({
@@ -168,11 +172,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockResolvedValue(prerequisiteResult)
 
     try {
-      render(
-        <WizardProvider>
-          <WizardHarness />
-        </WizardProvider>
-      )
+      render(<TenantConfigHarness />)
 
       expect(await screen.findByText('Last checked at 15:00 UTC')).toBeInTheDocument()
     } finally {
@@ -184,11 +184,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
     const user = userEvent.setup()
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect(await screen.findByText('Prerequisite check failed')).toBeInTheDocument()
     expect(screen.getByText('Graph connectivity failed')).toBeInTheDocument()
@@ -218,11 +214,7 @@ describe('TenantConfig', () => {
       )
     )
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect(
       await screen.findByText(
@@ -234,16 +226,43 @@ describe('TenantConfig', () => {
   it('keeps the operator identity constrained inside its summary card', async () => {
     validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     const operatorIdentity = await screen.findByText('operator@contoso.com')
+    const operatorIdentityRow = operatorIdentity.closest('p')
 
-    expect(operatorIdentity).toHaveClass('break-all')
-    expect(operatorIdentity).toHaveClass('max-w-full')
-    expect(operatorIdentity.parentElement).toHaveClass('min-w-0')
+    expect(operatorIdentityRow).toHaveClass('break-all')
+    expect(operatorIdentityRow).toHaveClass('max-w-full')
+    expect(operatorIdentityRow?.parentElement).toHaveClass('min-w-0')
+  })
+
+  it('blurs organization, tenant, and operator identities when Demo Mode is on', async () => {
+    localStorage.setItem(
+      'app-settings:v1',
+      JSON.stringify({ stopOnFirstError: false, demoMode: true })
+    )
+    validatePrerequisites.mockResolvedValue({
+      organization: { id: 'tenant-123', displayName: 'Contoso' },
+      licenses: null,
+      permissions: null,
+      isValid: true,
+      warnings: [],
+      errors: [],
+      timestamp: new Date('2026-04-25T15:00:00.000Z'),
+    } satisfies PrerequisiteCheckResult)
+
+    render(<TenantConfigHarness />)
+
+    const sensitiveValues = [
+      ...(await screen.findAllByText('Contoso')),
+      ...screen.getAllByText('tenant-123'),
+      ...screen.getAllByText('operator@contoso.com'),
+    ]
+
+    expect(sensitiveValues.length).toBeGreaterThanOrEqual(4)
+    sensitiveValues.forEach((value) => {
+      expect(value).toHaveClass('demo-sensitive-data')
+      expect(value).toHaveAttribute('aria-hidden', 'true')
+    })
   })
 })

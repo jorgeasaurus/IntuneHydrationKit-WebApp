@@ -4,6 +4,7 @@
 import { useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { AppNavigation } from "@/components/AppNavigation";
+import { SensitiveData } from "@/components/SensitiveData";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Home, RefreshCcw, AlertTriangle } from "lucide-react";
@@ -177,7 +178,10 @@ export default function ResultsPage() {
                       Tenant
                     </p>
                     <p className="mt-2 text-base font-semibold">
-                      {summary.tenantName || summary.tenantId}
+                      <SensitiveData
+                        value={summary.tenantName || summary.tenantId}
+                        fallback="Tenant unavailable"
+                      />
                     </p>
                   </div>
                   <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">

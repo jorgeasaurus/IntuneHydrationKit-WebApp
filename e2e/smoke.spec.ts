@@ -160,6 +160,29 @@ test.describe("Protected Routes", () => {
 });
 
 test.describe("Glass visual system", () => {
+  test("applies the Demo Mode privacy treatment", async ({ page }) => {
+    await page.goto("/");
+    const styles = await page.evaluate(() => {
+      const value = document.createElement("span");
+      value.className = "demo-sensitive-data";
+      value.textContent = "sensitive";
+      document.body.appendChild(value);
+      const computed = getComputedStyle(value);
+
+      return {
+        filter: computed.filter,
+        pointerEvents: computed.pointerEvents,
+        userSelect: computed.userSelect,
+      };
+    });
+
+    expect(styles).toEqual({
+      filter: "blur(6px)",
+      pointerEvents: "none",
+      userSelect: "none",
+    });
+  });
+
   test("discards retired theme settings and keeps the fixed glass visual system", async ({ page }) => {
     await page.addInitScript((storageKey) => {
       localStorage.setItem(
@@ -177,9 +200,9 @@ test.describe("Glass visual system", () => {
     );
     expect(
       await page.evaluate(
-        (storageKey) => localStorage.getItem(storageKey),
+        (storageKey) => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
         APP_SETTINGS_STORAGE_KEY
       )
-    ).toBe('{"stopOnFirstError":false}');
+    ).toEqual({ stopOnFirstError: false, demoMode: false });
   });
 });

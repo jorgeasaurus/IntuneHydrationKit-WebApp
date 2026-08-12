@@ -7,6 +7,7 @@ import { SettingsProvider } from '@/hooks/useSettings'
 
 const DEFAULT_SETTINGS = {
   stopOnFirstError: false,
+  demoMode: false,
 } as const
 
 describe('SettingsModal', () => {
@@ -66,6 +67,25 @@ describe('SettingsModal', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false)
     expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual({
       stopOnFirstError: true,
+      demoMode: false,
+    })
+  })
+
+  it('persists Demo Mode when saved', async () => {
+    const user = userEvent.setup()
+
+    render(
+      <SettingsProvider>
+        <SettingsModal open onOpenChange={vi.fn()} />
+      </SettingsProvider>
+    )
+
+    await user.click(screen.getByRole('switch', { name: /demo mode/i }))
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
+    expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual({
+      stopOnFirstError: false,
+      demoMode: true,
     })
   })
 
@@ -95,6 +115,7 @@ describe('SettingsModal', () => {
       'app-settings:v1',
       JSON.stringify({
         stopOnFirstError: false,
+        demoMode: true,
       })
     )
 

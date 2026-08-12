@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@testing-library/react'
 import { ReviewConfirm } from '@/components/wizard/ReviewConfirm'
+import { SettingsProvider } from '@/hooks/useSettings'
 import type { WizardState } from '@/types/hydration'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
@@ -12,6 +13,14 @@ const push = vi.fn()
 const getEstimatedTaskCount = vi.fn()
 const getEstimatedCategoryCount = vi.fn()
 const useWizardState = vi.fn()
+
+function renderReview() {
+  return render(
+    <SettingsProvider>
+      <ReviewConfirm />
+    </SettingsProvider>
+  )
+}
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push }),
@@ -61,6 +70,7 @@ function createState(overrides: Partial<WizardState> = {}): WizardState {
 describe('ReviewConfirm', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    localStorage.clear()
     getEstimatedTaskCount.mockReturnValue(12)
     getEstimatedCategoryCount.mockReturnValue(3)
     useWizardState.mockReturnValue({
@@ -72,7 +82,7 @@ describe('ReviewConfirm', () => {
 
   it('lets preview runs start immediately and routes to the dashboard', async () => {
     const user = userEvent.setup()
-    render(<ReviewConfirm />)
+    renderReview()
 
     expect(screen.getByText('Preview mode')).toHaveClass('text-sky-50')
     expect(screen.getByText(/Preview mode will check/)).toHaveClass('text-sky-100')
@@ -100,7 +110,7 @@ describe('ReviewConfirm', () => {
       previousStep,
     })
 
-    render(<ReviewConfirm />)
+    renderReview()
 
     const startButton = screen.getByRole('button', { name: 'Start Hydration' })
     expect(startButton).toBeDisabled()
@@ -121,5 +131,17 @@ describe('ReviewConfirm', () => {
 
     await user.click(startButton)
     expect(setConfirmed).toHaveBeenCalledWith(true)
+  })
+
+  it('blurs the tenant identity in the execution brief when Demo Mode is on', () => {
+    localStorage.setItem(
+      'app-settings:v1',
+      JSON.stringify({ stopOnFirstError: false, demoMode: true })
+    )
+
+    renderReview()
+
+    expect(screen.getByText('Contoso')).toHaveClass('demo-sensitive-data')
+    expect(screen.getByText('tenant-123')).toHaveClass('demo-sensitive-data')
   })
 })

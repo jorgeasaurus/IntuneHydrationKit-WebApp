@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useWizardState } from "@/hooks/useWizardState";
+import { SensitiveData } from "@/components/SensitiveData";
 import { TEMPLATE_METADATA } from "@/templates";
 import { getEstimatedTaskCount, getEstimatedCategoryCount } from "@/lib/hydration/engine";
 import {
@@ -140,10 +141,16 @@ export function ReviewConfirm(): React.JSX.Element {
                     Tenant
                   </p>
                   <p className="mt-2 text-sm font-medium">
-                    {state.tenantConfig?.tenantName || "Not set"}
+                    <SensitiveData
+                      value={state.tenantConfig?.tenantName}
+                      fallback="Not set"
+                    />
                   </p>
                   <p className="mt-1 break-all text-sm text-muted-foreground">
-                    {state.tenantConfig?.tenantId || "Not set"}
+                    <SensitiveData
+                      value={state.tenantConfig?.tenantId}
+                      fallback="Not set"
+                    />
                   </p>
                 </div>
                 <div>

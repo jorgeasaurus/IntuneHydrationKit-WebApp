@@ -13,17 +13,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/hooks/useSettings";
-import { AppSettings } from "@/types/hydration";
-import { RotateCcw } from "lucide-react";
+import { DEFAULT_APP_SETTINGS } from "@/lib/settings";
+import { EyeOff, RotateCcw } from "lucide-react";
 
 interface SettingsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
-
-const DEFAULT_LOCAL_SETTINGS: AppSettings = {
-  stopOnFirstError: false,
-};
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { settings, updateSettings, resetSettings } = useSettings();
@@ -36,7 +32,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   const handleReset = () => {
     resetSettings();
-    setLocalSettings(DEFAULT_LOCAL_SETTINGS);
+    setLocalSettings(DEFAULT_APP_SETTINGS);
   };
 
   const handleCancel = () => {
@@ -70,6 +66,29 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 checked={localSettings.stopOnFirstError}
                 onCheckedChange={(checked: boolean) =>
                   setLocalSettings({ ...localSettings, stopOnFirstError: checked })
+                }
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4 border-t border-border/80 pt-6">
+            <div className="flex items-center gap-2">
+              <EyeOff className="size-4 text-hydrate" aria-hidden="true" />
+              <h3 className="text-sm font-semibold">Presentation Settings</h3>
+            </div>
+
+            <div className="flex items-center justify-between gap-6">
+              <div className="space-y-0.5">
+                <Label htmlFor="demoMode">Demo Mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  Blur tenant and operator identity data during screen shares and demonstrations
+                </p>
+              </div>
+              <Switch
+                id="demoMode"
+                checked={localSettings.demoMode}
+                onCheckedChange={(checked: boolean) =>
+                  setLocalSettings({ ...localSettings, demoMode: checked })
                 }
               />
             </div>

@@ -121,6 +121,7 @@ export interface TenantConfig {
 
 export interface AppSettings {
   stopOnFirstError: boolean;
+  demoMode: boolean;
 }
 
 /**
