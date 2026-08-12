@@ -58,6 +58,16 @@ test.describe("Landing Page", () => {
     );
   });
 
+  test("keeps the hero preview below the copy at intermediate desktop widths", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1067, height: 1102 });
+    await page.goto("/");
+
+    await expect(page.locator(".landing-demo-column")).toBeHidden();
+    await expect(page.locator(".landing-mobile-preview")).toBeVisible();
+  });
+
   test("template page nav links return to landing sections", async ({ page }) => {
     await page.goto("/templates");
 

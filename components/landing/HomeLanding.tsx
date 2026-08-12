@@ -114,7 +114,7 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
 
 function MobileRunPreview() {
   return (
-    <div className="landing-mobile-preview glass-surface rounded-lg border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur lg:hidden">
+    <div className="landing-mobile-preview glass-surface rounded-lg border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur xl:hidden">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-mono text-xs uppercase text-muted-foreground">
@@ -159,7 +159,7 @@ function Hero({
         aria-hidden="true"
       />
       <div className="container relative mx-auto px-4 sm:px-6">
-        <div className="landing-hero-panel glass-panel grid items-center gap-6 sm:gap-10 lg:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.05fr)]">
+        <div className="landing-hero-panel glass-panel grid items-center gap-6 sm:gap-10 xl:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.05fr)]">
           <div className="space-y-5 sm:space-y-8">
             <div className="flex flex-wrap items-center gap-3">
               <span className="landing-version-badge inline-flex items-center gap-2 rounded-md border border-hydrate/35 bg-hydrate/10 px-3 py-1.5 font-mono text-xs uppercase text-hydrate">
@@ -237,7 +237,7 @@ function Hero({
             </div>
           </div>
 
-          <div className="landing-demo-column relative hidden lg:block">
+          <div className="landing-demo-column relative hidden xl:block">
             <div className="relative mx-auto max-w-2xl">
               <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
                 <div>
