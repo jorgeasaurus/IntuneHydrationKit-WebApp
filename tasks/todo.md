@@ -15,6 +15,7 @@
 - The website version is 2.6.45.
 - Draft PR #65 targets `main` from `agent/readme-visual-refresh` with only the intended six files.
 - Type-check, lint, and React Doctor at 100/100 passed before publication.
+- Copilot review cycle 1 found two Simplified Technical English issues in the new README text; the wording audit corrected both comments and related changed text.
 
 # README Site Image Refresh
 

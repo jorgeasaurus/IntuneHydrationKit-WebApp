@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  Bootstrap best-practice configurations, preview every change, and keep clear evidence of each run.
+  Apply recommended configurations. Preview every change. Keep clear evidence for each run.
 </p>
 
 <p align="center">
@@ -34,15 +34,15 @@
 
 ## Why Intune Hydration Kit
 
-The web app brings the proven workflow from the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit) to administrators who prefer a guided browser interface.
+The web app gives administrators a guided browser interface for the workflow in the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit).
 
-| Guided deployment | Guarded by default | Operator evidence |
+| Guided deployment | Default safeguards | Run records |
 | --- | --- | --- |
-| A focused four-stage wizard takes you from tenant sign-in to execution. | Ownership markers, assignment checks, and disabled Conditional Access policies protect destructive operations. | Preview mode, live status, execution logs, and downloadable reports show what changed. |
-| **Deployment intelligence** | **Local template catalog** | **Execution control** |
-| Existing-object checks and tenant caches keep each run focused on work that can succeed. | Browse import-ready payloads and load 182+ bundled templates without a GitHub API dependency. | Pause, resume, or cancel a run while the sequential queue limits Graph throttling. |
+| Use the four-stage wizard to sign in to a tenant and start an operation. | Ownership markers, assignment checks, and disabled Conditional Access policies protect delete operations. | Preview mode, live status, execution logs, and downloadable reports show what changed. |
+| **Deployment checks** | **Local template catalog** | **Execution control** |
+| The app checks for existing objects and caches tenant data. These actions reduce unnecessary work. | The catalog shows import-ready payloads and loads at least 182 bundled templates. It does not use the GitHub API. | The sequential queue limits Graph throttling. You can pause, resume, or cancel a run. |
 
-### Coverage at a glance
+### Configuration totals
 
 | Dynamic groups | Device filters | Compliance | App protection | Conditional Access |
 | ---: | ---: | ---: | ---: | ---: |
@@ -191,14 +191,14 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## Wizard Workflow
 
-The application uses a focused four-stage process.
+The application uses a four-stage process.
 
 | Stage | Purpose | Result |
 | ---: | --- | --- |
-| **01** | **Connect** — Enter the tenant, confirm the Global commercial cloud, and sign in with Microsoft Entra ID. | A verified tenant session. |
-| **02** | **Choose an operation** — Select Create, Preview, or Delete. | Explicit mutation intent. |
-| **03** | **Select targets** — Choose policy categories and individual templates. | A scoped execution queue. |
-| **04** | **Review and run** — Check object counts, confirm the operation, and start execution. | Live progress and a downloadable report. |
+| **01** | **Connect** — Enter the tenant. Confirm the Global commercial cloud. Sign in with Microsoft Entra ID. | The app verifies the tenant session. |
+| **02** | **Choose an operation** — Select Create, Preview, or Delete. | The operation is selected. |
+| **03** | **Select targets** — Choose policy categories and individual templates. | The app creates an execution queue for the selected items. |
+| **04** | **Review and run** — Check the object counts. Confirm the operation. Start the execution. | The app shows live progress and creates a downloadable report. |
 
 ## Configuration
 
@@ -340,6 +340,5 @@ For issues and questions:
 </p>
 
 <p align="center">
-  <strong>Guided in the browser. Scriptable in PowerShell.</strong><br />
-  Power users can continue to use the PowerShell module for automation scenarios.
+  <strong>Use the browser for guidance. Use PowerShell for automated tasks.</strong>
 </p>
