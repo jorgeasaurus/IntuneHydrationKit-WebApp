@@ -68,6 +68,9 @@ export async function getAccessToken(): Promise<string> {
  * Custom error class for auth session issues - allows callers to detect and show sign-in UI
  */
 export class AuthSessionExpiredError extends Error {
+  /** Prevent request retries when the active authentication session is invalid. */
+  readonly status = 401;
+
   constructor(message = "No active account found. Please sign in.") {
     super(message);
     this.name = "AuthSessionExpiredError";

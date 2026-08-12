@@ -228,5 +228,6 @@ describe("authUtils", () => {
 
     expect(error.name).toBe("AuthSessionExpiredError");
     expect(error.message).toBe("No active account found. Please sign in.");
+    expect(error.status).toBe(401);
   });
 });
