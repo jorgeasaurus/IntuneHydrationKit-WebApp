@@ -9,8 +9,8 @@ import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
 
 describe("executeDeletesInParallel", () => {
-  it("keeps Conditional Access out of batch execution", () => {
-    expect(isBatchableCategory("conditionalAccess")).toBe(false);
+  it("keeps Conditional Access batchable for create execution", () => {
+    expect(isBatchableCategory("conditionalAccess")).toBe(true);
   });
 
   it("deletes baseline group policy configurations when they exist in the group policy cache", async () => {

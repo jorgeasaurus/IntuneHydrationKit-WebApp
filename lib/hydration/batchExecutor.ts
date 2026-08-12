@@ -1251,7 +1251,7 @@ function updateCacheAfterCreate(
 export function isBatchableCategory(category: string): boolean {
   // Compliance re-enabled for batch - using smaller batch size and proper retry handling
   // PowerShell reference implementation uses batch successfully
-  return ["groups", "filters", "compliance", "baseline", "cisBaseline"].includes(category);
+  return ["groups", "filters", "compliance", "conditionalAccess", "baseline", "cisBaseline"].includes(category);
 }
 
 // ============================================================================

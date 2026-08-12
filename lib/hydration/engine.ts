@@ -482,8 +482,8 @@ export async function executeTasks(
     console.log(`[Execute Tasks] Batch CREATE execution enabled (batch size: ${batchConfig.defaultBatchSize})`);
 
     // Separate batchable from non-batchable tasks
-    const batchableTasks = tasks.filter((t) => isBatchableCategory(t.category));
-    const nonBatchableTasks = tasks.filter((t) => !isBatchableCategory(t.category));
+    const batchableTasks = tasks.filter((task) => isBatchableCategory(task.category));
+    const nonBatchableTasks = tasks.filter((task) => !isBatchableCategory(task.category));
 
     console.log(`[Execute Tasks] ${batchableTasks.length} batchable tasks, ${nonBatchableTasks.length} require sequential execution`);
 
@@ -518,8 +518,12 @@ export async function executeTasks(
     console.log(`[Execute Tasks] Fast parallel DELETE execution enabled`);
 
     // Separate batchable from non-batchable tasks
-    const batchableTasks = tasks.filter((t) => isBatchableCategory(t.category));
-    const nonBatchableTasks = tasks.filter((t) => !isBatchableCategory(t.category));
+    const batchableTasks = tasks.filter(
+      (task) => task.category !== "conditionalAccess" && isBatchableCategory(task.category)
+    );
+    const nonBatchableTasks = tasks.filter(
+      (task) => task.category === "conditionalAccess" || !isBatchableCategory(task.category)
+    );
 
     console.log(`[Execute Tasks] ${batchableTasks.length} parallel delete tasks, ${nonBatchableTasks.length} require sequential execution`);
 
