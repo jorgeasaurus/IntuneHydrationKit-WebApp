@@ -43,6 +43,14 @@ function renderLanding(overrides: Partial<ComponentProps<typeof HomeLanding>> = 
 describe('HomeLanding', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    Object.defineProperty(window, 'matchMedia', {
+      configurable: true,
+      value: vi.fn().mockReturnValue({
+        matches: true,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      }),
+    })
   })
 
   it('renders the current app version with product proof and core sections', () => {

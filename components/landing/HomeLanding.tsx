@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   CheckCircle2,
@@ -44,6 +44,27 @@ type HomeLandingProps = {
   onSignInClick: () => void;
   onContinue: () => void;
 };
+
+const DESKTOP_DEMO_QUERY = "(min-width: 1280px)";
+
+function useDesktopDemo(): boolean {
+  const [showDesktopDemo, setShowDesktopDemo] = useState(false);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia(DESKTOP_DEMO_QUERY);
+    const updateVisibility = () => setShowDesktopDemo(mediaQuery.matches);
+
+    updateVisibility();
+    mediaQuery.addEventListener("change", updateVisibility);
+    return () => mediaQuery.removeEventListener("change", updateVisibility);
+  }, []);
+
+  return showDesktopDemo;
+}
 
 function MicrosoftLogo() {
   return (
@@ -152,6 +173,8 @@ function Hero({
   onSignInClick,
   onContinue,
 }: Pick<HomeLandingProps, "isAuthenticated" | "onSignInClick" | "onContinue">) {
+  const showDesktopDemo = useDesktopDemo();
+
   return (
     <section className="relative overflow-hidden pt-20 pb-8 sm:pt-24 sm:pb-16">
       <div
@@ -237,25 +260,27 @@ function Hero({
             </div>
           </div>
 
-          <div className="landing-demo-column relative hidden xl:block">
-            <div className="relative mx-auto max-w-2xl">
-              <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
-                <div>
-                  <p className="font-mono text-xs uppercase text-muted-foreground">
-                    Live run preview
-                  </p>
-                  <p className="text-sm font-semibold">
-                    Scope, execute, report
-                  </p>
+          {showDesktopDemo && (
+            <div className="landing-demo-column relative">
+              <div className="relative mx-auto max-w-2xl">
+                <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
+                  <div>
+                    <p className="font-mono text-xs uppercase text-muted-foreground">
+                      Live run preview
+                    </p>
+                    <p className="text-sm font-semibold">
+                      Scope, execute, report
+                    </p>
+                  </div>
+                  <span className="badge-status badge-info text-[10px]">
+                    <span className="status-dot status-dot-info" />
+                    Hydrate
+                  </span>
                 </div>
-                <span className="badge-status badge-info text-[10px]">
-                  <span className="status-dot status-dot-info" />
-                  Hydrate
-                </span>
+                <WebAppDemo />
               </div>
-              <WebAppDemo />
             </div>
-          </div>
+          )}
         </div>
       </div>
     </section>

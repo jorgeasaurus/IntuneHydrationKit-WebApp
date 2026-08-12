@@ -64,7 +64,7 @@ test.describe("Landing Page", () => {
     await page.setViewportSize({ width: 1067, height: 1102 });
     await page.goto("/");
 
-    await expect(page.locator(".landing-demo-column")).toBeHidden();
+    await expect(page.locator(".landing-demo-column")).toHaveCount(0);
     await expect(page.locator(".landing-mobile-preview")).toBeVisible();
   });
 
