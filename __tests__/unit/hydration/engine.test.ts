@@ -345,6 +345,27 @@ describe("executeTasks", () => {
     expect(mockExecuteEnrollmentTask).not.toHaveBeenCalled();
   });
 
+  it("keeps Conditional Access deletion sequential while batching other deletes", async () => {
+    const batchTask = createTask("group-delete", "groups", "[IHD] Batch Group", "delete");
+    const conditionalAccessTask = createTask("ca-delete", "conditionalAccess", "[IHD] Conditional Access", "delete");
+
+    mockGetBatchConfig.mockReturnValue({ enableBatching: true, defaultBatchSize: 2, delayBetweenBatches: 0 });
+    mockExecuteDeletesInParallel.mockResolvedValue([expectSuccess(batchTask)]);
+    mockExecuteConditionalAccessTask.mockResolvedValue(expectSuccess(conditionalAccessTask));
+
+    const results = await executeTasks(
+      [batchTask, conditionalAccessTask],
+      createContext({ operationMode: "delete" })
+    );
+
+    expect(mockExecuteDeletesInParallel).toHaveBeenCalledWith([batchTask], expect.objectContaining({ operationMode: "delete" }));
+    expect(mockExecuteConditionalAccessTask).toHaveBeenCalledWith(conditionalAccessTask, expect.objectContaining({ operationMode: "delete" }));
+    expect(results).toEqual([
+      expect.objectContaining({ task: batchTask, success: true }),
+      expect.objectContaining({ task: conditionalAccessTask, success: true }),
+    ]);
+  });
+
   it("emits preview status and marks all remaining tasks cancelled when pause-cancelled in sequential mode", async () => {
     const firstTask = createTask("group-preview-1", "groups", "[IHD] Preview Group 1");
     const secondTask = createTask("group-preview-2", "groups", "[IHD] Preview Group 2");

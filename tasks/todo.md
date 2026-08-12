@@ -1,3 +1,19 @@
+# Security Control Remediation
+
+- [x] Revalidate the delete and tenant identity findings on `dev`.
+- [x] Keep Conditional Access deletion on the state-validating sequential path.
+- [x] Fail closed when assignment checks cannot complete.
+- [x] Bind Graph requests to the confirmed active MSAL account.
+- [x] Add focused regression coverage and run verification.
+
+## Review
+
+- Regression coverage now protects the Conditional Access fast-delete exclusion, fail-closed assignment checks, and account binding for Graph requests.
+- Checks passed: focused unit tests, type-check, lint, production build, and `git diff --check`.
+- Copilot review identified and verified fixes for unbound prerequisite validation and the pending-validation continue gate.
+- Copilot review identified and verified non-retryable handling for authentication session failures.
+- Copilot review identified and verified sequential Conditional Access batch deletion and active-account recovery guidance.
+
 # Landing Hero Intermediate-Width Overlap
 
 - [x] Reproduce the 1067px-wide landing layout and identify the constrained desktop grid.
