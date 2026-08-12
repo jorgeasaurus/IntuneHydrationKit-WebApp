@@ -12,6 +12,7 @@
 - Checks passed: focused unit tests, type-check, lint, production build, and `git diff --check`.
 - Copilot review identified and verified fixes for unbound prerequisite validation and the pending-validation continue gate.
 - Copilot review identified and verified non-retryable handling for authentication session failures.
+- Copilot review identified and verified sequential Conditional Access batch deletion and active-account recovery guidance.
 
 # Landing Hero Intermediate-Width Overlap
 

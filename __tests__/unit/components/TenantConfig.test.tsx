@@ -8,6 +8,9 @@ import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
 const validatePrerequisites = vi.fn()
 const createGraphClient = vi.fn()
+const { MockAuthSessionExpiredError } = vi.hoisted(() => ({
+  MockAuthSessionExpiredError: class extends Error {},
+}))
 
 vi.mock('@azure/msal-react', () => ({
   useMsal: () => ({
@@ -28,7 +31,7 @@ vi.mock('@/lib/auth/authUtils', async () => {
   const actual = await vi.importActual('@/lib/auth/authUtils')
   return {
     ...actual,
-    AuthSessionExpiredError: class AuthSessionExpiredError extends Error {},
+    AuthSessionExpiredError: MockAuthSessionExpiredError,
   }
 })
 
@@ -206,6 +209,26 @@ describe('TenantConfig', () => {
     await waitFor(() => {
       expect(validatePrerequisites.mock.calls.length).toBe(initialValidationCalls)
     })
+  })
+
+  it('preserves the active-account recovery message from prerequisite validation', async () => {
+    validatePrerequisites.mockRejectedValue(
+      new MockAuthSessionExpiredError(
+        'The active account changed. Return to tenant configuration and confirm the active account before continuing.'
+      )
+    )
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    expect(
+      await screen.findByText(
+        'The active account changed. Return to tenant configuration and confirm the active account before continuing.'
+      )
+    ).toBeInTheDocument()
   })
 
   it('keeps the operator identity constrained inside its summary card', async () => {

@@ -36,11 +36,12 @@ function getStatusFromResult(result: PrerequisiteCheckResult): PrerequisiteCheck
 }
 
 function createErrorResult(error: unknown): PrerequisiteCheckResult {
-  const isAuthError =
-    error instanceof AuthSessionExpiredError ||
-    (error instanceof Error && error.message.includes("sign in"));
-  const message = isAuthError
-    ? "Your session has expired. Please sign out and sign in again."
+  const isSessionExpired =
+    error instanceof Error && error.message.includes("sign in");
+  const message = error instanceof AuthSessionExpiredError
+    ? error.message
+    : isSessionExpired
+      ? "Your session has expired. Please sign out and sign in again."
     : error instanceof Error
       ? error.message
       : "Unknown error";

@@ -1732,6 +1732,11 @@ async function prepareTaskForDeleteBatch(
 ): Promise<DeletePrepareResult> {
   console.log(`[BatchExecutor:DELETE] Preparing "${task.itemName}" (${task.category})`);
 
+  // Conditional Access policy deletion must validate the disabled state in its sequential executor.
+  if (task.category === "conditionalAccess") {
+    return { type: "sequential" };
+  }
+
   // Find the resource ID
   const resource = findResourceIdForDelete(task, context);
 

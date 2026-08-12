@@ -304,7 +304,7 @@ describe("executeDeletesInParallel", () => {
     expect(client.batch).not.toHaveBeenCalled();
   });
 
-  it("simulates batched preview deletions without calling Graph", async () => {
+  it("routes Conditional Access deletion to the sequential safety check", async () => {
     const task: HydrationTask = {
       id: "conditional-access-preview-delete",
       category: "conditionalAccess",
@@ -339,11 +339,12 @@ describe("executeDeletesInParallel", () => {
 
     expect(results).toEqual([
       expect.objectContaining({
-        success: true,
+        success: false,
         skipped: false,
+        error: "NEEDS_SEQUENTIAL_EXECUTION",
       }),
     ]);
-    expect(task.status).toBe("success");
+    expect(task.status).toBe("pending");
     expect(client.batch).not.toHaveBeenCalled();
   });
 
