@@ -1572,3 +1572,30 @@
 
 - Ready PR #20 targets `main` from `codex/consolidate-win32-glass-ui` with website version 2.6.4.
 - Local validation passed: 529 tests, lint, type check, production build, React Doctor 100/100, browser verification, and whitespace validation.
+
+# Demo Mode Sensitive Data Blur
+
+- [x] Add Demo Mode to persistent application settings and the settings dialog.
+- [x] Add one accessible sensitive-data wrapper and apply it to tenant and operator identity fields.
+- [x] Add focused settings and UI regression coverage.
+- [x] Run focused tests, type check, lint, production build, and review the diff.
+
+## Review
+
+- Demo Mode persists in local storage and blurs tenant IDs, organization names, and operator email addresses across the wizard, dashboard, and results UI.
+- Blurred values are not selectable and are replaced with a privacy message for assistive technology. Graph requests, tenant state, and report exports are unchanged.
+- Checks passed: 529 tests, type check, lint, production build, and `git diff --check`.
+
+# Demo Mode Thermonuclear Review Loop
+
+- [x] Run a strict review of the complete Demo Mode diff.
+- [x] Fix every actionable finding and verify the focused behavior.
+- [x] Repeat the review until a fresh round reports zero findings.
+- [x] Run final project validation and record the clean result.
+
+## Review
+
+- Round 1 fixed a fail-open provider boundary, duplicate settings defaults, and missing real-surface privacy tests.
+- Round 2 separated sensitive values from public fallback text, added strict persisted-boolean normalization, and added a browser CSS contract test.
+- Round 3 reported zero actionable findings.
+- Checks passed: 529 tests, type check, lint, production build, React Doctor 100/100, focused Playwright computed-style validation, and `git diff --check`.

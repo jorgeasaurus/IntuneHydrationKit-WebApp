@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { AppNavigation } from "@/components/AppNavigation";
+import { SensitiveData } from "@/components/SensitiveData";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, AlertTriangle, Loader2, Eye } from "lucide-react";
@@ -133,7 +134,15 @@ export default function DashboardPage() {
             </span>
           )}
           title="Hydration Dashboard"
-          description={`${getOperationText()} in ${state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}`}
+          description={(
+            <>
+              {getOperationText()} in{" "}
+              <SensitiveData
+                value={state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}
+                fallback="the selected tenant"
+              />
+            </>
+          )}
           actions={(
             <Button variant="outline" onClick={() => router.push("/wizard")} className="nav-action size-9 px-0 sm:w-auto sm:px-4">
               <ArrowLeft className="size-4 sm:mr-2" />

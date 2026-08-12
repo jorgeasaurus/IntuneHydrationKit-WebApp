@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMsal } from "@azure/msal-react";
 import { Button } from "@/components/ui/button";
+import { SensitiveData } from "@/components/SensitiveData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { PrerequisiteCheckResult, PrerequisiteCheckStatus } from "@/types/prerequisites";
@@ -108,7 +109,6 @@ export function TenantConfig(): React.JSX.Element {
 
   const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
   const tenantId = activeAccount?.tenantId ?? "";
-  const operatorUsername = activeAccount?.username || "Not signed in";
   const tenantName = prerequisiteResult?.organization?.displayName || "";
 
   const runPrerequisiteValidation = useCallback(async (showLoadingState: boolean): Promise<void> => {
@@ -204,7 +204,12 @@ export function TenantConfig(): React.JSX.Element {
   const healthChecks = [
     {
       title: "Graph connectivity",
-      value: prerequisiteResult?.organization?.displayName ?? "Waiting for response",
+      value: (
+        <SensitiveData
+          value={prerequisiteResult?.organization?.displayName}
+          fallback="Waiting for response"
+        />
+      ),
       detail: prerequisiteResult?.organization
         ? "Connected to the selected tenant and organization endpoint."
         : "Confirm the app can resolve tenant organization details.",
@@ -315,7 +320,10 @@ export function TenantConfig(): React.JSX.Element {
               Organization
             </p>
             <p className="mt-3 text-base font-semibold">
-              {isLoading ? "Resolving tenant..." : tenantName || "Unknown organization"}
+              <SensitiveData
+                value={isLoading ? undefined : tenantName}
+                fallback={isLoading ? "Resolving tenant..." : "Unknown organization"}
+              />
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               This run stays scoped to the currently signed-in tenant.
@@ -327,7 +335,7 @@ export function TenantConfig(): React.JSX.Element {
               Tenant ID
             </p>
             <p className="mt-3 break-all text-sm font-medium">
-              {tenantId || "Not signed in"}
+              <SensitiveData value={tenantId} fallback="Not signed in" />
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Use sign out if you need to pivot to another tenant.
@@ -350,8 +358,11 @@ export function TenantConfig(): React.JSX.Element {
             <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
               Operator
             </p>
-            <p className="mt-3 max-w-full break-all text-sm font-semibold leading-6" title={operatorUsername}>
-              {operatorUsername}
+            <p className="mt-3 max-w-full break-all text-sm font-semibold leading-6">
+              <SensitiveData
+                value={activeAccount?.username}
+                fallback="Not signed in"
+              />
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Delegated permissions are evaluated through the active user session.

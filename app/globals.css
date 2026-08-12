@@ -62,6 +62,13 @@
   }
 }
 
+.demo-sensitive-data {
+  display: inline-block;
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
 .glass-surface,
 .glass-panel,
 .data-card,
