@@ -4,8 +4,8 @@
 - [x] Refresh the header, navigation, features, workflow, and content hierarchy.
 - [x] Verify Markdown structure, image references, links, and the final diff.
 - [x] Increment the website version for the pull request.
-- [ ] Commit and push the intended files, then open a draft pull request to `main`.
-- [ ] Verify the published pull request metadata.
+- [x] Commit and push the intended files, then open a draft pull request to `main`.
+- [x] Verify the published pull request metadata.
 
 ## Review
 
@@ -13,6 +13,8 @@
 - Removed decorative emoji and kept the existing technical content and product image.
 - All five section anchors, local images, local document links, and `git diff --check` passed.
 - The website version is 2.6.45.
+- Draft PR #65 targets `main` from `agent/readme-visual-refresh` with only the intended six files.
+- Type-check, lint, and React Doctor at 100/100 passed before publication.
 
 # README Site Image Refresh
 
