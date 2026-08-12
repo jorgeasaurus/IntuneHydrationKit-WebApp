@@ -40,13 +40,13 @@ The web app gives administrators a guided browser interface for the workflow in 
 | --- | --- | --- |
 | Use the four-stage wizard to sign in to a tenant and start an operation. | Ownership markers, assignment checks, and disabled Conditional Access policies protect delete operations. | Preview mode, live status, execution logs, and downloadable reports show what changed. |
 | **Deployment checks** | **Local template catalog** | **Execution control** |
-| The app checks for existing objects and caches tenant data. These actions reduce unnecessary work. | The catalog shows import-ready payloads and loads at least 182 bundled templates. It does not use the GitHub API. | The sequential queue limits Graph throttling. You can pause, resume, or cancel a run. |
+| The app checks for existing objects and caches tenant data. These actions reduce unnecessary work. | The catalog loads import-ready payloads from the bundled IntuneTemplates and CIS baseline manifests. It does not use the GitHub API at runtime. | The sequential queue limits Graph throttling. You can pause, resume, or cancel a run. |
 
-### Configuration totals
+### Configuration types
 
-| Dynamic groups | Device filters | Compliance | App protection | Conditional Access |
-| ---: | ---: | ---: | ---: | ---: |
-| 47 | 29 | 10 | 10 | 20 |
+| Identity and targeting | Device management | Security and applications |
+| --- | --- | --- |
+| Entra groups and device filters | Compliance policies, enrollment profiles, and notifications | Security baselines, Conditional Access, app protection, mobile apps, and Win32 apps |
 
 The web app supports Global commercial tenants. Use the PowerShell module for US Government, Germany, and China tenants.
 
@@ -183,7 +183,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 │   ├── templates/           # Template loader (local files)
 │   └── utils/               # Utility functions
 ├── public/
-│   └── IntuneTemplates/     # 183+ bundled policy templates
+│   └── IntuneTemplates/     # Bundled Intune and OpenIntuneBaseline payloads
 ├── types/                   # TypeScript type definitions
 ├── hooks/                   # Custom React hooks
 └── templates/               # Template metadata
@@ -232,7 +232,7 @@ For sovereign and government clouds, use the IntuneHydrationKit PowerShell modul
 ## Performance Optimizations
 
 ### Template Loading
-- **Local Storage**: All 183+ templates load from `public/IntuneTemplates/` in <100ms
+- **Bundled metadata**: Template metadata loads from local manifests, and payloads load on demand
 - **Session Caching**: Templates cached with automatic version invalidation
 - **No Network Dependency**: No GitHub API calls during template loading
 
