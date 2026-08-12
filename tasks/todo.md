@@ -6,7 +6,7 @@
 - [x] Add viewport regression coverage.
 - [x] Run focused tests, type-check, lint, production build, and visual verification.
 - [x] Increment the website version.
-- [ ] Open a pull request against `main`.
+- [x] Open a pull request against `main`.
 
 ## Review
 
