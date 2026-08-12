@@ -8,10 +8,14 @@ import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
 const validatePrerequisites = vi.fn()
 const createGraphClient = vi.fn()
+const { MockAuthSessionExpiredError } = vi.hoisted(() => ({
+  MockAuthSessionExpiredError: class extends Error {},
+}))
 
 vi.mock('@azure/msal-react', () => ({
   useMsal: () => ({
     accounts: [{ tenantId: 'tenant-123', username: 'operator@contoso.com' }],
+    instance: { getActiveAccount: () => ({ tenantId: 'tenant-123', homeAccountId: 'home-tenant-123', username: 'operator@contoso.com' }) },
   }),
 }))
 
@@ -27,7 +31,7 @@ vi.mock('@/lib/auth/authUtils', async () => {
   const actual = await vi.importActual('@/lib/auth/authUtils')
   return {
     ...actual,
-    AuthSessionExpiredError: class AuthSessionExpiredError extends Error {},
+    AuthSessionExpiredError: MockAuthSessionExpiredError,
   }
 })
 
@@ -122,6 +126,24 @@ describe('TenantConfig', () => {
     })
   })
 
+  it('binds prerequisite validation to the active account and blocks continue until it passes', async () => {
+    validatePrerequisites.mockReturnValue(new Promise(() => {}))
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    await waitFor(() => {
+      expect(createGraphClient).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        homeAccountId: 'home-tenant-123',
+      })
+    })
+    expect(screen.getByRole('button', { name: 'Use Tenant Configuration' })).toBeDisabled()
+  })
+
   it('formats the validation timestamp in the operator locale and labels its UTC timezone', async () => {
     const languageSpy = vi.spyOn(navigator, 'language', 'get').mockReturnValue('de-DE')
     const prerequisiteResult: PrerequisiteCheckResult = {
@@ -187,6 +209,26 @@ describe('TenantConfig', () => {
     await waitFor(() => {
       expect(validatePrerequisites.mock.calls.length).toBe(initialValidationCalls)
     })
+  })
+
+  it('preserves the active-account recovery message from prerequisite validation', async () => {
+    validatePrerequisites.mockRejectedValue(
+      new MockAuthSessionExpiredError(
+        'The active account changed. Return to tenant configuration and confirm the active account before continuing.'
+      )
+    )
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    expect(
+      await screen.findByText(
+        'The active account changed. Return to tenant configuration and confirm the active account before continuing.'
+      )
+    ).toBeInTheDocument()
   })
 
   it('keeps the operator identity constrained inside its summary card', async () => {

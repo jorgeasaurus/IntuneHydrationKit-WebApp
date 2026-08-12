@@ -708,7 +708,7 @@ describe("batchExecutor branch coverage", () => {
     ]);
   });
 
-  it("handles mixed fast-delete outcomes including skips, retries, resource-not-found success, and hard failures", async () => {
+  it("handles mixed fast-delete outcomes including Conditional Access safety skips, retries, and hard failures", async () => {
     const missingTask = createTask("fast-missing", "groups", "delete", "[IHD] Missing Group");
     const noMarkerTask = createTask("fast-no-marker", "groups", "delete", "[IHD] No Marker Group");
     const assignedTask = createTask("fast-assigned", "baseline", "delete", "[IHD] Assigned Settings Policy");
@@ -836,12 +836,13 @@ describe("batchExecutor branch coverage", () => {
         error: "Policy has 1 active assignment(s) - remove assignments before deleting",
       }),
       expect.objectContaining({
-        task: retryTask,
-        success: true,
-        skipped: false,
+        task: resourceGoneTask,
+        success: false,
+        skipped: true,
+        error: "Conditional Access deletion must use the sequential safety check",
       }),
       expect.objectContaining({
-        task: resourceGoneTask,
+        task: retryTask,
         success: true,
         skipped: false,
       }),
@@ -853,17 +854,15 @@ describe("batchExecutor branch coverage", () => {
       }),
     ]);
     expect(removeCalls).toHaveBeenCalledWith("/groups/retry-group-id", "v1.0");
-    expect(removeCalls).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/ca-gone-id",
-      "beta"
-    );
     expect(context.cachedIntuneGroups).toEqual([
       expect.objectContaining({
         id: "no-marker-group-id",
         displayName: "[IHD] No Marker Group",
       }),
     ]);
-    expect(context.cachedConditionalAccessPolicies).toEqual([]);
+    expect(context.cachedConditionalAccessPolicies).toEqual([
+      expect.objectContaining({ id: "ca-gone-id" }),
+    ]);
     expect(context.cachedFilters).toEqual([
       expect.objectContaining({
         id: "filter-blocked-id",

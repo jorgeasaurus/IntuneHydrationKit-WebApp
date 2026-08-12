@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/lib/auth/authUtils";
+import { assertActiveAccountMatches, getAccessToken } from "@/lib/auth/authUtils";
 import { getGraphEndpoint } from "@/lib/graph/endpoints";
 import { GraphResponse } from "@/types/graph";
 import { retryWithBackoff } from "@/lib/utils/retry";
@@ -9,15 +9,23 @@ import { BatchRequest, BatchResult } from "./batch";
  */
 export class GraphClient {
   private baseUrl: string;
+  private readonly expectedAccount?: { tenantId: string; homeAccountId: string };
 
-  constructor() {
+  constructor(expectedAccount?: { tenantId: string; homeAccountId: string }) {
     this.baseUrl = getGraphEndpoint();
+    this.expectedAccount = expectedAccount;
   }
 
   /**
    * Get authorization headers with access token
    */
   private async getHeaders(): Promise<HeadersInit> {
+    if (this.expectedAccount) {
+      assertActiveAccountMatches(
+        this.expectedAccount.tenantId,
+        this.expectedAccount.homeAccountId
+      );
+    }
     const token = await getAccessToken();
     return {
       Authorization: `Bearer ${token}`,
@@ -302,6 +310,6 @@ export class GraphClient {
 /**
  * Create a new Graph API client instance
  */
-export function createGraphClient(): GraphClient {
-  return new GraphClient();
+export function createGraphClient(expectedAccount?: { tenantId: string; homeAccountId: string }): GraphClient {
+  return new GraphClient(expectedAccount);
 }

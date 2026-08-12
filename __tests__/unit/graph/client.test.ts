@@ -5,6 +5,7 @@ import { GraphClient, createGraphClient } from '@/lib/graph/client'
 
 // Mock the auth module
 vi.mock('@/lib/auth/authUtils', () => ({
+  assertActiveAccountMatches: vi.fn(),
   getAccessToken: vi.fn().mockResolvedValue('mock-access-token'),
 }))
 
@@ -25,6 +26,16 @@ describe('GraphClient', () => {
   })
 
   describe('get', () => {
+    it('requires the confirmed active account before requests', async () => {
+      const auth = await import('@/lib/auth/authUtils')
+      server.use(http.get(`${GRAPH_BASE}/beta/test`, () => HttpResponse.json({})))
+      const client = new GraphClient({ tenantId: 'tenant-123', homeAccountId: 'home-account-123' })
+
+      await client.get('/test')
+
+      expect(auth.assertActiveAccountMatches).toHaveBeenCalledWith('tenant-123', 'home-account-123')
+    })
+
     it('makes GET request with correct headers', async () => {
       let capturedHeaders: Headers | undefined
 

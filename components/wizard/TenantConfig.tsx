@@ -36,11 +36,12 @@ function getStatusFromResult(result: PrerequisiteCheckResult): PrerequisiteCheck
 }
 
 function createErrorResult(error: unknown): PrerequisiteCheckResult {
-  const isAuthError =
-    error instanceof AuthSessionExpiredError ||
-    (error instanceof Error && error.message.includes("sign in"));
-  const message = isAuthError
-    ? "Your session has expired. Please sign out and sign in again."
+  const isSessionExpired =
+    error instanceof Error && error.message.includes("sign in");
+  const message = error instanceof AuthSessionExpiredError
+    ? error.message
+    : isSessionExpired
+      ? "Your session has expired. Please sign out and sign in again."
     : error instanceof Error
       ? error.message
       : "Unknown error";
@@ -95,7 +96,7 @@ export function TenantConfig(): React.JSX.Element {
     setPrerequisiteResult: setWizardPrerequisiteResult,
     nextStep,
   } = useWizardState();
-  const { accounts } = useMsal();
+  const { accounts, instance } = useMsal();
   const [isLoading, setIsLoading] = useState(false);
   const [prerequisiteStatus, setPrerequisiteStatus] =
     useState<PrerequisiteCheckStatus>(
@@ -105,8 +106,9 @@ export function TenantConfig(): React.JSX.Element {
     useState<PrerequisiteCheckResult | null>(state.prerequisiteResult ?? null);
   const userLocale = useSyncExternalStore(subscribeToUserLocale, getUserLocale, getServerLocale);
 
-  const tenantId = accounts.length > 0 ? accounts[0].tenantId : "";
-  const operatorUsername = accounts[0]?.username || "Not signed in";
+  const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
+  const tenantId = activeAccount?.tenantId ?? "";
+  const operatorUsername = activeAccount?.username || "Not signed in";
   const tenantName = prerequisiteResult?.organization?.displayName || "";
 
   const runPrerequisiteValidation = useCallback(async (showLoadingState: boolean): Promise<void> => {
@@ -116,7 +118,14 @@ export function TenantConfig(): React.JSX.Element {
       }
       setPrerequisiteStatus("checking");
 
-      const graphClient = createGraphClient();
+      if (!activeAccount) {
+        throw new AuthSessionExpiredError();
+      }
+
+      const graphClient = createGraphClient({
+        tenantId: activeAccount.tenantId,
+        homeAccountId: activeAccount.homeAccountId,
+      });
       const result = await validatePrerequisites(graphClient);
       setPrerequisiteResult(result);
       setWizardPrerequisiteResult(result);
@@ -130,7 +139,7 @@ export function TenantConfig(): React.JSX.Element {
     } finally {
       setIsLoading(false);
     }
-  }, [setWizardPrerequisiteResult]);
+  }, [activeAccount, setWizardPrerequisiteResult]);
 
   useEffect(() => {
     if (accounts.length === 0) {
@@ -164,15 +173,22 @@ export function TenantConfig(): React.JSX.Element {
   }
 
   function handleContinue(): void {
+    if (!activeAccount || prerequisiteStatus === "checking" || prerequisiteResult?.isValid !== true) {
+      return;
+    }
+
     setTenantConfig({
       tenantId,
+      accountHomeId: activeAccount.homeAccountId,
       tenantName: tenantName || undefined,
       cloudEnvironment: "global",
     });
     nextStep();
   }
 
-  const isValid = tenantId.length > 0 && prerequisiteResult?.isValid !== false;
+  const isValid = Boolean(
+    activeAccount && tenantId && prerequisiteStatus !== "checking" && prerequisiteResult?.isValid === true
+  );
   const validatedAt = useMemo(() => {
     if (!prerequisiteResult?.timestamp || !userLocale) {
       return null;
