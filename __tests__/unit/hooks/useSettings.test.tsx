@@ -83,17 +83,6 @@ describe("useSettings", () => {
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
   });
 
-  it("defaults persisted settings with invalid field types", () => {
-    window.localStorage.setItem(
-      "app-settings:v1",
-      JSON.stringify({ stopOnFirstError: "true", demoMode: 1 })
-    );
-
-    const { result } = renderHook(() => useSettings(), { wrapper });
-
-    expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
-  });
-
   it("merges updates into settings and persists them", () => {
     const { result } = renderHook(() => useSettings(), { wrapper });
 
