@@ -1743,5 +1743,10 @@
 # PR #68 Copilot Review Loop
 
 - [x] Capture the initial head, review count, and unresolved thread state.
-- [ ] Fix and resolve every valid Copilot review thread.
+- [x] Fix and resolve every valid Copilot review thread.
 - [ ] Complete a fresh clean Copilot review against the latest head.
+
+## Review
+
+- Cycle 1 found two valid issues. Pending and running tasks now render as unfinished, and warning-bearing tasks remain visible as issues.
+- Cycle 2 generated no threads. Its valid suppressed metric note changed the combined preview total from `Blocked` to `Needs attention`.

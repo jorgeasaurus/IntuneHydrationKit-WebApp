@@ -290,7 +290,7 @@ export function ResultsSummary({
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-400">{isPreview ? "Blocked" : "Failed"}</p>
+            <p className="text-xs text-slate-400">{isPreview ? "Needs attention" : "Failed"}</p>
             <p className="mt-1 text-2xl font-semibold text-red-200">
               {isPreview
                 ? getOutcomeCount(tasks, "blocked", true) +

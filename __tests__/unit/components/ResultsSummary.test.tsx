@@ -173,9 +173,9 @@ describe('ResultsSummary', () => {
     )
 
     const noChangeMetric = screen.getAllByText('No change').find((element) => element.tagName === 'P')
-    const blockedMetric = screen.getAllByText('Blocked').find((element) => element.tagName === 'P')
+    const attentionMetric = screen.getByText('Needs attention')
     expect(noChangeMetric?.nextElementSibling).toHaveTextContent('1')
-    expect(blockedMetric?.nextElementSibling).toHaveTextContent('1')
+    expect(attentionMetric.nextElementSibling).toHaveTextContent('1')
   })
 
   it('filters the category list to tasks that need attention', async () => {
@@ -263,9 +263,9 @@ describe('ResultsSummary', () => {
     )
 
     const changesMetric = screen.getByText('Changes')
-    const blockedMetric = screen.getAllByText('Blocked').find((element) => element.tagName === 'P')
+    const attentionMetric = screen.getByText('Needs attention')
     expect(changesMetric.nextElementSibling).toHaveTextContent('0')
-    expect(blockedMetric?.nextElementSibling).toHaveTextContent('1')
+    expect(attentionMetric.nextElementSibling).toHaveTextContent('1')
     expect(screen.getByText('Running group').closest('li')).toHaveTextContent('Unfinished')
   })
 
