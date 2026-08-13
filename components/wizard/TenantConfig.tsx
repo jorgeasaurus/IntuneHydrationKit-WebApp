@@ -117,7 +117,7 @@ export function TenantConfig(): React.JSX.Element {
   const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
   const tenantId = activeAccount?.tenantId ?? "";
   const homeAccountId = activeAccount?.homeAccountId ?? "";
-  const operatorUsername = activeAccount?.username || "Not signed in";
+  const operatorUsername = activeAccount?.username;
   const tenantName = prerequisiteResult?.organization?.displayName || "";
 
   const runPrerequisiteValidation = useCallback(async (showLoadingState: boolean): Promise<void> => {

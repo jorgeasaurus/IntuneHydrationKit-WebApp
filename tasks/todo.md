@@ -1645,6 +1645,7 @@
 
 - Merged `origin/dev` while keeping its strict Demo Mode normalization and privacy checks.
 - Checks passed: 533 tests, type check, lint, production build, React Doctor 100/100, 30 browser tests, one manual tenant test skipped, and `git diff --check`.
+- Copilot round 1 fixed the collapsed trace ARIA relationship and kept signed-out placeholders visible in Demo Mode.
 
 # Demo Mode Sensitive Data Blur
 

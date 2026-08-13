@@ -9,15 +9,13 @@ import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
 const validatePrerequisites = vi.fn()
 const createGraphClient = vi.fn()
-const { MockAuthSessionExpiredError } = vi.hoisted(() => ({
+const { MockAuthSessionExpiredError, useMsalMock } = vi.hoisted(() => ({
   MockAuthSessionExpiredError: class extends Error {},
+  useMsalMock: vi.fn(),
 }))
 
 vi.mock('@azure/msal-react', () => ({
-  useMsal: () => ({
-    accounts: [{ tenantId: 'tenant-123', username: 'operator@contoso.com' }],
-    instance: { getActiveAccount: () => ({ tenantId: 'tenant-123', homeAccountId: 'home-tenant-123', username: 'operator@contoso.com' }) },
-  }),
+  useMsal: () => useMsalMock(),
 }))
 
 vi.mock('@/lib/graph/client', () => ({
@@ -72,6 +70,16 @@ describe('TenantConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     localStorage.clear()
+    useMsalMock.mockReturnValue({
+      accounts: [{ tenantId: 'tenant-123', username: 'operator@contoso.com' }],
+      instance: {
+        getActiveAccount: () => ({
+          tenantId: 'tenant-123',
+          homeAccountId: 'home-tenant-123',
+          username: 'operator@contoso.com',
+        }),
+      },
+    })
   })
 
   it('keeps the health checklist state when navigating away and back', async () => {
@@ -176,6 +184,7 @@ describe('TenantConfig', () => {
     await user.click(traceToggle)
 
     expect(traceToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(traceToggle).not.toHaveAttribute('aria-controls')
     expect(screen.queryByRole('list', { name: 'Tenant validation trace' })).not.toBeInTheDocument()
   })
 
@@ -264,6 +273,26 @@ describe('TenantConfig', () => {
     expect(operatorIdentity).toHaveClass('break-all')
     expect(operatorIdentity).toHaveClass('max-w-full')
     expect(operatorIdentity.parentElement).toHaveClass('min-w-0')
+  })
+
+  it('keeps the signed-out operator fallback readable in Demo Mode', async () => {
+    localStorage.setItem(
+      'app-settings:v1',
+      JSON.stringify({ stopOnFirstError: false, demoMode: true })
+    )
+    useMsalMock.mockReturnValue({
+      accounts: [],
+      instance: { getActiveAccount: () => null },
+    })
+
+    render(<TenantConfigHarness />)
+
+    const fallbacks = await screen.findAllByText('Not signed in')
+    expect(fallbacks).toHaveLength(2)
+    fallbacks.forEach((fallback) => {
+      expect(fallback).not.toHaveClass('demo-sensitive-data')
+      expect(fallback).not.toHaveAttribute('aria-hidden')
+    })
   })
 
   it('blurs organization, tenant, and operator identities when Demo Mode is on', async () => {

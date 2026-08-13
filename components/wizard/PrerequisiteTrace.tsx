@@ -114,7 +114,7 @@ export function PrerequisiteTrace({
         <button
           type="button"
           aria-expanded={expanded}
-          aria-controls="tenant-validation-trace"
+          aria-controls={expanded ? "tenant-validation-trace" : undefined}
           onClick={() => setExpanded((current) => !current)}
           className="group flex min-w-0 items-center gap-3 rounded-lg text-left"
         >
