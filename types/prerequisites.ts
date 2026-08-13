@@ -61,6 +61,17 @@ export interface PrerequisiteCheckResult {
 
 export type PrerequisiteCheckStatus = "pending" | "checking" | "success" | "warning" | "error";
 
+export type PrerequisiteValidationStep =
+  | "organization"
+  | "intuneLicense"
+  | "conditionalAccess"
+  | "driverUpdates";
+
+export interface PrerequisiteValidationProgress {
+  step: PrerequisiteValidationStep;
+  status: Exclude<PrerequisiteCheckStatus, "pending">;
+}
+
 /**
  * Intune service plan names that indicate Intune licensing
  */

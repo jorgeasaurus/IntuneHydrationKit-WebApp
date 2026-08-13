@@ -3,28 +3,13 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HydrationTask, TaskCategory } from "@/types/hydration";
+import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
 
 interface ProgressBarProps {
   tasks: HydrationTask[];
   title?: string;
   description?: string;
 }
-
-/**
- * Display names for task categories
- */
-const CATEGORY_DISPLAY_NAMES: Record<TaskCategory, string> = {
-  groups: "Dynamic Groups",
-  filters: "Device Filters",
-  compliance: "Compliance Policies",
-  appProtection: "App Protection",
-  win32Apps: "Win32 Apps",
-  conditionalAccess: "Conditional Access",
-  enrollment: "Enrollment Profiles",
-  notification: "Notifications",
-  baseline: "OpenIntuneBaseline",
-  cisBaseline: "CIS Baselines",
-};
 
 interface CategoryStats {
   category: TaskCategory;
@@ -73,7 +58,7 @@ export function ProgressBar({ tasks, title, description }: ProgressBarProps) {
 
       stats.push({
         category,
-        displayName: CATEGORY_DISPLAY_NAMES[category] || category,
+        displayName: getTaskCategoryLabel(category),
         total: catTotal,
         succeeded: catSucceeded,
         failed: catFailed,

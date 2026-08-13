@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SettingsProvider, useSettings } from "@/hooks/useSettings";
 const DEFAULT_SETTINGS = {
   stopOnFirstError: false,
+  demoMode: false,
 } as const;
 
 let store: Record<string, string> = {};
@@ -71,6 +72,17 @@ describe("useSettings", () => {
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
   });
 
+  it("defaults persisted settings with invalid field types", () => {
+    window.localStorage.setItem(
+      "app-settings:v1",
+      JSON.stringify({ stopOnFirstError: "true", demoMode: 1 })
+    );
+
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
+  });
+
   it("merges updates into settings and persists them", () => {
     const { result } = renderHook(() => useSettings(), { wrapper });
 
@@ -78,8 +90,11 @@ describe("useSettings", () => {
       result.current.updateSettings({ stopOnFirstError: true });
     });
 
-    expect(result.current.settings).toEqual({ stopOnFirstError: true });
-    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual({ stopOnFirstError: true });
+    expect(result.current.settings).toEqual({ stopOnFirstError: true, demoMode: false });
+    expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual({
+      stopOnFirstError: true,
+      demoMode: false,
+    });
   });
 
   it("resets settings to defaults and persists the reset", () => {

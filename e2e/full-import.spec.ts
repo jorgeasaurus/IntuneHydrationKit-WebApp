@@ -16,7 +16,7 @@ test.describe("Full Import Flow", () => {
   test("complete hydration wizard and import", async ({ page }) => {
     // Step 1: Navigate to landing page
     await page.goto("/");
-    await expect(page.getByText("v2.6")).toBeVisible();
+    await expect(page.getByText(/^v\d+\.\d+\.\d+$/, { exact: true })).toBeVisible();
 
     // Step 2: Click sign-in - user authenticates manually in the browser
     console.log("Waiting for manual sign-in. Please authenticate in the browser.");

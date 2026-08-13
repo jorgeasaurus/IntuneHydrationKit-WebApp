@@ -10,6 +10,7 @@ import {
   LicenseCheckResult,
   PermissionCheckResult,
   PrerequisiteCheckResult,
+  PrerequisiteValidationProgress,
   INTUNE_SERVICE_PLANS,
   CONDITIONAL_ACCESS_SERVICE_PLANS,
   PREMIUM_P2_SERVICE_PLANS,
@@ -205,7 +206,8 @@ export async function checkPermissions(
  * Run all prerequisite checks
  */
 export async function validatePrerequisites(
-  client: GraphClient
+  client: GraphClient,
+  onProgress?: (progress: PrerequisiteValidationProgress) => void
 ): Promise<PrerequisiteCheckResult> {
   console.log("[Prerequisites] Starting validation...");
 
@@ -221,16 +223,20 @@ export async function validatePrerequisites(
 
   try {
     // Check 1: Organization info
+    onProgress?.({ step: "organization", status: "checking" });
     try {
       result.organization = await getOrganizationInfo(client);
+      onProgress?.({ step: "organization", status: "success" });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown error";
       result.errors.push(`Failed to get organization info: ${message}`);
+      onProgress?.({ step: "organization", status: "error" });
       console.error("[Prerequisites] Organization check failed:", error);
     }
 
     // Check 2: Licenses
+    onProgress?.({ step: "intuneLicense", status: "checking" });
     try {
       result.licenses = await checkLicenses(client);
 
@@ -240,6 +246,10 @@ export async function validatePrerequisites(
             INTUNE_SERVICE_PLANS.join(", ")
         );
       }
+      onProgress?.({
+        step: "intuneLicense",
+        status: result.licenses.hasIntuneLicense ? "success" : "error",
+      });
 
       if (!result.licenses.hasConditionalAccessLicense) {
         result.warnings.push(
@@ -250,16 +260,27 @@ export async function validatePrerequisites(
           "No Azure AD Premium P2 license found. Conditional Access policies that use risk-based conditions (signInRiskLevels, userRiskLevels, insiderRiskLevels) will be skipped during creation."
         );
       }
+      onProgress?.({
+        step: "conditionalAccess",
+        status: result.licenses.hasPremiumP2License ? "success" : "warning",
+      });
 
       if (!result.licenses.hasWindowsDriverUpdateLicense) {
         result.warnings.push(
           "No Windows Driver Update compatible license found (Windows E3/E5, Microsoft 365 E3/E5, etc.). Windows Driver Update profiles will be skipped during creation."
         );
       }
+      onProgress?.({
+        step: "driverUpdates",
+        status: result.licenses.hasWindowsDriverUpdateLicense ? "success" : "warning",
+      });
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown error";
       result.errors.push(`Failed to check licenses: ${message}`);
+      onProgress?.({ step: "intuneLicense", status: "error" });
+      onProgress?.({ step: "conditionalAccess", status: "error" });
+      onProgress?.({ step: "driverUpdates", status: "error" });
       console.error("[Prerequisites] License check failed:", error);
     }
 

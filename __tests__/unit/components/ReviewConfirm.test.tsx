@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@testing-library/react'
 import { ReviewConfirm } from '@/components/wizard/ReviewConfirm'
+import { SettingsProvider } from '@/hooks/useSettings'
 import type { WizardState } from '@/types/hydration'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
@@ -58,9 +59,18 @@ function createState(overrides: Partial<WizardState> = {}): WizardState {
   }
 }
 
+function renderReviewConfirm(): void {
+  render(
+    <SettingsProvider>
+      <ReviewConfirm />
+    </SettingsProvider>
+  )
+}
+
 describe('ReviewConfirm', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    localStorage.clear()
     getEstimatedTaskCount.mockReturnValue(12)
     getEstimatedCategoryCount.mockReturnValue(3)
     useWizardState.mockReturnValue({
@@ -70,12 +80,27 @@ describe('ReviewConfirm', () => {
     })
   })
 
+  it('blurs the tenant identity in the execution brief when Demo Mode is on', () => {
+    localStorage.setItem(
+      'app-settings:v1',
+      JSON.stringify({ stopOnFirstError: false, demoMode: true })
+    )
+
+    renderReviewConfirm()
+
+    expect(screen.getByText('Contoso')).toHaveClass('demo-sensitive-data')
+    expect(screen.getByText('tenant-123')).toHaveClass('demo-sensitive-data')
+  })
+
   it('lets preview runs start immediately and routes to the dashboard', async () => {
     const user = userEvent.setup()
-    render(<ReviewConfirm />)
+    renderReviewConfirm()
 
-    expect(screen.getByText('Preview mode')).toHaveClass('text-sky-50')
-    expect(screen.getByText(/Preview mode will check/)).toHaveClass('text-sky-100')
+    expect(screen.getByText('Preview mode')).toHaveClass('text-white')
+    expect(screen.getByText(/Preview mode will check/)).toHaveClass('text-slate-200')
+    expect(screen.getByText('No approval required')).toBeInTheDocument()
+    expect(screen.getAllByText('12 objects').length).toBeGreaterThan(0)
+    expect(screen.getByText('Read only')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Preview Create' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Preview Create' }))
@@ -100,7 +125,7 @@ describe('ReviewConfirm', () => {
       previousStep,
     })
 
-    render(<ReviewConfirm />)
+    renderReviewConfirm()
 
     const startButton = screen.getByRole('button', { name: 'Start Hydration' })
     expect(startButton).toBeDisabled()
@@ -113,11 +138,14 @@ describe('ReviewConfirm', () => {
     expect(acknowledgementLabel).toHaveClass('live-acknowledgement__title')
     expect(acknowledgementDescription).toHaveClass('live-acknowledgement__copy')
     expect(acknowledgement).toHaveClass('live-acknowledgement')
+    expect(screen.getByText('Human approval required')).toBeInTheDocument()
+    expect(screen.getByText('Awaiting approval')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
       .toHaveClass('live-acknowledgement__checkbox')
 
     await user.click(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
     expect(startButton).toBeEnabled()
+    expect(screen.getByText('Approved')).toBeInTheDocument()
 
     await user.click(startButton)
     expect(setConfirmed).toHaveBeenCalledWith(true)

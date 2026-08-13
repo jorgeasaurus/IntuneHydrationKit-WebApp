@@ -9,6 +9,7 @@ import { useRouter } from "next/navigation";
 import { AppNavigation } from "@/components/AppNavigation";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { SettingsModal } from "@/components/SettingsModal";
+import { SensitiveData } from "@/components/SensitiveData";
 import { TenantConfig } from "@/components/wizard/TenantConfig";
 import { OperationModeSelection } from "@/components/wizard/OperationMode";
 import { TargetSelectionView } from "@/components/wizard/TargetSelectionView";
@@ -143,7 +144,12 @@ function WizardContent() {
           </>
         )}
         title="Intune Hydration Kit"
-        description={`Signed in as ${accounts[0]?.username ?? "Connected operator"}`}
+        description={(
+          <>
+            Signed in as{" "}
+            <SensitiveData value={accounts[0]?.username} fallback="Connected operator" />
+          </>
+        )}
         actions={(
           <>
             <Button variant="outline" onClick={() => setShowSettings(true)} className="size-9 px-0 sm:w-auto sm:px-3">
@@ -258,7 +264,10 @@ function WizardContent() {
                   Operator Brief
                 </p>
                 <h3 className="mt-2 text-lg font-semibold">
-                  {state.tenantConfig?.tenantName ?? "Tenant not locked in"}
+                  <SensitiveData
+                    value={state.tenantConfig?.tenantName}
+                    fallback="Tenant not locked in"
+                  />
                 </h3>
               </div>
               <div className="rounded-full border border-border/80 bg-background/70 px-3 py-1 text-xs font-mono uppercase tracking-[0.22em] text-muted-foreground">
@@ -272,7 +281,10 @@ function WizardContent() {
                   Tenant ID
                 </p>
                 <p className="mt-2 break-all text-sm text-foreground">
-                  {state.tenantConfig?.tenantId ?? "Awaiting validation"}
+                  <SensitiveData
+                    value={state.tenantConfig?.tenantId}
+                    fallback="Awaiting validation"
+                  />
                 </p>
               </div>
 

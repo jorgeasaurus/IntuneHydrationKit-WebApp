@@ -472,6 +472,12 @@ describe('TargetSelection', () => {
 
     render(<TargetSelectionHarness />)
 
+    expect(screen.getByRole('region', { name: 'Selection console' })).toHaveClass(
+      'glass-surface',
+      'target-selection-console'
+    )
+    expect(screen.getByText('No scope selected')).toBeInTheDocument()
+
     await user.click(screen.getByRole('button', { name: 'Select All' }))
 
     await waitFor(() => {

@@ -1,8 +1,9 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { TenantConfig } from '@/components/wizard/TenantConfig'
+import { SettingsProvider } from '@/hooks/useSettings'
 import { WizardProvider, useWizardState } from '@/hooks/useWizardState'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
@@ -39,7 +40,7 @@ function WizardHarness() {
   const { state, setCurrentStep } = useWizardState()
 
   return (
-    <>
+    <SettingsProvider>
       {state.currentStep === 1 ? (
         <>
           <TenantConfig />
@@ -53,13 +54,14 @@ function WizardHarness() {
           Back to tenant checkpoint
         </button>
       ) : null}
-    </>
+    </SettingsProvider>
   )
 }
 
 describe('TenantConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    localStorage.clear()
   })
 
   it('keeps the health checklist state when navigating away and back', async () => {
@@ -103,6 +105,9 @@ describe('TenantConfig', () => {
 
     expect((await screen.findAllByText('Contoso')).length).toBeGreaterThan(0)
     expect(await screen.findByText('All prerequisites met')).toBeInTheDocument()
+    const validationTrace = screen.getByRole('list', { name: 'Tenant validation trace' })
+    expect(within(validationTrace).getAllByRole('listitem')).toHaveLength(4)
+    expect(within(validationTrace).getByText('Risk-based CA supported')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveClass('bg-emerald-500/18', 'text-emerald-50')
     expect(screen.getByText(/Validation passed/i)).toHaveClass('text-emerald-100')
     expect(screen.getByText(/Last checked at .* UTC/)).toBeInTheDocument()
@@ -141,7 +146,35 @@ describe('TenantConfig', () => {
         homeAccountId: 'home-tenant-123',
       })
     })
+    expect(screen.getByText('Querying the organization endpoint…')).toBeInTheDocument()
+    expect(screen.getAllByText('Queued')).toHaveLength(3)
     expect(screen.getByRole('button', { name: 'Use Tenant Configuration' })).toBeDisabled()
+  })
+
+  it('shows real prerequisite progress and lets the operator collapse the trace', async () => {
+    validatePrerequisites.mockImplementation((_client, onProgress) => {
+      onProgress({ step: 'organization', status: 'success' })
+      onProgress({ step: 'intuneLicense', status: 'checking' })
+      return new Promise(() => {})
+    })
+    const user = userEvent.setup()
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    expect(await screen.findByText('Reading subscribed service plans…')).toBeInTheDocument()
+    expect(screen.getAllByText('Running checks')).toHaveLength(2)
+
+    const traceToggle = screen.getByRole('button', { name: /Checking tenant readiness/i })
+    expect(traceToggle).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(traceToggle)
+
+    expect(traceToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('list', { name: 'Tenant validation trace' })).not.toBeInTheDocument()
   })
 
   it('formats the validation timestamp in the operator locale and labels its UTC timezone', async () => {
@@ -245,5 +278,39 @@ describe('TenantConfig', () => {
     expect(operatorIdentity).toHaveClass('break-all')
     expect(operatorIdentity).toHaveClass('max-w-full')
     expect(operatorIdentity.parentElement).toHaveClass('min-w-0')
+  })
+
+  it('blurs organization, tenant, and operator identities when Demo Mode is on', async () => {
+    localStorage.setItem(
+      'app-settings:v1',
+      JSON.stringify({ stopOnFirstError: false, demoMode: true })
+    )
+    validatePrerequisites.mockResolvedValue({
+      organization: { id: 'tenant-123', displayName: 'Contoso' },
+      licenses: null,
+      permissions: null,
+      isValid: true,
+      warnings: [],
+      errors: [],
+      timestamp: new Date('2026-04-25T15:00:00.000Z'),
+    } satisfies PrerequisiteCheckResult)
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    const sensitiveValues = [
+      ...(await screen.findAllByText('Contoso')),
+      ...screen.getAllByText('tenant-123'),
+      ...screen.getAllByText('operator@contoso.com'),
+    ]
+
+    expect(sensitiveValues.length).toBeGreaterThanOrEqual(4)
+    sensitiveValues.forEach((value) => {
+      expect(value).toHaveClass('demo-sensitive-data')
+      expect(value).toHaveAttribute('aria-hidden', 'true')
+    })
   })
 })

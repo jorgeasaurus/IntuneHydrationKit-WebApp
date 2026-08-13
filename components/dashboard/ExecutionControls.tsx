@@ -85,33 +85,63 @@ export function ExecutionControls({
       <CardContent className="space-y-4">
         {/* Batch Progress Indicator */}
         {batchProgress && batchProgress.isActive && (
-          <div className="bg-blue-50 dark:bg-blue-950/30 rounded-lg p-4 border border-blue-200 dark:border-blue-800">
-            <div className="flex items-center gap-2 mb-2">
-              <Layers className="size-4 text-blue-600 dark:text-blue-400 animate-pulse" />
-              <span className="font-medium text-blue-700 dark:text-blue-300">
-                Batch Processing Active
+          <section
+            aria-label="Batch processing status"
+            className="overflow-hidden rounded-xl border border-white/[0.12] bg-slate-950/65 text-slate-100 shadow-[inset_0_1px_0_rgb(255_255_255_/_0.06)] backdrop-blur-md"
+          >
+            <div className="flex flex-col gap-4 border-b border-white/10 p-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-sky-300/20 bg-sky-300/10 text-sky-100">
+                  <Layers aria-hidden="true" className="size-4" />
+                </span>
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sky-200">
+                    Graph batch
+                  </p>
+                  <h3 className="mt-1 text-sm font-semibold text-white">Batch processing</h3>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Parallel requests are active for the current task group.
+                  </p>
+                </div>
+              </div>
+
+              <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-100">
+                <span aria-hidden="true" className="size-1.5 animate-pulse rounded-full bg-emerald-300" />
+                Active
               </span>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-blue-600 dark:text-blue-400">
-                  Batch {batchProgress.currentBatch} of {batchProgress.totalBatches}
-                </span>
-                <span className="text-blue-600 dark:text-blue-400">
-                  {batchProgress.itemsInBatch} items/batch ({batchProgress.apiVersion})
-                </span>
+
+            <div className="space-y-3 p-4">
+              <div className="grid grid-cols-3 gap-3 text-sm">
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Batch</p>
+                  <p className="mt-1 font-medium tabular-nums text-white">
+                    {batchProgress.currentBatch} / {batchProgress.totalBatches}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Capacity</p>
+                  <p className="mt-1 font-medium tabular-nums text-white">
+                    {batchProgress.itemsInBatch} per batch
+                  </p>
+                </div>
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Graph API</p>
+                  <p className="mt-1 font-medium text-white">{batchProgress.apiVersion}</p>
+                </div>
               </div>
+
               <progress
                 aria-label="Batch progress"
                 value={batchProgress.currentBatch}
                 max={batchProgress.totalBatches}
-                className="h-2 w-full overflow-hidden rounded-full bg-blue-200 accent-blue-600 dark:bg-blue-900 dark:accent-blue-400 [&::-moz-progress-bar]:bg-blue-600 dark:[&::-moz-progress-bar]:bg-blue-400 [&::-webkit-progress-bar]:bg-blue-200 dark:[&::-webkit-progress-bar]:bg-blue-900 [&::-webkit-progress-value]:bg-blue-600 dark:[&::-webkit-progress-value]:bg-blue-400"
+                className="h-1.5 w-full overflow-hidden rounded-full bg-white/10 accent-sky-300 [&::-moz-progress-bar]:bg-sky-300 [&::-webkit-progress-bar]:bg-white/10 [&::-webkit-progress-value]:bg-sky-300"
               />
-              <p className="text-xs text-blue-500 dark:text-blue-400">
-                Processing {batchProgress.itemsInBatch} items in parallel via Graph API $batch endpoint
+              <p className="text-xs text-slate-400">
+                Processing {batchProgress.itemsInBatch} items through the Graph API $batch endpoint.
               </p>
             </div>
-          </div>
+          </section>
         )}
 
         {/* Timer */}

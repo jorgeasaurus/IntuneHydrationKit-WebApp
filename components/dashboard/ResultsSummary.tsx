@@ -10,7 +10,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HydrationSummary, HydrationTask, TaskCategory } from "@/types/hydration";
+import { HydrationSummary, HydrationTask } from "@/types/hydration";
 import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle, Eye } from "lucide-react";
 import {
   generateMarkdownReport,
@@ -20,6 +20,8 @@ import {
   generateReportFilename,
 } from "@/lib/hydration/reporter";
 import { formatDateTime } from "@/lib/utils/dateFormat";
+import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
+import { PreviewChangeTable } from "@/components/dashboard/PreviewChangeTable";
 
 interface ResultsSummaryProps {
   summary: HydrationSummary;
@@ -27,22 +29,8 @@ interface ResultsSummaryProps {
   isPreview?: boolean;
 }
 
-const CATEGORY_DISPLAY_NAMES: Record<TaskCategory, string> = {
-  groups: "Dynamic Groups",
-  filters: "Device Filters",
-  compliance: "Compliance Policies",
-  appProtection: "App Protection",
-  win32Apps: "Win32 Apps",
-  conditionalAccess: "Conditional Access",
-  enrollment: "Enrollment Profiles",
-  notification: "Notifications",
-  baseline: "OpenIntuneBaseline",
-  cisBaseline: "CIS Baselines",
-};
-
 function getCategoryDisplayName(category: string): string {
-  return CATEGORY_DISPLAY_NAMES[category as TaskCategory]
-    ?? category.charAt(0).toUpperCase() + category.slice(1);
+  return getTaskCategoryLabel(category);
 }
 
 function getTaskStatusClassName(status: HydrationTask["status"]): string {
@@ -192,6 +180,10 @@ export function ResultsSummary({
         </CardContent>
       </Card>
 
+      {isPreview && (
+        <PreviewChangeTable tasks={tasks} operationMode={summary.operationMode} />
+      )}
+
       {/* Category Breakdown */}
       <Card>
         <CardHeader>
@@ -280,7 +272,7 @@ export function ResultsSummary({
         const actionDescription = isPreview
           ? (summary.operationMode === "create" ? "would be created" : "would be deleted")
           : (summary.operationMode === "create" ? "were created" : "were deleted");
-        return successfulTasks.length > 0 ? (
+        return !isPreview && successfulTasks.length > 0 ? (
           <Card className="border-green-200 dark:border-green-900">
             <CardHeader>
               <CardTitle className="text-green-600 dark:text-green-400">
@@ -301,7 +293,7 @@ export function ResultsSummary({
                 ).map(([category, categoryTasks]) => (
                   <div key={category} className="space-y-2">
                     <h4 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                      {category.charAt(0).toUpperCase() + category.slice(1)} ({categoryTasks.length})
+                      {getTaskCategoryLabel(category)} ({categoryTasks.length})
                     </h4>
                     <div className="space-y-1 ml-2">
                       {categoryTasks.map((task) => (
