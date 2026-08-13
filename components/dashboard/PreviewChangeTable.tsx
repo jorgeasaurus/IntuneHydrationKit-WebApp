@@ -10,9 +10,14 @@ interface PreviewChangeTableProps {
 
 type PreviewDecision = "change" | "unchanged" | "blocked";
 
+function isNoOpSkip(task: HydrationTask): boolean {
+  const evidence = task.error || task.warning || "";
+  return /\b(already exists|not found|does not exist)\b/i.test(evidence);
+}
+
 function getDecision(task: HydrationTask): PreviewDecision {
   if (task.status === "failed") return "blocked";
-  if (task.status === "skipped") return "unchanged";
+  if (task.status === "skipped") return isNoOpSkip(task) ? "unchanged" : "blocked";
   return "change";
 }
 

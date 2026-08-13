@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@testing-library/react'
 import { ResultsSummary } from '@/components/dashboard/ResultsSummary'
+import { PreviewChangeTable } from '@/components/dashboard/PreviewChangeTable'
 import type { HydrationSummary, HydrationTask } from '@/types/hydration'
 
 const generateMarkdownReport = vi.fn()
@@ -125,6 +126,37 @@ describe('ResultsSummary', () => {
     )
     expect(getCategoryTaskRow('Corporate Devices')).toHaveClass('text-amber-100')
     expect(getCategoryTaskRow('Block Legacy Auth')).toHaveClass('text-red-100')
+  })
+
+  it('separates no-op skips from prerequisite-blocked preview items', () => {
+    render(
+      <PreviewChangeTable
+        operationMode="create"
+        tasks={[
+          {
+            id: 'existing',
+            category: 'groups',
+            operation: 'create',
+            itemName: 'Existing group',
+            status: 'skipped',
+            error: 'Group already exists',
+          },
+          {
+            id: 'missing-license',
+            category: 'conditionalAccess',
+            operation: 'create',
+            itemName: 'Risk policy',
+            status: 'skipped',
+            error: 'Missing Premium P2 license',
+          },
+        ]}
+      />
+    )
+
+    expect(screen.getByText('1 unchanged')).toBeInTheDocument()
+    expect(screen.getByText('1 blocked')).toBeInTheDocument()
+    expect(screen.getByText('Existing group').closest('tr')).toHaveTextContent('No change')
+    expect(screen.getByText('Risk policy').closest('tr')).toHaveTextContent('Blocked')
   })
 
   it('downloads markdown, json, and csv reports with generated filenames', async () => {
