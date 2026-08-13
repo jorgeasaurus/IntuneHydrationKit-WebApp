@@ -1719,3 +1719,8 @@
 - The results page now has one receipt, one mode-aware category accordion, and one compact export bar.
 - Clean categories start closed. Categories with skipped, blocked, or failed tasks start open. Long categories show 25 tasks until the user expands them.
 - Checks passed: 540 tests, type check, lint, production build, React Doctor 100/100 on changed files, desktop and mobile visual inspection, and `git diff --check`.
+
+# Results Output Delivery
+
+- [x] Increment the website version to 2.6.48.
+- [ ] Push the implementation branch and open a draft pull request to `dev`.
