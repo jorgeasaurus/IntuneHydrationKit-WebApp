@@ -62,6 +62,13 @@
   }
 }
 
+.demo-sensitive-data {
+  display: inline-block;
+  filter: blur(6px);
+  pointer-events: none;
+  user-select: none;
+}
+
 .glass-surface,
 .glass-panel,
 .data-card,
@@ -89,6 +96,19 @@
 .theme-select-content,
 .terminal-block {
   position: relative;
+}
+
+.target-selection-console {
+  background:
+    linear-gradient(
+      135deg,
+      rgb(8 35 47 / 0.88),
+      rgb(2 16 24 / 0.9) 54%,
+      rgb(1 10 16 / 0.93)
+    ),
+    rgb(2 12 18 / 0.88);
+  -webkit-backdrop-filter: blur(20px) saturate(1.18) brightness(0.58);
+  backdrop-filter: blur(20px) saturate(1.18) brightness(0.58);
 }
 
 .data-card,

@@ -1572,3 +1572,181 @@
 
 - Ready PR #20 targets `main` from `codex/consolidate-win32-glass-ui` with website version 2.6.4.
 - Local validation passed: 529 tests, lint, type check, production build, React Doctor 100/100, browser verification, and whitespace validation.
+
+# Beautiful UI Integration and Demo Mode
+
+- [x] Restore Demo Mode settings and sensitive-data rendering from `origin/dev`.
+- [x] Protect tenant and operator identity data across the wizard, dashboard, and results.
+- [x] Add focused Demo Mode regression coverage.
+- [x] Run unit tests, type-check, lint, production build, and diff validation.
+- [x] Continue the Beautiful UI plan with the preview change table.
+
+## Review
+
+- Demo Mode now blurs tenant and operator identities across all execution views.
+- Preview results now separate changes, unchanged objects, and blocked objects in one review table.
+- Checks passed: 530 tests, type-check, lint, production build, and `git diff --check`.
+
+# Beautiful UI Approval Card
+
+- [x] Replace the final confirmation notice with a structured approval card.
+- [x] Preserve live-run acknowledgement and preview safety behavior.
+- [x] Add approval-state regression coverage and run project verification.
+
+## Review
+
+- Preview runs show a read-only receipt with scope and Graph access.
+- Live runs show estimated impact, pending or approved state, and the required acknowledgement.
+- Checks passed: 530 tests, type-check, lint, production build, and `git diff --check`.
+
+# Dashboard Preview Glass Notice
+
+- [x] Apply the shared glass surface to the preview notice.
+- [x] Keep explicit white and pale foreground contrast.
+- [x] Add regression coverage and run verification.
+
+## Review
+
+- The dashboard preview notice now uses the shared glass panel, white title, pale body copy, and sky icon accent.
+- Checks passed: 531 tests, type-check, lint, production build, and `git diff --check`.
+
+# Target Selection Console
+
+- [x] Consolidate search, OS filters, bulk actions, and scope status.
+- [x] Preserve current selection behavior and accessible control names.
+- [x] Add regression coverage and run project verification.
+
+## Review
+
+- Search, platform filters, bulk actions, match counts, and selected scope now share one dark glass console.
+- Search-aware selection, manifest filtering, item-level selection, and navigation behavior are unchanged.
+- Checks passed: 531 tests, type-check, lint, production build, and `git diff --check`.
+
+# Batch Status Restyle
+
+- [x] Replace the light batch panel with a compact dark status surface.
+- [x] Keep batch metrics and progress semantics accessible.
+- [x] Add regression coverage and run project verification.
+
+## Review
+
+- Batch status now uses an embedded dark surface with compact metrics, an active-state chip, and a thin progress track.
+- Checks passed: 531 tests, type-check, lint, production build, and `git diff --check`.
+
+# Beautiful UI Delivery
+
+- [x] Run the browser suite and inspect desktop and mobile layouts.
+- [x] Increment the website version to 2.6.47.
+- [x] Integrate the latest `origin/dev` changes and rerun release checks.
+- [x] Commit and push the delivery branch.
+- [x] Open a pull request to `dev` and complete the Copilot review loop.
+
+## Review
+
+- Merged `origin/dev` while keeping its strict Demo Mode normalization and privacy checks.
+- Checks passed: 533 tests, type check, lint, production build, React Doctor 100/100, 30 browser tests, one manual tenant test skipped, and `git diff --check`.
+- Copilot round 1 fixed the collapsed trace ARIA relationship and kept signed-out placeholders visible in Demo Mode.
+- Copilot round 2 fixed misleading license trace text when entitlement queries fail.
+- Copilot round 3 reviewed `5b427e9` and reported no new comments.
+- Copilot round 4 fixed the idle trace state and same-count active-account revalidation.
+- Copilot round 5 fixed preview classification for prerequisite-blocked skipped tasks.
+
+# Completed Results Glass Surface
+
+- [x] Replace the light completed-item panel and rows with dark glass surfaces.
+- [x] Add regression coverage for the fixed dark status treatment.
+- [x] Run focused tests, type check, lint, build, and visual verification.
+- [x] Commit and push the correction to PR #67.
+
+## Review
+
+- The completed-items panel now uses a scoped dark teal glass fill, white content text, and restrained mint status accents.
+- Completed objects now render as semantic list rows that stay compact and truncate safely on mobile.
+- Checks passed: 538 tests, type check, lint, production build, React Doctor 100/100, desktop and mobile visual inspection, and `git diff --check`.
+
+# Demo Mode Sensitive Data Blur
+
+- [x] Add Demo Mode to persistent application settings and the settings dialog.
+- [x] Add one accessible sensitive-data wrapper and apply it to tenant and operator identity fields.
+- [x] Add focused settings and UI regression coverage.
+- [x] Run focused tests, type check, lint, production build, and review the diff.
+
+## Review
+
+- Demo Mode persists in local storage and blurs tenant IDs, organization names, and operator email addresses across the wizard, dashboard, and results UI.
+- Blurred values are not selectable and are replaced with a privacy message for assistive technology. Graph requests, tenant state, and report exports are unchanged.
+- Checks passed: 529 tests, type check, lint, production build, and `git diff --check`.
+
+# Demo Mode Thermonuclear Review Loop
+
+- [x] Run a strict review of the complete Demo Mode diff.
+- [x] Fix every actionable finding and verify the focused behavior.
+- [x] Repeat the review until a fresh round reports zero findings.
+- [x] Run final project validation and record the clean result.
+
+## Review
+
+- Round 1 fixed a fail-open provider boundary, duplicate settings defaults, and missing real-surface privacy tests.
+- Round 2 separated sensitive values from public fallback text, added strict persisted-boolean normalization, and added a browser CSS contract test.
+- Round 3 reported zero actionable findings.
+- Checks passed: 529 tests, type check, lint, production build, React Doctor 100/100, focused Playwright computed-style validation, and `git diff --check`.
+
+# PR #66 Copilot Review Loop
+
+- [x] Capture the initial Copilot review and thread state.
+- [x] Fix every valid comment with focused regression coverage.
+- [x] Push verified fixes, reply to and resolve handled threads, and request another review.
+- [ ] Complete a clean Copilot review cycle on the latest head.
+
+## Review
+
+- The first Copilot review on `ab524fe` generated no comments or review threads.
+- The review on `0a2443d` generated no threads and one valid suppressed comment about an order-sensitive JSON assertion.
+- The smoke test now parses stored settings before it compares the object shape.
+- A final review is pending on the fix commit.
+
+# Results Output Cleanup
+
+- [x] Consolidate run metadata and outcome counts into one summary.
+- [x] Show each category once in a collapsed result list.
+- [x] Keep failed categories open and add an issues-only filter.
+- [x] Remove duplicate success, error, and preview task sections.
+- [x] Limit large expanded categories and keep report actions compact.
+- [x] Add regression coverage and run full visual and project verification.
+
+## Review
+
+- The results page now has one receipt, one mode-aware category accordion, and one compact export bar.
+- Clean categories start closed. Categories with skipped, blocked, or failed tasks start open. Long categories show 25 tasks until the user expands them.
+- Checks passed: 540 tests, type check, lint, production build, React Doctor 100/100 on changed files, desktop and mobile visual inspection, and `git diff --check`.
+
+# Results Output Delivery
+
+- [x] Increment the website version to 2.6.48.
+- [x] Push the implementation branch and open a draft pull request to `dev`.
+
+## Review
+
+- Draft pull request #68 targets `dev` from `codex/results-output-cleanup`.
+
+# Results Preview Glass Notice
+
+- [x] Replace the opaque results preview notice with the shared glass surface.
+- [x] Add regression coverage and inspect the result over the route wallpaper.
+- [x] Commit and push the correction to pull request #68.
+
+## Review
+
+- The results preview notice now uses the shared translucent glass panel with a light rim and explicit pale foreground colors.
+- Checks passed: focused tests, type check, lint, production build, React Doctor 100/100, desktop and mobile visual inspection, and `git diff --check`.
+
+# PR #68 Copilot Review Loop
+
+- [x] Capture the initial head, review count, and unresolved thread state.
+- [x] Fix and resolve every valid Copilot review thread.
+- [ ] Complete a fresh clean Copilot review against the latest head.
+
+## Review
+
+- Cycle 1 found two valid issues. Pending and running tasks now render as unfinished, and warning-bearing tasks remain visible as issues.
+- Cycle 2 generated no threads. Its valid suppressed metric note changed the combined preview total from `Blocked` to `Needs attention`.

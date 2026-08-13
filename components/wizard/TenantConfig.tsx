@@ -4,17 +4,20 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useMsal } from "@azure/msal-react";
 import { Button } from "@/components/ui/button";
+import { SensitiveData } from "@/components/SensitiveData";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { PrerequisiteCheckResult, PrerequisiteCheckStatus } from "@/types/prerequisites";
+import {
+  PrerequisiteCheckResult,
+  PrerequisiteCheckStatus,
+  PrerequisiteValidationStep,
+} from "@/types/prerequisites";
 import { useWizardState } from "@/hooks/useWizardState";
 import {
   AlertTriangle,
   CheckCircle2,
   Cloud,
   KeyRound,
-  Loader2,
-  RefreshCw,
   ShieldCheck,
   Sparkles,
   XCircle,
@@ -22,6 +25,10 @@ import {
 import { createGraphClient } from "@/lib/graph/client";
 import { validatePrerequisites } from "@/lib/graph/prerequisites";
 import { AuthSessionExpiredError } from "@/lib/auth/authUtils";
+import {
+  PrerequisiteTrace,
+  type PrerequisiteTraceItem,
+} from "@/components/wizard/PrerequisiteTrace";
 
 const CLOUD_ENVIRONMENT_LABEL = "Global (Commercial)";
 
@@ -57,37 +64,33 @@ function createErrorResult(error: unknown): PrerequisiteCheckResult {
   };
 }
 
-type CheckStatus = "success" | "warning" | "error" | "checking";
+type ValidationTraceState = Record<PrerequisiteValidationStep, PrerequisiteCheckStatus>;
 
-const CHECK_STYLES: Record<
-  CheckStatus,
-  {
-    card: string;
-    icon: string;
-    label: string;
-  }
-> = {
-  success: {
-    card: "border-green-500/30 bg-green-500/10",
-    icon: "text-green-500",
-    label: "Healthy",
-  },
-  warning: {
-    card: "border-amber-500/30 bg-amber-500/10",
-    icon: "text-amber-500",
-    label: "Partial",
-  },
-  error: {
-    card: "border-red-500/30 bg-red-500/10",
-    icon: "text-red-500",
-    label: "Blocked",
-  },
-  checking: {
-    card: "border-blue-500/30 bg-blue-500/10",
-    icon: "text-blue-500",
-    label: "Checking",
-  },
-};
+function createPendingTrace(): ValidationTraceState {
+  return {
+    organization: "pending",
+    intuneLicense: "pending",
+    conditionalAccess: "pending",
+    driverUpdates: "pending",
+  };
+}
+
+function createTraceFromResult(result: PrerequisiteCheckResult): ValidationTraceState {
+  return {
+    organization: result.organization ? "success" : "error",
+    intuneLicense: result.licenses?.hasIntuneLicense ? "success" : "error",
+    conditionalAccess: !result.licenses
+      ? "error"
+      : result.licenses.hasPremiumP2License
+        ? "success"
+        : "warning",
+    driverUpdates: !result.licenses
+      ? "error"
+      : result.licenses.hasWindowsDriverUpdateLicense
+        ? "success"
+        : "warning",
+  };
+}
 
 export function TenantConfig(): React.JSX.Element {
   const {
@@ -104,11 +107,17 @@ export function TenantConfig(): React.JSX.Element {
     );
   const [prerequisiteResult, setPrerequisiteResult] =
     useState<PrerequisiteCheckResult | null>(state.prerequisiteResult ?? null);
+  const [validationTrace, setValidationTrace] = useState<ValidationTraceState>(() =>
+    state.prerequisiteResult
+      ? createTraceFromResult(state.prerequisiteResult)
+      : createPendingTrace()
+  );
   const userLocale = useSyncExternalStore(subscribeToUserLocale, getUserLocale, getServerLocale);
 
   const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
   const tenantId = activeAccount?.tenantId ?? "";
-  const operatorUsername = activeAccount?.username || "Not signed in";
+  const homeAccountId = activeAccount?.homeAccountId ?? "";
+  const operatorUsername = activeAccount?.username;
   const tenantName = prerequisiteResult?.organization?.displayName || "";
 
   const runPrerequisiteValidation = useCallback(async (showLoadingState: boolean): Promise<void> => {
@@ -117,32 +126,40 @@ export function TenantConfig(): React.JSX.Element {
         setIsLoading(true);
       }
       setPrerequisiteStatus("checking");
+      setValidationTrace(createPendingTrace());
 
-      if (!activeAccount) {
+      if (!tenantId || !homeAccountId) {
         throw new AuthSessionExpiredError();
       }
 
       const graphClient = createGraphClient({
-        tenantId: activeAccount.tenantId,
-        homeAccountId: activeAccount.homeAccountId,
+        tenantId,
+        homeAccountId,
       });
-      const result = await validatePrerequisites(graphClient);
+      const result = await validatePrerequisites(graphClient, (progress) => {
+        setValidationTrace((current) => ({
+          ...current,
+          [progress.step]: progress.status,
+        }));
+      });
       setPrerequisiteResult(result);
       setWizardPrerequisiteResult(result);
       setPrerequisiteStatus(getStatusFromResult(result));
+      setValidationTrace(createTraceFromResult(result));
     } catch (error) {
       const errorResult = createErrorResult(error);
       console.error("Failed to validate prerequisites:", error);
       setPrerequisiteStatus("error");
       setPrerequisiteResult(errorResult);
       setWizardPrerequisiteResult(errorResult);
+      setValidationTrace(createTraceFromResult(errorResult));
     } finally {
       setIsLoading(false);
     }
-  }, [activeAccount, setWizardPrerequisiteResult]);
+  }, [homeAccountId, setWizardPrerequisiteResult, tenantId]);
 
   useEffect(() => {
-    if (accounts.length === 0) {
+    if (!tenantId || !homeAccountId) {
       return;
     }
     // Re-run validation when there is no cached result, OR when the cached
@@ -156,7 +173,7 @@ export function TenantConfig(): React.JSX.Element {
     if (!state.prerequisiteResult || isStale) {
       void runPrerequisiteValidation(true);
     }
-  }, [accounts, tenantId, runPrerequisiteValidation, state.prerequisiteResult]);
+  }, [homeAccountId, tenantId, runPrerequisiteValidation, state.prerequisiteResult]);
 
   useEffect(() => {
     if (!state.prerequisiteResult) {
@@ -165,6 +182,7 @@ export function TenantConfig(): React.JSX.Element {
 
     setPrerequisiteResult(state.prerequisiteResult);
     setPrerequisiteStatus(getStatusFromResult(state.prerequisiteResult));
+    setValidationTrace(createTraceFromResult(state.prerequisiteResult));
   }, [state.prerequisiteResult]);
 
   async function handleRecheck(): Promise<void> {
@@ -179,7 +197,7 @@ export function TenantConfig(): React.JSX.Element {
 
     setTenantConfig({
       tenantId,
-      homeAccountId: activeAccount.homeAccountId,
+      homeAccountId,
       tenantName: tenantName || undefined,
       cloudEnvironment: "global",
     });
@@ -201,78 +219,92 @@ export function TenantConfig(): React.JSX.Element {
       timeZone: "UTC",
     }).format(new Date(prerequisiteResult.timestamp));
   }, [prerequisiteResult?.timestamp, userLocale]);
-  const healthChecks = [
+  const licenses = prerequisiteResult?.licenses;
+  const healthChecks: PrerequisiteTraceItem[] = [
     {
+      id: "organization",
       title: "Graph connectivity",
-      value: prerequisiteResult?.organization?.displayName ?? "Waiting for response",
+      value: validationTrace.organization === "checking"
+        ? "Querying the organization endpoint…"
+        : validationTrace.organization === "pending"
+          ? "Queued"
+          : (
+              <SensitiveData
+                value={prerequisiteResult?.organization?.displayName}
+                fallback="Organization unavailable"
+              />
+            ),
       detail: prerequisiteResult?.organization
         ? "Connected to the selected tenant and organization endpoint."
         : "Confirm the app can resolve tenant organization details.",
-      status:
-        prerequisiteStatus === "checking"
-          ? "checking"
-          : prerequisiteResult?.organization
-            ? "success"
-            : prerequisiteStatus === "error"
-              ? "error"
-              : "warning",
+      status: validationTrace.organization,
       icon: Cloud,
     },
     {
+      id: "intuneLicense",
       title: "Intune license",
-      value: prerequisiteResult?.licenses?.hasIntuneLicense
-        ? `${prerequisiteResult.licenses.intuneServicePlans.length} service plan(s)`
-        : "No qualifying license",
-      detail: prerequisiteResult?.licenses?.hasIntuneLicense
-        ? prerequisiteResult.licenses.intuneServicePlans.join(", ")
-        : "An Intune-capable subscription is required before execution can continue.",
-      status:
-        prerequisiteStatus === "checking"
-          ? "checking"
-          : prerequisiteResult?.licenses?.hasIntuneLicense
-            ? "success"
-            : prerequisiteResult?.licenses || prerequisiteStatus === "error"
-              ? "error"
-              : "warning",
+      value: validationTrace.intuneLicense === "checking"
+        ? "Reading subscribed service plans…"
+        : validationTrace.intuneLicense === "pending"
+          ? "Queued"
+          : !licenses
+            ? "License check failed"
+            : licenses.hasIntuneLicense
+              ? `${licenses.intuneServicePlans.length} service plan(s)`
+              : "No qualifying license",
+      detail: !licenses
+        ? "License details could not be retrieved. Review the validation error and run the checks again."
+        : licenses.hasIntuneLicense
+          ? licenses.intuneServicePlans.join(", ")
+          : "An Intune-capable subscription is required before execution can continue.",
+      status: validationTrace.intuneLicense,
       icon: ShieldCheck,
     },
     {
+      id: "conditionalAccess",
       title: "Conditional Access readiness",
-      value: prerequisiteResult?.licenses?.hasPremiumP2License
-        ? "Risk-based CA supported"
-        : prerequisiteResult?.licenses?.hasConditionalAccessLicense
-          ? "Basic CA only"
-          : "CA will be skipped",
-      detail: prerequisiteResult?.licenses?.hasPremiumP2License
-        ? "Premium P2 found for advanced Conditional Access templates."
-        : prerequisiteResult?.licenses?.hasConditionalAccessLicense
-          ? "P1-equivalent licensing exists, but risk-based templates will be skipped."
-          : "No qualifying Entra ID Premium license detected for Conditional Access creation.",
-      status:
-        prerequisiteStatus === "checking"
-          ? "checking"
-          : prerequisiteResult?.licenses?.hasPremiumP2License
-            ? "success"
-            : "warning",
+      value: validationTrace.conditionalAccess === "checking"
+        ? "Evaluating Entra entitlements…"
+        : validationTrace.conditionalAccess === "pending"
+          ? "Queued"
+          : !licenses
+            ? "License check failed"
+            : licenses.hasPremiumP2License
+            ? "Risk-based CA supported"
+            : licenses.hasConditionalAccessLicense
+              ? "Basic CA only"
+              : "CA will be skipped",
+      detail: !licenses
+        ? "Conditional Access licensing could not be evaluated. Review the validation error and run the checks again."
+        : licenses.hasPremiumP2License
+          ? "Premium P2 found for advanced Conditional Access templates."
+          : licenses.hasConditionalAccessLicense
+            ? "P1-equivalent licensing exists, but risk-based templates will be skipped."
+            : "No qualifying Entra ID Premium license detected for Conditional Access creation.",
+      status: validationTrace.conditionalAccess,
       icon: Sparkles,
     },
     {
+      id: "driverUpdates",
       title: "Driver update profiles",
-      value: prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense
-        ? "Windows entitlement detected"
-        : "Will be skipped",
-      detail: prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense
-        ? "Windows E3/E5-compatible licensing is available for driver update templates."
-        : "Windows Driver Update profiles require Windows Enterprise or equivalent Microsoft 365 licensing.",
-      status:
-        prerequisiteStatus === "checking"
-          ? "checking"
-          : prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense
-            ? "success"
-            : "warning",
+      value: validationTrace.driverUpdates === "checking"
+        ? "Evaluating Windows entitlements…"
+        : validationTrace.driverUpdates === "pending"
+          ? "Queued"
+          : !licenses
+            ? "License check failed"
+            : licenses.hasWindowsDriverUpdateLicense
+            ? "Windows entitlement detected"
+            : "Will be skipped",
+      detail: !licenses
+        ? "Windows entitlement licensing could not be evaluated. Review the validation error and run the checks again."
+        : licenses.hasWindowsDriverUpdateLicense
+          ? "Windows E3/E5-compatible licensing is available for driver update templates."
+          : "Windows Driver Update profiles require Windows Enterprise or equivalent Microsoft 365 licensing.",
+      status: validationTrace.driverUpdates,
       icon: KeyRound,
     },
-  ] as const;
+  ];
 
   return (
     <Card className="data-card rounded-2xl border bg-card/90 backdrop-blur">
@@ -315,7 +347,10 @@ export function TenantConfig(): React.JSX.Element {
               Organization
             </p>
             <p className="mt-3 text-base font-semibold">
-              {isLoading ? "Resolving tenant..." : tenantName || "Unknown organization"}
+              <SensitiveData
+                value={isLoading ? undefined : tenantName}
+                fallback={isLoading ? "Resolving tenant..." : "Unknown organization"}
+              />
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               This run stays scoped to the currently signed-in tenant.
@@ -327,7 +362,7 @@ export function TenantConfig(): React.JSX.Element {
               Tenant ID
             </p>
             <p className="mt-3 break-all text-sm font-medium">
-              {tenantId || "Not signed in"}
+              <SensitiveData value={tenantId} fallback="Not signed in" />
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
               Use sign out if you need to pivot to another tenant.
@@ -350,91 +385,25 @@ export function TenantConfig(): React.JSX.Element {
             <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
               Operator
             </p>
-            <p className="mt-3 max-w-full break-all text-sm font-semibold leading-6" title={operatorUsername}>
-              {operatorUsername}
-            </p>
+            <SensitiveData
+              value={operatorUsername}
+              fallback="Not signed in"
+              className="mt-3 block max-w-full break-all text-sm font-semibold leading-6"
+            />
             <p className="mt-1 text-sm text-muted-foreground">
               Delegated permissions are evaluated through the active user session.
             </p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-border/80 bg-muted/20 p-5">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div>
-              <p className="text-[11px] font-mono uppercase tracking-[0.28em] text-muted-foreground">
-                Health checklist
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                These checks mirror the go/no-go criteria used before the wizard advances.
-              </p>
-            </div>
-
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRecheck}
-              disabled={prerequisiteStatus === "checking"}
-            >
-              {prerequisiteStatus === "checking" ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <RefreshCw className="size-4" />
-              )}
-              <span className="ml-2">Recheck readiness</span>
-            </Button>
-          </div>
-
-          <div className="mt-4 grid gap-3 md:grid-cols-2">
-            {healthChecks.map((check) => {
-              const Icon = check.icon;
-              const style = CHECK_STYLES[check.status];
-
-              return (
-                <div
-                  key={check.title}
-                  className={`rounded-2xl border p-4 ${style.card}`}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div
-                      className={`rounded-xl border border-current/20 bg-background/70 p-2 ${style.icon}`}
-                    >
-                      {check.status === "checking" ? (
-                        <Loader2 className="size-5 animate-spin" />
-                      ) : check.status === "error" ? (
-                        <XCircle className="size-5" />
-                      ) : check.status === "warning" ? (
-                        <AlertTriangle className="size-5" />
-                      ) : (
-                        <Icon className="size-5" />
-                      )}
-                    </div>
-                    <span className="rounded-full border border-current/20 bg-background/70 px-2.5 py-1 text-[10px] font-mono uppercase tracking-[0.22em] text-muted-foreground">
-                      {style.label}
-                    </span>
-                  </div>
-                  <p className="mt-4 text-sm font-semibold">{check.title}</p>
-                  <p className="mt-2 text-sm font-medium">{check.value}</p>
-                  <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-                    {check.detail}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <PrerequisiteTrace
+          items={healthChecks}
+          isChecking={prerequisiteStatus === "checking"}
+          onRecheck={handleRecheck}
+        />
 
         {accounts.length > 0 && (
           <div className="space-y-3 border-t border-border/70 pt-4">
-            {prerequisiteStatus === "checking" && (
-              <Alert className="border-blue-500/30 bg-blue-500/10">
-                <Loader2 className="size-4 animate-spin" />
-                <AlertDescription>
-                  Validating tenant prerequisites and live license signals…
-                </AlertDescription>
-              </Alert>
-            )}
-
             {prerequisiteStatus === "success" && prerequisiteResult && (
               <Alert className="border-emerald-300/45 bg-emerald-500/18 text-emerald-50">
                 <CheckCircle2 className="size-4 text-emerald-200" />

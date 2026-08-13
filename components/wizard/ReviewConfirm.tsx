@@ -3,11 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useWizardState } from "@/hooks/useWizardState";
+import { SensitiveData } from "@/components/SensitiveData";
+import { ExecutionApprovalCard } from "@/components/wizard/ExecutionApprovalCard";
 import { TEMPLATE_METADATA } from "@/templates";
 import { getEstimatedTaskCount, getEstimatedCategoryCount } from "@/lib/hydration/engine";
 import {
@@ -140,10 +140,10 @@ export function ReviewConfirm(): React.JSX.Element {
                     Tenant
                   </p>
                   <p className="mt-2 text-sm font-medium">
-                    {state.tenantConfig?.tenantName || "Not set"}
+                    <SensitiveData value={state.tenantConfig?.tenantName} fallback="Not set" />
                   </p>
                   <p className="mt-1 break-all text-sm text-muted-foreground">
-                    {state.tenantConfig?.tenantId || "Not set"}
+                    <SensitiveData value={state.tenantConfig?.tenantId} fallback="Not set" />
                   </p>
                 </div>
                 <div>
@@ -273,43 +273,13 @@ export function ReviewConfirm(): React.JSX.Element {
           </div>
         </div>
 
-        {!state.isPreview && (
-          <div className="live-acknowledgement rounded-2xl border p-5 shadow-xl backdrop-blur-md">
-            <div className="flex items-start gap-x-3">
-              <Checkbox
-                id="acknowledge"
-                checked={acknowledged}
-                onCheckedChange={(checked) => setAcknowledged(checked as boolean)}
-                className="live-acknowledgement__checkbox"
-              />
-              <div className="space-y-1">
-                <Label
-                  htmlFor="acknowledge"
-                  className="live-acknowledgement__title cursor-pointer font-medium"
-                >
-                  I understand this run will modify my Intune tenant
-                </Label>
-                <p className="live-acknowledgement__copy text-sm">
-                  This operation will{" "}
-                  {state.operationMode === "create" ? "create new" : "delete existing"}{" "}
-                  configurations in your Intune tenant. Completed actions are not rolled back
-                  automatically.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {state.isPreview && (
-          <div className="rounded-2xl border border-sky-300/45 bg-sky-500/18 p-5 text-sky-50">
-            <p className="font-medium text-sky-50">Preview mode</p>
-            <p className="mt-1 text-sm text-sky-100">
-              Preview mode will check what would{" "}
-              {state.operationMode === "create" ? "be created" : "be deleted"} without making
-              any changes to your tenant.
-            </p>
-          </div>
-        )}
+        <ExecutionApprovalCard
+          isPreview={state.isPreview}
+          operationMode={state.operationMode}
+          estimatedObjects={estimatedObjects}
+          approved={acknowledged}
+          onApprovedChange={setAcknowledged}
+        />
 
         <div className="flex gap-4">
           <Button variant="outline" onClick={previousStep} className="flex-1">

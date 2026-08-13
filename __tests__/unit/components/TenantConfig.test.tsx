@@ -1,22 +1,21 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { TenantConfig } from '@/components/wizard/TenantConfig'
+import { SettingsProvider } from '@/hooks/useSettings'
 import { WizardProvider, useWizardState } from '@/hooks/useWizardState'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
 
 const validatePrerequisites = vi.fn()
 const createGraphClient = vi.fn()
-const { MockAuthSessionExpiredError } = vi.hoisted(() => ({
+const { MockAuthSessionExpiredError, useMsalMock } = vi.hoisted(() => ({
   MockAuthSessionExpiredError: class extends Error {},
+  useMsalMock: vi.fn(),
 }))
 
 vi.mock('@azure/msal-react', () => ({
-  useMsal: () => ({
-    accounts: [{ tenantId: 'tenant-123', username: 'operator@contoso.com' }],
-    instance: { getActiveAccount: () => ({ tenantId: 'tenant-123', homeAccountId: 'home-tenant-123', username: 'operator@contoso.com' }) },
-  }),
+  useMsal: () => useMsalMock(),
 }))
 
 vi.mock('@/lib/graph/client', () => ({
@@ -39,7 +38,7 @@ function WizardHarness() {
   const { state, setCurrentStep } = useWizardState()
 
   return (
-    <>
+    <SettingsProvider>
       {state.currentStep === 1 ? (
         <>
           <TenantConfig />
@@ -53,13 +52,34 @@ function WizardHarness() {
           Back to tenant checkpoint
         </button>
       ) : null}
-    </>
+    </SettingsProvider>
+  )
+}
+
+function TenantConfigHarness() {
+  return (
+    <SettingsProvider>
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    </SettingsProvider>
   )
 }
 
 describe('TenantConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks()
+    localStorage.clear()
+    useMsalMock.mockReturnValue({
+      accounts: [{ tenantId: 'tenant-123', username: 'operator@contoso.com' }],
+      instance: {
+        getActiveAccount: () => ({
+          tenantId: 'tenant-123',
+          homeAccountId: 'home-tenant-123',
+          username: 'operator@contoso.com',
+        }),
+      },
+    })
   })
 
   it('keeps the health checklist state when navigating away and back', async () => {
@@ -95,14 +115,13 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockResolvedValue(prerequisiteResult)
     const user = userEvent.setup()
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect((await screen.findAllByText('Contoso')).length).toBeGreaterThan(0)
     expect(await screen.findByText('All prerequisites met')).toBeInTheDocument()
+    const validationTrace = screen.getByRole('list', { name: 'Tenant validation trace' })
+    expect(within(validationTrace).getAllByRole('listitem')).toHaveLength(4)
+    expect(within(validationTrace).getByText('Risk-based CA supported')).toBeInTheDocument()
     expect(screen.getByRole('alert')).toHaveClass('bg-emerald-500/18', 'text-emerald-50')
     expect(screen.getByText(/Validation passed/i)).toHaveClass('text-emerald-100')
     expect(screen.getByText(/Last checked at .* UTC/)).toBeInTheDocument()
@@ -129,11 +148,7 @@ describe('TenantConfig', () => {
   it('binds prerequisite validation to the active account and blocks continue until it passes', async () => {
     validatePrerequisites.mockReturnValue(new Promise(() => {}))
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     await waitFor(() => {
       expect(createGraphClient).toHaveBeenCalledWith({
@@ -141,7 +156,66 @@ describe('TenantConfig', () => {
         homeAccountId: 'home-tenant-123',
       })
     })
+    expect(screen.getAllByText('Queued')).toHaveLength(4)
     expect(screen.getByRole('button', { name: 'Use Tenant Configuration' })).toBeDisabled()
+  })
+
+  it('revalidates when the active account changes without changing tenant count', async () => {
+    validatePrerequisites.mockReturnValue(new Promise(() => {}))
+    const view = render(<TenantConfigHarness />)
+
+    await waitFor(() => {
+      expect(createGraphClient).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        homeAccountId: 'home-tenant-123',
+      })
+    })
+
+    useMsalMock.mockReturnValue({
+      accounts: [{ tenantId: 'tenant-123', username: 'replacement@contoso.com' }],
+      instance: {
+        getActiveAccount: () => ({
+          tenantId: 'tenant-123',
+          homeAccountId: 'replacement-home-account',
+          username: 'replacement@contoso.com',
+        }),
+      },
+    })
+    view.rerender(<TenantConfigHarness />)
+
+    await waitFor(() => {
+      expect(createGraphClient).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        homeAccountId: 'replacement-home-account',
+      })
+    })
+  })
+
+  it('shows real prerequisite progress and lets the operator collapse the trace', async () => {
+    validatePrerequisites.mockImplementation((_client, onProgress) => {
+      onProgress({ step: 'organization', status: 'success' })
+      onProgress({ step: 'intuneLicense', status: 'checking' })
+      return new Promise(() => {})
+    })
+    const user = userEvent.setup()
+
+    render(
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    )
+
+    expect(await screen.findByText('Reading subscribed service plans…')).toBeInTheDocument()
+    expect(screen.getAllByText('Running checks')).toHaveLength(2)
+
+    const traceToggle = screen.getByRole('button', { name: /Checking tenant readiness/i })
+    expect(traceToggle).toHaveAttribute('aria-expanded', 'true')
+
+    await user.click(traceToggle)
+
+    expect(traceToggle).toHaveAttribute('aria-expanded', 'false')
+    expect(traceToggle).not.toHaveAttribute('aria-controls')
+    expect(screen.queryByRole('list', { name: 'Tenant validation trace' })).not.toBeInTheDocument()
   })
 
   it('formats the validation timestamp in the operator locale and labels its UTC timezone', async () => {
@@ -168,11 +242,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockResolvedValue(prerequisiteResult)
 
     try {
-      render(
-        <WizardProvider>
-          <WizardHarness />
-        </WizardProvider>
-      )
+      render(<TenantConfigHarness />)
 
       expect(await screen.findByText('Last checked at 15:00 UTC')).toBeInTheDocument()
     } finally {
@@ -184,11 +254,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
     const user = userEvent.setup()
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect(await screen.findByText('Prerequisite check failed')).toBeInTheDocument()
     expect(screen.getByText('Graph connectivity failed')).toBeInTheDocument()
@@ -211,6 +277,27 @@ describe('TenantConfig', () => {
     })
   })
 
+  it('labels unavailable license signals as validation failures', async () => {
+    validatePrerequisites.mockResolvedValue({
+      organization: { id: 'tenant-123', displayName: 'Contoso' },
+      licenses: null,
+      permissions: null,
+      isValid: false,
+      warnings: [],
+      errors: ['License query failed'],
+      timestamp: new Date('2026-04-25T15:00:00.000Z'),
+    } satisfies PrerequisiteCheckResult)
+
+    render(<TenantConfigHarness />)
+
+    expect(await screen.findAllByText('License check failed')).toHaveLength(3)
+    expect(screen.getByText(/License details could not be retrieved/)).toBeInTheDocument()
+    expect(screen.getByText(/Conditional Access licensing could not be evaluated/)).toBeInTheDocument()
+    expect(screen.getByText(/Windows entitlement licensing could not be evaluated/)).toBeInTheDocument()
+    expect(screen.queryByText('CA will be skipped')).not.toBeInTheDocument()
+    expect(screen.queryByText('Will be skipped')).not.toBeInTheDocument()
+  })
+
   it('preserves the active-account recovery message from prerequisite validation', async () => {
     validatePrerequisites.mockRejectedValue(
       new MockAuthSessionExpiredError(
@@ -218,11 +305,7 @@ describe('TenantConfig', () => {
       )
     )
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect(
       await screen.findByText(
@@ -234,11 +317,7 @@ describe('TenantConfig', () => {
   it('keeps the operator identity constrained inside its summary card', async () => {
     validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     const operatorIdentity = await screen.findByText('operator@contoso.com')
 
@@ -246,4 +325,55 @@ describe('TenantConfig', () => {
     expect(operatorIdentity).toHaveClass('max-w-full')
     expect(operatorIdentity.parentElement).toHaveClass('min-w-0')
   })
+
+  it('keeps the signed-out operator fallback readable in Demo Mode', async () => {
+    localStorage.setItem(
+      'app-settings:v1',
+      JSON.stringify({ stopOnFirstError: false, demoMode: true })
+    )
+    useMsalMock.mockReturnValue({
+      accounts: [],
+      instance: { getActiveAccount: () => null },
+    })
+
+    render(<TenantConfigHarness />)
+
+    const fallbacks = await screen.findAllByText('Not signed in')
+    expect(fallbacks).toHaveLength(2)
+    fallbacks.forEach((fallback) => {
+      expect(fallback).not.toHaveClass('demo-sensitive-data')
+      expect(fallback).not.toHaveAttribute('aria-hidden')
+    })
+  })
+
+  it('blurs organization, tenant, and operator identities when Demo Mode is on', async () => {
+    localStorage.setItem(
+      'app-settings:v1',
+      JSON.stringify({ stopOnFirstError: false, demoMode: true })
+    )
+    validatePrerequisites.mockResolvedValue({
+      organization: { id: 'tenant-123', displayName: 'Contoso' },
+      licenses: null,
+      permissions: null,
+      isValid: true,
+      warnings: [],
+      errors: [],
+      timestamp: new Date('2026-04-25T15:00:00.000Z'),
+    } satisfies PrerequisiteCheckResult)
+
+    render(<TenantConfigHarness />)
+
+    const sensitiveValues = [
+      ...(await screen.findAllByText('Contoso')),
+      ...screen.getAllByText('tenant-123'),
+      ...screen.getAllByText('operator@contoso.com'),
+    ]
+
+    expect(sensitiveValues.length).toBeGreaterThanOrEqual(4)
+    sensitiveValues.forEach((value) => {
+      expect(value).toHaveClass('demo-sensitive-data')
+      expect(value).toHaveAttribute('aria-hidden', 'true')
+    })
+  })
+
 })

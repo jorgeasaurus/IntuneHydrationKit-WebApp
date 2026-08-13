@@ -71,8 +71,14 @@ describe('OperationModeSelection', () => {
     const user = userEvent.setup()
     render(<OperationModeSelection />)
 
+    expect(screen.getByText('Execution behavior')).toHaveClass('text-white')
+    expect(screen.getAllByText('Preview')[0]).toHaveClass('text-white')
+    expect(screen.getByText('Safe mode')).toHaveClass('text-white')
     expect(screen.getByText('WhatIf preview')).toBeInTheDocument()
-    expect(screen.getByText('This run is safe to review without mutating the tenant.')).toBeInTheDocument()
+    expect(screen.getByText('This run is safe to review without mutating the tenant.')).toHaveClass('text-white/85')
+    expect(screen.getByText(/Simulate the create flow first/)).toHaveClass('text-white/85')
+    expect(screen.getByText('Dry run')).toHaveClass('text-white/80')
+    expect(screen.getByText('Read-only validation mode. No Graph mutations will be sent.')).toHaveClass('text-white/85')
     expectRemovedSummaryCardsToBeAbsent()
 
     await user.click(screen.getByRole('button', { name: 'Back' }))

@@ -156,7 +156,7 @@ export default function ResultsPage() {
           )}
         />
 
-        <main className="container mx-auto px-4 py-8 max-w-7xl">
+        <main className="container mx-auto max-w-6xl px-4 py-8">
           {error ? (
             <Alert variant="destructive">
               <AlertTriangle className="size-4" />
@@ -170,41 +170,7 @@ export default function ResultsPage() {
             </Alert>
           ) : summary ? (
             tasks.length > 0 ? (
-              <div className="space-y-6">
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                      Tenant
-                    </p>
-                    <p className="mt-2 text-base font-semibold">
-                      {summary.tenantName || summary.tenantId}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                      Mode
-                    </p>
-                    <p className="mt-2 text-base font-semibold capitalize">
-                      {summary.operationMode}
-                      {isPreview ? " preview" : ""}
-                    </p>
-                  </div>
-                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                      Tasks
-                    </p>
-                    <p className="mt-2 text-base font-semibold">{summary.stats.total}</p>
-                  </div>
-                  <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-                    <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                      Duration
-                    </p>
-                    <p className="mt-2 text-base font-semibold">
-                      {Math.round(summary.duration / 1000)}s
-                    </p>
-                  </div>
-                </div>
-
+              <div className="space-y-5">
                 {state.selectedTargets.includes("conditionalAccess") &&
                   summary.operationMode === "create" && (
                     <Alert className="border-amber-500/60 bg-card/95 text-card-foreground shadow-lg shadow-slate-950/15 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400">

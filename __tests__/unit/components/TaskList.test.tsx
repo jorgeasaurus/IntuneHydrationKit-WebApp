@@ -60,7 +60,7 @@ describe('TaskList', () => {
     await user.type(screen.getByRole('textbox', { name: 'Search tasks' }), 'windows')
 
     expect(screen.getByText('All Windows Devices')).toBeInTheDocument()
-    expect(screen.getByText('Duration: 4s')).toBeInTheDocument()
+    expect(screen.getByText('Duration 4s')).toBeInTheDocument()
     expect(screen.queryByText('Corporate Devices')).not.toBeInTheDocument()
   })
 
@@ -68,7 +68,9 @@ describe('TaskList', () => {
     render(<TaskList tasks={tasks} />)
 
     expect(screen.getByRole('textbox', { name: 'Search tasks' })).toBeInTheDocument()
-    expect(screen.getByRole('combobox', { name: 'Filter tasks by status' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: 'Filter tasks by status' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'All: 3 tasks' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: 'Failed: 1 task' })).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByRole('combobox', { name: 'Filter tasks by category' })).toBeInTheDocument()
   })
 
@@ -76,17 +78,14 @@ describe('TaskList', () => {
     const user = userEvent.setup()
     render(<TaskList tasks={tasks} />)
 
-    const filters = screen.getAllByRole('combobox')
-
-    await user.click(filters[0])
-    await user.click(await screen.findByRole('option', { name: 'Failed' }))
+    await user.click(screen.getByRole('button', { name: 'Failed: 1 task' }))
 
     expect(screen.getByText('Windows 11 Baseline')).toBeInTheDocument()
     expect(screen.getByText('Insufficient permissions')).toBeInTheDocument()
     expect(screen.queryByText('Corporate Devices')).not.toBeInTheDocument()
 
-    await user.click(filters[1])
-    await user.click(await screen.findByRole('option', { name: 'Filters' }))
+    await user.click(screen.getByRole('combobox', { name: 'Filter tasks by category' }))
+    await user.click(await screen.findByRole('option', { name: 'Device Filters' }))
 
     expect(screen.getByText('No tasks match your filters')).toBeInTheDocument()
   })
@@ -94,9 +93,9 @@ describe('TaskList', () => {
   it('renders skipped task errors with their contextual message', () => {
     render(<TaskList tasks={tasks} />)
 
-    const skippedTask = screen.getByText('Corporate Devices').closest('div')
-    expect(skippedTask).not.toBeNull()
-    expect(within(skippedTask as HTMLElement).getByText('Skipped')).toBeInTheDocument()
-    expect(screen.getByText('Already exists')).toBeInTheDocument()
+    const skippedTask = screen.getByRole('article', { name: 'Corporate Devices: Skipped' })
+    expect(within(skippedTask).getByText('Skipped')).toBeInTheDocument()
+    expect(within(skippedTask).getByText('Already exists')).toBeInTheDocument()
+    expect(within(skippedTask).getByText('Device Filters')).toBeInTheDocument()
   })
 })

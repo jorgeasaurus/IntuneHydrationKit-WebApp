@@ -1,23 +1,15 @@
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Search, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { TargetSelectionCategoryView } from "@/components/wizard/TargetSelectionCategoryView";
-import {
-  OS_PLATFORM_FILTERS,
-  TARGETS,
-} from "@/components/wizard/targetSelectionModel";
+import { TargetSelectionConsole } from "@/components/wizard/TargetSelectionConsole";
 import type { TargetSelectionViewModel } from "@/components/wizard/targetSelectionTypes";
 
 export function TargetSelectionView({ model }: { model: TargetSelectionViewModel }) {
   const {
     search,
-    platformFilters,
     data,
     selection,
-    actions,
     navigation,
   } = model;
 
@@ -30,58 +22,7 @@ export function TargetSelectionView({ model }: { model: TargetSelectionViewModel
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex gap-2 items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-            <Input
-              placeholder="Search categories and policies..."
-              value={search.query}
-              onChange={(e) => search.setQuery(e.target.value)}
-              className="pl-9 pr-9"
-            />
-            {search.query && (
-              <button
-                type="button"
-                onClick={() => search.setQuery("")}
-                aria-label="Clear search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              >
-                <X className="size-4" />
-              </button>
-            )}
-          </div>
-          <Button variant="outline" size="sm" onClick={actions.selectAll}>
-            Select All
-          </Button>
-          <Button variant="outline" size="sm" onClick={actions.deselectAll}>
-            Deselect All
-          </Button>
-        </div>
-
-        <div className="flex flex-wrap gap-4 items-center py-2 px-1 border rounded-md bg-muted/30">
-          <span className="text-sm font-medium text-muted-foreground pl-2">Filter by OS:</span>
-          {OS_PLATFORM_FILTERS.map(platform => (
-            <div key={platform.id} className="flex items-center gap-2">
-                <Checkbox
-                  id={`platform-filter-${platform.id}`}
-                  checked={platformFilters.selected.has(platform.id)}
-                  onCheckedChange={() => platformFilters.toggle(platform.id)}
-                />
-              <Label
-                htmlFor={`platform-filter-${platform.id}`}
-                className="text-sm cursor-pointer"
-              >
-                {platform.label}
-              </Label>
-            </div>
-          ))}
-        </div>
-
-        {search.normalized && (
-          <p className="text-sm text-muted-foreground">
-            Showing {data.filteredTargets.length} of {TARGETS.length} categories matching &quot;{search.query}&quot;
-          </p>
-        )}
+        <TargetSelectionConsole model={model} />
 
         <div className="space-y-4">
           {data.filteredTargets.length === 0 && search.normalized && (
@@ -101,14 +42,6 @@ export function TargetSelectionView({ model }: { model: TargetSelectionViewModel
             />
           ))}
         </div>
-
-        {selection.targets.length > 0 && (
-          <div className="rounded-md bg-muted p-4">
-            <p className="text-sm font-medium">
-              Total: {selection.targets.length} {selection.targets.length === 1 ? "category" : "categories"} ({selection.totalSelectedCount} items)
-            </p>
-          </div>
-        )}
 
         <div className="flex gap-4">
           <Button variant="outline" onClick={navigation.previousStep} className="flex-1">
