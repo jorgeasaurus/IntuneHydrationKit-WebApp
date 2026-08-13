@@ -150,4 +150,5 @@ describe('ReviewConfirm', () => {
     await user.click(startButton)
     expect(setConfirmed).toHaveBeenCalledWith(true)
   })
+
 })

@@ -37,7 +37,15 @@ describe("SensitiveData", () => {
     expect(screen.getByText(/sensitive data hidden while demo mode is on/i)).toHaveClass("sr-only");
   });
 
-  it("does not blur fallback text in Demo Mode", () => {
+  it("requires the application settings provider", () => {
+    expect(() => render(
+      <SensitiveData value="operator@contoso.com" fallback="Not signed in" />
+    )).toThrow(
+      "useSettings must be used within a SettingsProvider"
+    );
+  });
+
+  it("does not blur non-sensitive fallback text in Demo Mode", () => {
     localStorage.setItem(
       "app-settings:v1",
       JSON.stringify({ stopOnFirstError: false, demoMode: true })

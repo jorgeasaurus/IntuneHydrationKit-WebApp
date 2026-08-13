@@ -58,6 +58,16 @@ function WizardHarness() {
   )
 }
 
+function TenantConfigHarness() {
+  return (
+    <SettingsProvider>
+      <WizardProvider>
+        <WizardHarness />
+      </WizardProvider>
+    </SettingsProvider>
+  )
+}
+
 describe('TenantConfig', () => {
   beforeEach(() => {
     vi.resetAllMocks()
@@ -97,11 +107,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockResolvedValue(prerequisiteResult)
     const user = userEvent.setup()
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect((await screen.findAllByText('Contoso')).length).toBeGreaterThan(0)
     expect(await screen.findByText('All prerequisites met')).toBeInTheDocument()
@@ -134,11 +140,7 @@ describe('TenantConfig', () => {
   it('binds prerequisite validation to the active account and blocks continue until it passes', async () => {
     validatePrerequisites.mockReturnValue(new Promise(() => {}))
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     await waitFor(() => {
       expect(createGraphClient).toHaveBeenCalledWith({
@@ -201,11 +203,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockResolvedValue(prerequisiteResult)
 
     try {
-      render(
-        <WizardProvider>
-          <WizardHarness />
-        </WizardProvider>
-      )
+      render(<TenantConfigHarness />)
 
       expect(await screen.findByText('Last checked at 15:00 UTC')).toBeInTheDocument()
     } finally {
@@ -217,11 +215,7 @@ describe('TenantConfig', () => {
     validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
     const user = userEvent.setup()
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect(await screen.findByText('Prerequisite check failed')).toBeInTheDocument()
     expect(screen.getByText('Graph connectivity failed')).toBeInTheDocument()
@@ -251,11 +245,7 @@ describe('TenantConfig', () => {
       )
     )
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     expect(
       await screen.findByText(
@@ -267,11 +257,7 @@ describe('TenantConfig', () => {
   it('keeps the operator identity constrained inside its summary card', async () => {
     validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     const operatorIdentity = await screen.findByText('operator@contoso.com')
 
@@ -295,11 +281,7 @@ describe('TenantConfig', () => {
       timestamp: new Date('2026-04-25T15:00:00.000Z'),
     } satisfies PrerequisiteCheckResult)
 
-    render(
-      <WizardProvider>
-        <WizardHarness />
-      </WizardProvider>
-    )
+    render(<TenantConfigHarness />)
 
     const sensitiveValues = [
       ...(await screen.findAllByText('Contoso')),
@@ -313,4 +295,5 @@ describe('TenantConfig', () => {
       expect(value).toHaveAttribute('aria-hidden', 'true')
     })
   })
+
 })
