@@ -219,6 +219,7 @@ export function TenantConfig(): React.JSX.Element {
       timeZone: "UTC",
     }).format(new Date(prerequisiteResult.timestamp));
   }, [prerequisiteResult?.timestamp, userLocale]);
+  const licenses = prerequisiteResult?.licenses;
   const healthChecks: PrerequisiteTraceItem[] = [
     {
       id: "organization",
@@ -246,12 +247,16 @@ export function TenantConfig(): React.JSX.Element {
         ? "Reading subscribed service plans…"
         : validationTrace.intuneLicense === "pending"
           ? "Queued"
-          : prerequisiteResult?.licenses?.hasIntuneLicense
-            ? `${prerequisiteResult.licenses.intuneServicePlans.length} service plan(s)`
-            : "No qualifying license",
-      detail: prerequisiteResult?.licenses?.hasIntuneLicense
-        ? prerequisiteResult.licenses.intuneServicePlans.join(", ")
-        : "An Intune-capable subscription is required before execution can continue.",
+          : !licenses
+            ? "License check failed"
+            : licenses.hasIntuneLicense
+              ? `${licenses.intuneServicePlans.length} service plan(s)`
+              : "No qualifying license",
+      detail: !licenses
+        ? "License details could not be retrieved. Review the validation error and run the checks again."
+        : licenses.hasIntuneLicense
+          ? licenses.intuneServicePlans.join(", ")
+          : "An Intune-capable subscription is required before execution can continue.",
       status: validationTrace.intuneLicense,
       icon: ShieldCheck,
     },
@@ -262,16 +267,20 @@ export function TenantConfig(): React.JSX.Element {
         ? "Evaluating Entra entitlements…"
         : validationTrace.conditionalAccess === "pending"
           ? "Queued"
-          : prerequisiteResult?.licenses?.hasPremiumP2License
+          : !licenses
+            ? "License check failed"
+            : licenses.hasPremiumP2License
             ? "Risk-based CA supported"
-            : prerequisiteResult?.licenses?.hasConditionalAccessLicense
+            : licenses.hasConditionalAccessLicense
               ? "Basic CA only"
               : "CA will be skipped",
-      detail: prerequisiteResult?.licenses?.hasPremiumP2License
-        ? "Premium P2 found for advanced Conditional Access templates."
-        : prerequisiteResult?.licenses?.hasConditionalAccessLicense
-          ? "P1-equivalent licensing exists, but risk-based templates will be skipped."
-          : "No qualifying Entra ID Premium license detected for Conditional Access creation.",
+      detail: !licenses
+        ? "Conditional Access licensing could not be evaluated. Review the validation error and run the checks again."
+        : licenses.hasPremiumP2License
+          ? "Premium P2 found for advanced Conditional Access templates."
+          : licenses.hasConditionalAccessLicense
+            ? "P1-equivalent licensing exists, but risk-based templates will be skipped."
+            : "No qualifying Entra ID Premium license detected for Conditional Access creation.",
       status: validationTrace.conditionalAccess,
       icon: Sparkles,
     },
@@ -282,12 +291,16 @@ export function TenantConfig(): React.JSX.Element {
         ? "Evaluating Windows entitlements…"
         : validationTrace.driverUpdates === "pending"
           ? "Queued"
-          : prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense
+          : !licenses
+            ? "License check failed"
+            : licenses.hasWindowsDriverUpdateLicense
             ? "Windows entitlement detected"
             : "Will be skipped",
-      detail: prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense
-        ? "Windows E3/E5-compatible licensing is available for driver update templates."
-        : "Windows Driver Update profiles require Windows Enterprise or equivalent Microsoft 365 licensing.",
+      detail: !licenses
+        ? "Windows entitlement licensing could not be evaluated. Review the validation error and run the checks again."
+        : licenses.hasWindowsDriverUpdateLicense
+          ? "Windows E3/E5-compatible licensing is available for driver update templates."
+          : "Windows Driver Update profiles require Windows Enterprise or equivalent Microsoft 365 licensing.",
       status: validationTrace.driverUpdates,
       icon: KeyRound,
     },

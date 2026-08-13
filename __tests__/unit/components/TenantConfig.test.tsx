@@ -247,6 +247,27 @@ describe('TenantConfig', () => {
     })
   })
 
+  it('labels unavailable license signals as validation failures', async () => {
+    validatePrerequisites.mockResolvedValue({
+      organization: { id: 'tenant-123', displayName: 'Contoso' },
+      licenses: null,
+      permissions: null,
+      isValid: false,
+      warnings: [],
+      errors: ['License query failed'],
+      timestamp: new Date('2026-04-25T15:00:00.000Z'),
+    } satisfies PrerequisiteCheckResult)
+
+    render(<TenantConfigHarness />)
+
+    expect(await screen.findAllByText('License check failed')).toHaveLength(3)
+    expect(screen.getByText(/License details could not be retrieved/)).toBeInTheDocument()
+    expect(screen.getByText(/Conditional Access licensing could not be evaluated/)).toBeInTheDocument()
+    expect(screen.getByText(/Windows entitlement licensing could not be evaluated/)).toBeInTheDocument()
+    expect(screen.queryByText('CA will be skipped')).not.toBeInTheDocument()
+    expect(screen.queryByText('Will be skipped')).not.toBeInTheDocument()
+  })
+
   it('preserves the active-account recovery message from prerequisite validation', async () => {
     validatePrerequisites.mockRejectedValue(
       new MockAuthSessionExpiredError(
