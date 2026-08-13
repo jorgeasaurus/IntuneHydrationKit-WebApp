@@ -1723,4 +1723,8 @@
 # Results Output Delivery
 
 - [x] Increment the website version to 2.6.48.
-- [ ] Push the implementation branch and open a draft pull request to `dev`.
+- [x] Push the implementation branch and open a draft pull request to `dev`.
+
+## Review
+
+- Draft pull request #68 targets `dev` from `codex/results-output-cleanup`.
