@@ -87,3 +87,4 @@
 - Never leave light-theme utility panels inside the fixed dark dashboard; operational status blocks must use compact dark surfaces and restrained semantic accents.
 - Audit result-detail lists as well as top-level notices when applying a fixed dark visual system; nested success rows must not retain light-theme semantic fills.
 - A completed task must have one visible result source of truth; show status totals in category headers and details only inside the corresponding collapsed category.
+- When a cropped screenshot is ambiguous, use the next wider context image to confirm the exact component before changing shared surfaces.

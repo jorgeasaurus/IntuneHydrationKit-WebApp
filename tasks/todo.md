@@ -1728,3 +1728,14 @@
 ## Review
 
 - Draft pull request #68 targets `dev` from `codex/results-output-cleanup`.
+
+# Results Preview Glass Notice
+
+- [x] Replace the opaque results preview notice with the shared glass surface.
+- [x] Add regression coverage and inspect the result over the route wallpaper.
+- [x] Commit and push the correction to pull request #68.
+
+## Review
+
+- The results preview notice now uses the shared translucent glass panel with a light rim and explicit pale foreground colors.
+- Checks passed: focused tests, type check, lint, production build, React Doctor 100/100, desktop and mobile visual inspection, and `git diff --check`.

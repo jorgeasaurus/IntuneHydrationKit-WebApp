@@ -204,9 +204,9 @@ export function ResultsSummary({
   return (
     <div className="space-y-5">
       {isPreview && (
-        <Alert className="border-sky-300/60 bg-slate-950/95 text-slate-100 shadow-xl shadow-slate-950/25 backdrop-blur-md">
-          <Eye className="size-4 !text-sky-200" />
-          <AlertTitle className="text-slate-50">Preview Mode</AlertTitle>
+        <Alert className="glass-panel rounded-2xl text-slate-50 [&>svg]:text-sky-100">
+          <Eye className="size-4" />
+          <AlertTitle className="text-white">Preview Mode</AlertTitle>
           <AlertDescription className="text-slate-200">
             Review the simulated outcomes below. No changes were made to the tenant.
           </AlertDescription>
