@@ -1656,7 +1656,7 @@
 - [x] Replace the light completed-item panel and rows with dark glass surfaces.
 - [x] Add regression coverage for the fixed dark status treatment.
 - [x] Run focused tests, type check, lint, build, and visual verification.
-- [ ] Commit and push the correction to PR #67.
+- [x] Commit and push the correction to PR #67.
 
 ## Review
 
