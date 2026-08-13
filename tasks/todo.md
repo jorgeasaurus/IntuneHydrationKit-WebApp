@@ -1739,3 +1739,9 @@
 
 - The results preview notice now uses the shared translucent glass panel with a light rim and explicit pale foreground colors.
 - Checks passed: focused tests, type check, lint, production build, React Doctor 100/100, desktop and mobile visual inspection, and `git diff --check`.
+
+# PR #68 Copilot Review Loop
+
+- [x] Capture the initial head, review count, and unresolved thread state.
+- [ ] Fix and resolve every valid Copilot review thread.
+- [ ] Complete a fresh clean Copilot review against the latest head.
