@@ -68,7 +68,7 @@ type ValidationTraceState = Record<PrerequisiteValidationStep, PrerequisiteCheck
 
 function createPendingTrace(): ValidationTraceState {
   return {
-    organization: "checking",
+    organization: "pending",
     intuneLicense: "pending",
     conditionalAccess: "pending",
     driverUpdates: "pending",
@@ -159,7 +159,7 @@ export function TenantConfig(): React.JSX.Element {
   }, [homeAccountId, setWizardPrerequisiteResult, tenantId]);
 
   useEffect(() => {
-    if (accounts.length === 0) {
+    if (!tenantId || !homeAccountId) {
       return;
     }
     // Re-run validation when there is no cached result, OR when the cached
@@ -173,7 +173,7 @@ export function TenantConfig(): React.JSX.Element {
     if (!state.prerequisiteResult || isStale) {
       void runPrerequisiteValidation(true);
     }
-  }, [accounts.length, tenantId, runPrerequisiteValidation, state.prerequisiteResult]);
+  }, [homeAccountId, tenantId, runPrerequisiteValidation, state.prerequisiteResult]);
 
   useEffect(() => {
     if (!state.prerequisiteResult) {

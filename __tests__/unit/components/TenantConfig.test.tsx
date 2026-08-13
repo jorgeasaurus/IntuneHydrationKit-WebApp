@@ -156,9 +156,39 @@ describe('TenantConfig', () => {
         homeAccountId: 'home-tenant-123',
       })
     })
-    expect(screen.getByText('Querying the organization endpoint…')).toBeInTheDocument()
-    expect(screen.getAllByText('Queued')).toHaveLength(3)
+    expect(screen.getAllByText('Queued')).toHaveLength(4)
     expect(screen.getByRole('button', { name: 'Use Tenant Configuration' })).toBeDisabled()
+  })
+
+  it('revalidates when the active account changes without changing tenant count', async () => {
+    validatePrerequisites.mockReturnValue(new Promise(() => {}))
+    const view = render(<TenantConfigHarness />)
+
+    await waitFor(() => {
+      expect(createGraphClient).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        homeAccountId: 'home-tenant-123',
+      })
+    })
+
+    useMsalMock.mockReturnValue({
+      accounts: [{ tenantId: 'tenant-123', username: 'replacement@contoso.com' }],
+      instance: {
+        getActiveAccount: () => ({
+          tenantId: 'tenant-123',
+          homeAccountId: 'replacement-home-account',
+          username: 'replacement@contoso.com',
+        }),
+      },
+    })
+    view.rerender(<TenantConfigHarness />)
+
+    await waitFor(() => {
+      expect(createGraphClient).toHaveBeenCalledWith({
+        tenantId: 'tenant-123',
+        homeAccountId: 'replacement-home-account',
+      })
+    })
   })
 
   it('shows real prerequisite progress and lets the operator collapse the trace', async () => {

@@ -1648,6 +1648,7 @@
 - Copilot round 1 fixed the collapsed trace ARIA relationship and kept signed-out placeholders visible in Demo Mode.
 - Copilot round 2 fixed misleading license trace text when entitlement queries fail.
 - Copilot round 3 reviewed `5b427e9` and reported no new comments.
+- Copilot round 4 fixed the idle trace state and same-count active-account revalidation.
 
 # Demo Mode Sensitive Data Blur
 
