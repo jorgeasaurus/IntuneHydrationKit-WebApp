@@ -189,6 +189,86 @@ describe('ResultsSummary', () => {
     expect(screen.getByText('Conditional Access')).toBeInTheDocument()
   })
 
+  it('opens and filters categories with warnings or unfinished tasks', async () => {
+    const user = userEvent.setup()
+    const attentionTasks: HydrationTask[] = [
+      {
+        id: 'group-pending',
+        category: 'groups',
+        operation: 'create',
+        itemName: 'Pending group',
+        status: 'pending',
+      },
+      {
+        id: 'filter-warning',
+        category: 'filters',
+        operation: 'create',
+        itemName: 'Warning filter',
+        status: 'success',
+        warning: 'The assignment needs manual review',
+      },
+    ]
+
+    render(
+      <SettingsProvider>
+        <ResultsSummary
+          summary={{
+            ...summary,
+            stats: { total: 2, created: 1, deleted: 0, skipped: 0, failed: 0 },
+            categoryBreakdown: {
+              groups: { total: 1, success: 0, skipped: 0, failed: 0 },
+              filters: { total: 1, success: 1, skipped: 0, failed: 0 },
+            },
+            errors: [],
+          }}
+          tasks={attentionTasks}
+        />
+      </SettingsProvider>
+    )
+
+    expect(screen.getByRole('button', { name: /Dynamic Groups/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /Device Filters/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Pending group').closest('li')).toHaveTextContent('Unfinished')
+    expect(screen.getByText('Warning filter').closest('li')).toHaveTextContent('Warning')
+
+    await user.click(screen.getByRole('button', { name: /Issues only/i }))
+    expect(screen.getByText('Dynamic Groups')).toBeInTheDocument()
+    expect(screen.getByText('Device Filters')).toBeInTheDocument()
+  })
+
+  it('does not classify unfinished preview tasks as changes', () => {
+    render(
+      <SettingsProvider>
+        <ResultsSummary
+          summary={{
+            ...summary,
+            stats: { total: 1, created: 0, deleted: 0, skipped: 0, failed: 0 },
+            categoryBreakdown: {
+              groups: { total: 1, success: 0, skipped: 0, failed: 0 },
+            },
+            errors: [],
+          }}
+          isPreview
+          tasks={[
+            {
+              id: 'group-running',
+              category: 'groups',
+              operation: 'create',
+              itemName: 'Running group',
+              status: 'running',
+            },
+          ]}
+        />
+      </SettingsProvider>
+    )
+
+    const changesMetric = screen.getByText('Changes')
+    const blockedMetric = screen.getAllByText('Blocked').find((element) => element.tagName === 'P')
+    expect(changesMetric.nextElementSibling).toHaveTextContent('0')
+    expect(blockedMetric?.nextElementSibling).toHaveTextContent('1')
+    expect(screen.getByText('Running group').closest('li')).toHaveTextContent('Unfinished')
+  })
+
   it('limits long categories until the user asks to show every task', async () => {
     const user = userEvent.setup()
     const longTasks: HydrationTask[] = Array.from({ length: 26 }, (_, index) => ({

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Check,
   CheckCircle2,
+  CircleDashed,
   Eye,
   FileJson,
   FileSpreadsheet,
@@ -42,7 +43,15 @@ interface ResultsSummaryProps {
   isPreview?: boolean;
 }
 
-type ResultOutcome = "success" | "skipped" | "failed" | "change" | "unchanged" | "blocked";
+type ResultOutcome =
+  | "success"
+  | "skipped"
+  | "failed"
+  | "change"
+  | "unchanged"
+  | "blocked"
+  | "warning"
+  | "unfinished";
 
 const TASK_PREVIEW_LIMIT = 25;
 
@@ -98,6 +107,20 @@ const OUTCOME_STYLES: Record<
     iconClassName: "text-red-100",
     rowClassName: "border-red-300/25 bg-red-950/20",
   },
+  warning: {
+    label: "Warning",
+    Icon: AlertTriangle,
+    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    iconClassName: "text-amber-100",
+    rowClassName: "border-amber-300/20 bg-amber-950/10",
+  },
+  unfinished: {
+    label: "Unfinished",
+    Icon: CircleDashed,
+    className: "border-slate-300/25 bg-slate-300/10 text-slate-100",
+    iconClassName: "text-slate-200",
+    rowClassName: "border-slate-300/20",
+  },
 };
 
 function formatDuration(ms: number): string {
@@ -118,18 +141,24 @@ function isNoOpSkip(task: HydrationTask): boolean {
 function getTaskOutcome(task: HydrationTask, isPreview: boolean): ResultOutcome {
   if (!isPreview) {
     if (task.status === "failed") return "failed";
+    if (task.status === "pending" || task.status === "running") return "unfinished";
     if (task.status === "skipped") return "skipped";
+    if (task.warning) return "warning";
     return "success";
   }
 
   if (task.status === "failed") return "blocked";
+  if (task.status === "pending" || task.status === "running") return "unfinished";
   if (task.status === "skipped") return isNoOpSkip(task) ? "unchanged" : "blocked";
+  if (task.warning) return "warning";
   return "change";
 }
 
 function isIssueTask(task: HydrationTask, isPreview: boolean): boolean {
   const outcome = getTaskOutcome(task, isPreview);
-  return isPreview ? outcome === "blocked" : outcome === "failed" || outcome === "skipped";
+  return isPreview
+    ? outcome === "blocked" || outcome === "warning" || outcome === "unfinished"
+    : outcome !== "success";
 }
 
 function getOutcomeCount(tasks: HydrationTask[], outcome: ResultOutcome, isPreview: boolean): number {
@@ -263,7 +292,11 @@ export function ResultsSummary({
           <div>
             <p className="text-xs text-slate-400">{isPreview ? "Blocked" : "Failed"}</p>
             <p className="mt-1 text-2xl font-semibold text-red-200">
-              {isPreview ? getOutcomeCount(tasks, "blocked", true) : summary.stats.failed}
+              {isPreview
+                ? getOutcomeCount(tasks, "blocked", true) +
+                  getOutcomeCount(tasks, "warning", true) +
+                  getOutcomeCount(tasks, "unfinished", true)
+                : summary.stats.failed}
             </p>
           </div>
           {!isPreview && (
@@ -318,8 +351,8 @@ export function ResultsSummary({
               const showAll = showAllCategories.has(category);
               const shownTasks = showAll ? filteredTasks : filteredTasks.slice(0, TASK_PREVIEW_LIMIT);
               const outcomes: ResultOutcome[] = isPreview
-                ? ["change", "unchanged", "blocked"]
-                : ["success", "skipped", "failed"];
+                ? ["change", "unchanged", "blocked", "warning", "unfinished"]
+                : ["success", "skipped", "failed", "warning", "unfinished"];
 
               return (
                 <AccordionItem
