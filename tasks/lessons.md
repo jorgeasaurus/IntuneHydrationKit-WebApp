@@ -85,3 +85,4 @@
 - Safety notices shown over the route wallpaper should use the shared glass surface, not a flat translucent color fill.
 - Dense control consoles need a scoped dark glass fill; the shared transparent glass alone can let a bright wallpaper overpower the controls.
 - Never leave light-theme utility panels inside the fixed dark dashboard; operational status blocks must use compact dark surfaces and restrained semantic accents.
+- Audit result-detail lists as well as top-level notices when applying a fixed dark visual system; nested success rows must not retain light-theme semantic fills.

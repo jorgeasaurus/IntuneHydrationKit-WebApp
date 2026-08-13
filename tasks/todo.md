@@ -1651,6 +1651,19 @@
 - Copilot round 4 fixed the idle trace state and same-count active-account revalidation.
 - Copilot round 5 fixed preview classification for prerequisite-blocked skipped tasks.
 
+# Completed Results Glass Surface
+
+- [x] Replace the light completed-item panel and rows with dark glass surfaces.
+- [x] Add regression coverage for the fixed dark status treatment.
+- [x] Run focused tests, type check, lint, build, and visual verification.
+- [ ] Commit and push the correction to PR #67.
+
+## Review
+
+- The completed-items panel now uses a scoped dark teal glass fill, white content text, and restrained mint status accents.
+- Completed objects now render as semantic list rows that stay compact and truncate safely on mobile.
+- Checks passed: 538 tests, type check, lint, production build, React Doctor 100/100, desktop and mobile visual inspection, and `git diff --check`.
+
 # Demo Mode Sensitive Data Blur
 
 - [x] Add Demo Mode to persistent application settings and the settings dialog.

@@ -128,6 +128,22 @@ describe('ResultsSummary', () => {
     expect(getCategoryTaskRow('Block Legacy Auth')).toHaveClass('text-red-100')
   })
 
+  it('uses dark glass surfaces for successfully completed items', () => {
+    render(<ResultsSummary summary={summary} tasks={tasks} />)
+
+    const title = screen.getByText('Successfully Created (1)')
+    const panel = title.parentElement?.parentElement
+    const completedItem = screen
+      .getAllByText('All Windows Devices')
+      .find((element) => element.closest('li'))
+      ?.closest('li')
+
+    expect(panel).toHaveClass('completed-results-panel')
+    expect(title).toHaveClass('text-slate-50')
+    expect(completedItem).toHaveClass('bg-slate-950/65', 'border-emerald-300/15')
+    expect(completedItem?.querySelector('span:last-child')).toHaveClass('text-slate-100')
+  })
+
   it('separates no-op skips from prerequisite-blocked preview items', () => {
     render(
       <PreviewChangeTable
