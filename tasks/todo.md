@@ -1704,3 +1704,18 @@
 - The review on `0a2443d` generated no threads and one valid suppressed comment about an order-sensitive JSON assertion.
 - The smoke test now parses stored settings before it compares the object shape.
 - A final review is pending on the fix commit.
+
+# Results Output Cleanup
+
+- [x] Consolidate run metadata and outcome counts into one summary.
+- [x] Show each category once in a collapsed result list.
+- [x] Keep failed categories open and add an issues-only filter.
+- [x] Remove duplicate success, error, and preview task sections.
+- [x] Limit large expanded categories and keep report actions compact.
+- [x] Add regression coverage and run full visual and project verification.
+
+## Review
+
+- The results page now has one receipt, one mode-aware category accordion, and one compact export bar.
+- Clean categories start closed. Categories with skipped, blocked, or failed tasks start open. Long categories show 25 tasks until the user expands them.
+- Checks passed: 540 tests, type check, lint, production build, React Doctor 100/100 on changed files, desktop and mobile visual inspection, and `git diff --check`.

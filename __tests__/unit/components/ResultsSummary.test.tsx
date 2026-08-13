@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@testing-library/react'
 import { ResultsSummary } from '@/components/dashboard/ResultsSummary'
-import { PreviewChangeTable } from '@/components/dashboard/PreviewChangeTable'
+import { SettingsProvider } from '@/hooks/useSettings'
 import type { HydrationSummary, HydrationTask } from '@/types/hydration'
 
 const generateMarkdownReport = vi.fn()
@@ -83,72 +83,73 @@ describe('ResultsSummary', () => {
     generateReportFilename.mockImplementation((mode: string, extension: string) => `${mode}.${extension}`)
   })
 
-  it('renders preview-specific labels, successful items, and errors', () => {
-    render(<ResultsSummary summary={summary} tasks={tasks} isPreview />)
+  function renderSummary(isPreview = false) {
+    return render(
+      <SettingsProvider>
+        <ResultsSummary summary={summary} tasks={tasks} isPreview={isPreview} />
+      </SettingsProvider>
+    )
+  }
+
+  it('renders one mode-aware category list for preview results', () => {
+    renderSummary(true)
 
     const previewTitle = screen.getByText('Preview Mode')
-    const previewDescription = screen.getByText(/This is a preview of what would happen/i)
+    const previewDescription = screen.getByText(/Review the simulated outcomes below/i)
     const previewAlert = previewTitle.closest('[role="alert"]')
     expect(previewAlert).toHaveClass('bg-slate-950/95', 'border-sky-300/60', 'text-slate-100')
     expect(previewTitle).toHaveClass('text-slate-50')
     expect(previewDescription).toHaveClass('text-slate-200')
     expect(previewAlert?.querySelector('svg')).toHaveClass('!text-sky-200')
-    expect(screen.getByText('Would Create')).toBeInTheDocument()
-    expect(screen.getByText('33%')).toBeInTheDocument()
-    expect(screen.getByText('Tenant change review')).toBeInTheDocument()
-    expect(screen.getByText('1 change')).toBeInTheDocument()
-    expect(screen.getByText('1 unchanged')).toBeInTheDocument()
-    expect(screen.getByText('1 blocked')).toBeInTheDocument()
-    expect(screen.getByText('Create')).toBeInTheDocument()
+    expect(screen.getByText('Changes')).toBeInTheDocument()
     expect(screen.getAllByText('No change').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Blocked').length).toBeGreaterThan(0)
     expect(screen.queryByText(/Items That Would Be Created/i)).not.toBeInTheDocument()
-    expect(screen.getAllByText('All Windows Devices').length).toBeGreaterThan(0)
-    expect(screen.getByText('Errors (1)')).toBeInTheDocument()
-    expect(screen.getAllByText('Insufficient privileges').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Dynamic Groups').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Device Filters').length).toBeGreaterThan(0)
-    expect(screen.getAllByText('Conditional Access').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Successfully Created/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Errors \(/i)).not.toBeInTheDocument()
+    expect(screen.getAllByText('Dynamic Groups')).toHaveLength(1)
+    expect(screen.getAllByText('Device Filters')).toHaveLength(1)
+    expect(screen.getAllByText('Conditional Access')).toHaveLength(1)
   })
 
-  it('uses high-contrast status colors in the category breakdown', () => {
-    render(<ResultsSummary summary={summary} tasks={tasks} />)
+  it('keeps clean categories collapsed and opens categories that need attention', () => {
+    renderSummary()
 
-    const getCategoryTaskRow = (itemName: string): HTMLElement | undefined =>
-      screen
-        .getAllByText(itemName)
-        .map((element) => element.parentElement?.parentElement)
-        .find((element): element is HTMLElement => element?.classList.contains('items-start') ?? false)
-
-    expect(getCategoryTaskRow('All Windows Devices')).toHaveClass(
-      'font-medium',
-      'text-emerald-100'
-    )
-    expect(getCategoryTaskRow('Corporate Devices')).toHaveClass('text-amber-100')
-    expect(getCategoryTaskRow('Block Legacy Auth')).toHaveClass('text-red-100')
+    expect(screen.getByRole('button', { name: /Dynamic Groups/i })).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.getByRole('button', { name: /Device Filters/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /Conditional Access/i })).toHaveAttribute('aria-expanded', 'true')
   })
 
-  it('uses dark glass surfaces for successfully completed items', () => {
-    render(<ResultsSummary summary={summary} tasks={tasks} />)
+  it('shows each category once and keeps task details inside it', async () => {
+    const user = userEvent.setup()
+    renderSummary()
 
-    const title = screen.getByText('Successfully Created (1)')
-    const panel = title.parentElement?.parentElement
-    const completedItem = screen
-      .getAllByText('All Windows Devices')
-      .find((element) => element.closest('li'))
-      ?.closest('li')
+    expect(screen.getAllByText('Dynamic Groups')).toHaveLength(1)
+    expect(screen.queryByText(/Successfully Created/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Errors \(/i)).not.toBeInTheDocument()
 
-    expect(panel).toHaveClass('completed-results-panel')
-    expect(title).toHaveClass('text-slate-50')
-    expect(completedItem).toHaveClass('bg-slate-950/65', 'border-emerald-300/15')
-    expect(completedItem?.querySelector('span:last-child')).toHaveClass('text-slate-100')
+    await user.click(screen.getByRole('button', { name: /Dynamic Groups/i }))
+    const completedItem = screen.getByText('All Windows Devices').closest('li')
+
+    expect(completedItem).toHaveTextContent('Success')
+    expect(completedItem).toHaveClass('bg-slate-950/55', 'border-emerald-300/15')
   })
 
   it('separates no-op skips from prerequisite-blocked preview items', () => {
     render(
-      <PreviewChangeTable
-        operationMode="create"
-        tasks={[
+      <SettingsProvider>
+        <ResultsSummary
+          summary={{
+            ...summary,
+            stats: { total: 2, created: 0, deleted: 0, skipped: 2, failed: 0 },
+            categoryBreakdown: {
+              groups: { total: 1, success: 0, skipped: 1, failed: 0 },
+              conditionalAccess: { total: 1, success: 0, skipped: 1, failed: 0 },
+            },
+            errors: [],
+          }}
+          isPreview
+          tasks={[
           {
             id: 'existing',
             category: 'groups',
@@ -165,19 +166,66 @@ describe('ResultsSummary', () => {
             status: 'skipped',
             error: 'Missing Premium P2 license',
           },
-        ]}
-      />
+          ]}
+        />
+      </SettingsProvider>
     )
 
-    expect(screen.getByText('1 unchanged')).toBeInTheDocument()
-    expect(screen.getByText('1 blocked')).toBeInTheDocument()
-    expect(screen.getByText('Existing group').closest('tr')).toHaveTextContent('No change')
-    expect(screen.getByText('Risk policy').closest('tr')).toHaveTextContent('Blocked')
+    const noChangeMetric = screen.getAllByText('No change').find((element) => element.tagName === 'P')
+    const blockedMetric = screen.getAllByText('Blocked').find((element) => element.tagName === 'P')
+    expect(noChangeMetric?.nextElementSibling).toHaveTextContent('1')
+    expect(blockedMetric?.nextElementSibling).toHaveTextContent('1')
+  })
+
+  it('filters the category list to tasks that need attention', async () => {
+    const user = userEvent.setup()
+    renderSummary()
+
+    await user.click(screen.getByRole('button', { name: /Issues only/i }))
+
+    expect(screen.queryByText('Dynamic Groups')).not.toBeInTheDocument()
+    expect(screen.getByText('Device Filters')).toBeInTheDocument()
+    expect(screen.getByText('Conditional Access')).toBeInTheDocument()
+  })
+
+  it('limits long categories until the user asks to show every task', async () => {
+    const user = userEvent.setup()
+    const longTasks: HydrationTask[] = Array.from({ length: 26 }, (_, index) => ({
+      id: `group-${index}`,
+      category: 'groups',
+      operation: 'create',
+      itemName: `Group ${index + 1}`,
+      status: 'success',
+    }))
+
+    render(
+      <SettingsProvider>
+        <ResultsSummary
+          summary={{
+            ...summary,
+            stats: { total: 26, created: 26, deleted: 0, skipped: 0, failed: 0 },
+            categoryBreakdown: {
+              groups: { total: 26, success: 26, skipped: 0, failed: 0 },
+            },
+            errors: [],
+          }}
+          tasks={longTasks}
+        />
+      </SettingsProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: /Dynamic Groups/i }))
+    expect(screen.getByText('Group 25')).toBeInTheDocument()
+    expect(screen.queryByText('Group 26')).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Show all 26' }))
+    expect(screen.getByText('Group 26')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show fewer' })).toBeInTheDocument()
   })
 
   it('downloads markdown, json, and csv reports with generated filenames', async () => {
     const user = userEvent.setup()
-    render(<ResultsSummary summary={summary} tasks={tasks} />)
+    renderSummary()
 
     await user.click(screen.getByRole('button', { name: /markdown/i }))
     await user.click(screen.getByRole('button', { name: /json/i }))
