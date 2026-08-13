@@ -193,10 +193,10 @@ export default function DashboardPage() {
 
           {/* Preview mode indicator */}
           {state.isPreview && !isCompleted && (
-            <Alert className="border-blue-500 bg-blue-500/10">
-              <Eye className="size-4 text-blue-500" />
-              <AlertTitle className="text-blue-500">Preview Mode</AlertTitle>
-              <AlertDescription>
+            <Alert className="glass-panel rounded-2xl text-slate-50 [&>svg]:text-sky-100">
+              <Eye className="size-4" />
+              <AlertTitle className="text-white">Preview Mode</AlertTitle>
+              <AlertDescription className="text-slate-200">
                 No changes will be made to your tenant. This is a dry run to show what would happen.
               </AlertDescription>
             </Alert>

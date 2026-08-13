@@ -169,4 +169,31 @@ describe("graph/prerequisites", () => {
       "No Windows Driver Update compatible license found (Windows E3/E5, Microsoft 365 E3/E5, etc.). Windows Driver Update profiles will be skipped during creation.",
     ]);
   });
+
+  it("reports real progress for each sequential prerequisite step", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
+    const getCollection = vi
+      .fn()
+      .mockResolvedValueOnce([{ id: "tenant-1", displayName: "Contoso" }])
+      .mockResolvedValueOnce([
+        makeSku([
+          "INTUNE_A",
+          "AAD_PREMIUM_P2",
+          "WINDOWSUPDATEFORBUSINESS_DEPLOYMENTSERVICE",
+        ]),
+      ]);
+    const client = { getCollection } as unknown as GraphClient;
+    const onProgress = vi.fn();
+
+    await validatePrerequisites(client, onProgress);
+
+    expect(onProgress.mock.calls.map(([progress]) => progress)).toEqual([
+      { step: "organization", status: "checking" },
+      { step: "organization", status: "success" },
+      { step: "intuneLicense", status: "checking" },
+      { step: "intuneLicense", status: "success" },
+      { step: "conditionalAccess", status: "success" },
+      { step: "driverUpdates", status: "success" },
+    ]);
+  });
 });

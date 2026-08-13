@@ -34,8 +34,8 @@ function getExecutionTone(isPreview: boolean): ExecutionTone {
     return {
       shell: "border-blue-500/30 bg-blue-500/10",
       panel: "border-blue-500/30 bg-background/70",
-      label: "text-blue-500",
-      badge: "border-blue-500/40 bg-blue-500/15 text-blue-500",
+      label: "text-white",
+      badge: "border-blue-300/45 bg-blue-400/15 text-white",
       summary: "border-blue-500/30 bg-blue-500/10",
       marker: "bg-blue-500 shadow-[0_0_18px_rgba(59,130,246,0.75)]",
       title: "Preview execution",
@@ -88,7 +88,7 @@ const EXECUTION_OPTIONS = [
     description: "Read-only validation mode. No Graph mutations will be sent.",
     eyebrow: "Dry run",
     accent: "border-blue-500/30 bg-blue-500/10",
-    badge: "border-blue-500/40 bg-blue-500/15 text-blue-500",
+    badge: "border-blue-300/45 bg-blue-400/15 text-white",
     marker: "bg-blue-500 shadow-[0_0_18px_rgba(59,130,246,0.75)]",
   },
   {
@@ -233,7 +233,7 @@ export function OperationModeSelection(): React.JSX.Element {
                 <Eye className="size-4" />
                 {getPreviewLabel(isPreview)}
               </div>
-              <p className="text-sm leading-relaxed text-muted-foreground">
+              <p className="text-sm leading-relaxed text-white/85">
                 {getPreviewDescription(isPreview, mode)}
               </p>
             </div>
@@ -270,7 +270,7 @@ export function OperationModeSelection(): React.JSX.Element {
 
                     <span className="mt-4 flex items-center gap-2">
                       <span className={`size-2.5 rounded-full ${option.marker}`} />
-                      <span className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+                      <span className="text-[11px] font-mono uppercase tracking-[0.24em] text-white/80">
                         {option.eyebrow}
                       </span>
                     </span>
@@ -278,7 +278,7 @@ export function OperationModeSelection(): React.JSX.Element {
                     <span className="mt-2 block text-lg font-semibold">{option.title}</span>
                     <span
                       id={`execution-behavior-${option.id}-description`}
-                      className="mt-2 block text-sm leading-relaxed text-muted-foreground"
+                      className="mt-2 block text-sm leading-relaxed text-white/85"
                     >
                       {option.description}
                     </span>
@@ -291,7 +291,7 @@ export function OperationModeSelection(): React.JSX.Element {
 
         <div className={`w-full rounded-xl border p-4 transition-colors ${executionTone.summary}`}>
           <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-white/80">
               Execution
             </p>
             <span
@@ -306,7 +306,7 @@ export function OperationModeSelection(): React.JSX.Element {
               {isPreview ? "WhatIf preview" : "Live change"}
             </p>
           </div>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 text-sm text-white/85">
             {getExecutionSummary(isPreview)}
           </p>
         </div>

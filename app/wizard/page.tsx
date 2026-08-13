@@ -147,10 +147,7 @@ function WizardContent() {
         description={(
           <>
             Signed in as{" "}
-            <SensitiveData
-              value={accounts[0]?.username}
-              fallback="Connected operator"
-            />
+            <SensitiveData value={accounts[0]?.username} fallback="Connected operator" />
           </>
         )}
         actions={(

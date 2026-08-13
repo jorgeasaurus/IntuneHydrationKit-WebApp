@@ -71,9 +71,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
             </div>
           </div>
 
-          <div className="space-y-4 border-t border-border/80 pt-6">
+          <div className="space-y-4 border-t border-border/70 pt-6">
             <div className="flex items-center gap-2">
-              <EyeOff className="size-4 text-hydrate" aria-hidden="true" />
+              <EyeOff aria-hidden="true" className="size-4 text-hydrate" />
               <h3 className="text-sm font-semibold">Presentation Settings</h3>
             </div>
 

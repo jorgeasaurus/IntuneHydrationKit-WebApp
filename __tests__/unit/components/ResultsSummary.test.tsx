@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@testing-library/react'
 import { ResultsSummary } from '@/components/dashboard/ResultsSummary'
+import { PreviewChangeTable } from '@/components/dashboard/PreviewChangeTable'
 import type { HydrationSummary, HydrationTask } from '@/types/hydration'
 
 const generateMarkdownReport = vi.fn()
@@ -94,13 +95,20 @@ describe('ResultsSummary', () => {
     expect(previewAlert?.querySelector('svg')).toHaveClass('!text-sky-200')
     expect(screen.getByText('Would Create')).toBeInTheDocument()
     expect(screen.getByText('33%')).toBeInTheDocument()
-    expect(screen.getAllByText(/Items That Would Be Created/i).length).toBeGreaterThan(0)
+    expect(screen.getByText('Tenant change review')).toBeInTheDocument()
+    expect(screen.getByText('1 change')).toBeInTheDocument()
+    expect(screen.getByText('1 unchanged')).toBeInTheDocument()
+    expect(screen.getByText('1 blocked')).toBeInTheDocument()
+    expect(screen.getByText('Create')).toBeInTheDocument()
+    expect(screen.getAllByText('No change').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Blocked').length).toBeGreaterThan(0)
+    expect(screen.queryByText(/Items That Would Be Created/i)).not.toBeInTheDocument()
     expect(screen.getAllByText('All Windows Devices').length).toBeGreaterThan(0)
     expect(screen.getByText('Errors (1)')).toBeInTheDocument()
     expect(screen.getAllByText('Insufficient privileges').length).toBeGreaterThan(0)
-    expect(screen.getByText('Dynamic Groups')).toBeInTheDocument()
-    expect(screen.getByText('Device Filters')).toBeInTheDocument()
-    expect(screen.getByText('Conditional Access')).toBeInTheDocument()
+    expect(screen.getAllByText('Dynamic Groups').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Device Filters').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Conditional Access').length).toBeGreaterThan(0)
   })
 
   it('uses high-contrast status colors in the category breakdown', () => {
@@ -118,6 +126,53 @@ describe('ResultsSummary', () => {
     )
     expect(getCategoryTaskRow('Corporate Devices')).toHaveClass('text-amber-100')
     expect(getCategoryTaskRow('Block Legacy Auth')).toHaveClass('text-red-100')
+  })
+
+  it('uses dark glass surfaces for successfully completed items', () => {
+    render(<ResultsSummary summary={summary} tasks={tasks} />)
+
+    const title = screen.getByText('Successfully Created (1)')
+    const panel = title.parentElement?.parentElement
+    const completedItem = screen
+      .getAllByText('All Windows Devices')
+      .find((element) => element.closest('li'))
+      ?.closest('li')
+
+    expect(panel).toHaveClass('completed-results-panel')
+    expect(title).toHaveClass('text-slate-50')
+    expect(completedItem).toHaveClass('bg-slate-950/65', 'border-emerald-300/15')
+    expect(completedItem?.querySelector('span:last-child')).toHaveClass('text-slate-100')
+  })
+
+  it('separates no-op skips from prerequisite-blocked preview items', () => {
+    render(
+      <PreviewChangeTable
+        operationMode="create"
+        tasks={[
+          {
+            id: 'existing',
+            category: 'groups',
+            operation: 'create',
+            itemName: 'Existing group',
+            status: 'skipped',
+            error: 'Group already exists',
+          },
+          {
+            id: 'missing-license',
+            category: 'conditionalAccess',
+            operation: 'create',
+            itemName: 'Risk policy',
+            status: 'skipped',
+            error: 'Missing Premium P2 license',
+          },
+        ]}
+      />
+    )
+
+    expect(screen.getByText('1 unchanged')).toBeInTheDocument()
+    expect(screen.getByText('1 blocked')).toBeInTheDocument()
+    expect(screen.getByText('Existing group').closest('tr')).toHaveTextContent('No change')
+    expect(screen.getByText('Risk policy').closest('tr')).toHaveTextContent('Blocked')
   })
 
   it('downloads markdown, json, and csv reports with generated filenames', async () => {

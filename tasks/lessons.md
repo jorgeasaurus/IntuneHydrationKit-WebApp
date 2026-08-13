@@ -80,3 +80,9 @@
 - When replacing a proof-of-concept ownership format, preserve a narrowly fingerprinted migration path for objects created by the previous format so safe delete mode can still clean them up.
 - Site-wide navigation should reuse the landing hero's responsive container and gutters; an independent max-width will drift across breakpoints.
 - Avoid rectangular guide lines behind a focal demo window; they read as an unintended backplate even when their fill is transparent.
+- Before starting product work from `main`, compare the requested behavior with `origin/dev`; preserve active development features when the new branch must include them.
+- On saturated execution surfaces, use explicit white foreground utilities for labels and supporting copy; muted theme colors can render as low-contrast blue.
+- Safety notices shown over the route wallpaper should use the shared glass surface, not a flat translucent color fill.
+- Dense control consoles need a scoped dark glass fill; the shared transparent glass alone can let a bright wallpaper overpower the controls.
+- Never leave light-theme utility panels inside the fixed dark dashboard; operational status blocks must use compact dark surfaces and restrained semantic accents.
+- Audit result-detail lists as well as top-level notices when applying a fixed dark visual system; nested success rows must not retain light-theme semantic fills.

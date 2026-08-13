@@ -6,6 +6,7 @@ import { SettingsProvider } from '@/hooks/useSettings'
 
 const push = vi.fn()
 const startExecution = vi.fn().mockResolvedValue(undefined)
+const useWizardStateMock = vi.fn()
 
 function renderPage() {
   return render(
@@ -30,11 +31,15 @@ vi.mock('@/components/auth/ProtectedRoute', () => ({
 }))
 
 vi.mock('@/hooks/useWizardState', () => ({
-  useWizardState: () => ({
+  useWizardState: () => useWizardStateMock(),
+}))
+
+function createWizardState(isPreview = false) {
+  return {
     state: {
       confirmed: true,
       operationMode: 'delete',
-      isPreview: false,
+      isPreview,
       selectedTargets: ['groups'],
       selectedCISCategories: [],
       tenantConfig: {
@@ -43,8 +48,8 @@ vi.mock('@/hooks/useWizardState', () => ({
         tenantName: 'Delete Test Tenant',
       },
     },
-  }),
-}))
+  }
+}
 
 vi.mock('@/hooks/useHydrationExecution', () => ({
   useHydrationExecution: () => ({
@@ -68,6 +73,21 @@ vi.mock('@/hooks/useHydrationExecution', () => ({
 describe('DashboardPage', () => {
   beforeEach(() => {
     localStorage.clear()
+    useWizardStateMock.mockReturnValue(createWizardState())
+  })
+
+  it('renders the preview notice as a high-contrast glass surface', () => {
+    useWizardStateMock.mockReturnValue(createWizardState(true))
+
+    renderPage()
+
+    const previewTitle = screen.getByText('Preview Mode')
+    const previewNotice = previewTitle.closest('[role="alert"]')
+
+    expect(previewNotice).toHaveClass('glass-panel', 'rounded-2xl', 'text-slate-50')
+    expect(previewNotice).not.toHaveClass('bg-blue-500/10')
+    expect(previewTitle).toHaveClass('text-white')
+    expect(screen.getByText(/No changes will be made/)).toHaveClass('text-slate-200')
   })
 
   it('renders live delete mode with a filled high-contrast warning banner', () => {
@@ -81,7 +101,7 @@ describe('DashboardPage', () => {
     expect(warning).not.toHaveClass('text-destructive')
   })
 
-  it('blurs the tenant identity in the live execution header when Demo Mode is on', () => {
+  it('blurs the tenant identity in the execution header when Demo Mode is on', () => {
     localStorage.setItem(
       'app-settings:v1',
       JSON.stringify({ stopOnFirstError: false, demoMode: true })

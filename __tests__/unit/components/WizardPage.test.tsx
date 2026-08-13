@@ -46,7 +46,7 @@ describe('WizardPage', () => {
     localStorage.clear()
   })
 
-  it('blurs header and operator-brief identities when Demo Mode is on', () => {
+  it('blurs header and operator brief identities when Demo Mode is on', () => {
     localStorage.setItem(
       'app-settings:v1',
       JSON.stringify({ stopOnFirstError: false, demoMode: true })

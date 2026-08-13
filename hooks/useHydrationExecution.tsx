@@ -201,7 +201,9 @@ export function useHydrationExecution() {
       const updateTask = (task: HydrationTask) => {
         setExecutionState((prev) => ({
           ...prev,
-          tasks: prev.tasks.map((t) => (t.id === task.id ? task : t)),
+          tasks: prev.tasks.map((currentTask) => (
+            currentTask.id === task.id ? { ...task } : currentTask
+          )),
         }));
       };
 

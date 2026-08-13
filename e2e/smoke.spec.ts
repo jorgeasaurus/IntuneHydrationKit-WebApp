@@ -18,7 +18,7 @@ test.describe("Landing Page", () => {
 
   test("shows version badge", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByText("v2.6", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^v\d+\.\d+\.\d+$/, { exact: true })).toBeVisible();
   });
 
   test("has no unexpected console errors on load", async ({ page }) => {
@@ -32,7 +32,9 @@ test.describe("Landing Page", () => {
       }
     });
     await page.goto("/");
-    await page.waitForLoadState("networkidle");
+    await expect(
+      page.getByRole("heading", { name: /intune hydration kit/i })
+    ).toBeVisible();
     expect(errors).toHaveLength(0);
   });
 

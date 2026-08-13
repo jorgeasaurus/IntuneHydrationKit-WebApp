@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, ReactNode } from "react";
-import { AppSettings } from "@/types/hydration";
+import type { AppSettings } from "@/types/hydration";
 import { APP_SETTINGS_STORAGE_KEY } from "@/lib/storageKeys";
 import { DEFAULT_APP_SETTINGS } from "@/lib/settings";
 
@@ -13,14 +13,12 @@ function normalizeSettings(candidate: unknown): AppSettings {
   const parsed = candidate as Partial<AppSettings>;
 
   return {
-    stopOnFirstError:
-      typeof parsed.stopOnFirstError === "boolean"
-        ? parsed.stopOnFirstError
-        : DEFAULT_APP_SETTINGS.stopOnFirstError,
-    demoMode:
-      typeof parsed.demoMode === "boolean"
-        ? parsed.demoMode
-        : DEFAULT_APP_SETTINGS.demoMode,
+    stopOnFirstError: typeof parsed.stopOnFirstError === "boolean"
+      ? parsed.stopOnFirstError
+      : DEFAULT_APP_SETTINGS.stopOnFirstError,
+    demoMode: typeof parsed.demoMode === "boolean"
+      ? parsed.demoMode
+      : DEFAULT_APP_SETTINGS.demoMode,
   };
 }
 
