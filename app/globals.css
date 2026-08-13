@@ -111,31 +111,6 @@
   backdrop-filter: blur(20px) saturate(1.18) brightness(0.58);
 }
 
-.completed-results-panel {
-  border-color: rgb(110 231 183 / 0.28);
-  background:
-    linear-gradient(
-      135deg,
-      rgb(7 32 41 / 0.94),
-      rgb(2 17 26 / 0.96) 56%,
-      rgb(1 10 17 / 0.98)
-    ),
-    rgb(2 12 18 / 0.94);
-  -webkit-backdrop-filter: blur(20px) saturate(1.18) brightness(0.58);
-  backdrop-filter: blur(20px) saturate(1.18) brightness(0.58);
-  box-shadow:
-    0 22px 52px rgb(0 0 0 / 0.3),
-    inset 0 1px 0 rgb(255 255 255 / 0.08);
-}
-
-.completed-results-panel:hover {
-  border-color: rgb(110 231 183 / 0.38);
-  box-shadow:
-    0 22px 52px rgb(0 0 0 / 0.3),
-    inset 0 1px 0 rgb(255 255 255 / 0.1);
-  transform: none;
-}
-
 .data-card,
 .theme-card {
   transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;

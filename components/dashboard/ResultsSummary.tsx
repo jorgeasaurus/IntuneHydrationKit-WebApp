@@ -1,8 +1,22 @@
-/* oxlint-disable react-doctor/no-giant-component -- summary sections are kept together to preserve report workflow context. */
+/* oxlint-disable react-doctor/no-giant-component -- the result hierarchy stays together so summary, filters, and categories use one task model. */
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  CircleDashed,
+  Eye,
+  FileJson,
+  FileSpreadsheet,
+  FileText,
+  Minus,
+  MinusCircle,
+  XCircle,
+} from "lucide-react";
+import { SensitiveData } from "@/components/SensitiveData";
+import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
   Accordion,
@@ -10,18 +24,18 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { HydrationSummary, HydrationTask } from "@/types/hydration";
-import { FileText, FileJson, FileSpreadsheet, CheckCircle2, XCircle, MinusCircle, Eye } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  generateMarkdownReport,
-  generateJSONReport,
-  generateCSVReport,
   downloadReport,
+  generateCSVReport,
+  generateJSONReport,
+  generateMarkdownReport,
   generateReportFilename,
 } from "@/lib/hydration/reporter";
+import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils/dateFormat";
-import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
-import { PreviewChangeTable } from "@/components/dashboard/PreviewChangeTable";
+import type { HydrationSummary, HydrationTask } from "@/types/hydration";
 
 interface ResultsSummaryProps {
   summary: HydrationSummary;
@@ -29,35 +43,126 @@ interface ResultsSummaryProps {
   isPreview?: boolean;
 }
 
-function getCategoryDisplayName(category: string): string {
-  return getTaskCategoryLabel(category);
-}
+type ResultOutcome =
+  | "success"
+  | "skipped"
+  | "failed"
+  | "change"
+  | "unchanged"
+  | "blocked"
+  | "warning"
+  | "unfinished";
 
-function getTaskStatusClassName(status: HydrationTask["status"]): string {
-  switch (status) {
-    case "success":
-      return "text-emerald-100";
-    case "skipped":
-      return "text-amber-100";
-    case "failed":
-      return "text-red-100";
-    default:
-      return "text-slate-100";
+const TASK_PREVIEW_LIMIT = 25;
+
+const OUTCOME_STYLES: Record<
+  ResultOutcome,
+  {
+    label: string;
+    Icon: typeof Check;
+    className: string;
+    iconClassName: string;
+    rowClassName: string;
   }
-}
+> = {
+  success: {
+    label: "Success",
+    Icon: CheckCircle2,
+    className: "border-emerald-300/25 bg-emerald-300/10 text-emerald-100",
+    iconClassName: "text-emerald-100",
+    rowClassName: "border-emerald-300/15",
+  },
+  skipped: {
+    label: "Skipped",
+    Icon: MinusCircle,
+    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    iconClassName: "text-amber-100",
+    rowClassName: "border-amber-300/15",
+  },
+  failed: {
+    label: "Failed",
+    Icon: XCircle,
+    className: "border-red-300/25 bg-red-300/10 text-red-100",
+    iconClassName: "text-red-100",
+    rowClassName: "border-red-300/25 bg-red-950/20",
+  },
+  change: {
+    label: "Change",
+    Icon: Check,
+    className: "border-sky-300/25 bg-sky-300/10 text-sky-100",
+    iconClassName: "text-sky-100",
+    rowClassName: "border-sky-300/15",
+  },
+  unchanged: {
+    label: "No change",
+    Icon: Minus,
+    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    iconClassName: "text-amber-100",
+    rowClassName: "border-amber-300/15",
+  },
+  blocked: {
+    label: "Blocked",
+    Icon: AlertTriangle,
+    className: "border-red-300/25 bg-red-300/10 text-red-100",
+    iconClassName: "text-red-100",
+    rowClassName: "border-red-300/25 bg-red-950/20",
+  },
+  warning: {
+    label: "Warning",
+    Icon: AlertTriangle,
+    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    iconClassName: "text-amber-100",
+    rowClassName: "border-amber-300/20 bg-amber-950/10",
+  },
+  unfinished: {
+    label: "Unfinished",
+    Icon: CircleDashed,
+    className: "border-slate-300/25 bg-slate-300/10 text-slate-100",
+    iconClassName: "text-slate-200",
+    rowClassName: "border-slate-300/20",
+  },
+};
 
 function formatDuration(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
 
-  if (hours > 0) {
-    return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
-  } else if (minutes > 0) {
-    return `${minutes}m ${seconds % 60}s`;
-  } else {
-    return `${seconds}s`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
+  return `${seconds}s`;
+}
+
+function isNoOpSkip(task: HydrationTask): boolean {
+  const evidence = task.error || task.warning || "";
+  return /\b(already exists|not found|does not exist)\b/i.test(evidence);
+}
+
+function getTaskOutcome(task: HydrationTask, isPreview: boolean): ResultOutcome {
+  if (!isPreview) {
+    if (task.status === "failed") return "failed";
+    if (task.status === "pending" || task.status === "running") return "unfinished";
+    if (task.status === "skipped") return "skipped";
+    if (task.warning) return "warning";
+    return "success";
   }
+
+  if (task.status === "failed") return "blocked";
+  if (task.status === "pending" || task.status === "running") return "unfinished";
+  if (task.status === "skipped") return isNoOpSkip(task) ? "unchanged" : "blocked";
+  if (task.warning) return "warning";
+  return "change";
+}
+
+function isIssueTask(task: HydrationTask, isPreview: boolean): boolean {
+  const outcome = getTaskOutcome(task, isPreview);
+  return isPreview
+    ? outcome === "blocked" || outcome === "warning" || outcome === "unfinished"
+    : outcome !== "success";
+}
+
+function getOutcomeCount(tasks: HydrationTask[], outcome: ResultOutcome, isPreview: boolean): number {
+  return tasks.filter((task) => getTaskOutcome(task, isPreview) === outcome).length;
 }
 
 export function ResultsSummary({
@@ -65,309 +170,309 @@ export function ResultsSummary({
   tasks,
   isPreview = false,
 }: ResultsSummaryProps): React.JSX.Element {
+  const issueData = useMemo(() => {
+    const categories = new Set<string>();
+    let taskCount = 0;
+
+    for (const task of tasks) {
+      if (!isIssueTask(task, isPreview)) continue;
+      categories.add(task.category);
+      taskCount += 1;
+    }
+
+    return { categories, taskCount };
+  }, [isPreview, tasks]);
+  const [openCategories, setOpenCategories] = useState<string[]>(() =>
+    Array.from(issueData.categories)
+  );
+  const [issuesOnly, setIssuesOnly] = useState(false);
+  const [showAllCategories, setShowAllCategories] = useState<Set<string>>(() => new Set());
+
+  const categoryNames = useMemo(
+    () => Array.from(new Set([
+      ...Object.keys(summary.categoryBreakdown),
+      ...tasks.map((task) => task.category),
+    ])),
+    [summary.categoryBreakdown, tasks]
+  );
+
+  const visibleCategories = issuesOnly
+    ? categoryNames.filter((category) => issueData.categories.has(category))
+    : categoryNames;
+
+  const actionLabel = summary.operationMode === "create" ? "Created" : "Deleted";
+  const actionCount = summary.operationMode === "create" ? summary.stats.created : summary.stats.deleted;
+  const successRate = summary.stats.total > 0
+    ? Math.round(((summary.stats.created + summary.stats.deleted) / summary.stats.total) * 100)
+    : 0;
+
   function handleDownload(fileFormat: "md" | "json" | "csv"): void {
-    let content: string;
-    let filename: string;
-
-    switch (fileFormat) {
-      case "md":
-        content = generateMarkdownReport(summary, tasks);
-        filename = generateReportFilename(summary.operationMode, "md");
-        break;
-      case "json":
-        content = generateJSONReport(summary, tasks);
-        filename = generateReportFilename(summary.operationMode, "json");
-        break;
-      case "csv":
-        content = generateCSVReport(tasks);
-        filename = generateReportFilename(summary.operationMode, "csv");
-        break;
-    }
-
-    downloadReport(content, filename);
+    const content = fileFormat === "md"
+      ? generateMarkdownReport(summary, tasks)
+      : fileFormat === "json"
+        ? generateJSONReport(summary, tasks)
+        : generateCSVReport(tasks);
+    downloadReport(content, generateReportFilename(summary.operationMode, fileFormat));
   }
 
-  const successRate =
-    summary.stats.total > 0
-      ? Math.round(((summary.stats.created + summary.stats.deleted) / summary.stats.total) * 100)
-      : 0;
-
-  // Get appropriate labels based on mode and preview state
-  function getActionLabel(): string {
-    if (isPreview) {
-      return summary.operationMode === "create" ? "Would Create" : "Would Delete";
-    }
-    return summary.operationMode === "create" ? "Created" : "Deleted";
+  function handleIssuesOnly(): void {
+    const nextValue = !issuesOnly;
+    setIssuesOnly(nextValue);
+    if (nextValue) setOpenCategories(Array.from(issueData.categories));
   }
 
-  function getActionCount(): number {
-    return summary.operationMode === "create"
-      ? summary.stats.created
-      : summary.stats.deleted;
+  function toggleShowAll(category: string): void {
+    setShowAllCategories((current) => {
+      const next = new Set(current);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
   }
 
   return (
-    <div className="space-y-6">
-      {/* Preview Mode Banner */}
+    <div className="space-y-5">
       {isPreview && (
-        <Alert className="border-sky-300/60 bg-slate-950/95 text-slate-100 shadow-xl shadow-slate-950/25 backdrop-blur-md">
-          <Eye className="size-4 !text-sky-200" />
-          <AlertTitle className="text-slate-50">Preview Mode</AlertTitle>
+        <Alert className="glass-panel rounded-2xl text-slate-50 [&>svg]:text-sky-100">
+          <Eye className="size-4" />
+          <AlertTitle className="text-white">Preview Mode</AlertTitle>
           <AlertDescription className="text-slate-200">
-            This is a preview of what would happen. No changes were made to your tenant.
-            {summary.operationMode === "create"
-              ? " Items marked as 'Would Create' do not exist in your tenant yet."
-              : " Items marked as 'Would Delete' would be removed from your tenant."}
+            Review the simulated outcomes below. No changes were made to the tenant.
           </AlertDescription>
         </Alert>
       )}
 
-      {/* Summary Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle>{isPreview ? "Preview" : "Execution"} Summary</CardTitle>
-          <CardDescription>
-            {isPreview ? "Preview of " : ""}{summary.operationMode}{" "}
-            operation {isPreview ? "completed" : "completed"} on {formatDateTime(summary.endTime)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Overall Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Total Tasks</p>
-              <p className="text-2xl font-bold">{summary.stats.total}</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">{getActionLabel()}</p>
-              <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                {getActionCount()}
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-white/10 bg-black/15">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-sky-200">
+                {isPreview ? "Preview receipt" : "Run receipt"}
               </p>
+              <CardTitle className="mt-2">{isPreview ? "Preview complete" : "Run complete"}</CardTitle>
+              <CardDescription className="mt-1">
+                Completed {formatDateTime(summary.endTime)}
+              </CardDescription>
             </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Skipped</p>
-              <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                {summary.stats.skipped}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Failed</p>
-              <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-                {summary.stats.failed}
-              </p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Success Rate</p>
-              <p className="text-2xl font-bold">{successRate}%</p>
-            </div>
-          </div>
 
-          {/* Duration and Time */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t pt-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Duration</p>
-              <p className="text-lg font-medium">{formatDuration(summary.duration)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Started</p>
-              <p className="text-lg font-medium">{formatDateTime(summary.startTime)}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Completed</p>
-              <p className="text-lg font-medium">{formatDateTime(summary.endTime)}</p>
+            <div className="flex flex-wrap gap-2 text-xs text-slate-200">
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+                <SensitiveData
+                  value={summary.tenantName || summary.tenantId}
+                  fallback="Tenant unavailable"
+                />
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 capitalize">
+                {summary.operationMode}{isPreview ? " preview" : " live"}
+              </span>
+              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 tabular-nums">
+                {formatDuration(summary.duration)}
+              </span>
             </div>
           </div>
+        </CardHeader>
+
+        <CardContent className="grid grid-cols-2 gap-4 pt-6 sm:grid-cols-4 lg:grid-cols-5">
+          <div>
+            <p className="text-xs text-slate-400">Total</p>
+            <p className="mt-1 text-2xl font-semibold text-white">{summary.stats.total}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">{isPreview ? "Changes" : actionLabel}</p>
+            <p className="mt-1 text-2xl font-semibold text-emerald-200">
+              {isPreview ? getOutcomeCount(tasks, "change", true) : actionCount}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">{isPreview ? "No change" : "Skipped"}</p>
+            <p className="mt-1 text-2xl font-semibold text-amber-200">
+              {isPreview ? getOutcomeCount(tasks, "unchanged", true) : summary.stats.skipped}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-400">{isPreview ? "Needs attention" : "Failed"}</p>
+            <p className="mt-1 text-2xl font-semibold text-red-200">
+              {isPreview
+                ? getOutcomeCount(tasks, "blocked", true) +
+                  getOutcomeCount(tasks, "warning", true) +
+                  getOutcomeCount(tasks, "unfinished", true)
+                : summary.stats.failed}
+            </p>
+          </div>
+          {!isPreview && (
+            <div>
+              <p className="text-xs text-slate-400">Success rate</p>
+              <p className="mt-1 text-2xl font-semibold text-white">{successRate}%</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {isPreview && (
-        <PreviewChangeTable tasks={tasks} operationMode={summary.operationMode} />
-      )}
-
-      {/* Category Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Category Breakdown</CardTitle>
-          <CardDescription>Results grouped by category</CardDescription>
+      <Card className="overflow-hidden">
+        <CardHeader className="border-b border-white/10 bg-black/15">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-sky-200">
+                Run evidence
+              </p>
+              <CardTitle className="mt-2">Results by category</CardTitle>
+              <CardDescription className="mt-1">
+                Open a category to inspect its tasks.
+              </CardDescription>
+            </div>
+            {issueData.categories.size > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-pressed={issuesOnly}
+                onClick={handleIssuesOnly}
+                className={cn(issuesOnly && "border-amber-300/40 bg-amber-300/10 text-amber-100")}
+              >
+                <AlertTriangle className="mr-2 size-3.5" />
+                Issues only ({issueData.taskCount})
+              </Button>
+            )}
+          </div>
         </CardHeader>
-        <CardContent>
+
+        <CardContent className="pt-6">
           <Accordion
             type="multiple"
-            defaultValue={Object.keys(summary.categoryBreakdown)}
-            className="space-y-4"
+            value={openCategories}
+            onValueChange={setOpenCategories}
+            className="space-y-3"
           >
-            {Object.entries(summary.categoryBreakdown).map(([category, stats]) => {
+            {visibleCategories.map((category) => {
               const categoryTasks = tasks.filter((task) => task.category === category);
+              const filteredTasks = issuesOnly
+                ? categoryTasks.filter((task) => isIssueTask(task, isPreview))
+                : categoryTasks;
+              const showAll = showAllCategories.has(category);
+              const shownTasks = showAll ? filteredTasks : filteredTasks.slice(0, TASK_PREVIEW_LIMIT);
+              const outcomes: ResultOutcome[] = isPreview
+                ? ["change", "unchanged", "blocked", "warning", "unfinished"]
+                : ["success", "skipped", "failed", "warning", "unfinished"];
+
               return (
                 <AccordionItem
                   key={category}
                   value={category}
-                  className="overflow-hidden rounded-lg border px-0"
+                  className="overflow-hidden rounded-xl border border-white/10 bg-slate-950/35 px-0"
                 >
-                  <AccordionTrigger className="px-4 py-3 hover:no-underline">
-                    <div className="flex w-full items-center justify-between gap-4 pr-4 text-left">
-                      <div className="space-y-1">
-                        <p className="font-medium">{getCategoryDisplayName(category)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {stats.total} {stats.total === 1 ? "item" : "items"}
+                  <AccordionTrigger className="px-4 py-3.5 hover:no-underline">
+                    <div className="flex min-w-0 flex-1 flex-col gap-3 pr-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 text-left">
+                        <p className="truncate font-medium text-slate-50">{getTaskCategoryLabel(category)}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {categoryTasks.length} {categoryTasks.length === 1 ? "item" : "items"}
                         </p>
                       </div>
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-1">
-                          <CheckCircle2 className="size-4 text-emerald-200" />
-                          <span className="text-sm font-medium">{stats.success}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <MinusCircle className="size-4 text-amber-200" />
-                          <span className="text-sm font-medium">{stats.skipped}</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <XCircle className="size-4 text-red-200" />
-                          <span className="text-sm font-medium">{stats.failed}</span>
-                        </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {outcomes.map((outcome) => {
+                          const presentation = OUTCOME_STYLES[outcome];
+                          const count = getOutcomeCount(categoryTasks, outcome, isPreview);
+                          return (
+                            <span
+                              key={outcome}
+                              aria-label={`${presentation.label}: ${count}`}
+                              className={cn(
+                                "inline-flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em]",
+                                presentation.className
+                              )}
+                            >
+                              <presentation.Icon aria-hidden="true" className="size-3" />
+                              {count}
+                              <span className="hidden md:inline">{presentation.label}</span>
+                            </span>
+                          );
+                        })}
                       </div>
                     </div>
                   </AccordionTrigger>
 
-                  <AccordionContent className="border-t px-4 pb-4 pt-3">
-                    <div className="space-y-1">
-                      {categoryTasks.map((task) => (
-                        <div
-                          key={task.id}
-                          className={`flex items-start gap-2 rounded p-2 text-sm font-medium ${getTaskStatusClassName(task.status)}`}
-                        >
-                          {task.status === "success" ? (
-                            <CheckCircle2 className="mt-0.5 size-3 flex-shrink-0" />
-                          ) : task.status === "skipped" ? (
-                            <MinusCircle className="mt-0.5 size-3 flex-shrink-0" />
-                          ) : task.status === "failed" ? (
-                            <XCircle className="mt-0.5 size-3 flex-shrink-0" />
-                          ) : null}
-                          <div className="min-w-0 flex-1">
-                            <span className="block truncate">{task.itemName}</span>
-                            {task.error &&
-                              (task.status === "skipped" || task.status === "failed") && (
-                                <span className="mt-0.5 block text-xs opacity-75">
-                                  {task.error}
-                                </span>
-                              )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                  <AccordionContent className="border-t border-white/10 px-3 pb-3 pt-3 sm:px-4 sm:pb-4">
+                    <ul className="space-y-1.5">
+                      {shownTasks.map((task) => {
+                        const outcome = getTaskOutcome(task, isPreview);
+                        const presentation = OUTCOME_STYLES[outcome];
+                        return (
+                          <li
+                            key={task.id}
+                            className={cn(
+                              "rounded-lg border bg-slate-950/55 px-3 py-2.5",
+                              presentation.rowClassName
+                            )}
+                          >
+                            <div className="flex items-start gap-3">
+                              <presentation.Icon
+                                aria-hidden="true"
+                                className={cn("mt-0.5 size-4 shrink-0", presentation.iconClassName)}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-slate-100" title={task.itemName}>
+                                  {task.itemName}
+                                </p>
+                                {(task.error || task.warning) && (
+                                  <p className="mt-1 text-xs leading-5 text-slate-400">
+                                    {task.error || task.warning}
+                                  </p>
+                                )}
+                              </div>
+                              <span className={cn(
+                                "shrink-0 rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em]",
+                                presentation.className
+                              )}>
+                                {presentation.label}
+                              </span>
+                            </div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+
+                    {filteredTasks.length > TASK_PREVIEW_LIMIT && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => toggleShowAll(category)}
+                        className="mt-3 w-full text-slate-300"
+                      >
+                        {showAll ? "Show fewer" : `Show all ${filteredTasks.length}`}
+                      </Button>
+                    )}
                   </AccordionContent>
                 </AccordionItem>
               );
             })}
           </Accordion>
+
+          {visibleCategories.length === 0 && (
+            <div className="rounded-xl border border-dashed border-white/15 bg-black/15 py-10 text-center">
+              <CheckCircle2 className="mx-auto size-7 text-emerald-200" />
+              <p className="mt-3 text-sm font-medium text-slate-100">No issues found</p>
+              <p className="mt-1 text-xs text-slate-400">All tasks completed without warnings or failures.</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Successfully Imported Items */}
-      {(() => {
-        const successfulTasks = tasks.filter((task) => task.status === "success");
-        const actionVerb = isPreview
-          ? (summary.operationMode === "create" ? "Would Be Created" : "Would Be Deleted")
-          : (summary.operationMode === "create" ? "Created" : "Deleted");
-        const actionDescription = isPreview
-          ? (summary.operationMode === "create" ? "would be created" : "would be deleted")
-          : (summary.operationMode === "create" ? "were created" : "were deleted");
-        return !isPreview && successfulTasks.length > 0 ? (
-          <Card className="completed-results-panel overflow-hidden text-slate-100">
-            <CardHeader className="border-b border-white/10">
-              <CardTitle className="text-slate-50">
-                {isPreview ? "Items That " : "Successfully "}{actionVerb} ({successfulTasks.length})
-              </CardTitle>
-              <CardDescription className="text-slate-300">
-                Items that {actionDescription} in your tenant
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="max-h-[400px] space-y-4 overflow-y-auto">
-                {Object.entries(
-                  successfulTasks.reduce((acc, task) => {
-                    if (!acc[task.category]) acc[task.category] = [];
-                    acc[task.category].push(task);
-                    return acc;
-                  }, {} as Record<string, HydrationTask[]>)
-                ).map(([category, categoryTasks]) => (
-                  <div key={category} className="space-y-2">
-                    <h4 className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-200">
-                      {getTaskCategoryLabel(category)} ({categoryTasks.length})
-                    </h4>
-                    <ul className="space-y-1.5">
-                      {categoryTasks.map((task) => (
-                        <li
-                          key={task.id}
-                          className="flex items-center gap-2.5 rounded-xl border border-emerald-300/15 bg-slate-950/65 px-3 py-2.5 shadow-[inset_3px_0_0_rgb(110_231_183_/_0.7)]"
-                        >
-                          <span className="flex size-6 shrink-0 items-center justify-center rounded-md border border-emerald-300/20 bg-emerald-300/10 text-emerald-200">
-                            <CheckCircle2 aria-hidden="true" className="size-3.5" />
-                          </span>
-                          <span className="min-w-0 truncate text-sm font-medium text-slate-100">
-                            {task.itemName}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        ) : null;
-      })()}
-
-      {/* Errors */}
-      {summary.errors.length > 0 && (
-        <Card className="border-red-200 dark:border-red-900">
-          <CardHeader>
-            <CardTitle className="text-red-600 dark:text-red-400">
-              Errors ({summary.errors.length})
-            </CardTitle>
-            <CardDescription>Tasks that failed during execution</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 max-h-[300px] overflow-y-auto">
-              {summary.errors.map((error) => (
-                <div key={`${error.task}-${error.timestamp.toISOString()}`} className="p-3 rounded-lg border border-red-200 dark:border-red-900 bg-red-50 dark:bg-red-950/20">
-                  <p className="text-sm font-medium text-red-900 dark:text-red-100">
-                    {error.task}
-                  </p>
-                  <p className="text-xs text-red-700 dark:text-red-300 mt-1">
-                    {error.message}
-                  </p>
-                  <p className="text-xs text-red-600 dark:text-red-400 mt-1">
-                    {formatDateTime(error.timestamp)}
-                  </p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Download Reports */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Download Reports</CardTitle>
-          <CardDescription>
-            Export execution results in multiple formats
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Button variant="outline" onClick={() => handleDownload("md")} className="w-full">
-              <FileText className="size-4 mr-2" />
-              Markdown
+      <Card className="overflow-hidden">
+        <CardContent className="flex flex-col gap-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-medium text-slate-100">Download report</p>
+            <p className="mt-1 text-xs text-slate-400">Export the complete task record.</p>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Button variant="outline" size="sm" onClick={() => handleDownload("md")}>
+              <FileText className="mr-2 size-3.5" /> Markdown
             </Button>
-            <Button variant="outline" onClick={() => handleDownload("json")} className="w-full">
-              <FileJson className="size-4 mr-2" />
-              JSON
+            <Button variant="outline" size="sm" onClick={() => handleDownload("json")}>
+              <FileJson className="mr-2 size-3.5" /> JSON
             </Button>
-            <Button variant="outline" onClick={() => handleDownload("csv")} className="w-full">
-              <FileSpreadsheet className="size-4 mr-2" />
-              CSV
+            <Button variant="outline" size="sm" onClick={() => handleDownload("csv")}>
+              <FileSpreadsheet className="mr-2 size-3.5" /> CSV
             </Button>
           </div>
         </CardContent>
