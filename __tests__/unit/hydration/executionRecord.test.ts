@@ -68,6 +68,31 @@ describe("execution record storage", () => {
     expect(record?.activityLog[0].timestamp).toBeInstanceOf(Date);
   });
 
+  it("accepts equivalent category summaries with a different key order", () => {
+    const record = createRecord();
+    if (!record.summary) throw new Error("Expected a reportable record.");
+    record.selectedObjectCount = 2;
+    record.tasks.push({
+      id: "filter-1",
+      category: "filters",
+      operation: "create",
+      itemName: "Windows devices",
+      status: "success",
+      startTime: record.startTime ?? undefined,
+      endTime: record.endTime,
+    });
+    record.summary.stats.total = 2;
+    record.summary.stats.created = 2;
+    record.summary.categoryBreakdown = {
+      filters: { total: 1, success: 1, skipped: 0, failed: 0 },
+      groups: { total: 1, success: 1, skipped: 0, failed: 0 },
+    };
+
+    writeExecutionRecord(sessionStorage, record);
+
+    expect(readExecutionRecord(sessionStorage)?.summary?.stats.total).toBe(2);
+  });
+
   it("rejects invalid data and clears only hydration session data", () => {
     sessionStorage.setItem("hydration-execution:v1", "not-json");
     sessionStorage.setItem("intune-hydration-templates-groups", "cached");

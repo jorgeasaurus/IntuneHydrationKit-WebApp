@@ -325,7 +325,20 @@ export function summaryMatchesExecution(
     summary.batchStats,
     source.tenantName,
   );
-  return JSON.stringify(summary) === JSON.stringify(expected);
+  return JSON.stringify(toCanonicalValue(summary)) === JSON.stringify(toCanonicalValue(expected));
+}
+
+function toCanonicalValue(value: unknown): unknown {
+  if (value instanceof Date) return value.toISOString();
+  if (Array.isArray(value)) return value.map(toCanonicalValue);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, toCanonicalValue(item)]),
+    );
+  }
+  return value;
 }
 
 /**
