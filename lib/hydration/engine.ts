@@ -63,6 +63,9 @@ function markTaskCancelled(
   task: HydrationTask,
   results: ExecutionResult[]
 ): void {
+  const cancelledAt = new Date();
+  task.startTime ??= cancelledAt;
+  task.endTime = cancelledAt;
   markTaskSkipped(task, "cancelled", "Cancelled by user");
   results.push({ task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled by user" });
 }

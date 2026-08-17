@@ -60,6 +60,10 @@ describe("executeDeletesInParallel", () => {
     expect(results.every((result) => result.skipKind === "cancelled")).toBe(
       true,
     );
+    for (const task of tasks) {
+      expect(task.startTime).toBeInstanceOf(Date);
+      expect(task.endTime).toBe(task.startTime);
+    }
   });
 
   it("deletes baseline group policy configurations when they exist in the group policy cache", async () => {

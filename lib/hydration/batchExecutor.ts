@@ -66,6 +66,7 @@ function markPreparedTasksCancelled(
 
   for (const { task } of items) {
     if (task.status !== "pending" && task.status !== "running") continue;
+    task.startTime ??= cancelledAt;
     task.endTime = cancelledAt;
     markTaskSkipped(task, "cancelled", "Cancelled");
     results.push({ task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled" });

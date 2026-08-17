@@ -388,6 +388,11 @@ describe("executeTasks", () => {
       expect.objectContaining({ task: secondTask, success: false, skipped: true, error: "Cancelled by user" }),
     ]);
     expect(mockExecuteGroupTask).not.toHaveBeenCalled();
+    for (const task of [firstTask, secondTask]) {
+      expect(task.startTime).toBeInstanceOf(Date);
+      expect(task.endTime).toBeInstanceOf(Date);
+      expect(task.endTime?.getTime()).toBeGreaterThanOrEqual(task.startTime?.getTime() ?? 0);
+    }
     expect(statusUpdates.map(({ message }) => message)).toContain(
       "Running preview (create mode) - no changes will be made..."
     );
