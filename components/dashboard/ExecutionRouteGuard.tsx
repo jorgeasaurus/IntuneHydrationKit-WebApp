@@ -37,7 +37,10 @@ export function ExecutionRouteGuard({ children }: ExecutionRouteGuardProps): Rea
   }, [mustDiscard]);
 
   useEffect(() => {
-    if (shouldReturnToDashboard) router.replace("/dashboard");
+    if (shouldReturnToDashboard) {
+      // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- active execution state exists only in the client store
+      router.replace("/dashboard");
+    }
   }, [router, shouldReturnToDashboard]);
 
   useEffect(() => {

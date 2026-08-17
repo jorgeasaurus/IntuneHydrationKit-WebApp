@@ -181,6 +181,7 @@ export default function DashboardPage(): React.JSX.Element {
     clearHydrationSession(sessionStorage);
     reset();
     setRestoredRecord(null);
+    // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- account ownership is client authentication state
     router.push("/wizard");
   }, [ownerMismatch, reset, router]);
 
@@ -235,10 +236,7 @@ export default function DashboardPage(): React.JSX.Element {
         tenantName={displayTenantName}
         tenantId={displayTenantId}
         selectedObjectCount={selectedObjectCount}
-        isBuildingQueue={isBuildingQueue}
-        isPaused={isPaused}
-        isCancelling={isCancelling}
-        isCompleted={displayCompleted}
+        phase={displayCompleted ? "completed" : phase}
         batchProgress={restoredRecord ? null : batchProgress}
         onPause={isRunning && !isPaused && !isCancelling ? pause : undefined}
         onResume={isRunning && isPaused && !isCancelling ? resume : undefined}

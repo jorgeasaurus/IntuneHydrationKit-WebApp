@@ -78,11 +78,11 @@ function markPendingTasksCancelled(
   results: ExecutionResult[],
   context: ExecutionContext
 ): void {
-  markPreparedTasksCancelled(
-    tasks.filter((task) => task.status === "pending").map((task) => ({ task })),
-    results,
-    context
-  );
+  const pendingTasks: Array<{ task: HydrationTask }> = [];
+  for (const task of tasks) {
+    if (task.status === "pending") pendingTasks.push({ task });
+  }
+  markPreparedTasksCancelled(pendingTasks, results, context);
 }
 
 /**

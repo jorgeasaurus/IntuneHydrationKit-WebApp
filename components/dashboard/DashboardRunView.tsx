@@ -11,6 +11,7 @@ import { TaskList } from "@/components/dashboard/TaskList";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { ActivityMessage } from "@/lib/hydration/types";
+import type { ExecutionState } from "@/lib/hydration/executionStateStore";
 import type {
   BatchProgress,
   ExecutionOutcome,
@@ -32,10 +33,7 @@ interface DashboardRunViewProps {
   tenantName?: string;
   tenantId?: string;
   selectedObjectCount: number;
-  isBuildingQueue: boolean;
-  isPaused: boolean;
-  isCancelling: boolean;
-  isCompleted: boolean;
+  phase: ExecutionState["phase"];
   batchProgress: BatchProgress | null;
   onPause?: () => void;
   onResume?: () => void;
@@ -73,10 +71,7 @@ export function DashboardRunView({
   tenantName,
   tenantId,
   selectedObjectCount,
-  isBuildingQueue,
-  isPaused,
-  isCancelling,
-  isCompleted,
+  phase,
   batchProgress,
   onPause,
   onResume,
@@ -84,6 +79,10 @@ export function DashboardRunView({
   onDownloadLog,
   onStartNewHydration,
 }: DashboardRunViewProps): React.JSX.Element {
+  const isBuildingQueue = phase === "building";
+  const isPaused = phase === "paused";
+  const isCancelling = phase === "cancelling";
+  const isCompleted = phase === "completed";
   const completedTaskCount = tasks.filter(
     (task) =>
       task.status === "success" ||
