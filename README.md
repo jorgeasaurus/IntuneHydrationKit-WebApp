@@ -168,8 +168,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 │   ├── layout.tsx           # Root layout with providers
 │   ├── page.tsx             # Landing page
 │   ├── wizard/              # 4-step configuration wizard
-│   ├── dashboard/           # Real-time execution dashboard
-│   └── results/             # Execution results and reporting
+│   └── dashboard/           # Live execution, results, and reporting
 ├── components/
 │   ├── ui/                  # shadcn/ui components
 │   ├── auth/                # Authentication components

@@ -239,7 +239,7 @@ export async function executeWin32AppTask(
 
   if (task.operation === "create") {
     if (existingApps.length > 0) {
-      return { task, success: true, skipped: true, error: "Already exists" };
+      return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
     }
     if (context.isPreview) {
       return { task, success: true, skipped: false };
@@ -273,6 +273,7 @@ export async function executeWin32AppTask(
       task,
       success: true,
       skipped: true,
+      skipKind: deleteCandidates?.hasNameMatch ? "blocked" : "noOp",
       error: deleteCandidates?.hasNameMatch
         ? "Matching app is not owned by Intune Hydration Kit"
         : "Not found in tenant",

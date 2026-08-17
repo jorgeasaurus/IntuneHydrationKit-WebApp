@@ -65,6 +65,7 @@ export async function executeConditionalAccessTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "blocked",
         error: "No Entra ID Premium (P1) license",
       };
     }
@@ -81,6 +82,7 @@ export async function executeConditionalAccessTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "blocked",
         error: "Requires Premium P2 license",
       };
     }
@@ -95,6 +97,7 @@ export async function executeConditionalAccessTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "noOp",
         error: "Already exists",
       };
     }
@@ -105,6 +108,7 @@ export async function executeConditionalAccessTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "noOp",
         error: "Already exists",
       };
     }
@@ -147,7 +151,7 @@ export async function executeConditionalAccessTask(
       // If no cache, check via API
       const exists = await conditionalAccessPolicyExists(client, targetName);
       if (!exists) {
-        return { task, success: true, skipped: true, error: "Not found in tenant" };
+        return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
       }
     }
 
@@ -163,7 +167,7 @@ export async function executeConditionalAccessTask(
     } catch (error) {
       // Policy not found or not created by hydration kit - skip
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, error: errorMessage };
+      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
     }
   }
 

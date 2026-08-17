@@ -13,6 +13,55 @@ describe("executeDeletesInParallel", () => {
     expect(isBatchableCategory("conditionalAccess")).toBe(true);
   });
 
+  it("stops assignment checks when cancellation arrives during preparation", async () => {
+    const tasks: HydrationTask[] = ["One", "Two"].map((name) => ({
+      id: `baseline-${name.toLowerCase()}`,
+      category: "baseline",
+      operation: "delete",
+      itemName: `[IHD] Baseline ${name}`,
+      status: "pending",
+    }));
+    let resolveAssignmentCheck!: (value: { value: unknown[] }) => void;
+    let cancelled = false;
+    const client = {
+      delete: vi.fn(),
+      get: vi.fn(
+        () =>
+          new Promise<{ value: unknown[] }>((resolve) => {
+            resolveAssignmentCheck = resolve;
+          }),
+      ),
+      post: vi.fn(),
+      getCollection: vi.fn(),
+      patch: vi.fn(),
+    } as unknown as ExecutionContext["client"];
+    const context: ExecutionContext = {
+      client,
+      operationMode: "delete",
+      isPreview: false,
+      stopOnFirstError: false,
+      shouldCancel: () => cancelled,
+      cachedSettingsCatalogPolicies: tasks.map((task, index) => ({
+        id: `policy-${index}`,
+        name: task.itemName,
+        description: "Imported by Intune Hydration Kit",
+      })),
+    };
+
+    const execution = executeDeletesInParallel(tasks, context);
+    await vi.waitFor(() => expect(client.get).toHaveBeenCalledTimes(1));
+    cancelled = true;
+    resolveAssignmentCheck({ value: [] });
+    const results = await execution;
+
+    expect(client.get).toHaveBeenCalledTimes(1);
+    expect(client.delete).not.toHaveBeenCalled();
+    expect(results).toHaveLength(2);
+    expect(results.every((result) => result.skipKind === "cancelled")).toBe(
+      true,
+    );
+  });
+
   it("deletes baseline group policy configurations when they exist in the group policy cache", async () => {
     const task: HydrationTask = {
       id: "baseline-group-policy-delete",
@@ -213,6 +262,7 @@ describe("executeDeletesInParallel", () => {
       skipped: true,
       error: "Could not verify active assignments - deletion skipped",
     })]);
+    expect(task.skipKind).toBe("blocked");
     expect(client.delete).not.toHaveBeenCalled();
   });
 
@@ -298,6 +348,7 @@ describe("executeDeletesInParallel", () => {
         error: "Policy has 1 active assignment(s) - remove assignments before deleting",
       }),
     ]);
+    expect(task.skipKind).toBe("blocked");
     expect(client.get).toHaveBeenCalledWith(
       "/deviceManagement/configurationPolicies/settings-policy-id/assignments"
     );
@@ -396,6 +447,7 @@ describe("executeDeletesInParallel", () => {
         error: "Already deleted",
       }),
     ]);
+    expect(task.skipKind).toBe("noOp");
     expect(task.status).toBe("skipped");
     expect(client.batch).toHaveBeenCalledWith(
       [

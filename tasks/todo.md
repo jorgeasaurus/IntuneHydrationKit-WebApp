@@ -1750,3 +1750,40 @@
 
 - Cycle 1 found two valid issues. Pending and running tasks now render as unfinished, and warning-bearing tasks remain visible as issues.
 - Cycle 2 generated no threads. Its valid suppressed metric note changed the combined preview total from `Blocked` to `Needs attention`.
+
+# Operation Mode Colors and Persistent Run Dashboard
+
+- [x] Give create, delete, preview, and live choices distinct semantic selected states.
+- [x] Keep completed hydration runs on the dashboard and preserve result storage.
+- [x] Make the retained completion state clear and actionable.
+- [x] Add regression coverage and run project verification.
+
+## Review
+
+- Create uses emerald, delete uses red, preview uses sky, and live uses amber across selected cards, indicators, icons, labels, and summary surfaces.
+- Completed and stopped runs stay on the dashboard. The summary remains in session storage, and the dashboard keeps task details, activity, controls, and final status visible. Start New Hydration clears the stored result and resets the confirmed wizard state.
+- Checks passed: 543 tests, type check, lint, production build, React Doctor 100/100 on changed files, desktop and mobile visual inspection, and `git diff --check`.
+
+# Thermonuclear Review Fix Loop
+
+- [x] Run a strict review of the operation-mode and persistent-dashboard diff.
+- [x] Fix every actionable finding and verify each repair.
+- [x] Repeat with a fresh review until it reports zero findings.
+- [x] Run final tests, type check, lint, build, and diff validation.
+
+## Review
+
+- Round 1 findings:
+  1. Cancellation becomes terminal before active Graph work settles and can allow a duplicate run.
+  2. Cancelled, blocked, and fatal runs do not have one typed terminal outcome.
+  3. Post-run ownership is split between the dashboard and the obsolete results route.
+  4. Completed dashboard state cannot restore from the persisted record after refresh.
+  5. Result storage and reset logic is duplicated and can race with wizard reset.
+  6. Preview and live colors use duplicate tone schemas and duplicate card rendering.
+  7. Completion and persistence tests do not cover all terminal outcomes and storage fields.
+- Round 1 fixes are complete. The dashboard now owns terminal outcomes, report exports, restore, and session reset. Cancellation stays active until current Graph work settles.
+- [x] Round 2: run a fresh independent review of the repaired diff.
+- Round 2 fixes are complete. Storage now has a validated, account-bound terminal record; task skips and execution phases are typed; active runs cannot leave through the dashboard header; terminal timing, status copy, and screen-reader announcements are accurate.
+- Rounds 3-10 repaired route-safe execution ownership, cancellation and pause semantics, typed terminal evidence, account-bound restore, report fidelity, stop-on-first-error behavior, and focused regression gaps.
+- Round 11 returned zero findings from behavior, structure, and test reviewers.
+- Checks passed: 604 tests, type check, lint, production build, and `git diff --check`.

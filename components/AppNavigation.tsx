@@ -7,6 +7,7 @@ interface AppNavigationProps {
   title: string;
   description?: ReactNode;
   actions?: ReactNode;
+  brandHref?: string | null;
 }
 
 export function AppNavigation({
@@ -14,13 +15,14 @@ export function AppNavigation({
   title,
   description,
   actions,
+  brandHref,
 }: AppNavigationProps): React.JSX.Element {
   return (
     <header className="app-glass-header-shell">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="app-glass-header">
           <div className="flex min-h-16 items-center gap-3 px-4 py-2 sm:gap-4 sm:px-6">
-            <NavigationBrand />
+            <NavigationBrand href={brandHref} />
 
             <div className="min-w-0 flex-1">
               {eyebrow && (

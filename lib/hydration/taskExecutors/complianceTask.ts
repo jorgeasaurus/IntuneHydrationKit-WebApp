@@ -81,6 +81,7 @@ export async function executeComplianceTask(
           task,
           success: true,
           skipped: true,
+          skipKind: "noOp",
           error: "Already exists",
         };
       }
@@ -113,6 +114,7 @@ export async function executeComplianceTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "noOp",
         error: "Already exists",
       };
     }
@@ -204,11 +206,11 @@ export async function executeComplianceTask(
       }
 
       if (!policy) {
-        return { task, success: true, skipped: true, error: "Not found in tenant" };
+        return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
       }
 
       if (!hasHydrationMarker(policy.description)) {
-        return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+        return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
       }
 
       if (isPreview) {
@@ -224,6 +226,7 @@ export async function executeComplianceTask(
           task,
           success: true,
           skipped: true,
+          skipKind: "blocked",
           error: `Policy has ${assignmentCount} active assignment(s)`,
         };
       }
@@ -240,7 +243,7 @@ export async function executeComplianceTask(
     // Check if policy exists first
     const exists = await compliancePolicyExists(client, targetName);
     if (!exists) {
-      return { task, success: true, skipped: true, error: "Not found in tenant" };
+      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
     }
 
     // Preview mode - would delete
@@ -254,7 +257,7 @@ export async function executeComplianceTask(
 
       // Check if skipped due to active assignments
       if (result.skipped) {
-        return { task, success: true, skipped: true, error: result.reason };
+        return { task, success: true, skipped: true, skipKind: "blocked", error: result.reason };
       }
 
       return { task, success: true, skipped: false };
@@ -279,7 +282,7 @@ export async function executeComplianceTask(
       }
 
       // Policy not found or not created by hydration kit - skip
-      return { task, success: true, skipped: true, error: errorMessage };
+      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
     }
   }
 

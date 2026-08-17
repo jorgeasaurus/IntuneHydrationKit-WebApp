@@ -9,6 +9,7 @@ import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import { useWizardState } from "@/hooks/useWizardState";
 import { Terminal, Github } from "lucide-react";
+import { resetHydrationFlow } from "@/lib/hydration/resetHydrationFlow";
 
 export function Navigation() {
   const isAuthenticated = useIsAuthenticated();
@@ -21,7 +22,7 @@ export function Navigation() {
     try {
       await signIn();
       toast.success("Successfully signed in!");
-      resetWizard();
+      resetHydrationFlow(sessionStorage, resetWizard);
       router.push("/wizard");
     } catch (error) {
       toast.error("Failed to sign in. Please try again.");
@@ -31,7 +32,7 @@ export function Navigation() {
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
-      resetWizard();
+      resetHydrationFlow(sessionStorage, resetWizard);
       router.push("/wizard");
     } else {
       handleSignInClick();
@@ -78,9 +79,11 @@ export function Navigation() {
                 </a>
                 {/* Terminal Status Indicator */}
                 <div className="landing-nav-status hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border">
-                  <span className={`size-2 rounded-full ${isAuthenticated ? 'bg-signal-success' : 'bg-muted-foreground'}`} />
+                  <span
+                    className={`size-2 rounded-full ${isAuthenticated ? "bg-signal-success" : "bg-muted-foreground"}`}
+                  />
                   <span className="text-xs font-mono text-muted-foreground">
-                    {isAuthenticated ? 'CONNECTED' : 'OFFLINE'}
+                    {isAuthenticated ? "CONNECTED" : "OFFLINE"}
                   </span>
                 </div>
 
@@ -97,12 +100,7 @@ export function Navigation() {
                     </>
                   ) : (
                     <>
-                      <svg
-                        className="size-4"
-                        viewBox="0 0 21 21"
-                        fill="none"
-                        xmlns="http://www.w3.org/2000/svg"
-                      >
+                      <svg className="size-4" viewBox="0 0 21 21" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <rect x="1" y="1" width="9" height="9" fill="#f25022" />
                         <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
                         <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
@@ -116,9 +114,7 @@ export function Navigation() {
             </div>
           </nav>
         </div>
-
       </div>
-
     </>
   );
 }

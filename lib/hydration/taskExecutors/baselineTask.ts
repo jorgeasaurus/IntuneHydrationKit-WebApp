@@ -76,13 +76,13 @@ export async function executeBaselineTask(
 
         if (existingCompliancePolicy) {
           console.log(`[Baseline Task] Compliance policy already exists (cache), skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, error: "Already exists" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
 
         const exists = await compliancePolicyExistsByName(client, policyName);
         if (exists) {
           console.log(`[Baseline Task] Compliance policy already exists, skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, error: "Already exists" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
         if (isPreview) {
           return { task, success: true, skipped: false };
@@ -104,7 +104,7 @@ export async function executeBaselineTask(
         );
         if (existingPolicy) {
           console.log(`[Baseline Task] App Protection policy already exists, skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, error: "Already exists" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
         if (isPreview) {
           return { task, success: true, skipped: false };
@@ -120,7 +120,7 @@ export async function executeBaselineTask(
         );
         if (existsResponse.value && existsResponse.value.length > 0) {
           console.log(`[Baseline Task] Device Configuration policy already exists, skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, error: "Already exists" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
         if (isPreview) {
           return { task, success: true, skipped: false };
@@ -138,7 +138,7 @@ export async function executeBaselineTask(
         );
         if (existingProfile) {
           console.log(`[Baseline Task] Driver Update Profile already exists, skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, error: "Already exists" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
         if (isPreview) {
           return { task, success: true, skipped: false };
@@ -160,7 +160,7 @@ export async function executeBaselineTask(
 
         if (existsInCache) {
           console.log(`[Baseline Task] Settings Catalog policy already exists (cache), skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, error: "Already exists" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
 
         if (isPreview) {
@@ -192,14 +192,14 @@ export async function executeBaselineTask(
         // Find compliance policy by name first (to get ID)
         if (hasODataUnsafeChars(policyName)) {
           console.log(`[Baseline Task] Cannot query compliance for "${policyName}" (OData-unsafe chars) - skipping`);
-          return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
+          return { task, success: true, skipped: true, skipKind: "blocked", error: "Cannot query by name (special characters)" };
         }
         const escapedPolicyName = escapeODataString(policyName);
         const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
           `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedPolicyName)}'&$select=id,displayName`
         );
         if (!response.value || response.value.length === 0) {
-          return { task, success: true, skipped: true, error: "Not found in tenant" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
         }
         const policyId = response.value[0].id;
 
@@ -208,7 +208,7 @@ export async function executeBaselineTask(
           `/deviceManagement/deviceCompliancePolicies/${policyId}?$select=id,displayName,description`
         );
         if (!hasHydrationMarker(fullPolicy.description)) {
-          return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
         }
 
         if (isPreview) {
@@ -225,7 +225,7 @@ export async function executeBaselineTask(
           (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
         );
         if (!cachedPolicy || !cachedPolicy.id) {
-          return { task, success: true, skipped: true, error: "Not found in tenant" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
         }
 
         if (isPreview) {
@@ -243,7 +243,7 @@ export async function executeBaselineTask(
         } catch (deleteError) {
           const errMsg = deleteError instanceof Error ? deleteError.message : String(deleteError);
           if (errMsg.includes("Not created by Intune Hydration Kit")) {
-            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
           }
           throw deleteError;
         }
@@ -252,14 +252,14 @@ export async function executeBaselineTask(
         // DeviceConfiguration and UpdatePolicies use /deviceManagement/deviceConfigurations endpoint
         if (hasODataUnsafeChars(policyName)) {
           console.log(`[Baseline Task] Cannot query device config for "${policyName}" (OData-unsafe chars) - skipping`);
-          return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
+          return { task, success: true, skipped: true, skipKind: "blocked", error: "Cannot query by name (special characters)" };
         }
         const escapedPolicyNameDel = escapeODataString(policyName);
         const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
           `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedPolicyNameDel)}'&$select=id,displayName`
         );
         if (!response.value || response.value.length === 0) {
-          return { task, success: true, skipped: true, error: "Not found in tenant" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
         }
         const policyId = response.value[0].id;
 
@@ -268,7 +268,7 @@ export async function executeBaselineTask(
           `/deviceManagement/deviceConfigurations/${policyId}?$select=id,displayName,description`
         );
         if (!hasHydrationMarker(fullPolicy.description)) {
-          return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
         }
 
         if (isPreview) {
@@ -296,14 +296,14 @@ export async function executeBaselineTask(
           (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
         );
         if (!matchingProfile) {
-          return { task, success: true, skipped: true, error: "Not found in tenant" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
         }
 
         console.log(`[Baseline Task] Found Driver Update Profile: "${matchingProfile.displayName}" (ID: ${matchingProfile.id})`);
 
         // Check hydration marker
         if (!hasHydrationMarker(matchingProfile.description)) {
-          return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
         }
 
         if (isPreview) {
@@ -341,7 +341,7 @@ export async function executeBaselineTask(
             console.log(`[Baseline Task] Found V2 Compliance policy: "${v2Policy.name}" (ID: ${v2Policy.id})`);
 
             if (!hasHydrationMarker(v2Policy.description)) {
-              return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+              return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
             }
 
             if (isPreview) {
@@ -360,14 +360,14 @@ export async function executeBaselineTask(
             return { task, success: true, skipped: false };
           }
 
-          return { task, success: true, skipped: true, error: "Not found in tenant" };
+          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
         }
 
         console.log(`[Baseline Task] Found Settings Catalog policy: "${matchingPolicy.name}" (ID: ${matchingPolicy.id})`);
 
         // Check hydration marker
         if (!hasHydrationMarker(matchingPolicy.description)) {
-          return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
         }
 
         // Check if the policy has any assignments - skip deletion if assigned
@@ -378,7 +378,7 @@ export async function executeBaselineTask(
           const assignmentCount = assignmentsResponse.value?.length ?? 0;
           if (assignmentCount > 0) {
             console.log(`[Baseline Task] Skipping deletion of "${policyName}" - has ${assignmentCount} active assignment(s)`);
-            return { task, success: true, skipped: true, error: `Policy has ${assignmentCount} active assignment(s)` };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: `Policy has ${assignmentCount} active assignment(s)` };
           }
         } catch {
           console.log(`[Baseline Task] Could not check assignments for "${policyName}", will try delete directly`);

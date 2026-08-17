@@ -6,18 +6,16 @@ import { cn } from "@/lib/utils";
 interface NavigationBrandProps {
   showWordmark?: boolean;
   className?: string;
+  href?: string | null;
 }
 
 export function NavigationBrand({
   showWordmark = false,
   className,
+  href = "/",
 }: NavigationBrandProps): React.JSX.Element {
-  return (
-    <Link
-      href="/"
-      aria-label="Intune Hydration Kit home"
-      className={cn("group flex shrink-0 items-center gap-3", className)}
-    >
+  const content = (
+    <>
       <span className="relative">
         <Image
           src="/IHTLogoClear.png"
@@ -37,6 +35,22 @@ export function NavigationBrand({
           Intune Hydration Kit
         </span>
       )}
+    </>
+  );
+
+  const brandClassName = cn("group flex shrink-0 items-center gap-3", className);
+
+  if (!href) {
+    return (
+      <div aria-label="Intune Hydration Kit" className={brandClassName}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <Link href={href} aria-label="Intune Hydration Kit home" className={brandClassName}>
+      {content}
     </Link>
   );
 }

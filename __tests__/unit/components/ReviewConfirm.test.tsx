@@ -6,6 +6,12 @@ import { ReviewConfirm } from '@/components/wizard/ReviewConfirm'
 import { SettingsProvider } from '@/hooks/useSettings'
 import type { WizardState } from '@/types/hydration'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
+import { EXECUTION_RECORD_STORAGE_KEY } from '@/lib/storageKeys'
+import {
+  beginExecution,
+  forceResetExecutionSessionForTests,
+  resetExecutionSession
+} from '@/lib/hydration/executionStateStore'
 
 const setConfirmed = vi.fn()
 const previousStep = vi.fn()
@@ -15,16 +21,16 @@ const getEstimatedCategoryCount = vi.fn()
 const useWizardState = vi.fn()
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push }),
+  useRouter: () => ({ push })
 }))
 
 vi.mock('@/hooks/useWizardState', () => ({
-  useWizardState: () => useWizardState(),
+  useWizardState: () => useWizardState()
 }))
 
 vi.mock('@/lib/hydration/engine', () => ({
   getEstimatedTaskCount: (...args: unknown[]) => getEstimatedTaskCount(...args),
-  getEstimatedCategoryCount: (...args: unknown[]) => getEstimatedCategoryCount(...args),
+  getEstimatedCategoryCount: (...args: unknown[]) => getEstimatedCategoryCount(...args)
 }))
 
 function createPrerequisites(overrides: Partial<PrerequisiteCheckResult> = {}): PrerequisiteCheckResult {
@@ -36,7 +42,7 @@ function createPrerequisites(overrides: Partial<PrerequisiteCheckResult> = {}): 
     warnings: [],
     errors: [],
     timestamp: new Date('2026-04-26T09:00:00.000Z'),
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -52,10 +58,10 @@ function createState(overrides: Partial<WizardState> = {}): WizardState {
       tenantId: 'tenant-123',
       homeAccountId: 'home-tenant-123',
       tenantName: 'Contoso',
-      cloudEnvironment: 'global',
+      cloudEnvironment: 'global'
     },
     prerequisiteResult: createPrerequisites(),
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -71,20 +77,19 @@ describe('ReviewConfirm', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     localStorage.clear()
+    sessionStorage.clear()
+    forceResetExecutionSessionForTests()
     getEstimatedTaskCount.mockReturnValue(12)
     getEstimatedCategoryCount.mockReturnValue(3)
     useWizardState.mockReturnValue({
       state: createState(),
       setConfirmed,
-      previousStep,
+      previousStep
     })
   })
 
   it('blurs the tenant identity in the execution brief when Demo Mode is on', () => {
-    localStorage.setItem(
-      'app-settings:v1',
-      JSON.stringify({ stopOnFirstError: false, demoMode: true })
-    )
+    localStorage.setItem('app-settings:v1', JSON.stringify({ stopOnFirstError: false, demoMode: true }))
 
     renderReviewConfirm()
 
@@ -94,6 +99,7 @@ describe('ReviewConfirm', () => {
 
   it('lets preview runs start immediately and routes to the dashboard', async () => {
     const user = userEvent.setup()
+    sessionStorage.setItem(EXECUTION_RECORD_STORAGE_KEY, '{"stale":true}')
     renderReviewConfirm()
 
     expect(screen.getByText('Preview mode')).toHaveClass('text-white')
@@ -106,6 +112,7 @@ describe('ReviewConfirm', () => {
     await user.click(screen.getByRole('button', { name: 'Preview Create' }))
 
     expect(setConfirmed).toHaveBeenCalledWith(true)
+    expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).toBeNull()
     expect(push).toHaveBeenCalledWith('/dashboard')
   })
 
@@ -118,11 +125,11 @@ describe('ReviewConfirm', () => {
         prerequisiteResult: createPrerequisites({
           isValid: false,
           warnings: ['Tenant has custom naming policies'],
-          errors: ['Conditional access license missing'],
-        }),
+          errors: ['Conditional access license missing']
+        })
       }),
       setConfirmed,
-      previousStep,
+      previousStep
     })
 
     renderReviewConfirm()
@@ -140,8 +147,9 @@ describe('ReviewConfirm', () => {
     expect(acknowledgement).toHaveClass('live-acknowledgement')
     expect(screen.getByText('Human approval required')).toBeInTheDocument()
     expect(screen.getByText('Awaiting approval')).toBeInTheDocument()
-    expect(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
-      .toHaveClass('live-acknowledgement__checkbox')
+    expect(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i })).toHaveClass(
+      'live-acknowledgement__checkbox'
+    )
 
     await user.click(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
     expect(startButton).toBeEnabled()
@@ -151,4 +159,35 @@ describe('ReviewConfirm', () => {
     expect(setConfirmed).toHaveBeenCalledWith(true)
   })
 
+  it('does not start another run while hydration is active', () => {
+    beginExecution({
+      tenantId: 'tenant-123',
+      homeAccountId: 'home-tenant-123',
+      operationMode: 'create',
+      isPreview: true,
+      selectedObjectCount: 1
+    })
+
+    renderReviewConfirm()
+
+    expect(screen.getByRole('button', { name: 'Preview Create' })).toBeDisabled()
+    expect(screen.getByRole('status')).toHaveTextContent('A hydration run is active')
+  })
+
+  it('asks the user to wait while a hidden previous run stops', () => {
+    beginExecution({
+      tenantId: 'tenant-123',
+      homeAccountId: 'home-tenant-123',
+      operationMode: 'create',
+      isPreview: true,
+      selectedObjectCount: 1
+    })
+    resetExecutionSession()
+
+    renderReviewConfirm()
+
+    expect(screen.getByRole('status')).toHaveTextContent('The previous run is stopping')
+    expect(screen.getByRole('status')).not.toHaveTextContent('Return to the dashboard')
+    expect(screen.getByRole('button', { name: 'Preview Create' })).toBeDisabled()
+  })
 })

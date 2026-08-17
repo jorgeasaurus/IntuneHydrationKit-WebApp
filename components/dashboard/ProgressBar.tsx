@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HydrationTask, TaskCategory } from "@/types/hydration";
-import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
+import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 
 interface ProgressBarProps {
   tasks: HydrationTask[];

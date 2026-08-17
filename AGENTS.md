@@ -455,10 +455,8 @@ src/
 │   ├── page.tsx                   # Landing page
 │   ├── wizard/
 │   │   └── page.tsx              # Multi-step wizard
-│   ├── dashboard/
-│   │   └── page.tsx              # Execution dashboard
-│   └── results/
-│       └── page.tsx              # Results & reports
+│   └── dashboard/
+│       └── page.tsx              # Live execution, results, and reports
 ├── components/
 │   ├── auth/
 │   │   ├── MsalProvider.tsx

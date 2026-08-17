@@ -35,6 +35,7 @@ import { executeConditionalAccessTask } from "./taskExecutors/conditionalAccessT
 import { executeAppProtectionTask } from "./taskExecutors/appProtectionTask";
 import { executeWin32AppTask } from "./taskExecutors/win32AppTask";
 import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
+import { markTaskSkipped } from "./taskTransitions";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
 
@@ -62,9 +63,8 @@ function markTaskCancelled(
   task: HydrationTask,
   results: ExecutionResult[]
 ): void {
-  task.status = "skipped";
-  task.error = "Cancelled by user";
-  results.push({ task, success: false, skipped: true, error: "Cancelled by user" });
+  markTaskSkipped(task, "cancelled", "Cancelled by user");
+  results.push({ task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled by user" });
 }
 
 function cancelRemainingTasks(
@@ -74,6 +74,25 @@ function cancelRemainingTasks(
 ): void {
   for (let i = startIndex; i < tasks.length; i++) {
     markTaskCancelled(tasks[i], results);
+  }
+}
+
+function blockRemainingTasksAfterFailure(
+  tasks: HydrationTask[],
+  results: ExecutionResult[],
+  context: ExecutionContext,
+): void {
+  const stoppedAt = new Date();
+  const reason = "Not run because execution stopped after an earlier failure.";
+  const recordedTaskIds = new Set(results.map((result) => result.task.id));
+  for (const task of tasks) {
+    if (recordedTaskIds.has(task.id)) continue;
+    if (task.status !== "pending" && task.status !== "running") continue;
+    task.startTime ??= stoppedAt;
+    task.endTime = stoppedAt;
+    markTaskSkipped(task, "blocked", reason);
+    results.push({ task, success: false, skipped: true, skipKind: "blocked", error: reason });
+    context.onTaskComplete?.(task);
   }
 }
 
@@ -110,14 +129,18 @@ async function executeTask(
       task.itemName.toLowerCase().includes("driver update");
 
     if (isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
-      task.status = "skipped";
-      task.error = "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)";
+      markTaskSkipped(
+        task,
+        "blocked",
+        "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)"
+      );
       task.endTime = new Date();
       context.onTaskComplete?.(task);
       return {
         task,
         success: true,
         skipped: true,
+        skipKind: "blocked",
         error: task.error,
       };
     }
@@ -159,7 +182,11 @@ async function executeTask(
     }
 
     // Update task with result
-    task.status = result.skipped ? "skipped" : result.success ? "success" : "failed";
+    if (result.skipped) {
+      markTaskSkipped(task, result.skipKind, result.error);
+    } else {
+      task.status = result.success ? "success" : "failed";
+    }
     task.error = result.error;
     task.warning = result.warning;
     task.endTime = new Date();
@@ -221,6 +248,7 @@ async function executeSequentialTasks(
     results.push(result);
 
     if (context.stopOnFirstError && !result.success && !result.skipped) {
+      blockRemainingTasksAfterFailure(tasks.slice(taskIndex + 1), results, context);
       break;
     }
 
@@ -238,8 +266,20 @@ export async function executeTasks(
   context: ExecutionContext
 ): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
+  const stopForExecutionControl = async (): Promise<boolean> => {
+    if ((await waitWhilePaused(context)) !== "cancelled") return false;
+    cancelRemainingTasks(tasks, 0, results);
+    emitStatus(
+      context,
+      "Cancellation requested. No new tenant checks or tasks will start.",
+      "warning",
+      "control"
+    );
+    return true;
+  };
 
   emitStatus(context, `Checking tenant for existing resources (${tasks.length} items selected)...`, "info", "prefetch");
+  if (await stopForExecutionControl()) return results;
 
   // Pre-fetch "Intune - " groups if any group tasks exist
   const hasGroupTasks = tasks.some((task) => task.category === "groups");
@@ -259,6 +299,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch all filters if any filter tasks exist
+  if (await stopForExecutionControl()) return results;
   const hasFilterTasks = tasks.some((task) => task.category === "filters");
   if (hasFilterTasks && !context.cachedFilters) {
     emitStatus(context, "Querying existing device filters...", "progress", "prefetch");
@@ -276,6 +317,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch App Protection policies if any appProtection or baseline tasks exist
+  if (await stopForExecutionControl()) return results;
   // Baseline tasks can include AppProtection policies (e.g., Android/iOS BYOD)
   const hasAppProtectionTasks = tasks.some((task) => task.category === "appProtection");
   const hasBaselineTasks = tasks.some((task) => task.category === "baseline");
@@ -295,6 +337,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch Conditional Access policies for DELETE mode or CREATE mode with batching
+  if (await stopForExecutionControl()) return results;
   const hasConditionalAccessTasks = tasks.some((task) => task.category === "conditionalAccess");
   if (hasConditionalAccessTasks && !context.cachedConditionalAccessPolicies) {
     emitStatus(context, "Querying existing Conditional Access policies...", "progress", "prefetch");
@@ -313,6 +356,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch Compliance policies for batch mode (CREATE or DELETE)
+  if (await stopForExecutionControl()) return results;
   // This enables duplicate detection and prevents creating duplicates in batch mode
   // Also pre-fetch for DELETE mode with baseline tasks since OIB Compliance policies use V1 Compliance endpoint
   const hasComplianceTasks = tasks.some((task) => task.category === "compliance");
@@ -340,6 +384,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch Settings Catalog policies for DELETE mode, CREATE mode with batching, or PREVIEW mode (baseline and CIS tasks)
+  if (await stopForExecutionControl()) return results;
   // This avoids calling getCollection for every single operation and enables duplicate detection in batch mode
   const needsSettingsCatalogCache =
     ((context.operationMode === "delete" || context.isPreview) && (hasBaselineTasks || hasCISTasks)) ||
@@ -362,6 +407,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch V2 Compliance policies for DELETE/PREVIEW mode.
+  if (await stopForExecutionControl()) return results;
   // Used by OIB/CIS compliance deletes and Linux compliance templates.
   const needsV2ComplianceCache =
     ((context.operationMode === "delete" || context.isPreview) &&
@@ -385,6 +431,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch Driver Update Profiles and Device Configurations for baseline/CIS tasks
+  if (await stopForExecutionControl()) return results;
   const needsBaselinePolicyCaches =
     ((context.operationMode === "delete" || context.isPreview) && (hasBaselineTasks || hasCISTasks)) ||
     (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
@@ -407,6 +454,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch Device Configurations (Health Monitoring, etc.) - same condition as Driver Update above
+  if (await stopForExecutionControl()) return results;
   if (needsBaselinePolicyCaches && !context.cachedDeviceConfigurations) {
     emitStatus(context, "Querying Device Configurations...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Device Configurations...");
@@ -424,6 +472,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch Group Policy Configurations (Administrative Templates / ADMX) for baseline/CIS delete paths
+  if (await stopForExecutionControl()) return results;
   if (needsBaselinePolicyCaches && !context.cachedGroupPolicyConfigurations) {
     emitStatus(context, "Querying Administrative Templates...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Group Policy Configurations...");
@@ -440,6 +489,7 @@ export async function executeTasks(
     }
   }
 
+  if (await stopForExecutionControl()) return results;
   if (needsBaselinePolicyCaches && !context.cachedSecurityIntents) {
     emitStatus(context, "Querying Endpoint Security profiles...", "progress", "prefetch");
     console.log("[Execute Tasks] Pre-fetching all Security Intents...");
@@ -457,6 +507,7 @@ export async function executeTasks(
   }
 
   // Pre-fetch baseline templates from cache for batch operations
+  if (await stopForExecutionControl()) return results;
   // This ensures templates are passed directly to batch executor without relying on global cache
   if (batchConfig.enableBatching && hasBaselineTasks && !context.cachedBaselineTemplates) {
     console.log("[Execute Tasks] Loading baseline templates for batch operations...");
@@ -471,9 +522,12 @@ export async function executeTasks(
   }
 
   // Check if batch execution is enabled and applicable
+  if (await stopForExecutionControl()) return results;
   // Preview mode now uses batching with guards in batchExecutor.ts that skip actual API calls
-  const useCreateBatching = batchConfig.enableBatching && context.operationMode === "create";
-  const useDeleteBatching = batchConfig.enableBatching && context.operationMode === "delete";
+  const useCreateBatching =
+    batchConfig.enableBatching && context.operationMode === "create" && !context.stopOnFirstError;
+  const useDeleteBatching =
+    batchConfig.enableBatching && context.operationMode === "delete" && !context.stopOnFirstError;
 
   emitStatus(context, "Tenant check complete - starting execution...", "success", "prefetch");
 
@@ -502,6 +556,10 @@ export async function executeTasks(
           // Stop on first error if configured
           if (context.stopOnFirstError && !result.success && !result.skipped) {
             console.log("[Execute Tasks] Stopping on first error");
+            result.task.status = "failed";
+            result.task.error ??= result.error;
+            result.task.endTime ??= new Date();
+            blockRemainingTasksAfterFailure(tasks, results, context);
             return results;
           }
         }
@@ -538,6 +596,10 @@ export async function executeTasks(
         // Stop on first error if configured
         if (context.stopOnFirstError && !result.success && !result.skipped) {
           console.log("[Execute Tasks] Stopping on first error");
+          result.task.status = "failed";
+          result.task.error ??= result.error;
+          result.task.endTime ??= new Date();
+          blockRemainingTasksAfterFailure(tasks, results, context);
           return results;
         }
       }

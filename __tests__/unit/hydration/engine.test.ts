@@ -161,7 +161,10 @@ describe("executeTasks", () => {
 
     mockSleep.mockResolvedValue(undefined);
     mockSleepWithExecutionControl.mockResolvedValue("completed");
-    mockWaitWhilePaused.mockResolvedValue("resumed");
+    mockWaitWhilePaused.mockImplementation(
+      async (controls: ExecutionContext) =>
+        controls.shouldCancel?.() ? "cancelled" : "resumed",
+    );
 
     mockGetIntuneGroups.mockResolvedValue([]);
     mockGetAllFilters.mockResolvedValue([]);
@@ -179,6 +182,26 @@ describe("executeTasks", () => {
     mockExecuteEnrollmentTask.mockImplementation((task: HydrationTask) => Promise.resolve(expectSuccess(task)));
     mockExecuteBaselineTask.mockImplementation((task: HydrationTask) => Promise.resolve(expectSuccess(task)));
     mockExecuteCISBaselineTask.mockImplementation((task: HydrationTask) => Promise.resolve(expectSuccess(task)));
+  });
+
+  it("stops prefetching and cancels pending tasks after cancellation", async () => {
+    const groupTask = createTask("group-1", "groups", "Group One");
+    const filterTask = createTask("filter-1", "filters", "Filter One");
+    let cancelled = false;
+    mockGetIntuneGroups.mockImplementation(async () => {
+      cancelled = true;
+      return [];
+    });
+
+    const results = await executeTasks(
+      [groupTask, filterTask],
+      createContext({ shouldCancel: () => cancelled })
+    );
+
+    expect(mockGetIntuneGroups).toHaveBeenCalledTimes(1);
+    expect(mockGetAllFilters).not.toHaveBeenCalled();
+    expect(results).toHaveLength(2);
+    expect(results.every((result) => result.skipKind === "cancelled")).toBe(true);
   });
 
   it("prefetches relevant caches and routes sequential fallbacks after batch create setup", async () => {
@@ -283,37 +306,6 @@ describe("executeTasks", () => {
     );
   });
 
-  it("stops batch create execution after the first failed batch result when configured", async () => {
-    const batchTask = createTask("group-batch", "groups", "[IHD] Batch Group");
-    const sequentialTask = createTask("enrollment-sequential", "enrollment", "[IHD] Enrollment");
-
-    mockGetBatchConfig.mockReturnValue({
-      enableBatching: true,
-      defaultBatchSize: 2,
-      delayBetweenBatches: 0,
-    });
-    mockExecuteTasksInBatches.mockResolvedValue([
-      { task: batchTask, success: false, skipped: false, error: "Graph failure" },
-    ]);
-
-    const results = await executeTasks(
-      [batchTask, sequentialTask],
-      createContext({ stopOnFirstError: true })
-    );
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        task: batchTask,
-        success: false,
-        skipped: false,
-        error: "Graph failure",
-      }),
-    ]);
-    expect(mockExecuteEnrollmentTask).not.toHaveBeenCalled();
-    expect(mockExecuteGroupTask).not.toHaveBeenCalled();
-    expect(mockSleepWithExecutionControl).not.toHaveBeenCalled();
-  });
-
   it("marks remaining non-batchable delete tasks as cancelled after parallel deletes pause-cancel", async () => {
     const batchTask = createTask("group-delete", "groups", "[IHD] Batch Group", "delete");
     const sequentialTask = createTask("enrollment-delete", "enrollment", "[IHD] Enrollment", "delete");
@@ -323,12 +315,18 @@ describe("executeTasks", () => {
       defaultBatchSize: 2,
       delayBetweenBatches: 0,
     });
-    mockExecuteDeletesInParallel.mockResolvedValue([expectSuccess(batchTask)]);
-    mockWaitWhilePaused.mockResolvedValueOnce("cancelled");
+    let cancelled = false;
+    mockExecuteDeletesInParallel.mockImplementation(async () => {
+      cancelled = true;
+      return [expectSuccess(batchTask)];
+    });
 
     const results = await executeTasks(
       [batchTask, sequentialTask],
-      createContext({ operationMode: "delete" })
+      createContext({
+        operationMode: "delete",
+        shouldCancel: () => cancelled,
+      })
     );
 
     expect(mockExecuteDeletesInParallel).toHaveBeenCalledWith([batchTask], expect.objectContaining({ operationMode: "delete" }));
@@ -371,13 +369,17 @@ describe("executeTasks", () => {
     const secondTask = createTask("group-preview-2", "groups", "[IHD] Preview Group 2");
     const statusUpdates: ActivityMessage[] = [];
 
-    mockWaitWhilePaused.mockResolvedValueOnce("cancelled");
+    let cancelled = false;
 
     const results = await executeTasks(
       [firstTask, secondTask],
       createContext({
         isPreview: true,
-        onStatusUpdate: (message) => statusUpdates.push(message),
+        shouldCancel: () => cancelled,
+        onStatusUpdate: (message) => {
+          statusUpdates.push(message);
+          if (message.message.startsWith("Running preview")) cancelled = true;
+        },
       })
     );
 
@@ -392,6 +394,11 @@ describe("executeTasks", () => {
   });
 
   it("skips driver update tasks without a license and then stops on the next failure", async () => {
+    mockGetBatchConfig.mockReturnValue({
+      enableBatching: true,
+      defaultBatchSize: 20,
+      delayBetweenBatches: 0,
+    });
     const driverUpdateTask = createTask(
       "driver-update",
       "baseline",
@@ -428,9 +435,49 @@ describe("executeTasks", () => {
         skipped: false,
         error: "Group creation failed",
       }),
+      expect.objectContaining({
+        task: untouchedTask,
+        success: false,
+        skipped: true,
+        skipKind: "blocked",
+        error: "Not run because execution stopped after an earlier failure.",
+      }),
     ]);
     expect(mockExecuteBaselineTask).not.toHaveBeenCalled();
+    expect(mockExecuteTasksInBatches).not.toHaveBeenCalled();
     expect(mockExecuteGroupTask).toHaveBeenCalledTimes(1);
-    expect(untouchedTask.status).toBe("pending");
+    expect(untouchedTask).toMatchObject({
+      status: "skipped",
+      skipKind: "blocked",
+      error: "Not run because execution stopped after an earlier failure.",
+    });
+  });
+
+  it("uses sequential delete execution when stop on first error is enabled", async () => {
+    const failingTask = createTask("delete-failure", "groups", "[IHD] Delete Failure", "delete");
+    const untouchedTask = createTask("delete-untouched", "groups", "[IHD] Delete Untouched", "delete");
+    mockGetBatchConfig.mockReturnValue({
+      enableBatching: true,
+      defaultBatchSize: 20,
+      delayBetweenBatches: 0,
+    });
+    mockExecuteGroupTask.mockResolvedValueOnce({
+      task: failingTask,
+      success: false,
+      skipped: false,
+      error: "Delete failed",
+    });
+
+    const results = await executeTasks(
+      [failingTask, untouchedTask],
+      createContext({ operationMode: "delete", stopOnFirstError: true }),
+    );
+
+    expect(mockExecuteDeletesInParallel).not.toHaveBeenCalled();
+    expect(mockExecuteGroupTask).toHaveBeenCalledTimes(1);
+    expect(results).toEqual([
+      expect.objectContaining({ task: failingTask, success: false, skipped: false }),
+      expect.objectContaining({ task: untouchedTask, skipped: true, skipKind: "blocked" }),
+    ]);
   });
 });

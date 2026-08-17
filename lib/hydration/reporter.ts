@@ -3,8 +3,31 @@
  * Generates reports in Markdown, JSON, and CSV formats
  */
 
-import { HydrationSummary, HydrationTask, BatchExecutionStats } from "@/types/hydration";
+import {
+  HydrationSummary,
+  HydrationTask,
+  BatchExecutionStats,
+  type ReportableExecutionOutcome,
+} from "@/types/hydration";
 import { formatClockTime, formatFileTimestamp } from "@/lib/utils/dateFormat";
+import { getTaskEvidenceOutcome, type TaskEvidenceOutcome } from "@/lib/hydration/executionOutcome";
+import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
+
+const TASK_OUTCOME_LABELS: Record<TaskEvidenceOutcome, string> = {
+  pending: "Pending",
+  running: "Running",
+  success: "Success",
+  failed: "Failed",
+  noOp: "No change",
+  blocked: "Blocked",
+  cancelled: "Cancelled",
+};
+
+const RUN_OUTCOME_LABELS: Record<ReportableExecutionOutcome, string> = {
+  succeeded: "Succeeded",
+  completedWithIssues: "Completed with issues",
+  cancelled: "Cancelled",
+};
 
 function formatUtcDateTime(date: Date): string {
   return date.toISOString().replace("T", " ").slice(0, 19);
@@ -15,7 +38,8 @@ function formatUtcDateTime(date: Date): string {
  */
 export function generateMarkdownReport(
   summary: HydrationSummary,
-  tasks: HydrationTask[]
+  tasks: HydrationTask[],
+  outcome: ReportableExecutionOutcome,
 ): string {
   const duration = formatDuration(summary.duration);
   // Render actual UTC time (toISOString), not local time with a hardcoded UTC label
@@ -25,6 +49,7 @@ export function generateMarkdownReport(
 
 **Tenant ID**: ${summary.tenantId}
 **Operation**: ${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)}
+**Outcome**: ${RUN_OUTCOME_LABELS[outcome]}
 **Date**: ${timestamp}
 **Duration**: ${duration}
 
@@ -34,13 +59,17 @@ export function generateMarkdownReport(
 - **Created**: ${summary.stats.created}
 - **Deleted**: ${summary.stats.deleted}
 - **Skipped**: ${summary.stats.skipped}
-- **Failed**: ${summary.stats.failed}${summary.batchStats ? `
+- **Failed**: ${summary.stats.failed}${
+    summary.batchStats
+      ? `
 
 ### Batch Execution
 - **Batch Size**: ${summary.batchStats.batchSize}
 - **Batch Requests**: ${summary.batchStats.batchRequestCount}
 - **Batched Tasks**: ${summary.batchStats.batchedTaskCount}
-- **Sequential Tasks**: ${summary.batchStats.sequentialTaskCount}` : ""}
+- **Sequential Tasks**: ${summary.batchStats.sequentialTaskCount}`
+      : ""
+  }
 
 ## Category Breakdown
 
@@ -48,7 +77,7 @@ export function generateMarkdownReport(
 
   // Add category breakdown
   for (const [category, stats] of Object.entries(summary.categoryBreakdown)) {
-    const categoryName = formatCategoryName(category);
+    const categoryName = getTaskCategoryLabel(category);
     markdown += `### ${categoryName} (${stats.total})\n`;
     markdown += `- Success: ${stats.success}\n`;
     markdown += `- Failed: ${stats.failed}\n\n`;
@@ -60,11 +89,12 @@ export function generateMarkdownReport(
   const groupedTasks = groupTasksByCategory(tasks);
 
   for (const [category, categoryTasks] of Object.entries(groupedTasks)) {
-    markdown += `### ${formatCategoryName(category)}\n\n`;
+    markdown += `### ${getTaskCategoryLabel(category)}\n\n`;
 
     for (const task of categoryTasks) {
       const icon = getTaskStatusIcon(task.status);
       markdown += `${icon} ${task.itemName}\n`;
+      markdown += `   - Outcome: ${TASK_OUTCOME_LABELS[getTaskEvidenceOutcome(task)]}\n`;
 
       if (task.error) {
         markdown += `   - Error: ${task.error}\n`;
@@ -114,9 +144,11 @@ export function generateMarkdownReport(
  */
 export function generateJSONReport(
   summary: HydrationSummary,
-  tasks: HydrationTask[]
+  tasks: HydrationTask[],
+  outcome: ReportableExecutionOutcome,
 ): string {
   const report = {
+    outcome,
     summary,
     tasks: tasks.map((task) => ({
       id: task.id,
@@ -124,13 +156,12 @@ export function generateJSONReport(
       operation: task.operation,
       itemName: task.itemName,
       status: task.status,
+      outcome: getTaskEvidenceOutcome(task),
       error: task.error,
       warning: task.warning,
       startTime: task.startTime?.toISOString(),
       endTime: task.endTime?.toISOString(),
-      duration: task.startTime && task.endTime
-        ? task.endTime.getTime() - task.startTime.getTime()
-        : null,
+      duration: task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : null,
     })),
     metadata: {
       reportVersion: "1.0",
@@ -144,12 +175,14 @@ export function generateJSONReport(
 /**
  * Generate CSV report
  */
-export function generateCSVReport(tasks: HydrationTask[]): string {
+export function generateCSVReport(tasks: HydrationTask[], outcome: ReportableExecutionOutcome): string {
   const headers = [
     "Category",
     "Item Name",
     "Operation",
+    "Run Outcome",
     "Status",
+    "Outcome",
     "Error",
     "Warning",
     "Start Time (UTC)",
@@ -170,16 +203,15 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
   };
 
   const rows = tasks.map((task) => {
-    const duration =
-      task.startTime && task.endTime
-        ? task.endTime.getTime() - task.startTime.getTime()
-        : "";
+    const duration = task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : "";
 
     return [
       task.category,
       task.itemName,
       task.operation,
+      outcome,
       task.status,
+      getTaskEvidenceOutcome(task),
       task.error ?? "",
       task.warning ?? "",
       task.startTime ? formatUtcDateTime(task.startTime) : "",
@@ -188,9 +220,11 @@ export function generateCSVReport(tasks: HydrationTask[]): string {
     ].map(escapeCSVField);
   });
 
-  const csv = [headers.map(escapeCSVField), ...rows]
-    .map((row) => row.join(","))
-    .join("\n");
+  if (rows.length === 0) {
+    rows.push(["", "", "", outcome, "", "", "", "", "", "", ""].map(escapeCSVField));
+  }
+
+  const csv = [headers.map(escapeCSVField), ...rows].map((row) => row.join(",")).join("\n");
 
   return csv;
 }
@@ -205,14 +239,12 @@ export function createSummary(
   endTime: Date,
   tasks: HydrationTask[],
   batchStats?: BatchExecutionStats,
-  tenantName?: string
+  tenantName?: string,
 ): HydrationSummary {
   const stats = {
     total: tasks.length,
-    created: tasks.filter((t) => t.status === "success" && t.operation === "create")
-      .length,
-    deleted: tasks.filter((t) => t.status === "success" && t.operation === "delete")
-      .length,
+    created: tasks.filter((t) => t.status === "success" && t.operation === "create").length,
+    deleted: tasks.filter((t) => t.status === "success" && t.operation === "delete").length,
     skipped: tasks.filter((t) => t.status === "skipped").length,
     failed: tasks.filter((t) => t.status === "failed").length,
   };
@@ -245,7 +277,7 @@ export function createSummary(
       items.push({
         task: task.itemName,
         message: task.error || "Unknown error",
-        timestamp: task.endTime || new Date(),
+        timestamp: task.endTime || endTime,
       });
     }
     return items;
@@ -257,7 +289,7 @@ export function createSummary(
       items.push({
         task: task.itemName,
         message: task.warning || "",
-        timestamp: task.endTime || new Date(),
+        timestamp: task.endTime || endTime,
       });
     }
     return items;
@@ -276,6 +308,24 @@ export function createSummary(
     warnings,
     batchStats,
   };
+}
+
+export function summaryMatchesExecution(
+  summary: HydrationSummary,
+  source: Pick<HydrationSummary, "tenantId" | "tenantName" | "operationMode" | "startTime" | "endTime"> & {
+    tasks: HydrationTask[];
+  },
+): boolean {
+  const expected = createSummary(
+    source.tenantId,
+    source.operationMode,
+    source.startTime,
+    source.endTime,
+    source.tasks,
+    summary.batchStats,
+    source.tenantName,
+  );
+  return JSON.stringify(summary) === JSON.stringify(expected);
 }
 
 /**
@@ -331,30 +381,9 @@ function getTaskStatusIcon(status: string): string {
 }
 
 /**
- * Format category name for display
- */
-function formatCategoryName(category: string): string {
-  const names: Record<string, string> = {
-    groups: "Dynamic Groups",
-    filters: "Device Filters",
-    compliance: "Compliance Policies",
-    conditionalAccess: "Conditional Access Policies",
-    appProtection: "App Protection Policies",
-    enrollment: "Enrollment Profiles",
-    baseline: "OpenIntuneBaseline",
-    cisBaseline: "CIS Intune Baselines",
-    notification: "Notification Templates",
-  };
-
-  return names[category] || category;
-}
-
-/**
  * Group tasks by category
  */
-function groupTasksByCategory(
-  tasks: HydrationTask[]
-): Record<string, HydrationTask[]> {
+function groupTasksByCategory(tasks: HydrationTask[]): Record<string, HydrationTask[]> {
   return tasks.reduce<Record<string, HydrationTask[]>>((grouped, task) => {
     (grouped[task.category] ??= []).push(task);
     return grouped;
@@ -364,10 +393,7 @@ function groupTasksByCategory(
 /**
  * Generate filename for report based on operation and timestamp
  */
-export function generateReportFilename(
-  operationMode: string,
-  fileFormat: "md" | "json" | "csv"
-): string {
+export function generateReportFilename(operationMode: string, fileFormat: "md" | "json" | "csv"): string {
   const timestamp = formatFileTimestamp(new Date());
   return `intune-hydration-${operationMode}-${timestamp}.${fileFormat}`;
 }

@@ -15,7 +15,7 @@ import { HydrationTask, TaskStatus } from "@/types/hydration";
 import { AlertCircle, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskRow } from "@/components/dashboard/TaskRow";
-import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
+import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 
 interface TaskListProps {
   tasks: HydrationTask[];

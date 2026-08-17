@@ -68,6 +68,7 @@ export async function executeAppProtectionTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "noOp",
         error: "Already exists",
       };
     }
@@ -98,7 +99,7 @@ export async function executeAppProtectionTask(
 
     if (!policy || !policy.id) {
       // Policy doesn't exist, skip deletion
-      return { task, success: true, skipped: true, error: "Not found in tenant" };
+      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
     }
 
     // Preview mode - would delete
@@ -137,7 +138,7 @@ export async function executeAppProtectionTask(
 
     // Check if skipped due to active assignments
     if (result.skipped) {
-      return { task, success: true, skipped: true, error: result.reason };
+      return { task, success: true, skipped: true, skipKind: "blocked", error: result.reason };
     }
 
     // Remove the deleted policy from the cache

@@ -4,7 +4,14 @@
  * Functions for building the hydration task queue from selected categories
  */
 
-import { HydrationTask, OperationMode, TaskCategory, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
+import {
+  HydrationTask,
+  OperationMode,
+  TaskCategory,
+  CategorySelections,
+} from "@/types/hydration";
+import type { BuildTaskQueueOptions } from "@/lib/hydration/types";
+import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 import * as Templates from "@/templates";
 import {
   fetchDynamicGroups,
@@ -23,30 +30,6 @@ import {
   CISBaselinePolicy,
 } from "@/lib/templates/loader";
 
-/**
- * Options for building the task queue
- */
-export interface BuildTaskQueueOptions {
-  selectedCategories: TaskCategory[];
-  operationMode: OperationMode;
-  selectedCISCategories?: CISCategoryId[];
-  baselineSelection?: BaselineSelection;
-  categorySelections?: CategorySelections;
-}
-
-/** Display labels for each category */
-const CATEGORY_LABELS: Partial<Record<TaskCategory, string>> = {
-  groups: "Dynamic Groups",
-  filters: "Device Filters",
-  compliance: "Compliance Policies",
-  appProtection: "App Protection Policies",
-  win32Apps: "Win32 Apps",
-  conditionalAccess: "Conditional Access Policies",
-  enrollment: "Enrollment Profiles",
-  baseline: "OpenIntuneBaseline Policies",
-  cisBaseline: "CIS Baseline Policies",
-};
-
 function getTaskDedupKey(task: HydrationTask): string {
   return task.templatePath || task.itemName;
 }
@@ -58,17 +41,24 @@ function getTaskDedupKey(task: HydrationTask): string {
 export async function buildTaskQueueAsync(
   selectedCategories: TaskCategory[],
   operationMode: OperationMode,
-  options?: {
-    selectedCISCategories?: CISCategoryId[];
-    baselineSelection?: BaselineSelection;
-    categorySelections?: CategorySelections;
-    /** Callback for reporting progress during queue construction */
-    onProgress?: (message: string, type?: "info" | "progress" | "success" | "warning" | "error") => void;
-  }
+  options?: Omit<BuildTaskQueueOptions, "selectedCategories" | "operationMode">,
 ): Promise<HydrationTask[]> {
   const emit = options?.onProgress;
+  const throwIfCancelled = (): void => {
+    if (options?.shouldCancel?.()) {
+      throw new Error("Task queue construction cancelled.");
+    }
+  };
+  const loadTemplates = async <T>(load: () => Promise<T>): Promise<T> => {
+    throwIfCancelled();
+    const value = await load();
+    throwIfCancelled();
+    return value;
+  };
   console.log(`[Task Queue] Building task queue for categories:`, selectedCategories);
-  emit?.(`Preparing ${selectedCategories.length} categor${selectedCategories.length === 1 ? "y" : "ies"}: ${selectedCategories.join(", ")}`);
+  emit?.(
+    `Preparing ${selectedCategories.length} categor${selectedCategories.length === 1 ? "y" : "ies"}: ${selectedCategories.join(", ")}`,
+  );
   if (options?.selectedCISCategories) {
     console.log(`[Task Queue] Selected CIS categories:`, options.selectedCISCategories);
   }
@@ -82,8 +72,9 @@ export async function buildTaskQueueAsync(
   let taskId = 1;
 
   for (const [categoryIndex, category] of selectedCategories.entries()) {
+    throwIfCancelled();
     console.log(`[Task Queue] Processing category: ${category}`);
-    const label = CATEGORY_LABELS[category] || category;
+    const label = getTaskCategoryLabel(category);
     emit?.(`[${categoryIndex + 1}/${selectedCategories.length}] Loading templates for ${label}...`);
     let items: Array<{ displayName: string }> = [];
     const categorySelections = options?.categorySelections;
@@ -91,20 +82,17 @@ export async function buildTaskQueueAsync(
     const selection = categorySelections?.[selectionKey];
     const cisSelection = categorySelections?.cisBaseline;
     const hasSelectedCISPolicyPaths =
-      category === "cisBaseline" &&
-      !!cisSelection?.selectedItems &&
-      cisSelection.selectedItems.length > 0;
-    const selectedCISCategories = options?.selectedCISCategories?.length
-      ? options.selectedCISCategories
-      : undefined;
+      category === "cisBaseline" && !!cisSelection?.selectedItems && cisSelection.selectedItems.length > 0;
+    const selectedCISCategories = options?.selectedCISCategories?.length ? options.selectedCISCategories : undefined;
 
-    const cacheKey = category === "cisBaseline" && selectedCISCategories && !hasSelectedCISPolicyPaths
-      ? `${category}-${selectedCISCategories.toSorted().join(",")}`
-      : category;
+    const cacheKey =
+      category === "cisBaseline" && selectedCISCategories && !hasSelectedCISPolicyPaths
+        ? `${category}-${selectedCISCategories.toSorted().join(",")}`
+        : category;
 
     // Clear cache if categorySelections has selections for this category
     // This ensures we fetch fresh templates and don't use stale filtered cache
-    if (selection && 'selectedItems' in selection && selection.selectedItems && selection.selectedItems.length > 0) {
+    if (selection && "selectedItems" in selection && selection.selectedItems && selection.selectedItems.length > 0) {
       console.log(`[Task Queue] Clearing cache for ${cacheKey} - specific items selected`);
       clearCategoryCache(cacheKey);
     }
@@ -124,9 +112,9 @@ export async function buildTaskQueueAsync(
           {
             console.log(`[Task Queue] Fetching dynamic and static groups...`);
             emit?.("Fetching dynamic groups...");
-            const dynamicGroups = await fetchDynamicGroups();
+            const dynamicGroups = await loadTemplates(fetchDynamicGroups);
             emit?.(`Found ${dynamicGroups.length} dynamic groups. Fetching static groups...`);
-            const staticGroups = await fetchStaticGroups();
+            const staticGroups = await loadTemplates(fetchStaticGroups);
             emit?.(`Found ${staticGroups.length} static groups`, "info");
             let allGroups = [...dynamicGroups, ...staticGroups];
 
@@ -134,9 +122,12 @@ export async function buildTaskQueueAsync(
             const groupSelection = options?.categorySelections?.groups;
             if (groupSelection?.selectedItems && groupSelection.selectedItems.length > 0) {
               const selectedSet = new Set(groupSelection.selectedItems);
-              allGroups = allGroups.filter(g => selectedSet.has(g.displayName));
+              allGroups = allGroups.filter((g) => selectedSet.has(g.displayName));
               console.log(`[Task Queue] Filtered to ${allGroups.length} selected groups`);
-              emit?.(`Filtered to ${allGroups.length} of ${dynamicGroups.length + staticGroups.length} groups based on selection`, "info");
+              emit?.(
+                `Filtered to ${allGroups.length} of ${dynamicGroups.length + staticGroups.length} groups based on selection`,
+                "info",
+              );
             }
 
             items = allGroups;
@@ -148,14 +139,14 @@ export async function buildTaskQueueAsync(
           {
             console.log(`[Task Queue] Fetching device filters...`);
             emit?.("Fetching device filter templates...");
-            let filters = await fetchFilters();
+            let filters = await loadTemplates(fetchFilters);
 
             // Filter by selected items if categorySelections is provided
             const filterSelection = options?.categorySelections?.filters;
             if (filterSelection?.selectedItems && filterSelection.selectedItems.length > 0) {
               const selectedSet = new Set(filterSelection.selectedItems);
               const totalCount = filters.length;
-              filters = filters.filter(f => selectedSet.has(f.displayName));
+              filters = filters.filter((f) => selectedSet.has(f.displayName));
               console.log(`[Task Queue] Filtered to ${filters.length} selected filters`);
               emit?.(`Filtered to ${filters.length} of ${totalCount} device filters based on selection`, "info");
             }
@@ -168,14 +159,14 @@ export async function buildTaskQueueAsync(
         case "compliance":
           {
             emit?.("Fetching compliance policy templates...");
-            let policies = await fetchCompliancePolicies();
+            let policies = await loadTemplates(fetchCompliancePolicies);
 
             // Filter by selected items if categorySelections is provided
             const complianceSelection = options?.categorySelections?.compliance;
             if (complianceSelection?.selectedItems && complianceSelection.selectedItems.length > 0) {
               const selectedSet = new Set(complianceSelection.selectedItems);
               const totalCount = policies.length;
-              policies = policies.filter(p => selectedSet.has(p.displayName));
+              policies = policies.filter((p) => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${policies.length} selected compliance policies`);
               emit?.(`Filtered to ${policies.length} of ${totalCount} compliance policies based on selection`, "info");
             }
@@ -187,16 +178,19 @@ export async function buildTaskQueueAsync(
         case "conditionalAccess":
           {
             emit?.("Fetching conditional access policy templates...");
-            let policies = await fetchConditionalAccessPolicies();
+            let policies = await loadTemplates(fetchConditionalAccessPolicies);
 
             // Filter by selected items if categorySelections is provided
             const caSelection = options?.categorySelections?.conditionalAccess;
             if (caSelection?.selectedItems && caSelection.selectedItems.length > 0) {
               const selectedSet = new Set(caSelection.selectedItems);
               const totalCount = policies.length;
-              policies = policies.filter(p => selectedSet.has(p.displayName));
+              policies = policies.filter((p) => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${policies.length} selected CA policies`);
-              emit?.(`Filtered to ${policies.length} of ${totalCount} conditional access policies based on selection`, "info");
+              emit?.(
+                `Filtered to ${policies.length} of ${totalCount} conditional access policies based on selection`,
+                "info",
+              );
             }
 
             items = policies;
@@ -206,16 +200,19 @@ export async function buildTaskQueueAsync(
         case "appProtection":
           {
             emit?.("Fetching app protection policy templates...");
-            let policies = await fetchAppProtectionPolicies();
+            let policies = await loadTemplates(fetchAppProtectionPolicies);
 
             // Filter by selected items if categorySelections is provided
             const appSelection = options?.categorySelections?.appProtection;
             if (appSelection?.selectedItems && appSelection.selectedItems.length > 0) {
               const selectedSet = new Set(appSelection.selectedItems);
               const totalCount = policies.length;
-              policies = policies.filter(p => selectedSet.has(p.displayName));
+              policies = policies.filter((p) => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${policies.length} selected app protection policies`);
-              emit?.(`Filtered to ${policies.length} of ${totalCount} app protection policies based on selection`, "info");
+              emit?.(
+                `Filtered to ${policies.length} of ${totalCount} app protection policies based on selection`,
+                "info",
+              );
             }
 
             items = policies;
@@ -236,8 +233,11 @@ export async function buildTaskQueueAsync(
         case "enrollment":
           {
             emit?.("Fetching enrollment profile templates...");
-            const rawProfiles = await fetchEnrollmentProfiles() as Array<{ displayName?: string; name?: string }>;
-            let profiles = rawProfiles.map(p => ({
+            const rawProfiles = (await loadTemplates(fetchEnrollmentProfiles)) as Array<{
+              displayName?: string;
+              name?: string;
+            }>;
+            let profiles = rawProfiles.map((p) => ({
               ...p,
               displayName: p.displayName || p.name || "Unknown Profile",
             }));
@@ -246,7 +246,7 @@ export async function buildTaskQueueAsync(
             if (enrollmentSelection?.selectedItems && enrollmentSelection.selectedItems.length > 0) {
               const selectedSet = new Set(enrollmentSelection.selectedItems);
               const totalCount = profiles.length;
-              profiles = profiles.filter(p => selectedSet.has(p.displayName));
+              profiles = profiles.filter((p) => selectedSet.has(p.displayName));
               console.log(`[Task Queue] Filtered to ${profiles.length} selected enrollment profiles`);
               emit?.(`Filtered to ${profiles.length} of ${totalCount} enrollment profiles based on selection`, "info");
             }
@@ -259,7 +259,7 @@ export async function buildTaskQueueAsync(
           {
             console.log(`[Task Queue] Fetching OpenIntuneBaseline policies...`);
             emit?.("Fetching OpenIntuneBaseline policies from local templates...");
-            let baselinePolicies = await fetchBaselinePolicies();
+            let baselinePolicies = await loadTemplates(fetchBaselinePolicies);
             emit?.(`Found ${baselinePolicies.length} baseline policies`, "info");
 
             // Filter by selected policies if baselineSelection is provided
@@ -267,16 +267,19 @@ export async function buildTaskQueueAsync(
             if (selectedPolicies && selectedPolicies.length > 0) {
               const selectedPaths = new Set(selectedPolicies);
               const totalCount = baselinePolicies.length;
-              baselinePolicies = baselinePolicies.filter(p => selectedPaths.has(p._oibFilePath));
+              baselinePolicies = baselinePolicies.filter((p) => selectedPaths.has(p._oibFilePath));
               console.log(`[Task Queue] Filtered to ${baselinePolicies.length} selected baseline policies`);
-              emit?.(`Filtered to ${baselinePolicies.length} of ${totalCount} baseline policies based on selection`, "info");
+              emit?.(
+                `Filtered to ${baselinePolicies.length} of ${totalCount} baseline policies based on selection`,
+                "info",
+              );
             }
 
             items = baselinePolicies as Array<{ displayName: string }>;
             console.log(`[Task Queue] Using ${items.length} OpenIntuneBaseline policies`);
             // Debug: Log sample policy names to verify name field exists
             if (baselinePolicies.length > 0) {
-              const sample = baselinePolicies.slice(0, 3).map(p => ({ name: p.name, displayName: p.displayName }));
+              const sample = baselinePolicies.slice(0, 3).map((p) => ({ name: p.name, displayName: p.displayName }));
               console.log(`[Task Queue] Sample baseline policies:`, sample);
             }
             cacheTemplates(category, baselinePolicies); // Cache the filtered policies
@@ -284,7 +287,6 @@ export async function buildTaskQueueAsync(
             // Verify cache was set
             const verifyCache = getCachedTemplates(category);
             console.log(`[Task Queue] Cache verification: ${verifyCache?.length || 0} policies in cache`);
-
           }
           break;
         case "cisBaseline":
@@ -294,17 +296,20 @@ export async function buildTaskQueueAsync(
 
             if (hasSelectedCISPolicyPaths) {
               emit?.("Fetching all CIS Intune Baseline policies for selected policy paths...");
-              cisItems = await fetchCISBaselinePolicies();
+              cisItems = await loadTemplates(fetchCISBaselinePolicies);
               emit?.(`Found ${cisItems.length} CIS baseline policies`, "info");
             } else if (selectedCISCategories) {
               console.log(`[Task Queue] Fetching CIS baselines for selected categories:`, selectedCISCategories);
               emit?.(`Fetching CIS baselines for ${selectedCISCategories.length} sub-categories...`);
-              cisItems = await fetchCISBaselinePoliciesByCategories(selectedCISCategories);
-              emit?.(`Found ${cisItems.length} CIS policies across ${selectedCISCategories.length} sub-categories`, "info");
+              cisItems = await loadTemplates(() => fetchCISBaselinePoliciesByCategories(selectedCISCategories));
+              emit?.(
+                `Found ${cisItems.length} CIS policies across ${selectedCISCategories.length} sub-categories`,
+                "info",
+              );
             } else {
               emit?.("Fetching all CIS Intune Baseline policies...");
               // Fetch all if no specific categories selected
-              cisItems = await fetchCISBaselinePolicies();
+              cisItems = await loadTemplates(fetchCISBaselinePolicies);
               emit?.(`Found ${cisItems.length} CIS baseline policies`, "info");
             }
 
@@ -312,7 +317,7 @@ export async function buildTaskQueueAsync(
             if (cisSelection?.selectedItems && cisSelection.selectedItems.length > 0) {
               const selectedPaths = new Set(cisSelection.selectedItems);
               const totalCount = cisItems.length;
-              cisItems = cisItems.filter(p => selectedPaths.has(p._cisFilePath));
+              cisItems = cisItems.filter((p) => selectedPaths.has(p._cisFilePath));
               console.log(`[Task Queue] Filtered to ${cisItems.length} selected CIS policies`);
               emit?.(`Filtered to ${cisItems.length} of ${totalCount} CIS policies based on selection`, "info");
             }
@@ -335,13 +340,19 @@ export async function buildTaskQueueAsync(
     // During execution, items that don't exist in the tenant will be marked as "skipped"
 
     // Check if we have direct selections for this category
-    const hasDirectSelections = selection && 'selectedItems' in selection && selection.selectedItems && selection.selectedItems.length > 0;
+    const hasDirectSelections =
+      selection && "selectedItems" in selection && selection.selectedItems && selection.selectedItems.length > 0;
 
     // Special handling for baseline which uses baselineSelection instead of categorySelections
-    const hasBaselineSelections = category === "baseline" && options?.baselineSelection?.selectedPolicies && options.baselineSelection.selectedPolicies.length > 0;
+    const hasBaselineSelections =
+      category === "baseline" &&
+      options?.baselineSelection?.selectedPolicies &&
+      options.baselineSelection.selectedPolicies.length > 0;
 
     if (operationMode === "delete" && hasDirectSelections) {
-      console.log(`[Task Queue] Using ${selection!.selectedItems!.length} selected items directly for ${category} (delete mode)`);
+      console.log(
+        `[Task Queue] Using ${selection!.selectedItems!.length} selected items directly for ${category} (delete mode)`,
+      );
 
       // For cisBaseline, selectedItems contains file paths - need to look up displayNames
       if (category === "cisBaseline" && items.length > 0) {
@@ -357,8 +368,12 @@ export async function buildTaskQueueAsync(
 
         for (const selectedPath of selection!.selectedItems!) {
           // Use displayName if found, otherwise extract name from path
-          const displayName = pathToDisplayName.get(selectedPath) ||
-            selectedPath.replace(/\.json$/, '').split('/').pop() ||
+          const displayName =
+            pathToDisplayName.get(selectedPath) ||
+            selectedPath
+              .replace(/\.json$/, "")
+              .split("/")
+              .pop() ||
             selectedPath;
           tasks.push({
             id: `task-${taskId++}`,
@@ -387,7 +402,7 @@ export async function buildTaskQueueAsync(
       for (const item of items) {
         const itemRecord = item as Record<string, unknown>;
         // Use name first (matches batchExecutor lookup order: p.name || p.displayName)
-        const itemName = (itemRecord.name as string) || item.displayName || 'Unknown Policy';
+        const itemName = (itemRecord.name as string) || item.displayName || "Unknown Policy";
         tasks.push({
           id: `task-${taskId++}`,
           category,
@@ -397,8 +412,12 @@ export async function buildTaskQueueAsync(
         });
       }
     } else {
-      console.log(`[Task Queue] Creating ${items.length} tasks for ${category}:`,
-        items.slice(0, 5).map(i => i.displayName || (i as Record<string, unknown>).name || 'Unknown').concat(items.length > 5 ? ['...'] : [])
+      console.log(
+        `[Task Queue] Creating ${items.length} tasks for ${category}:`,
+        items
+          .slice(0, 5)
+          .map((i) => i.displayName || (i as Record<string, unknown>).name || "Unknown")
+          .concat(items.length > 5 ? ["..."] : []),
       );
 
       for (const item of items) {
@@ -406,9 +425,14 @@ export async function buildTaskQueueAsync(
         const itemRecord = item as Record<string, unknown>;
         // For file paths, extract just the name without extension
         const filePath = itemRecord._cisFilePath as string | undefined;
-        const extractedName = filePath ? filePath.replace(/\.json$/, '').split('/').pop() : undefined;
+        const extractedName = filePath
+          ? filePath
+              .replace(/\.json$/, "")
+              .split("/")
+              .pop()
+          : undefined;
         // Use name first (matches batchExecutor lookup order: p.name || p.displayName)
-        const itemName = (itemRecord.name as string) || item.displayName || extractedName || 'Unknown Policy';
+        const itemName = (itemRecord.name as string) || item.displayName || extractedName || "Unknown Policy";
 
         tasks.push({
           id: `task-${taskId++}`,
@@ -457,7 +481,7 @@ export async function buildTaskQueueAsync(
  */
 export function getEstimatedTaskCount(
   selectedCategories: TaskCategory[],
-  categorySelections?: CategorySelections
+  categorySelections?: CategorySelections,
 ): number {
   let count = 0;
 
@@ -472,10 +496,7 @@ export function getEstimatedTaskCount(
  * Get estimated count for a single category
  * Returns selection count if items are selected, otherwise returns metadata count
  */
-export function getEstimatedCategoryCount(
-  category: TaskCategory,
-  categorySelections?: CategorySelections
-): number {
+export function getEstimatedCategoryCount(category: TaskCategory, categorySelections?: CategorySelections): number {
   // Check if we have individual item selections for this category
   if (categorySelections) {
     const selectionKey = category as keyof CategorySelections;
@@ -483,11 +504,11 @@ export function getEstimatedCategoryCount(
 
     if (selection) {
       // For baseline, use selectedPolicies
-      if (selectionKey === 'baseline' && 'selectedPolicies' in selection) {
+      if (selectionKey === "baseline" && "selectedPolicies" in selection) {
         return selection.selectedPolicies.length;
       }
       // For other categories, use selectedItems
-      if ('selectedItems' in selection && selection.selectedItems.length > 0) {
+      if ("selectedItems" in selection && selection.selectedItems.length > 0) {
         return selection.selectedItems.length;
       }
     }
