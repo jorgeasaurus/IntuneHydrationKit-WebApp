@@ -66,11 +66,10 @@ export default function DashboardPage(): React.JSX.Element {
   } = useHydrationExecution();
 
   useEffect(() => {
+    if (!activeHomeAccountId || !activeTenantId) return;
     const record = readExecutionRecord(sessionStorage);
     if (
       record &&
-      activeHomeAccountId &&
-      activeTenantId &&
       record.homeAccountId === activeHomeAccountId &&
       record.tenantId === activeTenantId
     ) {
@@ -121,7 +120,7 @@ export default function DashboardPage(): React.JSX.Element {
       });
       return;
     }
-    if (!summary) return;
+    if (!summary || !startTime) return;
     writeExecutionRecord(sessionStorage, {
       ...baseRecord,
       outcome,

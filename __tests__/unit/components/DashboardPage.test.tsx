@@ -360,6 +360,88 @@ describe('DashboardPage', () => {
     getItemSpy.mockRestore()
   })
 
+  it('waits for the authenticated account before checking a stored run', async () => {
+    const startTime = new Date('2026-08-17T01:00:00.000Z')
+    const endTime = new Date('2026-08-17T01:00:01.000Z')
+    writeExecutionRecord(sessionStorage, {
+      tenantId: 'tenant-id',
+      homeAccountId: 'home-tenant-id',
+      tenantName: 'Delayed Account Tenant',
+      operationMode: 'create',
+      isPreview: true,
+      selectedObjectCount: 0,
+      tasks: [],
+      summary: {
+        tenantId: 'tenant-id',
+        tenantName: 'Delayed Account Tenant',
+        operationMode: 'create',
+        startTime,
+        endTime,
+        duration: 1000,
+        stats: { total: 0, created: 0, deleted: 0, skipped: 0, failed: 0 },
+        categoryBreakdown: {},
+        errors: [],
+        warnings: []
+      },
+      outcome: 'succeeded',
+      fatalError: null,
+      activityLog: [],
+      startTime,
+      endTime
+    })
+    getActiveAccount.mockReturnValue(null)
+    const view = renderPage()
+
+    expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).not.toBeNull()
+    expect(push).not.toHaveBeenCalledWith('/wizard')
+
+    getActiveAccount.mockReturnValue({
+      tenantId: 'tenant-id',
+      homeAccountId: 'home-tenant-id'
+    })
+    view.rerender(
+      <SettingsProvider>
+        <DashboardPage />
+      </SettingsProvider>
+    )
+
+    await waitFor(() => expect(screen.getAllByText('Delayed Account Tenant')).toHaveLength(2))
+    expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).not.toBeNull()
+  })
+
+  it('does not persist a reportable run without a start time', async () => {
+    const summaryStartTime = new Date('2026-08-17T01:00:00.000Z')
+    const endTime = new Date('2026-08-17T01:00:01.000Z')
+    useHydrationExecutionMock.mockReturnValue(
+      createExecutionState({
+        configuration: runConfiguration,
+        phase: 'completed',
+        isCompleted: true,
+        startTime: null,
+        endTime,
+        summary: {
+          tenantId: 'tenant-id',
+          tenantName: 'Delete Test Tenant',
+          operationMode: 'delete',
+          startTime: summaryStartTime,
+          endTime,
+          duration: 1000,
+          stats: { total: 0, created: 0, deleted: 0, skipped: 0, failed: 0 },
+          categoryBreakdown: {},
+          errors: [],
+          warnings: []
+        },
+        outcome: 'succeeded'
+      })
+    )
+
+    renderPage()
+    await act(async () => undefined)
+
+    expect(screen.getByText('Run complete')).toBeInTheDocument()
+    expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).toBeNull()
+  })
+
   it('restores planned scope for cancellation before task creation', async () => {
     const startTime = new Date('2026-08-17T01:00:00.000Z')
     const endTime = new Date('2026-08-17T01:00:01.000Z')
