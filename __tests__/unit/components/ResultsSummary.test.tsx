@@ -435,11 +435,22 @@ describe('ResultsSummary', () => {
     await user.click(screen.getByRole('button', { name: /json/i }))
     await user.click(screen.getByRole('button', { name: /csv/i }))
 
-    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues')
-    expect(generateJSONReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues')
-    expect(generateCSVReport).toHaveBeenCalledWith(tasks, 'completedWithIssues')
+    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false)
+    expect(generateJSONReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false)
+    expect(generateCSVReport).toHaveBeenCalledWith(tasks, 'completedWithIssues', false)
+    expect(generateReportFilename).toHaveBeenCalledWith('create', 'md', false)
     expect(downloadReport).toHaveBeenNthCalledWith(1, '# report', 'create.md')
     expect(downloadReport).toHaveBeenNthCalledWith(2, '{"ok":true}', 'create.json')
     expect(downloadReport).toHaveBeenNthCalledWith(3, 'id,status', 'create.csv')
+  })
+
+  it('passes preview mode to report content and filenames', async () => {
+    const user = userEvent.setup()
+    renderSummary(true)
+
+    await user.click(screen.getByRole('button', { name: /markdown/i }))
+
+    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', true)
+    expect(generateReportFilename).toHaveBeenCalledWith('create', 'md', true)
   })
 })

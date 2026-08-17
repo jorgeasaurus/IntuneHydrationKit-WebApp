@@ -92,6 +92,7 @@ export function DashboardRunView({
   const successTaskCount = tasks.filter(
     (task) => task.status === "success",
   ).length;
+  const controlsStartTime = startTime ?? (isCompleted ? endTime : null);
 
   return (
     <div className="relative z-10 min-h-screen">
@@ -161,14 +162,14 @@ export function DashboardRunView({
           />
         )}
 
-        {startTime && (
+        {controlsStartTime && (
           <ExecutionControls
             tasks={tasks}
             isPaused={isPaused}
             isCancelling={isCancelling}
             isCompleted={isCompleted}
             outcome={outcome}
-            startTime={startTime}
+            startTime={controlsStartTime}
             endTime={endTime}
             batchProgress={batchProgress}
             onPause={onPause}

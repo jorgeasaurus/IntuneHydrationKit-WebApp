@@ -224,11 +224,11 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
   function handleDownload(fileFormat: "md" | "json" | "csv"): void {
     const content =
       fileFormat === "md"
-        ? generateMarkdownReport(summary, tasks, outcome)
+        ? generateMarkdownReport(summary, tasks, outcome, isPreview)
         : fileFormat === "json"
-          ? generateJSONReport(summary, tasks, outcome)
-          : generateCSVReport(tasks, outcome);
-    downloadReport(content, generateReportFilename(summary.operationMode, fileFormat));
+          ? generateJSONReport(summary, tasks, outcome, isPreview)
+          : generateCSVReport(tasks, outcome, isPreview);
+    downloadReport(content, generateReportFilename(summary.operationMode, fileFormat, isPreview));
   }
 
   function handleIssuesOnly(): void {

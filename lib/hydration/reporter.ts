@@ -40,6 +40,7 @@ export function generateMarkdownReport(
   summary: HydrationSummary,
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
+  isPreview: boolean,
 ): string {
   const duration = formatDuration(summary.duration);
   // Render actual UTC time (toISOString), not local time with a hardcoded UTC label
@@ -49,6 +50,7 @@ export function generateMarkdownReport(
 
 **Tenant ID**: ${summary.tenantId}
 **Operation**: ${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)}
+**Execution**: ${isPreview ? "Preview" : "Live"}
 **Outcome**: ${RUN_OUTCOME_LABELS[outcome]}
 **Date**: ${timestamp}
 **Duration**: ${duration}
@@ -146,9 +148,11 @@ export function generateJSONReport(
   summary: HydrationSummary,
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
+  isPreview: boolean,
 ): string {
   const report = {
     outcome,
+    executionMode: isPreview ? "preview" : "live",
     summary,
     tasks: tasks.map((task) => ({
       id: task.id,
@@ -175,11 +179,16 @@ export function generateJSONReport(
 /**
  * Generate CSV report
  */
-export function generateCSVReport(tasks: HydrationTask[], outcome: ReportableExecutionOutcome): string {
+export function generateCSVReport(
+  tasks: HydrationTask[],
+  outcome: ReportableExecutionOutcome,
+  isPreview: boolean,
+): string {
   const headers = [
     "Category",
     "Item Name",
     "Operation",
+    "Execution Mode",
     "Run Outcome",
     "Status",
     "Outcome",
@@ -209,6 +218,7 @@ export function generateCSVReport(tasks: HydrationTask[], outcome: ReportableExe
       task.category,
       task.itemName,
       task.operation,
+      isPreview ? "preview" : "live",
       outcome,
       task.status,
       getTaskEvidenceOutcome(task),
@@ -221,7 +231,11 @@ export function generateCSVReport(tasks: HydrationTask[], outcome: ReportableExe
   });
 
   if (rows.length === 0) {
-    rows.push(["", "", "", outcome, "", "", "", "", "", "", ""].map(escapeCSVField));
+    rows.push(
+      ["", "", "", isPreview ? "preview" : "live", outcome, "", "", "", "", "", "", ""].map(
+        escapeCSVField,
+      ),
+    );
   }
 
   const csv = [headers.map(escapeCSVField), ...rows].map((row) => row.join(",")).join("\n");
@@ -406,7 +420,11 @@ function groupTasksByCategory(tasks: HydrationTask[]): Record<string, HydrationT
 /**
  * Generate filename for report based on operation and timestamp
  */
-export function generateReportFilename(operationMode: string, fileFormat: "md" | "json" | "csv"): string {
+export function generateReportFilename(
+  operationMode: string,
+  fileFormat: "md" | "json" | "csv",
+  isPreview: boolean,
+): string {
   const timestamp = formatFileTimestamp(new Date());
-  return `intune-hydration-${operationMode}-${timestamp}.${fileFormat}`;
+  return `intune-hydration-${operationMode}-${isPreview ? "preview" : "live"}-${timestamp}.${fileFormat}`;
 }

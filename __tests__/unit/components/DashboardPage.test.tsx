@@ -509,6 +509,34 @@ describe('DashboardPage', () => {
     expect(screen.queryByText('Private tenant detail')).not.toBeInTheDocument()
   })
 
+  it('shows execution controls for a restored failure without a start time', async () => {
+    const endTime = new Date('2026-08-17T01:00:02.000Z')
+    writeExecutionRecord(sessionStorage, {
+      tenantId: 'tenant-id',
+      homeAccountId: 'home-tenant-id',
+      tenantName: 'Delete Test Tenant',
+      operationMode: 'delete',
+      isPreview: false,
+      selectedObjectCount: 0,
+      tasks: [],
+      summary: null,
+      outcome: 'failed',
+      fatalError: 'Queue construction failed',
+      activityLog: [],
+      startTime: null,
+      endTime
+    })
+    const wizard = createWizardState()
+    wizard.state.confirmed = false
+    useWizardStateMock.mockReturnValue(wizard)
+
+    renderPage()
+
+    expect(await screen.findByRole('button', { name: 'Download Execution Log' })).toBeInTheDocument()
+    expect(screen.getByText('Started')).toBeInTheDocument()
+    expect(screen.getAllByText('Completed')).toHaveLength(2)
+  })
+
   it('hides a restored run when the authenticated account changes', async () => {
     const startTime = new Date('2026-08-17T01:00:00.000Z')
     const endTime = new Date('2026-08-17T01:00:01.000Z')
