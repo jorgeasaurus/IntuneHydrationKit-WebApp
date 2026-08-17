@@ -1,0 +1,25 @@
+name: Main source guard
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  source-branch:
+    name: Require dev source
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify pull request source
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          TARGET_REPOSITORY: ${{ github.repository }}
+        run: |
+          if [ "$HEAD_REF" != "dev" ] || [ "$HEAD_REPOSITORY" != "$TARGET_REPOSITORY" ]; then
+            echo "Pull requests to main must come from this repository's dev branch."
+            exit 1
+          fi
