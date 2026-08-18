@@ -99,6 +99,7 @@ export async function executeCISBaselineTask(
             task,
             success: true,
             skipped: true,
+            skipKind: "blocked",
             error: `Unsupported policy type: ${odataType}. ${unsupportedReason}`
           };
 
@@ -122,13 +123,13 @@ export async function executeCISBaselineTask(
 
           if (existingGroupPolicyConfiguration) {
             console.log(`[CIS Baseline Task] Group Policy Configuration already exists (cache), skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
 
           const groupPolicyExists = await groupPolicyConfigurationExists(client, policyName);
           if (groupPolicyExists) {
             console.log(`[CIS Baseline Task] Group Policy Configuration already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -164,13 +165,13 @@ export async function executeCISBaselineTask(
 
           if (existingSecurityIntent) {
             console.log(`[CIS Baseline Task] Security Intent already exists (cache), skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
 
           const intentExists = await securityIntentExists(client, policyName);
           if (intentExists) {
             console.log(`[CIS Baseline Task] Security Intent already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -191,7 +192,7 @@ export async function executeCISBaselineTask(
           const v2Exists = await v2CompliancePolicyExists(client, policyName);
           if (v2Exists) {
             console.log(`[CIS Baseline Task] V2 Compliance policy already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -221,13 +222,13 @@ export async function executeCISBaselineTask(
 
           if (existingV1Policy) {
             console.log(`[CIS Baseline Task] V1 Compliance policy already exists (cache), skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
 
           const v1Exists = await compliancePolicyExistsByName(client, policyName);
           if (v1Exists) {
             console.log(`[CIS Baseline Task] V1 Compliance policy already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -248,7 +249,7 @@ export async function executeCISBaselineTask(
           const dcExists = await deviceConfigurationExists(client, policyName);
           if (dcExists) {
             console.log(`[CIS Baseline Task] Device Configuration already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -263,7 +264,7 @@ export async function executeCISBaselineTask(
           const scExists = await settingsCatalogPolicyExists(client, policyName);
           if (scExists) {
             console.log(`[CIS Baseline Task] Settings Catalog policy already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, error: "Already exists" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -295,11 +296,11 @@ export async function executeCISBaselineTask(
             }
 
             if (!policy) {
-              return { task, success: true, skipped: true, error: "Not found in tenant" };
+              return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
             }
 
             if (!hasHydrationMarker(policy.description)) {
-              return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+              return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
             }
 
             try {
@@ -308,7 +309,7 @@ export async function executeCISBaselineTask(
               );
               const assignmentCount = assignmentsResponse.value?.length ?? 0;
               if (assignmentCount > 0) {
-                return { task, success: true, skipped: true, error: `Policy has ${assignmentCount} active assignment(s)` };
+                return { task, success: true, skipped: true, skipKind: "blocked", error: `Policy has ${assignmentCount} active assignment(s)` };
               }
             } catch {
               // Continue if assignments can't be checked
@@ -345,11 +346,11 @@ export async function executeCISBaselineTask(
             }
 
             if (!policy) {
-              return { task, success: true, skipped: true, error: "Not found in tenant" };
+              return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
             }
 
             if (!hasHydrationMarker(policy.description)) {
-              return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+              return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
             }
 
             try {
@@ -358,7 +359,7 @@ export async function executeCISBaselineTask(
               );
               const assignmentCount = assignmentsResponse.value?.length ?? 0;
               if (assignmentCount > 0) {
-                return { task, success: true, skipped: true, error: `Policy has ${assignmentCount} active assignment(s)` };
+                return { task, success: true, skipped: true, skipKind: "blocked", error: `Policy has ${assignmentCount} active assignment(s)` };
               }
             } catch {
               // Continue if assignments can't be checked
@@ -380,13 +381,13 @@ export async function executeCISBaselineTask(
           }
 
           // Can't delete what we can't create
-          return { task, success: true, skipped: true, error: "Unsupported policy type" };
+          return { task, success: true, skipped: true, skipKind: "blocked", error: "Unsupported policy type" };
 
         case "V2Compliance": {
           // Delete from /compliancePolicies
           if (hasODataUnsafeChars(policyName)) {
             console.log(`[CIS Baseline Task] Cannot query V2 Compliance for "${policyName}" (OData-unsafe chars) - skipping`);
-            return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Cannot query by name (special characters)" };
           }
           const escapedV2Name = escapeODataString(policyName);
           const v2Response = await client.get<{ value: Array<{ id: string; name: string; description?: string }> }>(
@@ -394,12 +395,12 @@ export async function executeCISBaselineTask(
           );
           if (!v2Response.value || v2Response.value.length === 0) {
             console.log(`[CIS Baseline Task] V2 Compliance policy "${policyName}" not found in tenant`);
-            return { task, success: true, skipped: true, error: "Not found in tenant" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
           }
           const v2Policy = v2Response.value[0];
           if (!hasHydrationMarker(v2Policy.description)) {
             console.log(`[CIS Baseline Task] V2 Compliance policy "${v2Policy.name}" exists but was not created by Intune Hydration Kit`);
-            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -413,7 +414,7 @@ export async function executeCISBaselineTask(
           // Delete from /deviceCompliancePolicies
           if (hasODataUnsafeChars(policyName)) {
             console.log(`[CIS Baseline Task] Cannot query V1 Compliance for "${policyName}" (OData-unsafe chars) - skipping`);
-            return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Cannot query by name (special characters)" };
           }
           const escapedV1Name = escapeODataString(policyName);
           const v1Response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
@@ -421,12 +422,12 @@ export async function executeCISBaselineTask(
           );
           if (!v1Response.value || v1Response.value.length === 0) {
             console.log(`[CIS Baseline Task] V1 Compliance policy "${policyName}" not found in tenant`);
-            return { task, success: true, skipped: true, error: "Not found in tenant" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
           }
           const v1Policy = v1Response.value[0];
           if (!hasHydrationMarker(v1Policy.description)) {
             console.log(`[CIS Baseline Task] V1 Compliance policy "${v1Policy.displayName}" exists but was not created by Intune Hydration Kit`);
-            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -440,7 +441,7 @@ export async function executeCISBaselineTask(
           // Delete from /deviceConfigurations
           if (hasODataUnsafeChars(policyName)) {
             console.log(`[CIS Baseline Task] Cannot query Device Configuration for "${policyName}" (OData-unsafe chars) - skipping`);
-            return { task, success: true, skipped: true, error: "Cannot query by name (special characters)" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Cannot query by name (special characters)" };
           }
           const escapedDcName = escapeODataString(policyName);
           const dcResponse = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
@@ -448,12 +449,12 @@ export async function executeCISBaselineTask(
           );
           if (!dcResponse.value || dcResponse.value.length === 0) {
             console.log(`[CIS Baseline Task] Device Configuration policy "${policyName}" not found in tenant`);
-            return { task, success: true, skipped: true, error: "Not found in tenant" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
           }
           const dcPolicy = dcResponse.value[0];
           if (!hasHydrationMarker(dcPolicy.description)) {
             console.log(`[CIS Baseline Task] Device Configuration policy "${dcPolicy.displayName}" exists but was not created by Intune Hydration Kit`);
-            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
@@ -494,14 +495,14 @@ export async function executeCISBaselineTask(
 
           if (!policy) {
             console.log(`[CIS Baseline Task] Policy "${policyName}" not found in ${allPolicies.length} cached policies`);
-            return { task, success: true, skipped: true, error: "Not found in tenant" };
+            return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
           }
 
           console.log(`[CIS Baseline Task] Found Settings Catalog policy: "${policy.name}" (ID: ${policy.id})`);
 
           if (!hasHydrationMarker(policy.description)) {
             console.log(`[CIS Baseline Task] Policy "${policy.name}" exists but was not created by Intune Hydration Kit (no marker in description)`);
-            return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+            return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
           }
 
           // Check for active assignments - skip deletion if assigned
@@ -512,7 +513,7 @@ export async function executeCISBaselineTask(
             const assignmentCount = assignmentsResponse.value?.length ?? 0;
             if (assignmentCount > 0) {
               console.log(`[CIS Baseline Task] Skipping deletion of "${policy.name}" - has ${assignmentCount} active assignment(s)`);
-              return { task, success: true, skipped: true, error: `Policy has ${assignmentCount} active assignment(s)` };
+              return { task, success: true, skipped: true, skipKind: "blocked", error: `Policy has ${assignmentCount} active assignment(s)` };
             }
           } catch {
             // Continue if assignments can't be checked

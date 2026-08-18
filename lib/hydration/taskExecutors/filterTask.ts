@@ -42,6 +42,7 @@ export async function executeFilterTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "noOp",
         error: "Already exists",
       };
     }
@@ -86,12 +87,12 @@ export async function executeFilterTask(
     );
 
     if (!existingFilter) {
-      return { task, success: true, skipped: true, error: "Not found in tenant" };
+      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
     }
 
     // Check if it was created by the hydration kit
     if (!hasHydrationMarker(existingFilter.description)) {
-      return { task, success: true, skipped: true, error: "Not created by Hydration Kit" };
+      return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
     }
 
     // Preview mode - would delete

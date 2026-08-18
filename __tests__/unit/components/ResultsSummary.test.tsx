@@ -17,7 +17,7 @@ vi.mock('@/lib/hydration/reporter', () => ({
   generateJSONReport: (...args: unknown[]) => generateJSONReport(...args),
   generateCSVReport: (...args: unknown[]) => generateCSVReport(...args),
   downloadReport: (...args: unknown[]) => downloadReport(...args),
-  generateReportFilename: (...args: unknown[]) => generateReportFilename(...args),
+  generateReportFilename: (...args: unknown[]) => generateReportFilename(...args)
 }))
 
 const tasks: HydrationTask[] = [
@@ -26,7 +26,7 @@ const tasks: HydrationTask[] = [
     category: 'groups',
     operation: 'create',
     itemName: 'All Windows Devices',
-    status: 'success',
+    status: 'success'
   },
   {
     id: 'filter-skipped',
@@ -34,7 +34,8 @@ const tasks: HydrationTask[] = [
     operation: 'create',
     itemName: 'Corporate Devices',
     status: 'skipped',
-    error: 'Already exists',
+    skipKind: 'noOp',
+    error: 'Already exists'
   },
   {
     id: 'ca-failed',
@@ -42,8 +43,8 @@ const tasks: HydrationTask[] = [
     operation: 'create',
     itemName: 'Block Legacy Auth',
     status: 'failed',
-    error: 'Insufficient privileges',
-  },
+    error: 'Insufficient privileges'
+  }
 ]
 
 const summary: HydrationSummary = {
@@ -57,21 +58,21 @@ const summary: HydrationSummary = {
     created: 1,
     deleted: 0,
     skipped: 1,
-    failed: 1,
+    failed: 1
   },
   categoryBreakdown: {
     groups: { total: 1, success: 1, skipped: 0, failed: 0 },
     filters: { total: 1, success: 0, skipped: 1, failed: 0 },
-    conditionalAccess: { total: 1, success: 0, skipped: 0, failed: 1 },
+    conditionalAccess: { total: 1, success: 0, skipped: 0, failed: 1 }
   },
   errors: [
     {
       task: 'Block Legacy Auth',
       message: 'Insufficient privileges',
-      timestamp: new Date('2026-04-26T09:03:00.000Z'),
-    },
+      timestamp: new Date('2026-04-26T09:03:00.000Z')
+    }
   ],
-  warnings: [],
+  warnings: []
 }
 
 describe('ResultsSummary', () => {
@@ -86,7 +87,7 @@ describe('ResultsSummary', () => {
   function renderSummary(isPreview = false) {
     return render(
       <SettingsProvider>
-        <ResultsSummary summary={summary} tasks={tasks} isPreview={isPreview} />
+        <ResultsSummary summary={summary} tasks={tasks} isPreview={isPreview} outcome="completedWithIssues" />
       </SettingsProvider>
     )
   }
@@ -117,8 +118,113 @@ describe('ResultsSummary', () => {
     renderSummary()
 
     expect(screen.getByRole('button', { name: /Dynamic Groups/i })).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.getByRole('button', { name: /Device Filters/i })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: /Device Filters/i })).toHaveAttribute('aria-expanded', 'false')
     expect(screen.getByRole('button', { name: /Conditional Access/i })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('shows cancellation as an amber terminal outcome', () => {
+    render(
+      <SettingsProvider>
+        <ResultsSummary summary={summary} tasks={tasks} outcome="cancelled" />
+      </SettingsProvider>
+    )
+
+    expect(screen.getByText('Run cancelled')).toHaveClass('text-amber-100')
+  })
+
+  it('shows a completed run with blocked skips as an issue outcome', () => {
+    render(
+      <SettingsProvider>
+        <ResultsSummary summary={summary} tasks={tasks} outcome="completedWithIssues" />
+      </SettingsProvider>
+    )
+
+    expect(screen.getByText('Run complete with issues')).toHaveClass('text-amber-100')
+  })
+
+  it('keeps live no-op, blocked, and cancelled skips distinct', () => {
+    render(
+      <SettingsProvider>
+        <ResultsSummary
+          summary={{
+            ...summary,
+            stats: { total: 3, created: 0, deleted: 0, skipped: 3, failed: 0 },
+            errors: []
+          }}
+          outcome="cancelled"
+          tasks={[
+            {
+              id: 'no-op',
+              category: 'groups',
+              operation: 'create',
+              itemName: 'Existing group',
+              status: 'skipped',
+              skipKind: 'noOp',
+              error: 'Already exists'
+            },
+            {
+              id: 'blocked',
+              category: 'groups',
+              operation: 'create',
+              itemName: 'Assigned policy',
+              status: 'skipped',
+              skipKind: 'blocked',
+              error: 'Remove assignments first'
+            },
+            {
+              id: 'cancelled',
+              category: 'groups',
+              operation: 'create',
+              itemName: 'Remaining group',
+              status: 'skipped',
+              skipKind: 'cancelled',
+              error: 'Cancelled by user'
+            }
+          ]}
+        />
+      </SettingsProvider>
+    )
+
+    expect(screen.getAllByText('Skipped').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Blocked').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0)
+    expect(screen.getByRole('button', { name: /Issues only \(2\)/ })).toBeInTheDocument()
+  })
+
+  it('shows a cancelled preview task as cancelled instead of blocked', () => {
+    render(
+      <SettingsProvider>
+        <ResultsSummary
+          summary={{
+            ...summary,
+            stats: { total: 1, created: 0, deleted: 0, skipped: 1, failed: 0 },
+            categoryBreakdown: {
+              groups: { total: 1, success: 0, skipped: 1, failed: 0 }
+            },
+            errors: []
+          }}
+          outcome="cancelled"
+          isPreview
+          tasks={[
+            {
+              id: 'cancelled-preview',
+              category: 'groups',
+              operation: 'create',
+              itemName: 'Remaining group',
+              status: 'skipped',
+              skipKind: 'cancelled',
+              error: 'Cancelled by user'
+            }
+          ]}
+        />
+      </SettingsProvider>
+    )
+
+    expect(screen.getAllByText('Cancelled').length).toBeGreaterThan(0)
+    expect(screen.getByText('Needs attention').nextElementSibling).toHaveTextContent('1')
+    expect(screen.getByText('Remaining group').closest('li')).toHaveTextContent('Cancelled')
+    expect(screen.getByText('Remaining group').closest('li')).not.toHaveTextContent('Blocked')
+    expect(screen.getByRole('button', { name: /Issues only \(1\)/ })).toBeInTheDocument()
   })
 
   it('shows each category once and keeps task details inside it', async () => {
@@ -140,33 +246,41 @@ describe('ResultsSummary', () => {
     render(
       <SettingsProvider>
         <ResultsSummary
+          outcome="completedWithIssues"
           summary={{
             ...summary,
             stats: { total: 2, created: 0, deleted: 0, skipped: 2, failed: 0 },
             categoryBreakdown: {
               groups: { total: 1, success: 0, skipped: 1, failed: 0 },
-              conditionalAccess: { total: 1, success: 0, skipped: 1, failed: 0 },
+              conditionalAccess: {
+                total: 1,
+                success: 0,
+                skipped: 1,
+                failed: 0
+              }
             },
-            errors: [],
+            errors: []
           }}
           isPreview
           tasks={[
-          {
-            id: 'existing',
-            category: 'groups',
-            operation: 'create',
-            itemName: 'Existing group',
-            status: 'skipped',
-            error: 'Group already exists',
-          },
-          {
-            id: 'missing-license',
-            category: 'conditionalAccess',
-            operation: 'create',
-            itemName: 'Risk policy',
-            status: 'skipped',
-            error: 'Missing Premium P2 license',
-          },
+            {
+              id: 'existing',
+              category: 'groups',
+              operation: 'create',
+              itemName: 'Existing group',
+              status: 'skipped',
+              skipKind: 'noOp',
+              error: 'Group already exists'
+            },
+            {
+              id: 'missing-license',
+              category: 'conditionalAccess',
+              operation: 'create',
+              itemName: 'Risk policy',
+              status: 'skipped',
+              skipKind: 'blocked',
+              error: 'Missing Premium P2 license'
+            }
           ]}
         />
       </SettingsProvider>
@@ -185,7 +299,7 @@ describe('ResultsSummary', () => {
     await user.click(screen.getByRole('button', { name: /Issues only/i }))
 
     expect(screen.queryByText('Dynamic Groups')).not.toBeInTheDocument()
-    expect(screen.getByText('Device Filters')).toBeInTheDocument()
+    expect(screen.queryByText('Device Filters')).not.toBeInTheDocument()
     expect(screen.getByText('Conditional Access')).toBeInTheDocument()
   })
 
@@ -197,7 +311,7 @@ describe('ResultsSummary', () => {
         category: 'groups',
         operation: 'create',
         itemName: 'Pending group',
-        status: 'pending',
+        status: 'pending'
       },
       {
         id: 'filter-warning',
@@ -205,21 +319,22 @@ describe('ResultsSummary', () => {
         operation: 'create',
         itemName: 'Warning filter',
         status: 'success',
-        warning: 'The assignment needs manual review',
-      },
+        warning: 'The assignment needs manual review'
+      }
     ]
 
     render(
       <SettingsProvider>
         <ResultsSummary
+          outcome="completedWithIssues"
           summary={{
             ...summary,
             stats: { total: 2, created: 1, deleted: 0, skipped: 0, failed: 0 },
             categoryBreakdown: {
               groups: { total: 1, success: 0, skipped: 0, failed: 0 },
-              filters: { total: 1, success: 1, skipped: 0, failed: 0 },
+              filters: { total: 1, success: 1, skipped: 0, failed: 0 }
             },
-            errors: [],
+            errors: []
           }}
           tasks={attentionTasks}
         />
@@ -240,13 +355,14 @@ describe('ResultsSummary', () => {
     render(
       <SettingsProvider>
         <ResultsSummary
+          outcome="completedWithIssues"
           summary={{
             ...summary,
             stats: { total: 1, created: 0, deleted: 0, skipped: 0, failed: 0 },
             categoryBreakdown: {
-              groups: { total: 1, success: 0, skipped: 0, failed: 0 },
+              groups: { total: 1, success: 0, skipped: 0, failed: 0 }
             },
-            errors: [],
+            errors: []
           }}
           isPreview
           tasks={[
@@ -255,8 +371,8 @@ describe('ResultsSummary', () => {
               category: 'groups',
               operation: 'create',
               itemName: 'Running group',
-              status: 'running',
-            },
+              status: 'running'
+            }
           ]}
         />
       </SettingsProvider>
@@ -276,19 +392,26 @@ describe('ResultsSummary', () => {
       category: 'groups',
       operation: 'create',
       itemName: `Group ${index + 1}`,
-      status: 'success',
+      status: 'success'
     }))
 
     render(
       <SettingsProvider>
         <ResultsSummary
+          outcome="succeeded"
           summary={{
             ...summary,
-            stats: { total: 26, created: 26, deleted: 0, skipped: 0, failed: 0 },
-            categoryBreakdown: {
-              groups: { total: 26, success: 26, skipped: 0, failed: 0 },
+            stats: {
+              total: 26,
+              created: 26,
+              deleted: 0,
+              skipped: 0,
+              failed: 0
             },
-            errors: [],
+            categoryBreakdown: {
+              groups: { total: 26, success: 26, skipped: 0, failed: 0 }
+            },
+            errors: []
           }}
           tasks={longTasks}
         />
@@ -312,11 +435,22 @@ describe('ResultsSummary', () => {
     await user.click(screen.getByRole('button', { name: /json/i }))
     await user.click(screen.getByRole('button', { name: /csv/i }))
 
-    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks)
-    expect(generateJSONReport).toHaveBeenCalledWith(summary, tasks)
-    expect(generateCSVReport).toHaveBeenCalledWith(tasks)
+    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false)
+    expect(generateJSONReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false)
+    expect(generateCSVReport).toHaveBeenCalledWith(tasks, 'completedWithIssues', false)
+    expect(generateReportFilename).toHaveBeenCalledWith('create', 'md', false)
     expect(downloadReport).toHaveBeenNthCalledWith(1, '# report', 'create.md')
     expect(downloadReport).toHaveBeenNthCalledWith(2, '{"ok":true}', 'create.json')
     expect(downloadReport).toHaveBeenNthCalledWith(3, 'id,status', 'create.csv')
+  })
+
+  it('passes preview mode to report content and filenames', async () => {
+    const user = userEvent.setup()
+    renderSummary(true)
+
+    await user.click(screen.getByRole('button', { name: /markdown/i }))
+
+    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', true)
+    expect(generateReportFilename).toHaveBeenCalledWith('create', 'md', true)
   })
 })

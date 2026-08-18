@@ -152,13 +152,6 @@ test.describe("Protected Routes", () => {
     expect(page.url()).toMatch(/\/$/);
   });
 
-  test("results redirects to landing when unauthenticated", async ({
-    page,
-  }) => {
-    await page.goto("/results");
-    await page.waitForURL("/");
-    expect(page.url()).toMatch(/\/$/);
-  });
 });
 
 test.describe("Glass visual system", () => {

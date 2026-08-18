@@ -11,22 +11,22 @@ const activeTasks: HydrationTask[] = [
     category: 'groups',
     operation: 'create',
     itemName: 'All Windows Devices',
-    status: 'success',
+    status: 'success'
   },
   {
     id: 'task-2',
     category: 'filters',
     operation: 'create',
     itemName: 'Corporate Devices',
-    status: 'failed',
+    status: 'failed'
   },
   {
     id: 'task-3',
     category: 'compliance',
     operation: 'create',
     itemName: 'Windows 11 Security Baseline',
-    status: 'pending',
-  },
+    status: 'pending'
+  }
 ]
 
 const batchProgress: BatchProgress = {
@@ -34,7 +34,7 @@ const batchProgress: BatchProgress = {
   currentBatch: 2,
   totalBatches: 4,
   itemsInBatch: 5,
-  apiVersion: 'beta',
+  apiVersion: 'beta'
 }
 
 describe('ExecutionControls', () => {
@@ -55,7 +55,9 @@ describe('ExecutionControls', () => {
       <ExecutionControls
         tasks={activeTasks}
         isPaused={false}
+        isCancelling={false}
         isCompleted={false}
+        outcome={null}
         startTime={startTime}
         batchProgress={batchProgress}
         onPause={onPause}
@@ -68,7 +70,9 @@ describe('ExecutionControls', () => {
     })
 
     expect(screen.getByText('Execution in progress')).toBeInTheDocument()
-    const batchStatus = screen.getByRole('region', { name: 'Batch processing status' })
+    const batchStatus = screen.getByRole('region', {
+      name: 'Batch processing status'
+    })
     expect(batchStatus).toHaveClass('bg-slate-950/65', 'backdrop-blur-md')
     expect(batchStatus).not.toHaveClass('bg-blue-50')
     expect(screen.getByText('Batch processing')).toHaveClass('text-white')
@@ -95,7 +99,9 @@ describe('ExecutionControls', () => {
       <ExecutionControls
         tasks={activeTasks}
         isPaused
+        isCancelling={false}
         isCompleted={false}
+        outcome={null}
         startTime={startTime}
         onResume={onResume}
       />
@@ -116,17 +122,59 @@ describe('ExecutionControls', () => {
       <ExecutionControls
         tasks={activeTasks}
         isPaused={false}
+        isCancelling={false}
         isCompleted
+        outcome="succeeded"
         startTime={startTime}
+        endTime={new Date(startTime.getTime() + 5000)}
         onDownloadLog={onDownloadLog}
       />
     )
 
     expect(screen.getByText('Execution completed')).toBeInTheDocument()
+    expect(screen.getByText('5s')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: 'Download Execution Log' }))
 
     expect(onDownloadLog).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows cancellation pending without action controls', () => {
+    render(
+      <ExecutionControls
+        tasks={activeTasks}
+        isPaused={false}
+        isCancelling
+        isCompleted={false}
+        outcome={null}
+        startTime={startTime}
+      />
+    )
+
+    expect(screen.getByText('Cancellation pending')).toBeInTheDocument()
+    expect(screen.getByText(/Waiting for the active request/)).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('No new work will start')
+    expect(screen.queryByRole('button', { name: 'Pause' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Resume' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Download Execution Log' })).not.toBeInTheDocument()
+  })
+
+  it('preserves cancelled terminal wording', () => {
+    render(
+      <ExecutionControls
+        tasks={activeTasks}
+        isPaused={false}
+        isCancelling={false}
+        isCompleted
+        outcome="cancelled"
+        startTime={startTime}
+        endTime={new Date(startTime.getTime() + 3000)}
+      />
+    )
+
+    expect(screen.getByText('Execution cancelled')).toBeInTheDocument()
+    expect(screen.getByText('3s')).toBeInTheDocument()
   })
 })

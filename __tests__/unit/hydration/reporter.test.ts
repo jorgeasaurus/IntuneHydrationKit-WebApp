@@ -4,7 +4,7 @@ import {
   generateJSONReport,
   generateCSVReport,
   createSummary,
-  generateReportFilename,
+  generateReportFilename
 } from '@/lib/hydration/reporter'
 import type { HydrationSummary, HydrationTask } from '@/types/hydration'
 
@@ -17,7 +17,7 @@ describe('reporter', () => {
       itemName: 'All Windows Devices',
       status: 'success',
       startTime: new Date('2024-01-15T10:00:00Z'),
-      endTime: new Date('2024-01-15T10:00:02Z'),
+      endTime: new Date('2024-01-15T10:00:02Z')
     },
     {
       id: 'task-2',
@@ -26,7 +26,7 @@ describe('reporter', () => {
       itemName: 'All macOS Devices',
       status: 'success',
       startTime: new Date('2024-01-15T10:00:03Z'),
-      endTime: new Date('2024-01-15T10:00:05Z'),
+      endTime: new Date('2024-01-15T10:00:05Z')
     },
     {
       id: 'task-3',
@@ -36,7 +36,7 @@ describe('reporter', () => {
       status: 'failed',
       error: 'Insufficient permissions',
       startTime: new Date('2024-01-15T10:00:06Z'),
-      endTime: new Date('2024-01-15T10:00:07Z'),
+      endTime: new Date('2024-01-15T10:00:07Z')
     },
     {
       id: 'task-4',
@@ -44,9 +44,10 @@ describe('reporter', () => {
       operation: 'create',
       itemName: 'Windows Security Baseline',
       status: 'skipped',
+      skipKind: 'noOp',
       startTime: new Date('2024-01-15T10:00:08Z'),
-      endTime: new Date('2024-01-15T10:00:08Z'),
-    },
+      endTime: new Date('2024-01-15T10:00:08Z')
+    }
   ]
 
   const mockSummary: HydrationSummary = {
@@ -60,31 +61,33 @@ describe('reporter', () => {
       created: 2,
       deleted: 0,
       skipped: 1,
-      failed: 1,
+      failed: 1
     },
     categoryBreakdown: {
       groups: { total: 2, success: 2, skipped: 0, failed: 0 },
       filters: { total: 1, success: 0, skipped: 0, failed: 1 },
-      compliance: { total: 1, success: 0, skipped: 1, failed: 0 },
+      compliance: { total: 1, success: 0, skipped: 1, failed: 0 }
     },
     errors: [
       {
         task: 'Corporate Windows Devices',
         message: 'Insufficient permissions',
-        timestamp: new Date('2024-01-15T10:00:07Z'),
-      },
+        timestamp: new Date('2024-01-15T10:00:07Z')
+      }
     ],
-    warnings: [],
+    warnings: []
   }
 
   describe('generateMarkdownReport', () => {
     it('generates valid markdown with all sections', () => {
-      const markdown = generateMarkdownReport(mockSummary, mockTasks)
+      const markdown = generateMarkdownReport(mockSummary, mockTasks, 'completedWithIssues', false)
 
       // Check header
       expect(markdown).toContain('# Intune Hydration Report')
       expect(markdown).toContain('**Tenant ID**: 00000000-0000-0000-0000-000000000001')
       expect(markdown).toContain('**Operation**: Create')
+      expect(markdown).toContain('**Execution**: Live')
+      expect(markdown).toContain('**Outcome**: Completed with issues')
       expect(markdown).toContain('**Duration**: 10m 0s')
 
       // Check summary section
@@ -106,6 +109,7 @@ describe('reporter', () => {
       expect(markdown).toContain('✓ All macOS Devices')
       expect(markdown).toContain('✗ Corporate Windows Devices')
       expect(markdown).toContain('⊗ Windows Security Baseline')
+      expect(markdown).toContain('- Outcome: No change')
 
       // Check errors section
       expect(markdown).toContain('## Errors')
@@ -116,30 +120,30 @@ describe('reporter', () => {
     })
 
     it('includes task durations', () => {
-      const markdown = generateMarkdownReport(mockSummary, mockTasks)
+      const markdown = generateMarkdownReport(mockSummary, mockTasks, 'completedWithIssues', false)
       expect(markdown).toContain('- Duration: 2s')
     })
 
     it('includes error messages in task details', () => {
-      const markdown = generateMarkdownReport(mockSummary, mockTasks)
+      const markdown = generateMarkdownReport(mockSummary, mockTasks, 'completedWithIssues', false)
       expect(markdown).toContain('- Error: Insufficient permissions')
     })
 
     it('handles delete operation mode', () => {
       const deleteSummary = { ...mockSummary, operationMode: 'delete' as const }
-      const markdown = generateMarkdownReport(deleteSummary, mockTasks)
+      const markdown = generateMarkdownReport(deleteSummary, mockTasks, 'completedWithIssues', false)
       expect(markdown).toContain('**Operation**: Delete')
     })
 
     it('handles create operation mode', () => {
       const createSummary = { ...mockSummary, operationMode: 'create' as const }
-      const markdown = generateMarkdownReport(createSummary, mockTasks)
+      const markdown = generateMarkdownReport(createSummary, mockTasks, 'completedWithIssues', false)
       expect(markdown).toContain('**Operation**: Create')
     })
 
     it('handles empty errors array', () => {
       const noErrorSummary = { ...mockSummary, errors: [] }
-      const markdown = generateMarkdownReport(noErrorSummary, mockTasks)
+      const markdown = generateMarkdownReport(noErrorSummary, mockTasks, 'completedWithIssues', false)
       // Should not contain errors section header followed by error content
       const errorSectionIndex = markdown.indexOf('## Errors')
       // If errors section exists, check what follows
@@ -152,28 +156,47 @@ describe('reporter', () => {
     it('formats duration correctly for different time ranges', () => {
       // Less than a minute
       const shortSummary = { ...mockSummary, duration: 45000 }
-      let markdown = generateMarkdownReport(shortSummary, mockTasks)
+      let markdown = generateMarkdownReport(shortSummary, mockTasks, 'completedWithIssues', false)
       expect(markdown).toContain('**Duration**: 45s')
 
       // Over an hour
       const longSummary = { ...mockSummary, duration: 3725000 } // 1h 2m 5s
-      markdown = generateMarkdownReport(longSummary, mockTasks)
+      markdown = generateMarkdownReport(longSummary, mockTasks, 'completedWithIssues', false)
       expect(markdown).toContain('**Duration**: 1h 2m 5s')
+    })
+
+    it('preserves cancellation when no task rows exist', () => {
+      const emptySummary = {
+        ...mockSummary,
+        stats: { total: 0, created: 0, deleted: 0, skipped: 0, failed: 0 },
+        categoryBreakdown: {},
+        errors: []
+      }
+
+      expect(generateMarkdownReport(emptySummary, [], 'cancelled', false)).toContain('**Outcome**: Cancelled')
+    })
+
+    it('identifies preview execution', () => {
+      expect(generateMarkdownReport(mockSummary, mockTasks, 'completedWithIssues', true)).toContain(
+        '**Execution**: Preview'
+      )
     })
   })
 
   describe('generateJSONReport', () => {
     it('generates valid JSON structure', () => {
-      const jsonString = generateJSONReport(mockSummary, mockTasks)
+      const jsonString = generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
       expect(report).toHaveProperty('summary')
+      expect(report.outcome).toBe('completedWithIssues')
+      expect(report.executionMode).toBe('live')
       expect(report).toHaveProperty('tasks')
       expect(report).toHaveProperty('metadata')
     })
 
     it('includes summary data', () => {
-      const jsonString = generateJSONReport(mockSummary, mockTasks)
+      const jsonString = generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
       expect(report.summary.tenantId).toBe('00000000-0000-0000-0000-000000000001')
@@ -182,7 +205,7 @@ describe('reporter', () => {
     })
 
     it('includes all tasks with correct properties', () => {
-      const jsonString = generateJSONReport(mockSummary, mockTasks)
+      const jsonString = generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
       expect(report.tasks).toHaveLength(4)
@@ -192,26 +215,30 @@ describe('reporter', () => {
         operation: 'create',
         itemName: 'All Windows Devices',
         status: 'success',
+        outcome: 'success'
       })
+      expect(report.tasks[3].outcome).toBe('noOp')
     })
 
     it('calculates task duration', () => {
-      const jsonString = generateJSONReport(mockSummary, mockTasks)
+      const jsonString = generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
       expect(report.tasks[0].duration).toBe(2000) // 2 seconds
     })
 
     it('handles tasks without start/end times', () => {
-      const tasksWithoutTimes: HydrationTask[] = [{
-        id: 'task-no-time',
-        category: 'groups',
-        operation: 'create',
-        itemName: 'Test Group',
-        status: 'pending',
-      }]
+      const tasksWithoutTimes: HydrationTask[] = [
+        {
+          id: 'task-no-time',
+          category: 'groups',
+          operation: 'create',
+          itemName: 'Test Group',
+          status: 'pending'
+        }
+      ]
 
-      const jsonString = generateJSONReport(mockSummary, tasksWithoutTimes)
+      const jsonString = generateJSONReport(mockSummary, tasksWithoutTimes, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
       expect(report.tasks[0].startTime).toBeUndefined()
@@ -220,7 +247,7 @@ describe('reporter', () => {
     })
 
     it('includes metadata with version and timestamp', () => {
-      const jsonString = generateJSONReport(mockSummary, mockTasks)
+      const jsonString = generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
       expect(report.metadata.reportVersion).toBe('1.0')
@@ -228,77 +255,92 @@ describe('reporter', () => {
     })
 
     it('formats dates as ISO strings', () => {
-      const jsonString = generateJSONReport(mockSummary, mockTasks)
+      const jsonString = generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
       expect(report.tasks[0].startTime).toBe('2024-01-15T10:00:00.000Z')
       expect(report.tasks[0].endTime).toBe('2024-01-15T10:00:02.000Z')
     })
+
+    it('preserves cancellation when no task rows exist', () => {
+      const report = JSON.parse(generateJSONReport(mockSummary, [], 'cancelled', true))
+
+      expect(report.outcome).toBe('cancelled')
+      expect(report.executionMode).toBe('preview')
+      expect(report.tasks).toEqual([])
+    })
   })
 
   describe('generateCSVReport', () => {
     it('generates valid CSV with headers', () => {
-      const csv = generateCSVReport(mockTasks)
+      const csv = generateCSVReport(mockTasks, 'completedWithIssues', false)
       const lines = csv.split('\n')
 
       expect(lines[0]).toBe(
-        '"Category","Item Name","Operation","Status","Error","Warning","Start Time (UTC)","End Time (UTC)","Duration (ms)"'
+        '"Category","Item Name","Operation","Execution Mode","Run Outcome","Status","Outcome","Error","Warning","Start Time (UTC)","End Time (UTC)","Duration (ms)"'
       )
+      expect(lines[4]).toContain('"live","completedWithIssues","skipped","noOp"')
     })
 
     it('includes all tasks as rows', () => {
-      const csv = generateCSVReport(mockTasks)
+      const csv = generateCSVReport(mockTasks, 'completedWithIssues', false)
       const lines = csv.split('\n')
 
       expect(lines).toHaveLength(5) // 1 header + 4 tasks
     })
 
     it('escapes quotes in item names', () => {
-      const tasksWithQuotes: HydrationTask[] = [{
-        id: 'task-quotes',
-        category: 'groups',
-        operation: 'create',
-        itemName: 'Group with "quotes" inside',
-        status: 'success',
-        startTime: new Date('2024-01-15T10:00:00Z'),
-        endTime: new Date('2024-01-15T10:00:01Z'),
-      }]
+      const tasksWithQuotes: HydrationTask[] = [
+        {
+          id: 'task-quotes',
+          category: 'groups',
+          operation: 'create',
+          itemName: 'Group with "quotes" inside',
+          status: 'success',
+          startTime: new Date('2024-01-15T10:00:00Z'),
+          endTime: new Date('2024-01-15T10:00:01Z')
+        }
+      ]
 
-      const csv = generateCSVReport(tasksWithQuotes)
+      const csv = generateCSVReport(tasksWithQuotes, 'succeeded', false)
       expect(csv).toContain('"Group with ""quotes"" inside"')
     })
 
     it('escapes quotes in error messages', () => {
-      const tasksWithErrorQuotes: HydrationTask[] = [{
-        id: 'task-error-quotes',
-        category: 'filters',
-        operation: 'create',
-        itemName: 'Test Filter',
-        status: 'failed',
-        error: 'Error: "Something" went wrong',
-        startTime: new Date('2024-01-15T10:00:00Z'),
-        endTime: new Date('2024-01-15T10:00:01Z'),
-      }]
+      const tasksWithErrorQuotes: HydrationTask[] = [
+        {
+          id: 'task-error-quotes',
+          category: 'filters',
+          operation: 'create',
+          itemName: 'Test Filter',
+          status: 'failed',
+          error: 'Error: "Something" went wrong',
+          startTime: new Date('2024-01-15T10:00:00Z'),
+          endTime: new Date('2024-01-15T10:00:01Z')
+        }
+      ]
 
-      const csv = generateCSVReport(tasksWithErrorQuotes)
+      const csv = generateCSVReport(tasksWithErrorQuotes, 'completedWithIssues', false)
       expect(csv).toContain('"Error: ""Something"" went wrong"')
     })
 
     it('includes duration in milliseconds', () => {
-      const csv = generateCSVReport(mockTasks)
+      const csv = generateCSVReport(mockTasks, 'completedWithIssues', false)
       expect(csv).toContain(',"2000"') // 2 seconds = 2000ms
     })
 
     it('handles tasks without times', () => {
-      const pendingTasks: HydrationTask[] = [{
-        id: 'pending-task',
-        category: 'groups',
-        operation: 'create',
-        itemName: 'Pending Group',
-        status: 'pending',
-      }]
+      const pendingTasks: HydrationTask[] = [
+        {
+          id: 'pending-task',
+          category: 'groups',
+          operation: 'create',
+          itemName: 'Pending Group',
+          status: 'pending'
+        }
+      ]
 
-      const csv = generateCSVReport(pendingTasks)
+      const csv = generateCSVReport(pendingTasks, 'completedWithIssues', false)
       const lines = csv.split('\n')
       const dataLine = lines[1]
 
@@ -307,19 +349,29 @@ describe('reporter', () => {
     })
 
     it('formats dates in UTC', () => {
-      const tasksWithOffsetDates: HydrationTask[] = [{
-        id: 'task-offset-date',
-        category: 'groups',
-        operation: 'create',
-        itemName: 'Offset Date Group',
-        status: 'success',
-        startTime: new Date('2024-01-15T10:00:00-05:00'),
-        endTime: new Date('2024-01-15T10:00:01-05:00'),
-      }]
+      const tasksWithOffsetDates: HydrationTask[] = [
+        {
+          id: 'task-offset-date',
+          category: 'groups',
+          operation: 'create',
+          itemName: 'Offset Date Group',
+          status: 'success',
+          startTime: new Date('2024-01-15T10:00:00-05:00'),
+          endTime: new Date('2024-01-15T10:00:01-05:00')
+        }
+      ]
 
-      const csv = generateCSVReport(tasksWithOffsetDates)
+      const csv = generateCSVReport(tasksWithOffsetDates, 'succeeded', false)
 
       expect(csv).toContain('"2024-01-15 15:00:00","2024-01-15 15:00:01"')
+    })
+
+    it('preserves a cancelled outcome when no task rows exist', () => {
+      const csv = generateCSVReport([], 'cancelled', true)
+
+      expect(csv.split('\n')).toHaveLength(2)
+      expect(csv.split('\n')[1]).toContain('"cancelled"')
+      expect(csv.split('\n')[1]).toContain('"preview"')
     })
   })
 
@@ -344,7 +396,7 @@ describe('reporter', () => {
       const deleteTasks: HydrationTask[] = [
         { id: '1', category: 'groups', operation: 'delete', itemName: 'G1', status: 'success' },
         { id: '2', category: 'groups', operation: 'delete', itemName: 'G2', status: 'success' },
-        { id: '3', category: 'filters', operation: 'delete', itemName: 'F1', status: 'failed', error: 'Not found' },
+        { id: '3', category: 'filters', operation: 'delete', itemName: 'F1', status: 'failed', error: 'Not found' }
       ]
 
       const summary = createSummary(
@@ -398,7 +450,7 @@ describe('reporter', () => {
       expect(summary.errors).toHaveLength(1)
       expect(summary.errors[0]).toMatchObject({
         task: 'Corporate Windows Devices',
-        message: 'Insufficient permissions',
+        message: 'Insufficient permissions'
       })
     })
 
@@ -419,14 +471,16 @@ describe('reporter', () => {
     })
 
     it('handles tasks without error message', () => {
-      const failedNoError: HydrationTask[] = [{
-        id: 'task-no-error',
-        category: 'groups',
-        operation: 'create',
-        itemName: 'Failed Group',
-        status: 'failed',
-        endTime: new Date('2024-01-15T10:00:05Z'),
-      }]
+      const failedNoError: HydrationTask[] = [
+        {
+          id: 'task-no-error',
+          category: 'groups',
+          operation: 'create',
+          itemName: 'Failed Group',
+          status: 'failed',
+          endTime: new Date('2024-01-15T10:00:05Z')
+        }
+      ]
 
       const summary = createSummary(
         'tenant-123',
@@ -442,18 +496,18 @@ describe('reporter', () => {
 
   describe('generateReportFilename', () => {
     it('generates markdown filename with correct format', () => {
-      const filename = generateReportFilename('create', 'md')
-      expect(filename).toMatch(/^intune-hydration-create-\d{4}-\d{2}-\d{2}-\d{6}\.md$/)
+      const filename = generateReportFilename('create', 'md', false)
+      expect(filename).toMatch(/^intune-hydration-create-live-\d{4}-\d{2}-\d{2}-\d{6}\.md$/)
     })
 
     it('generates JSON filename with correct format', () => {
-      const filename = generateReportFilename('delete', 'json')
-      expect(filename).toMatch(/^intune-hydration-delete-\d{4}-\d{2}-\d{2}-\d{6}\.json$/)
+      const filename = generateReportFilename('delete', 'json', false)
+      expect(filename).toMatch(/^intune-hydration-delete-live-\d{4}-\d{2}-\d{2}-\d{6}\.json$/)
     })
 
     it('generates CSV filename with correct format', () => {
-      const filename = generateReportFilename('preview', 'csv')
-      expect(filename).toMatch(/^intune-hydration-preview-\d{4}-\d{2}-\d{2}-\d{6}\.csv$/)
+      const filename = generateReportFilename('create', 'csv', true)
+      expect(filename).toMatch(/^intune-hydration-create-preview-\d{4}-\d{2}-\d{2}-\d{6}\.csv$/)
     })
   })
 })

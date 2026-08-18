@@ -52,7 +52,6 @@ describe('RouteWallpaper', () => {
     expect(shouldRenderWallpaper('/')).toBe(true)
     expect(shouldRenderWallpaper('/wizard')).toBe(true)
     expect(shouldRenderWallpaper('/dashboard')).toBe(true)
-    expect(shouldRenderWallpaper('/results')).toBe(true)
     expect(shouldRenderWallpaper('/templates')).toBe(true)
     expect(shouldRenderWallpaper('/templates/conditional-access')).toBe(true)
     expect(shouldRenderWallpaper('/templates-old')).toBe(false)
@@ -81,15 +80,10 @@ describe('RouteWallpaper', () => {
     )
   })
 
-  it('mounts the animated wallpaper on dashboard and results routes', () => {
+  it('mounts the animated wallpaper on the dashboard route', () => {
     pathname.mockReturnValue('/dashboard')
 
-    const { rerender } = render(<RouteWallpaper />)
-
-    expect(screen.getByTestId('dynamic-wallpaper')).toBeInTheDocument()
-
-    pathname.mockReturnValue('/results')
-    rerender(<RouteWallpaper />)
+    render(<RouteWallpaper />)
 
     expect(screen.getByTestId('dynamic-wallpaper')).toBeInTheDocument()
   })

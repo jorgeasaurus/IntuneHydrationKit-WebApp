@@ -1,116 +1,200 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useMsal } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
-import { AppNavigation } from "@/components/AppNavigation";
-import { SensitiveData } from "@/components/SensitiveData";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
-import { Button } from "@/components/ui/button";
-import { ArrowLeft, AlertTriangle, Loader2, Eye } from "lucide-react";
-import { ActivityLog } from "@/components/dashboard/ActivityLog";
-import { ExecutionControls } from "@/components/dashboard/ExecutionControls";
-import { ProgressBar } from "@/components/dashboard/ProgressBar";
-import { TaskList } from "@/components/dashboard/TaskList";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { DashboardRunView } from "@/components/dashboard/DashboardRunView";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
 import { useWizardState } from "@/hooks/useWizardState";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  clearHydrationSession,
+  readExecutionRecord,
+  writeExecutionRecord,
+  type ExecutionRecord,
+} from "@/lib/hydration/executionRecord";
 import { getEstimatedTaskCount } from "@/lib/hydration/engine";
-import { EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
+import type { ExecutionOutcome, HydrationSummary, HydrationTask, OperationMode } from "@/types/hydration";
+import type { ActivityMessage } from "@/lib/hydration/types";
 
-export default function DashboardPage() {
+interface DashboardRun {
+  tenantId?: string;
+  homeAccountId?: string;
+  tenantName?: string;
+  operationMode: OperationMode;
+  isPreview: boolean;
+  tasks: HydrationTask[];
+  summary: HydrationSummary | null;
+  outcome: ExecutionOutcome | null;
+  fatalError: string | null;
+  activityLog: ActivityMessage[];
+  startTime: Date | null;
+  endTime: Date | null;
+}
+
+export default function DashboardPage(): React.JSX.Element {
   const router = useRouter();
-  const { state } = useWizardState();
+  const { state, resetWizard } = useWizardState();
   const hasStartedRef = useRef(false);
+  const [restoredRecord, setRestoredRecord] = useState<ExecutionRecord | null>(null);
+  const [hasCheckedRecord, setHasCheckedRecord] = useState(false);
+  const { instance, accounts } = useMsal();
+  const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
+  const activeHomeAccountId = activeAccount?.homeAccountId ?? null;
+  const activeTenantId = activeAccount?.tenantId ?? null;
   const {
     tasks,
+    phase,
+    configuration,
     isRunning,
     isPaused,
+    isCancelling,
     isCompleted,
     isBuildingQueue,
     startTime,
     endTime,
     summary,
+    outcome,
+    fatalError,
     batchProgress,
     activityLog,
     startExecution,
     pause,
     resume,
     cancel,
+    reset,
   } = useHydrationExecution();
-  const selectedObjectCount = getEstimatedTaskCount(
-    state.selectedTargets,
-    state.categorySelections
-  );
-  const completedTaskCount = tasks.filter(
-    (task) => task.status === "success" || task.status === "failed" || task.status === "skipped"
-  ).length;
-  const successTaskCount = tasks.filter((task) => task.status === "success").length;
-  const failedTaskCount = tasks.filter((task) => task.status === "failed").length;
 
-  // Auto-start execution when page loads
   useEffect(() => {
+    if (!activeHomeAccountId || !activeTenantId) return;
+    const record = readExecutionRecord(sessionStorage);
+    if (
+      record &&
+      record.homeAccountId === activeHomeAccountId &&
+      record.tenantId === activeTenantId
+    ) {
+      setRestoredRecord(record);
+    } else if (record) {
+      clearHydrationSession(sessionStorage);
+    }
+    setHasCheckedRecord(true);
+  }, [activeHomeAccountId, activeTenantId]);
+
+  useEffect(() => {
+    if (!hasCheckedRecord) return;
+    if (restoredRecord) return;
+    if (phase !== "idle") return;
     if (!state.confirmed) {
-      // Redirect to wizard if not confirmed
       // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- wizard confirmation lives in client context
       router.push("/wizard");
       return;
     }
-
-    if (hasStartedRef.current) {
-      return;
-    }
-
+    if (hasStartedRef.current) return;
     hasStartedRef.current = true;
-
-    // Start execution
-    startExecution().catch((error) => {
-      console.error("Failed to start execution:", error);
+    startExecution().catch(() => {
+      // The execution hook records and displays the actionable error.
     });
-  }, [router, startExecution, state.confirmed]);
+  }, [hasCheckedRecord, restoredRecord, router, phase, startExecution, state.confirmed]);
 
-  // Navigate to results when completed
   useEffect(() => {
-    if (isCompleted && summary) {
-      // Store summary in sessionStorage for results page
-      sessionStorage.setItem(EXECUTION_RESULT_STORAGE_KEYS.summary, JSON.stringify(summary));
-      sessionStorage.setItem(EXECUTION_RESULT_STORAGE_KEYS.tasks, JSON.stringify(tasks));
-      sessionStorage.setItem(
-        EXECUTION_RESULT_STORAGE_KEYS.isPreview,
-        JSON.stringify(state.isPreview)
-      );
-
-      // Navigate to results page after a short delay
-      const timeoutId = setTimeout(() => {
-        // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- execution completion is client-only state
-        router.push("/results");
-      }, 2000);
-
-      return () => clearTimeout(timeoutId);
-    }
-  }, [isCompleted, summary, tasks, router, state.isPreview]);
-
-  const getOperationText = (): string => {
-    switch (state.operationMode) {
-      case "create":
-        return "Creating configurations";
-      case "delete":
-        return "Deleting configurations";
-      default:
-        return "Previewing changes";
-    }
-  };
-
-  const handleDownloadLog = () => {
-    // Download current execution log as JSON
-    const log = {
+    if (!isCompleted || !outcome || !endTime || !configuration) return;
+    const baseRecord = {
+      tenantId: configuration.tenantId,
+      homeAccountId: configuration.homeAccountId,
+      tenantName: configuration.tenantName,
+      operationMode: configuration.operationMode,
+      isPreview: configuration.isPreview,
+      selectedObjectCount: configuration.selectedObjectCount,
       tasks,
+      activityLog,
       startTime,
       endTime,
-      operationMode: state.operationMode,
-      tenantId: state.tenantConfig?.tenantId,
     };
+    if (outcome === "failed") {
+      if (!fatalError) return;
+      writeExecutionRecord(sessionStorage, {
+        ...baseRecord,
+        outcome,
+        summary: null,
+        fatalError,
+      });
+      return;
+    }
+    if (!summary || !startTime) return;
+    writeExecutionRecord(sessionStorage, {
+      ...baseRecord,
+      outcome,
+      summary,
+      fatalError: null,
+    });
+  }, [activityLog, endTime, fatalError, isCompleted, outcome, startTime, configuration, summary, tasks]);
 
+  const liveRun: DashboardRun = {
+    tenantId: configuration?.tenantId ?? state.tenantConfig?.tenantId,
+    homeAccountId: configuration?.homeAccountId ?? state.tenantConfig?.homeAccountId,
+    tenantName: configuration?.tenantName ?? state.tenantConfig?.tenantName,
+    operationMode: configuration?.operationMode ?? state.operationMode ?? "create",
+    isPreview: configuration?.isPreview ?? state.isPreview,
+    tasks,
+    summary,
+    outcome,
+    fatalError,
+    activityLog,
+    startTime,
+    endTime,
+  };
+  const displayRun: DashboardRun = restoredRecord ?? liveRun;
+  const {
+    tasks: displayTasks,
+    summary: displaySummary,
+    outcome: displayOutcome,
+    fatalError: displayFatalError,
+    activityLog: displayActivityLog,
+    startTime: displayStartTime,
+    endTime: displayEndTime,
+    operationMode: displayOperationMode,
+    isPreview: displayIsPreview,
+    tenantName: displayTenantName,
+    tenantId: displayTenantId,
+  } = displayRun;
+  const displayCompleted = Boolean(restoredRecord) || isCompleted;
+  const selectedObjectCount = restoredRecord
+    ? restoredRecord.selectedObjectCount
+    : configuration?.selectedObjectCount ?? getEstimatedTaskCount(state.selectedTargets, state.categorySelections);
+  const liveOwnerMismatch = Boolean(
+    configuration &&
+    activeHomeAccountId &&
+    activeTenantId &&
+    (configuration.homeAccountId !== activeHomeAccountId || configuration.tenantId !== activeTenantId),
+  );
+  const restoredOwnerMismatch = Boolean(
+    restoredRecord &&
+      activeHomeAccountId &&
+      activeTenantId &&
+      (restoredRecord.homeAccountId !== activeHomeAccountId || restoredRecord.tenantId !== activeTenantId),
+  );
+  const ownerMismatch = liveOwnerMismatch || restoredOwnerMismatch;
+
+  useEffect(() => {
+    if (!ownerMismatch) return;
+    clearHydrationSession(sessionStorage);
+    reset();
+    setRestoredRecord(null);
+    // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- account ownership is client authentication state
+    router.push("/wizard");
+  }, [ownerMismatch, reset, router]);
+
+  function handleDownloadLog(): void {
+    const log = {
+      tasks: displayTasks,
+      activityLog: displayActivityLog,
+      startTime: displayStartTime,
+      endTime: displayEndTime,
+      operationMode: displayOperationMode,
+      tenantId: displayTenantId,
+      outcome: displayOutcome,
+      fatalError: displayFatalError,
+    };
     const blob = new Blob([JSON.stringify(log, null, 2)], {
       type: "application/json",
     });
@@ -122,163 +206,43 @@ export default function DashboardPage() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
+  }
+
+  function handleStartNewHydration(): void {
+    clearHydrationSession(sessionStorage);
+    reset();
+    setRestoredRecord(null);
+    resetWizard();
+    router.push("/wizard");
+  }
+
+  if (ownerMismatch) {
+    return <ProtectedRoute>{null}</ProtectedRoute>;
+  }
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen relative z-10">
-        <AppNavigation
-          eyebrow={(
-            <span className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
-              Live execution
-            </span>
-          )}
-          title="Hydration Dashboard"
-          description={(
-            <>
-              {getOperationText()} in{" "}
-              <SensitiveData
-                value={state.tenantConfig?.tenantName || state.tenantConfig?.tenantId}
-                fallback="the selected tenant"
-              />
-            </>
-          )}
-          actions={(
-            <Button variant="outline" onClick={() => router.push("/wizard")} className="nav-action size-9 px-0 sm:w-auto sm:px-4">
-              <ArrowLeft className="size-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only">Back to Wizard</span>
-            </Button>
-          )}
-        />
-
-        <main className="container mx-auto px-4 py-8 max-w-7xl space-y-6">
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                Run mode
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                {state.isPreview
-                  ? `${state.operationMode === "create" ? "Create" : "Delete"} preview`
-                  : state.operationMode === "create"
-                    ? "Create live"
-                    : "Delete live"}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                Planned scope
-              </p>
-              <p className="mt-2 text-lg font-semibold">{selectedObjectCount} objects</p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                Completed
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                {isBuildingQueue
-                  ? `—/—`
-                  : `${completedTaskCount}/${tasks.length || selectedObjectCount || 0}`}
-              </p>
-            </div>
-            <div className="rounded-2xl border border-border/80 bg-card/80 p-4 backdrop-blur">
-              <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                Outcome so far
-              </p>
-              <p className="mt-2 text-lg font-semibold">
-                {failedTaskCount > 0 ? `${failedTaskCount} failed` : `${successTaskCount} succeeded`}
-              </p>
-            </div>
-          </div>
-
-          {/* Preview mode indicator */}
-          {state.isPreview && !isCompleted && (
-            <Alert className="glass-panel rounded-2xl text-slate-50 [&>svg]:text-sky-100">
-              <Eye className="size-4" />
-              <AlertTitle className="text-white">Preview Mode</AlertTitle>
-              <AlertDescription className="text-slate-200">
-                No changes will be made to your tenant. This is a dry run to show what would happen.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Warning for delete mode */}
-          {state.operationMode === "delete" && !state.isPreview && !isCompleted && (
-            <Alert className="border-red-500/70 bg-slate-950/90 text-slate-50 shadow-2xl shadow-slate-950/25 backdrop-blur-md [&>svg]:text-red-400">
-              <AlertTriangle className="size-4" />
-              <AlertTitle className="text-red-200">Delete Mode Active</AlertTitle>
-              <AlertDescription className="text-slate-200">
-                Deleting configurations from your tenant. Only objects created by Intune
-                Hydration Kit will be removed.
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Building Queue Indicator */}
-          {isBuildingQueue && tasks.length === 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Loader2 className="size-5 animate-spin text-blue-500" />
-                  Preparing Hydration
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Building task queue -- loading and validating templates for the selected categories.
-                  This may take a moment for large selections.
-                </p>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-muted">
-                  <div className="h-full w-full animate-pulse bg-gradient-to-r from-blue-500/40 via-blue-500 to-blue-500/40 rounded-full" />
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Progress Overview */}
-          {tasks.length > 0 && (
-            <ProgressBar
-              tasks={tasks}
-              title="Overall Progress"
-              description={`${tasks.filter((t) => t.status === "success" || t.status === "failed" || t.status === "skipped").length} of ${tasks.length} tasks completed`}
-            />
-          )}
-
-          {/* Execution Controls */}
-          {startTime && (
-            <ExecutionControls
-              tasks={tasks}
-              isPaused={isPaused}
-              isCompleted={isCompleted}
-              startTime={startTime}
-              endTime={endTime}
-              batchProgress={batchProgress}
-              onPause={isRunning && !isPaused ? pause : undefined}
-              onResume={isRunning && isPaused ? resume : undefined}
-              onCancel={isRunning ? cancel : undefined}
-              onDownloadLog={handleDownloadLog}
-            />
-          )}
-
-          {/* Activity Log - shows what's happening behind the scenes */}
-          <ActivityLog messages={activityLog} />
-
-          {/* Task List */}
-          <TaskList tasks={tasks} />
-
-          {/* Completion Message */}
-          {isCompleted && (
-            <Alert>
-              <AlertTitle>Execution Complete</AlertTitle>
-              <AlertDescription>
-                {summary
-                  ? `Successfully completed ${summary.stats.created + summary.stats.deleted} of ${summary.stats.total} tasks. ${summary.stats.failed > 0 ? `${summary.stats.failed} tasks failed.` : ""}`
-                  : "Execution completed. Redirecting to results..."}
-              </AlertDescription>
-            </Alert>
-          )}
-        </main>
-      </div>
+      <DashboardRunView
+        tasks={displayTasks}
+        summary={displaySummary}
+        outcome={displayOutcome}
+        fatalError={displayFatalError}
+        activityLog={displayActivityLog}
+        startTime={displayStartTime}
+        endTime={displayEndTime}
+        operationMode={displayOperationMode}
+        isPreview={displayIsPreview}
+        tenantName={displayTenantName}
+        tenantId={displayTenantId}
+        selectedObjectCount={selectedObjectCount}
+        phase={displayCompleted ? "completed" : phase}
+        batchProgress={restoredRecord ? null : batchProgress}
+        onPause={isRunning && !isPaused && !isCancelling ? pause : undefined}
+        onResume={isRunning && isPaused && !isCancelling ? resume : undefined}
+        onCancel={(isRunning || isBuildingQueue) && !isCancelling ? cancel : undefined}
+        onDownloadLog={handleDownloadLog}
+        onStartNewHydration={handleStartNewHydration}
+      />
     </ProtectedRoute>
   );
 }

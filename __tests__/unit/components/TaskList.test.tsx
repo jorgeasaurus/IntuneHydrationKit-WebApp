@@ -21,6 +21,7 @@ const tasks: HydrationTask[] = [
     operation: 'create',
     itemName: 'Corporate Devices',
     status: 'skipped',
+    skipKind: 'noOp',
     error: 'Already exists',
   },
   {

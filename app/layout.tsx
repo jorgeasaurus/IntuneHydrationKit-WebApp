@@ -10,6 +10,7 @@ import { RouteWallpaper } from "@/components/RouteWallpaper";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { SITE_URL } from "@/lib/siteUrl";
 import { Analytics } from "@vercel/analytics/next";
+import { ExecutionRouteGuard } from "@/components/dashboard/ExecutionRouteGuard";
 
 // DM Sans - Geometric, bold display font
 const dmSans = DM_Sans({
@@ -86,9 +87,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${dmSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}
-      >
+      <body className={`${dmSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         {/* Rendered outside MsalProvider (which gates SSR) so the JSON-LD is
             always present in the server HTML for crawlers. */}
         <StructuredData />
@@ -96,7 +95,7 @@ export default function RootLayout({
           <SettingsProvider>
             <WizardProvider>
               <RouteWallpaper />
-              {children}
+              <ExecutionRouteGuard>{children}</ExecutionRouteGuard>
               <Toaster />
               <Analytics />
             </WizardProvider>

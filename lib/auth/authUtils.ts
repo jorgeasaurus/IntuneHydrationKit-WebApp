@@ -1,6 +1,8 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
-import { APP_SETTINGS_STORAGE_KEY, EXECUTION_RESULT_STORAGE_KEYS } from "@/lib/storageKeys";
+import { APP_SETTINGS_STORAGE_KEY } from "@/lib/storageKeys";
+import { clearHydrationSession } from "@/lib/hydration/executionRecord";
+import { resetExecutionSession } from "@/lib/hydration/executionStateStore";
 
 /**
  * Get the active account from MSAL.
@@ -102,18 +104,8 @@ export async function signIn(): Promise<AccountInfo> {
 function clearSessionData(): void {
   if (typeof window === "undefined") return;
 
-  Object.values(EXECUTION_RESULT_STORAGE_KEYS).forEach((key) =>
-    sessionStorage.removeItem(key)
-  );
-
-  const keysToRemove: string[] = [];
-  for (let i = 0; i < sessionStorage.length; i++) {
-    const key = sessionStorage.key(i);
-    if (key?.startsWith("intune-hydration-templates-")) {
-      keysToRemove.push(key);
-    }
-  }
-  keysToRemove.forEach((key) => sessionStorage.removeItem(key));
+  clearHydrationSession(sessionStorage);
+  resetExecutionSession();
 
   // Clear persisted app settings so the next user on a shared browser starts clean
   if (typeof localStorage !== "undefined") {

@@ -259,6 +259,23 @@ describe("taskQueue", () => {
     expect(tasks[0].templatePath).toBe("cis/fetched.json");
   });
 
+  it("stops category fetches after queue cancellation", async () => {
+    let cancelled = false;
+    mockFetchDynamicGroups.mockImplementation(async () => {
+      cancelled = true;
+      return [];
+    });
+
+    await expect(
+      buildTaskQueueAsync(["groups", "filters"], "create", {
+        shouldCancel: () => cancelled,
+      }),
+    ).rejects.toThrow("Task queue construction cancelled");
+
+    expect(mockFetchStaticGroups).not.toHaveBeenCalled();
+    expect(mockFetchFilters).not.toHaveBeenCalled();
+  });
+
   it("returns zero for categories without metadata or explicit selections", () => {
     const count = getEstimatedCategoryCount("notification" as never);
 

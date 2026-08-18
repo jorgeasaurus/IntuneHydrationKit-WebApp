@@ -4,7 +4,7 @@
  */
 
 import { GraphClient } from "@/lib/graph/client";
-import { HydrationTask, OperationMode, BatchProgress, TaskCategory, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
+import { HydrationTask, OperationMode, BatchProgress, TaskCategory, CISCategoryId, BaselineSelection, CategorySelections, SkipKind } from "@/types/hydration";
 import {
   DeviceGroup,
   DeviceFilter,
@@ -13,6 +13,16 @@ import {
 import { BaselinePolicy } from "@/lib/templates/loader";
 import type { Win32LobApp } from "@/lib/graph/win32Apps";
 
+export const ACTIVITY_MESSAGE_TYPES = [
+  "info",
+  "progress",
+  "success",
+  "warning",
+  "error",
+] as const;
+
+export type ActivityMessageType = (typeof ACTIVITY_MESSAGE_TYPES)[number];
+
 /**
  * Activity message for status updates
  */
@@ -20,7 +30,7 @@ export interface ActivityMessage {
   id: string;
   timestamp: Date;
   message: string;
-  type: "info" | "progress" | "success" | "warning" | "error";
+  type: ActivityMessageType;
   /** Optional category for grouping (e.g., "prefetch", "delete", "create") */
   category?: string;
 }
@@ -75,14 +85,17 @@ export interface ExecutionContext {
 /**
  * Task execution result
  */
-export interface ExecutionResult {
+interface ExecutionResultBase {
   task: HydrationTask;
   success: boolean;
-  skipped: boolean;
   error?: string;
   warning?: string;
   createdId?: string;
 }
+
+export type ExecutionResult =
+  | (ExecutionResultBase & { skipped: false; skipKind?: never })
+  | (ExecutionResultBase & { skipped: true; skipKind: SkipKind });
 
 /**
  * CIS Policy type detection result
@@ -106,4 +119,6 @@ export interface BuildTaskQueueOptions {
   selectedCISCategories?: CISCategoryId[];
   baselineSelection?: BaselineSelection;
   categorySelections?: CategorySelections;
+  shouldCancel?: () => boolean;
+  onProgress?: (message: string, type?: ActivityMessage["type"]) => void;
 }

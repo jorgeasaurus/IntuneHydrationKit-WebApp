@@ -1,6 +1,6 @@
 {
   "name": "intune-hydration-kit-webapp",
-  "version": "2.6.48",
+  "version": "2.6.49",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -45,7 +45,8 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "0.134.0",
-    "vanta": "^0.5.24"
+    "vanta": "^0.5.24",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",

@@ -54,6 +54,8 @@ import {
   shouldLogConditionalAccessCreateFailure,
 } from "./conditionalAccessBatch";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
+import { markTaskSkipped } from "./taskTransitions";
+import { getTaskCategoryLabel } from "./categoryLabels";
 
 function markPreparedTasksCancelled(
   items: Array<{ task: HydrationTask }>,
@@ -63,12 +65,25 @@ function markPreparedTasksCancelled(
   const cancelledAt = new Date();
 
   for (const { task } of items) {
-    task.status = "skipped";
-    task.error = "Cancelled";
+    if (task.status !== "pending" && task.status !== "running") continue;
+    task.startTime ??= cancelledAt;
     task.endTime = cancelledAt;
-    results.push({ task, success: false, skipped: true, error: "Cancelled" });
+    markTaskSkipped(task, "cancelled", "Cancelled");
+    results.push({ task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled" });
     context.onTaskComplete?.(task);
   }
+}
+
+function markPendingTasksCancelled(
+  tasks: HydrationTask[],
+  results: ExecutionResult[],
+  context: ExecutionContext
+): void {
+  const pendingTasks: Array<{ task: HydrationTask }> = [];
+  for (const task of tasks) {
+    if (task.status === "pending") pendingTasks.push({ task });
+  }
+  markPreparedTasksCancelled(pendingTasks, results, context);
 }
 
 /**
@@ -103,7 +118,7 @@ interface PreparedBatchTask {
  */
 type BatchPrepareResult =
   | { type: "batch"; data: PreparedBatchTask }
-  | { type: "skip"; reason: string }
+  | { type: "skip"; reason: string; skipKind: "noOp" | "blocked" }
   | { type: "sequential" };
 
 /**
@@ -645,7 +660,7 @@ async function prepareTaskForBatch(
   switch (task.category) {
     case "groups": {
       const result = buildGroupRequestBody(task, context);
-      if (result.type === "skip") return { type: "skip", reason: result.reason };
+      if (result.type === "skip") return { type: "skip", reason: result.reason, skipKind: "noOp" };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
       endpoint = CATEGORY_ENDPOINTS.groups;
@@ -655,7 +670,7 @@ async function prepareTaskForBatch(
 
     case "filters": {
       const result = buildFilterRequestBody(task, context);
-      if (result.type === "skip") return { type: "skip", reason: result.reason };
+      if (result.type === "skip") return { type: "skip", reason: result.reason, skipKind: "noOp" };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
       endpoint = CATEGORY_ENDPOINTS.filters;
@@ -672,16 +687,16 @@ async function prepareTaskForBatch(
     case "conditionalAccess": {
       // Skip all CA policies if tenant lacks Entra ID Premium P1 license
       if (context.hasConditionalAccessLicense === false) {
-        return { type: "skip", reason: "No Entra ID Premium (P1) license" };
+        return { type: "skip", reason: "No Entra ID Premium (P1) license", skipKind: "blocked" };
       }
 
       // Check if policy already exists
       if (await policyExistsInCacheOrApi("ConditionalAccess", task.itemName, context)) {
-        return { type: "skip", reason: "Already exists" };
+        return { type: "skip", reason: "Already exists", skipKind: "noOp" };
       }
 
       const result = buildConditionalAccessRequestBody(task);
-      if (result.type === "skip") return { type: "skip", reason: result.reason };
+      if (result.type === "skip") return { type: "skip", reason: result.reason, skipKind: "blocked" };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
       endpoint = result.endpoint || CATEGORY_ENDPOINTS.conditionalAccess;
@@ -692,7 +707,7 @@ async function prepareTaskForBatch(
     case "baseline": {
       const baselineResult = await buildBaselineRequestBody(task, context);
       if (!baselineResult) return { type: "sequential" };
-      if ("skip" in baselineResult) return { type: "skip", reason: baselineResult.reason };
+      if ("skip" in baselineResult) return { type: "skip", reason: baselineResult.reason, skipKind: "noOp" };
       body = baselineResult.body;
       endpoint = baselineResult.endpoint;
       break;
@@ -705,7 +720,7 @@ async function prepareTaskForBatch(
         console.log(`[BatchExecutor] CIS task "${task.itemName}" could not be prepared for batch`);
         return { type: "sequential" };
       }
-      if ("skip" in cisResult) return { type: "skip", reason: cisResult.reason };
+      if ("skip" in cisResult) return { type: "skip", reason: cisResult.reason, skipKind: "noOp" };
       console.log(`[BatchExecutor] CIS task "${task.itemName}" prepared with endpoint: ${cisResult.endpoint}`);
       body = cisResult.body;
       endpoint = cisResult.endpoint;
@@ -748,20 +763,13 @@ export async function executeTasksInBatches(
   const results: ExecutionResult[] = [];
   const batchableTasks: PreparedBatchTask[] = [];
   const nonBatchableTasks: HydrationTask[] = [];
-  const skippedTasks: { task: HydrationTask; reason: string }[] = [];
+  const skippedTasks: { task: HydrationTask; reason: string; skipKind: "noOp" | "blocked" }[] = [];
 
   // Build a category summary for logging
   const categoryCounts = tasks.reduce((acc, t) => {
     acc[t.category] = (acc[t.category] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
-  const categoryNames: Record<string, string> = {
-    groups: "Entra Groups", filters: "Device Filters", compliance: "Compliance Policies",
-    conditionalAccess: "Conditional Access", appProtection: "App Protection",
-    enrollment: "Enrollment Profiles", baseline: "OpenIntuneBaseline",
-    cisBaseline: "CIS Baselines", notificationTemplates: "Notification Templates",
-  };
-
   emitStatus(context, `Preparing ${tasks.length} items for batch creation...`, "progress", "create");
   console.log(`[BatchExecutor] Preparing ${tasks.length} tasks for batch execution (batch size: ${config.defaultBatchSize})`);
   console.log(`[BatchExecutor] Task categories:`, categoryCounts);
@@ -773,6 +781,10 @@ export async function executeTasksInBatches(
   let categoryTotal = 0;
 
   for (let i = 0; i < tasks.length; i++) {
+    if ((await waitWhilePaused(context)) === "cancelled") {
+      markPendingTasksCancelled(tasks, results, context);
+      return results;
+    }
     const task = tasks[i];
 
     // Emit progress when entering a new category
@@ -780,7 +792,7 @@ export async function executeTasksInBatches(
       currentCategory = task.category;
       categoryTotal = categoryCounts[currentCategory] || 0;
       categoryProcessed = 0;
-      const friendlyName = categoryNames[currentCategory] || currentCategory;
+      const friendlyName = getTaskCategoryLabel(currentCategory);
       emitStatus(
         context,
         `Preparing ${friendlyName} (${categoryTotal} items)...`,
@@ -793,7 +805,7 @@ export async function executeTasksInBatches(
 
     // Emit progress every 25 items within large categories
     if (categoryTotal > 25 && categoryProcessed % 25 === 0) {
-      const friendlyName = categoryNames[currentCategory] || currentCategory;
+      const friendlyName = getTaskCategoryLabel(currentCategory);
       emitStatus(
         context,
         `Preparing ${friendlyName}: ${categoryProcessed}/${categoryTotal}...`,
@@ -812,7 +824,7 @@ export async function executeTasksInBatches(
         break;
       case "skip":
         console.log(`[BatchExecutor] ○ Task skipped: "${task.itemName}" - ${prepared.reason}`);
-        skippedTasks.push({ task, reason: prepared.reason });
+        skippedTasks.push({ task, reason: prepared.reason, skipKind: prepared.skipKind });
         break;
       case "sequential":
         console.log(`[BatchExecutor] ✗ Task needs sequential: "${task.itemName}"`);
@@ -823,13 +835,12 @@ export async function executeTasksInBatches(
 
   // Immediately add skipped tasks to results
   const skipTime = new Date();
-  for (const { task, reason } of skippedTasks) {
+  for (const { task, reason, skipKind } of skippedTasks) {
     // Update task status and error reason before notifying
-    task.status = "skipped";
-    task.error = reason;  // Set skip reason on task object for UI display
+    markTaskSkipped(task, skipKind, reason); // Set skip reason on task object for UI display
     task.startTime = skipTime;
     task.endTime = skipTime;
-    results.push({ task, success: false, skipped: true, error: reason });
+    results.push({ task, success: false, skipped: true, skipKind, error: reason });
     // Notify completion for skipped tasks
     context.onTaskComplete?.(task);
   }
@@ -1015,10 +1026,9 @@ async function executeBatchGroup(
             // Update caches
             updateCacheAfterCreate(task, response, context);
           } else if (isBatchResponseConflict(response.status)) {
-            task.status = "skipped";
-            task.error = "Already exists";  // Set skip reason on task object for UI display
+            markTaskSkipped(task, "noOp", "Already exists"); // Set skip reason on task object for UI display
             task.endTime = new Date();
-            results.push({ task, success: false, skipped: true, error: "Already exists" });
+            results.push({ task, success: false, skipped: true, skipKind: "noOp", error: "Already exists" });
             context.onTaskComplete?.(task);
           } else if (response.status === 504 && task.category === "compliance") {
             // Special handling for compliance policies with 504 timeout
@@ -1054,10 +1064,9 @@ async function executeBatchGroup(
             const privatePreviewFeatureName = getPrivatePreviewFeatureName(error);
             if (privatePreviewFeatureName) {
               const skipReason = getPrivatePreviewSkipReason(privatePreviewFeatureName);
-              task.status = "skipped";
-              task.error = skipReason;
+              markTaskSkipped(task, "blocked", skipReason);
               task.endTime = new Date();
-              results.push({ task, success: false, skipped: true, error: skipReason });
+              results.push({ task, success: false, skipped: true, skipKind: "blocked", error: skipReason });
               context.onTaskComplete?.(task);
               continue;
             }
@@ -1111,6 +1120,7 @@ async function executeBatchGroup(
     }
 
     if (context.shouldCancel?.()) {
+      markPreparedTasksCancelled(remainingTasks, results, context);
       break;
     }
 
@@ -1263,7 +1273,7 @@ export function isBatchableCategory(category: string): boolean {
  */
 type DeletePrepareResult =
   | { type: "batch"; data: PreparedBatchTask }
-  | { type: "skip"; reason: string }
+  | { type: "skip"; reason: string; skipKind: "noOp" | "blocked" }
   | { type: "sequential" };
 
 /**
@@ -1742,13 +1752,13 @@ async function prepareTaskForDeleteBatch(
 
   if (!resource) {
     console.log(`[BatchExecutor:DELETE] ○ Not found: "${task.itemName}"`);
-    return { type: "skip", reason: `Not found in tenant: "${task.itemName}" does not exist` };
+    return { type: "skip", reason: `Not found in tenant: "${task.itemName}" does not exist`, skipKind: "noOp" };
   }
 
   // Check for hydration marker
   if (!resource.hasMarker) {
     console.log(`[BatchExecutor:DELETE] ○ No hydration marker: "${task.itemName}"`);
-    return { type: "skip", reason: `Not created by Intune Hydration Kit (missing marker in description)` };
+    return { type: "skip", reason: `Not created by Intune Hydration Kit (missing marker in description)`, skipKind: "blocked" };
   }
 
   // Check for active assignments - skip deletion if policy is assigned
@@ -1759,11 +1769,11 @@ async function prepareTaskForDeleteBatch(
     resource.endpointType
   );
   if (assignmentCount === null) {
-    return { type: "skip", reason: "Could not verify active assignments - deletion skipped" };
+    return { type: "skip", reason: "Could not verify active assignments - deletion skipped", skipKind: "blocked" };
   }
   if (assignmentCount > 0) {
     console.log(`[BatchExecutor:DELETE] ○ Has assignments: "${task.itemName}" (${assignmentCount} assignment(s))`);
-    return { type: "skip", reason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting` };
+    return { type: "skip", reason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting`, skipKind: "blocked" };
   }
 
   // Determine API version
@@ -1800,13 +1810,17 @@ export async function executeDeleteTasksInBatches(
   const results: ExecutionResult[] = [];
   const batchableTasks: PreparedBatchTask[] = [];
   const nonBatchableTasks: HydrationTask[] = [];
-  const skippedTasks: { task: HydrationTask; reason: string }[] = [];
+  const skippedTasks: { task: HydrationTask; reason: string; skipKind: "noOp" | "blocked" }[] = [];
 
   console.log(`[BatchExecutor:DELETE] Preparing ${tasks.length} tasks for batch deletion (batch size: ${config.defaultBatchSize})`);
 
   // Separate tasks into: batchable, skipped, or needs sequential
   // Assignment checks are async, so we await each prepare
   for (let i = 0; i < tasks.length; i++) {
+    if ((await waitWhilePaused(context)) === "cancelled") {
+      markPendingTasksCancelled(tasks, results, context);
+      return results;
+    }
     const task = tasks[i];
     const prepared = await prepareTaskForDeleteBatch(task, context, `del-${i}`);
 
@@ -1815,7 +1829,7 @@ export async function executeDeleteTasksInBatches(
         batchableTasks.push(prepared.data);
         break;
       case "skip":
-        skippedTasks.push({ task, reason: prepared.reason });
+        skippedTasks.push({ task, reason: prepared.reason, skipKind: prepared.skipKind });
         break;
       case "sequential":
         nonBatchableTasks.push(task);
@@ -1825,12 +1839,11 @@ export async function executeDeleteTasksInBatches(
 
   // Immediately add skipped tasks to results
   const skipTime = new Date();
-  for (const { task, reason } of skippedTasks) {
-    task.status = "skipped";
-    task.error = reason;  // Set skip reason on task object for UI display
+  for (const { task, reason, skipKind } of skippedTasks) {
+    markTaskSkipped(task, skipKind, reason); // Set skip reason on task object for UI display
     task.startTime = skipTime;
     task.endTime = skipTime;
-    results.push({ task, success: false, skipped: true, error: reason });
+    results.push({ task, success: false, skipped: true, skipKind, error: reason });
     context.onTaskComplete?.(task);
   }
 
@@ -1972,10 +1985,9 @@ async function executeDeleteBatchGroup(
             updateCacheAfterDelete(task, context);
           } else if (response.status === 404) {
             // Already deleted
-            task.status = "skipped";
-            task.error = "Already deleted";  // Set skip reason on task object for UI display
+            markTaskSkipped(task, "noOp", "Already deleted"); // Set skip reason on task object for UI display
             task.endTime = new Date();
-            results.push({ task, success: false, skipped: true, error: "Already deleted" });
+            results.push({ task, success: false, skipped: true, skipKind: "noOp", error: "Already deleted" });
             context.onTaskComplete?.(task);
           } else if (response.status === 504 && task.category === "compliance") {
             // Special handling for compliance policies with 504 timeout
@@ -2029,6 +2041,7 @@ async function executeDeleteBatchGroup(
     }
 
     if (context.shouldCancel?.()) {
+      markPreparedTasksCancelled(chunks.slice(i + 1).flat(), results, context);
       break;
     }
 
@@ -2222,15 +2235,27 @@ export async function executeDeletesInParallel(
   emitStatus(context, `Preparing ${tasks.length} items for deletion...`, "progress", "delete");
 
   // Prepare all tasks first
-  const preparedTasks: Array<{
-    task: HydrationTask;
-    deleteUrl: string | null;
-    apiVersion: "v1.0" | "beta";
-    skipReason?: string;
-  }> = [];
+  type PreparedDeleteTask =
+    | {
+        task: HydrationTask;
+        deleteUrl: string;
+        apiVersion: "v1.0" | "beta";
+      }
+    | {
+        task: HydrationTask;
+        deleteUrl: null;
+        apiVersion: "v1.0" | "beta";
+        skipReason: string;
+        skipKind: "noOp" | "blocked";
+      };
+  const preparedTasks: PreparedDeleteTask[] = [];
 
   let checkedCount = 0;
   for (const task of tasks) {
+    if ((await waitWhilePaused(context)) === "cancelled") {
+      markPendingTasksCancelled(tasks, results, context);
+      return results;
+    }
     checkedCount++;
     // Emit progress every 10 items or on last item
     if (checkedCount % 10 === 0 || checkedCount === tasks.length) {
@@ -2245,6 +2270,7 @@ export async function executeDeletesInParallel(
         deleteUrl: null,
         apiVersion: "beta",
         skipReason: "Resource not found in tenant",
+        skipKind: "noOp",
       });
       continue;
     }
@@ -2255,6 +2281,7 @@ export async function executeDeletesInParallel(
         deleteUrl: null,
         apiVersion: "beta",
         skipReason: "Missing hydration marker - not created by this tool",
+        skipKind: "blocked",
       });
       continue;
     }
@@ -2265,6 +2292,7 @@ export async function executeDeletesInParallel(
         deleteUrl: null,
         apiVersion: "beta",
         skipReason: "Conditional Access deletion must use the sequential safety check",
+        skipKind: "blocked",
       });
       continue;
     }
@@ -2276,12 +2304,17 @@ export async function executeDeletesInParallel(
       resourceInfo.id,
       resourceInfo.endpointType
     );
+    if (context.shouldCancel?.()) {
+      markPendingTasksCancelled(tasks, results, context);
+      return results;
+    }
     if (assignmentCount === null) {
       preparedTasks.push({
         task,
         deleteUrl: null,
         apiVersion: "beta",
         skipReason: "Could not verify active assignments - deletion skipped",
+        skipKind: "blocked",
       });
       continue;
     }
@@ -2291,6 +2324,7 @@ export async function executeDeletesInParallel(
         deleteUrl: null,
         apiVersion: "beta",
         skipReason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting`,
+        skipKind: "blocked",
       });
       continue;
     }
@@ -2303,20 +2337,25 @@ export async function executeDeletesInParallel(
   }
 
   // Count by type
-  const toDelete = preparedTasks.filter((p) => p.deleteUrl);
-  const toSkip = preparedTasks.filter((p) => !p.deleteUrl);
+  const toDelete = preparedTasks.filter(
+    (item): item is Extract<PreparedDeleteTask, { deleteUrl: string }> =>
+      item.deleteUrl !== null
+  );
+  const toSkip = preparedTasks.filter(
+    (item): item is Extract<PreparedDeleteTask, { deleteUrl: null }> =>
+      item.deleteUrl === null
+  );
 
   console.log(`[FastDelete] ${toDelete.length} to delete, ${toSkip.length} to skip`);
   emitStatus(context, `Deleting ${toDelete.length} items (${toSkip.length} skipped)...`, "info", "delete");
 
   // Process skipped tasks immediately
   const skipTime = new Date();
-  for (const { task, skipReason } of toSkip) {
-    task.status = "skipped";
-    task.error = skipReason;
+  for (const { task, skipReason, skipKind } of toSkip) {
+    markTaskSkipped(task, skipKind, skipReason);
     task.startTime = skipTime;
     task.endTime = skipTime;
-    results.push({ task, success: false, skipped: true, error: skipReason });
+    results.push({ task, success: false, skipped: true, skipKind, error: skipReason });
     context.onTaskComplete?.(task);
   }
 
@@ -2344,7 +2383,7 @@ export async function executeDeletesInParallel(
 
     // Execute all deletes in this batch concurrently with retry logic
     const batchResults = await Promise.all(
-      batch.map(async ({ task, deleteUrl, apiVersion }) => {
+      batch.map(async ({ task, deleteUrl, apiVersion }): Promise<ExecutionResult> => {
         task.status = "running";
         task.startTime = new Date();
         context.onTaskStart?.(task);
@@ -2357,7 +2396,7 @@ export async function executeDeletesInParallel(
           try {
             // Preview mode: skip actual API call and cache updates
             if (!context.isPreview) {
-              await context.client.delete(deleteUrl!, apiVersion);
+              await context.client.delete(deleteUrl, apiVersion);
               updateCacheAfterDelete(task, context);
             }
 
@@ -2394,11 +2433,10 @@ export async function executeDeletesInParallel(
               console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms (${is429Error ? "throttled" : "transient"})`);
               const waitResult = await sleepWithExecutionControl(retryDelay, context);
               if (waitResult === "cancelled") {
-                task.status = "skipped";
-                task.error = "Cancelled";
+                markTaskSkipped(task, "cancelled", "Cancelled");
                 task.endTime = new Date();
                 context.onTaskComplete?.(task);
-                return { task, success: false, skipped: true, error: "Cancelled" };
+                return { task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled" };
               }
               continue;
             }

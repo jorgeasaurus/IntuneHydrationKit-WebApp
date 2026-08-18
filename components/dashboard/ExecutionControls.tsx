@@ -2,15 +2,27 @@
 
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Pause, Play, Square, Download, Layers } from "lucide-react";
-import { HydrationTask, BatchProgress } from "@/types/hydration";
+import {
+  HydrationTask,
+  BatchProgress,
+  ExecutionOutcome,
+} from "@/types/hydration";
 import { formatDateTime } from "@/lib/utils/dateFormat";
 
 interface ExecutionControlsProps {
   tasks: HydrationTask[];
   isPaused: boolean;
+  isCancelling: boolean;
   isCompleted: boolean;
+  outcome: ExecutionOutcome | null;
   startTime: Date;
   endTime?: Date | null;
   batchProgress?: BatchProgress | null;
@@ -37,7 +49,9 @@ function formatDuration(ms: number): string {
 export function ExecutionControls({
   tasks,
   isPaused,
+  isCancelling,
   isCompleted,
+  outcome,
   startTime,
   endTime,
   batchProgress,
@@ -61,26 +75,38 @@ export function ExecutionControls({
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(
-    (t) => t.status === "success" || t.status === "failed" || t.status === "skipped"
+    (t) =>
+      t.status === "success" || t.status === "failed" || t.status === "skipped",
   ).length;
 
   // Calculate estimated time remaining
-  const avgTimePerTask =
-    completedTasks > 0 ? elapsedTime / completedTasks : 0;
+  const avgTimePerTask = completedTasks > 0 ? elapsedTime / completedTasks : 0;
   const remainingTasks = totalTasks - completedTasks;
   const estimatedTimeRemaining = avgTimePerTask * remainingTasks;
+  const displayedElapsedTime =
+    isCompleted && endTime
+      ? Math.max(0, endTime.getTime() - startTime.getTime())
+      : elapsedTime;
+  const executionDescription =
+    outcome === "failed"
+      ? "Execution failed"
+      : outcome === "cancelled"
+        ? "Execution cancelled"
+        : outcome === "completedWithIssues"
+          ? "Execution completed with issues"
+          : isCompleted
+            ? "Execution completed"
+            : isCancelling
+              ? "Cancellation pending"
+              : isPaused
+                ? "Execution paused"
+                : "Execution in progress";
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Execution Controls</CardTitle>
-        <CardDescription>
-          {isCompleted
-            ? "Execution completed"
-            : isPaused
-              ? "Execution paused"
-              : "Execution in progress"}
-        </CardDescription>
+        <CardDescription>{executionDescription}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Batch Progress Indicator */}
@@ -98,7 +124,9 @@ export function ExecutionControls({
                   <p className="font-mono text-[10px] uppercase tracking-[0.22em] text-sky-200">
                     Graph batch
                   </p>
-                  <h3 className="mt-1 text-sm font-semibold text-white">Batch processing</h3>
+                  <h3 className="mt-1 text-sm font-semibold text-white">
+                    Batch processing
+                  </h3>
                   <p className="mt-1 text-xs text-slate-400">
                     Parallel requests are active for the current task group.
                   </p>
@@ -106,7 +134,10 @@ export function ExecutionControls({
               </div>
 
               <span className="inline-flex shrink-0 items-center gap-2 self-start rounded-full border border-emerald-300/20 bg-emerald-300/10 px-3 py-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-emerald-100">
-                <span aria-hidden="true" className="size-1.5 animate-pulse rounded-full bg-emerald-300" />
+                <span
+                  aria-hidden="true"
+                  className="size-1.5 animate-pulse rounded-full bg-emerald-300"
+                />
                 Active
               </span>
             </div>
@@ -114,20 +145,28 @@ export function ExecutionControls({
             <div className="space-y-3 p-4">
               <div className="grid grid-cols-3 gap-3 text-sm">
                 <div>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Batch</p>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+                    Batch
+                  </p>
                   <p className="mt-1 font-medium tabular-nums text-white">
                     {batchProgress.currentBatch} / {batchProgress.totalBatches}
                   </p>
                 </div>
                 <div>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Capacity</p>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+                    Capacity
+                  </p>
                   <p className="mt-1 font-medium tabular-nums text-white">
                     {batchProgress.itemsInBatch} per batch
                   </p>
                 </div>
                 <div>
-                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">Graph API</p>
-                  <p className="mt-1 font-medium text-white">{batchProgress.apiVersion}</p>
+                  <p className="font-mono text-[9px] uppercase tracking-[0.18em] text-slate-500">
+                    Graph API
+                  </p>
+                  <p className="mt-1 font-medium text-white">
+                    {batchProgress.apiVersion}
+                  </p>
                 </div>
               </div>
 
@@ -138,7 +177,8 @@ export function ExecutionControls({
                 className="h-1.5 w-full overflow-hidden rounded-full bg-white/10 accent-sky-300 [&::-moz-progress-bar]:bg-sky-300 [&::-webkit-progress-bar]:bg-white/10 [&::-webkit-progress-value]:bg-sky-300"
               />
               <p className="text-xs text-slate-400">
-                Processing {batchProgress.itemsInBatch} items through the Graph API $batch endpoint.
+                Processing {batchProgress.itemsInBatch} items through the Graph
+                API $batch endpoint.
               </p>
             </div>
           </section>
@@ -148,11 +188,15 @@ export function ExecutionControls({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-1">
             <p className="text-sm text-muted-foreground">Elapsed Time</p>
-            <p className="text-2xl font-bold font-mono">{formatDuration(elapsedTime)}</p>
+            <p className="text-2xl font-bold font-mono">
+              {formatDuration(displayedElapsedTime)}
+            </p>
           </div>
           {!isCompleted && remainingTasks > 0 && completedTasks > 0 && (
             <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">Estimated Remaining</p>
+              <p className="text-sm text-muted-foreground">
+                Estimated Remaining
+              </p>
               <p className="text-2xl font-bold font-mono">
                 {formatDuration(estimatedTimeRemaining)}
               </p>
@@ -169,13 +213,15 @@ export function ExecutionControls({
           {isCompleted && (
             <div>
               <p className="text-muted-foreground">Completed</p>
-              <p className="font-medium">{endTime ? formatDateTime(endTime) : "Completed"}</p>
+              <p className="font-medium">
+                {endTime ? formatDateTime(endTime) : "Completed"}
+              </p>
             </div>
           )}
         </div>
 
         {/* Control Buttons */}
-        {!isCompleted && (
+        {!isCompleted && !isCancelling && (
           <div className="flex gap-2">
             {!isPaused ? (
               <Button
@@ -211,6 +257,16 @@ export function ExecutionControls({
               Cancel
             </Button>
           </div>
+        )}
+
+        {isCancelling && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm text-amber-100"
+          >
+            Waiting for the active request to finish. No new work will start.
+          </p>
         )}
 
         {/* Download Log */}

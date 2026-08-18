@@ -60,12 +60,12 @@ export async function executeEnrollmentTask(
       );
 
       if (existingProfile) {
-        return { task, success: true, skipped: true, error: "Already exists" };
+        return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
       }
     }
 
     if (await enrollmentProfileExists(client, template)) {
-      return { task, success: true, skipped: true, error: "Already exists" };
+      return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
     }
     if (isPreview) {
       return { task, success: true, skipped: false };
@@ -85,7 +85,7 @@ export async function executeEnrollmentTask(
 
   if (mode === "delete") {
     if (!(await enrollmentProfileExists(client, template))) {
-      return { task, success: true, skipped: true, error: "Not found in tenant" };
+      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
     }
     if (isPreview) {
       return { task, success: true, skipped: false };
@@ -95,7 +95,7 @@ export async function executeEnrollmentTask(
       return { task, success: true, skipped: false };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, error: errorMessage };
+      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
     }
   }
 

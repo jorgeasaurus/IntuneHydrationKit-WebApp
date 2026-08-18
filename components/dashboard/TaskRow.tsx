@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HydrationTask, TaskStatus } from "@/types/hydration";
-import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
+import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 
 const STATUS_CONFIG: Record<
   TaskStatus,

@@ -32,6 +32,7 @@ const mixedTasks: HydrationTask[] = [
     operation: 'create',
     itemName: 'BYOD Devices',
     status: 'skipped',
+    skipKind: 'noOp',
   },
 ]
 

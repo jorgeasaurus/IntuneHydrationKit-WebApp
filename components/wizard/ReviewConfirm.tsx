@@ -1,22 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useWizardState } from "@/hooks/useWizardState";
+import { clearExecutionRecord } from "@/lib/hydration/executionRecord";
+import { getExecutionState, resetExecutionSession, subscribeExecutionState } from "@/lib/hydration/executionStateStore";
 import { SensitiveData } from "@/components/SensitiveData";
 import { ExecutionApprovalCard } from "@/components/wizard/ExecutionApprovalCard";
 import { TEMPLATE_METADATA } from "@/templates";
 import { getEstimatedTaskCount, getEstimatedCategoryCount } from "@/lib/hydration/engine";
-import {
-  AlertTriangle,
-  CheckCircle2,
-  Eye,
-  ShieldAlert,
-  Sparkles,
-} from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, ShieldAlert, Sparkles } from "lucide-react";
 
 const CLOUD_ENVIRONMENT_LABELS = {
   global: "Global (Commercial)",
@@ -26,10 +22,7 @@ const CLOUD_ENVIRONMENT_LABELS = {
   china: "China (21Vianet)",
 } as const;
 
-function getModeLabel(
-  operationMode: "create" | "delete" | undefined,
-  isPreview: boolean
-): string {
+function getModeLabel(operationMode: "create" | "delete" | undefined, isPreview: boolean): string {
   const baseLabel = operationMode === "delete" ? "Delete" : "Create";
 
   if (isPreview) {
@@ -39,10 +32,7 @@ function getModeLabel(
   return baseLabel;
 }
 
-function getActionButtonText(
-  operationMode: "create" | "delete" | undefined,
-  isPreview: boolean
-): string {
+function getActionButtonText(operationMode: "create" | "delete" | undefined, isPreview: boolean): string {
   if (isPreview) {
     return operationMode === "delete" ? "Preview Delete" : "Preview Create";
   }
@@ -50,10 +40,7 @@ function getActionButtonText(
   return operationMode === "delete" ? "Start Deletion" : "Start Hydration";
 }
 
-function getOutcomeSummary(
-  operationMode: "create" | "delete" | undefined,
-  isPreview: boolean
-): string {
+function getOutcomeSummary(operationMode: "create" | "delete" | undefined, isPreview: boolean): string {
   if (isPreview) {
     return `Read-only preview of ${operationMode === "delete" ? "eligible deletions" : "new objects"}.`;
   }
@@ -69,57 +56,46 @@ export function ReviewConfirm(): React.JSX.Element {
   const { state, setConfirmed, previousStep } = useWizardState();
   const [acknowledged, setAcknowledged] = useState(false);
   const router = useRouter();
+  const executionState = useSyncExternalStore(subscribeExecutionState, getExecutionState, getExecutionState);
+  const hasActiveExecution = executionState.phase !== "idle" && executionState.phase !== "completed";
+  const hasVisibleActiveExecution = hasActiveExecution && executionState.configuration !== null;
 
   function handleStart(): void {
+    if (hasActiveExecution) return;
+    resetExecutionSession();
+    clearExecutionRecord(sessionStorage);
     setConfirmed(true);
     router.push("/dashboard");
   }
 
-  const estimatedObjects = getEstimatedTaskCount(
-    state.selectedTargets,
-    state.categorySelections
-  );
+  const estimatedObjects = getEstimatedTaskCount(state.selectedTargets, state.categorySelections);
   const showConditionalAccessReminder =
     state.operationMode === "create" && state.selectedTargets.includes("conditionalAccess");
 
   return (
     <Card className="data-card rounded-2xl border bg-card/90 backdrop-blur">
       <CardHeader>
-        <p className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">
-          Final Briefing
-        </p>
+        <p className="text-[11px] font-mono uppercase tracking-[0.28em] text-hydrate">Final Briefing</p>
         <CardTitle>Review & Confirm</CardTitle>
-        <CardDescription>
-          Review scope, safety rails, and impact before the run starts.
-        </CardDescription>
+        <CardDescription>Review scope, safety rails, and impact before the run starts.</CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-              Operation
-            </p>
-            <p className="mt-2 text-lg font-semibold">
-              {getModeLabel(state.operationMode, state.isPreview)}
-            </p>
+            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Operation</p>
+            <p className="mt-2 text-lg font-semibold">{getModeLabel(state.operationMode, state.isPreview)}</p>
           </div>
           <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-              Categories
-            </p>
+            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Categories</p>
             <p className="mt-2 text-lg font-semibold">{state.selectedTargets.length}</p>
           </div>
           <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-              Estimated objects
-            </p>
+            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Estimated objects</p>
             <p className="mt-2 text-lg font-semibold">{estimatedObjects}</p>
           </div>
           <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
-            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-              Readiness
-            </p>
+            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Readiness</p>
             <p className="mt-2 text-lg font-semibold">
               {state.prerequisiteResult?.isValid ? "Validated" : "Review warnings"}
             </p>
@@ -136,9 +112,7 @@ export function ReviewConfirm(): React.JSX.Element {
 
               <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                    Tenant
-                  </p>
+                  <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Tenant</p>
                   <p className="mt-2 text-sm font-medium">
                     <SensitiveData value={state.tenantConfig?.tenantName} fallback="Not set" />
                   </p>
@@ -151,23 +125,17 @@ export function ReviewConfirm(): React.JSX.Element {
                     Cloud environment
                   </p>
                   <p className="mt-2 text-sm font-medium">
-                    {state.tenantConfig
-                      ? CLOUD_ENVIRONMENT_LABELS[state.tenantConfig.cloudEnvironment]
-                      : "Not set"}
+                    {state.tenantConfig ? CLOUD_ENVIRONMENT_LABELS[state.tenantConfig.cloudEnvironment] : "Not set"}
                   </p>
                 </div>
                 <div>
                   <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
                     Execution mode
                   </p>
-                  <p className="mt-2 text-sm font-medium">
-                    {getModeLabel(state.operationMode, state.isPreview)}
-                  </p>
+                  <p className="mt-2 text-sm font-medium">{getModeLabel(state.operationMode, state.isPreview)}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-                    Outcome
-                  </p>
+                  <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Outcome</p>
                   <p className="mt-2 text-sm text-muted-foreground">
                     {getOutcomeSummary(state.operationMode, state.isPreview)}
                   </p>
@@ -233,8 +201,7 @@ export function ReviewConfirm(): React.JSX.Element {
                     : "Live mode will begin immediately after acknowledgement; completed actions are not rolled back on cancel."}
                 </div>
                 <div className="rounded-xl border border-border/80 bg-card/70 p-4">
-                  Conditional Access policies must be disabled before deletion. Review them
-                  manually after create runs.
+                  Conditional Access policies must be disabled before deletion. Review them manually after create runs.
                 </div>
               </div>
             </div>
@@ -244,15 +211,14 @@ export function ReviewConfirm(): React.JSX.Element {
                 <AlertTriangle className="size-4" />
                 <AlertTitle>Conditional Access reminder</AlertTitle>
                 <AlertDescription>
-                  The run can create Conditional Access templates, but you should review and
-                  enable those policies manually after verification.
+                  The run can create Conditional Access templates, but you should review and enable those policies
+                  manually after verification.
                 </AlertDescription>
               </Alert>
             )}
 
             {state.prerequisiteResult &&
-              (state.prerequisiteResult.warnings.length > 0 ||
-                state.prerequisiteResult.errors.length > 0) && (
+              (state.prerequisiteResult.warnings.length > 0 || state.prerequisiteResult.errors.length > 0) && (
                 <Alert className="border-blue-500/30 bg-blue-500/10">
                   {state.prerequisiteResult.errors.length > 0 ? (
                     <AlertTriangle className="size-4" />
@@ -281,13 +247,26 @@ export function ReviewConfirm(): React.JSX.Element {
           onApprovedChange={setAcknowledged}
         />
 
+        {hasActiveExecution && (
+          <Alert role="status" aria-live="polite">
+            <AlertTitle>
+              {hasVisibleActiveExecution ? "A hydration run is active" : "The previous run is stopping"}
+            </AlertTitle>
+            <AlertDescription>
+              {hasVisibleActiveExecution
+                ? "Return to the dashboard to monitor or cancel the current run."
+                : "Wait for the current request to finish before you start another run."}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex gap-4">
           <Button variant="outline" onClick={previousStep} className="flex-1">
             Back
           </Button>
           <Button
             onClick={handleStart}
-            disabled={!acknowledged && !state.isPreview}
+            disabled={hasActiveExecution || (!acknowledged && !state.isPreview)}
             className="flex-1"
           >
             {getActionButtonText(state.operationMode, state.isPreview)}

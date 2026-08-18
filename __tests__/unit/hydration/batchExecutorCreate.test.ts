@@ -158,6 +158,7 @@ describe("executeTasksInBatches", () => {
       skipped: true,
       error: "Already exists",
     });
+    expect(task.skipKind).toBe("noOp");
     expect(client.batch).not.toHaveBeenCalled();
   });
 

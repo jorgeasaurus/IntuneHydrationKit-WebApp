@@ -45,6 +45,7 @@ export async function executeGroupTask(
         task,
         success: true,
         skipped: true,
+        skipKind: "noOp",
         error: "Already exists",
       };
     }
@@ -109,7 +110,7 @@ export async function executeGroupTask(
     });
 
     if (!existingGroup) {
-      return { task, success: true, skipped: true, error: "Not found in tenant" };
+      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
     }
 
     // Preview mode - would delete
@@ -124,7 +125,7 @@ export async function executeGroupTask(
     } catch (error) {
       // Group not found or not created by hydration kit - skip
       const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, error: errorMessage };
+      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
     }
   }
 

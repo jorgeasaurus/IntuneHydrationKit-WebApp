@@ -16,14 +16,9 @@ import {
   XCircle,
 } from "lucide-react";
 import { SensitiveData } from "@/components/SensitiveData";
-import { getTaskCategoryLabel } from "@/components/dashboard/categoryLabels";
+import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -35,12 +30,14 @@ import {
 } from "@/lib/hydration/reporter";
 import { cn } from "@/lib/utils";
 import { formatDateTime } from "@/lib/utils/dateFormat";
-import type { HydrationSummary, HydrationTask } from "@/types/hydration";
+import { isExpectedNoOpSkip } from "@/lib/hydration/executionOutcome";
+import type { HydrationSummary, HydrationTask, ReportableExecutionOutcome } from "@/types/hydration";
 
 interface ResultsSummaryProps {
   summary: HydrationSummary;
   tasks: HydrationTask[];
   isPreview?: boolean;
+  outcome: ReportableExecutionOutcome;
 }
 
 type ResultOutcome =
@@ -50,6 +47,7 @@ type ResultOutcome =
   | "change"
   | "unchanged"
   | "blocked"
+  | "cancelled"
   | "warning"
   | "unfinished";
 
@@ -107,6 +105,13 @@ const OUTCOME_STYLES: Record<
     iconClassName: "text-red-100",
     rowClassName: "border-red-300/25 bg-red-950/20",
   },
+  cancelled: {
+    label: "Cancelled",
+    Icon: MinusCircle,
+    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    iconClassName: "text-amber-100",
+    rowClassName: "border-amber-300/20 bg-amber-950/10",
+  },
   warning: {
     label: "Warning",
     Icon: AlertTriangle,
@@ -133,23 +138,25 @@ function formatDuration(ms: number): string {
   return `${seconds}s`;
 }
 
-function isNoOpSkip(task: HydrationTask): boolean {
-  const evidence = task.error || task.warning || "";
-  return /\b(already exists|not found|does not exist)\b/i.test(evidence);
-}
-
 function getTaskOutcome(task: HydrationTask, isPreview: boolean): ResultOutcome {
   if (!isPreview) {
     if (task.status === "failed") return "failed";
     if (task.status === "pending" || task.status === "running") return "unfinished";
-    if (task.status === "skipped") return "skipped";
+    if (task.status === "skipped") {
+      if (task.skipKind === "noOp") return "skipped";
+      if (task.skipKind === "cancelled") return "cancelled";
+      return "blocked";
+    }
     if (task.warning) return "warning";
     return "success";
   }
 
   if (task.status === "failed") return "blocked";
   if (task.status === "pending" || task.status === "running") return "unfinished";
-  if (task.status === "skipped") return isNoOpSkip(task) ? "unchanged" : "blocked";
+  if (task.status === "skipped") {
+    if (task.skipKind === "cancelled") return "cancelled";
+    return isExpectedNoOpSkip(task) ? "unchanged" : "blocked";
+  }
   if (task.warning) return "warning";
   return "change";
 }
@@ -157,19 +164,19 @@ function getTaskOutcome(task: HydrationTask, isPreview: boolean): ResultOutcome 
 function isIssueTask(task: HydrationTask, isPreview: boolean): boolean {
   const outcome = getTaskOutcome(task, isPreview);
   return isPreview
-    ? outcome === "blocked" || outcome === "warning" || outcome === "unfinished"
-    : outcome !== "success";
+    ? outcome === "blocked" || outcome === "cancelled" || outcome === "warning" || outcome === "unfinished"
+    : outcome === "blocked" ||
+        outcome === "cancelled" ||
+        outcome === "failed" ||
+        outcome === "warning" ||
+        outcome === "unfinished";
 }
 
 function getOutcomeCount(tasks: HydrationTask[], outcome: ResultOutcome, isPreview: boolean): number {
   return tasks.filter((task) => getTaskOutcome(task, isPreview) === outcome).length;
 }
 
-export function ResultsSummary({
-  summary,
-  tasks,
-  isPreview = false,
-}: ResultsSummaryProps): React.JSX.Element {
+export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: ResultsSummaryProps): React.JSX.Element {
   const issueData = useMemo(() => {
     const categories = new Set<string>();
     let taskCount = 0;
@@ -182,18 +189,13 @@ export function ResultsSummary({
 
     return { categories, taskCount };
   }, [isPreview, tasks]);
-  const [openCategories, setOpenCategories] = useState<string[]>(() =>
-    Array.from(issueData.categories)
-  );
+  const [openCategories, setOpenCategories] = useState<string[]>(() => Array.from(issueData.categories));
   const [issuesOnly, setIssuesOnly] = useState(false);
   const [showAllCategories, setShowAllCategories] = useState<Set<string>>(() => new Set());
 
   const categoryNames = useMemo(
-    () => Array.from(new Set([
-      ...Object.keys(summary.categoryBreakdown),
-      ...tasks.map((task) => task.category),
-    ])),
-    [summary.categoryBreakdown, tasks]
+    () => Array.from(new Set([...Object.keys(summary.categoryBreakdown), ...tasks.map((task) => task.category)])),
+    [summary.categoryBreakdown, tasks],
   );
 
   const visibleCategories = issuesOnly
@@ -202,17 +204,31 @@ export function ResultsSummary({
 
   const actionLabel = summary.operationMode === "create" ? "Created" : "Deleted";
   const actionCount = summary.operationMode === "create" ? summary.stats.created : summary.stats.deleted;
-  const successRate = summary.stats.total > 0
-    ? Math.round(((summary.stats.created + summary.stats.deleted) / summary.stats.total) * 100)
-    : 0;
+  const successRate =
+    summary.stats.total > 0
+      ? Math.round(((summary.stats.created + summary.stats.deleted) / summary.stats.total) * 100)
+      : 0;
+  const receiptTitle =
+    outcome === "cancelled"
+      ? isPreview
+        ? "Preview cancelled"
+        : "Run cancelled"
+      : outcome === "completedWithIssues"
+        ? isPreview
+          ? "Preview complete with issues"
+          : "Run complete with issues"
+        : isPreview
+          ? "Preview complete"
+          : "Run complete";
 
   function handleDownload(fileFormat: "md" | "json" | "csv"): void {
-    const content = fileFormat === "md"
-      ? generateMarkdownReport(summary, tasks)
-      : fileFormat === "json"
-        ? generateJSONReport(summary, tasks)
-        : generateCSVReport(tasks);
-    downloadReport(content, generateReportFilename(summary.operationMode, fileFormat));
+    const content =
+      fileFormat === "md"
+        ? generateMarkdownReport(summary, tasks, outcome, isPreview)
+        : fileFormat === "json"
+          ? generateJSONReport(summary, tasks, outcome, isPreview)
+          : generateCSVReport(tasks, outcome, isPreview);
+    downloadReport(content, generateReportFilename(summary.operationMode, fileFormat, isPreview));
   }
 
   function handleIssuesOnly(): void {
@@ -242,28 +258,38 @@ export function ResultsSummary({
         </Alert>
       )}
 
-      <Card className="overflow-hidden">
+      <Card
+        className={cn(
+          "overflow-hidden",
+          outcome === "cancelled" || outcome === "completedWithIssues"
+            ? "border-amber-300/35"
+            : "border-emerald-300/25",
+        )}
+      >
         <CardHeader className="border-b border-white/10 bg-black/15">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-sky-200">
                 {isPreview ? "Preview receipt" : "Run receipt"}
               </p>
-              <CardTitle className="mt-2">{isPreview ? "Preview complete" : "Run complete"}</CardTitle>
-              <CardDescription className="mt-1">
-                Completed {formatDateTime(summary.endTime)}
-              </CardDescription>
+              <CardTitle
+                className={cn(
+                  "mt-2",
+                  outcome === "cancelled" || outcome === "completedWithIssues" ? "text-amber-100" : "text-emerald-100",
+                )}
+              >
+                {receiptTitle}
+              </CardTitle>
+              <CardDescription className="mt-1">Completed {formatDateTime(summary.endTime)}</CardDescription>
             </div>
 
             <div className="flex flex-wrap gap-2 text-xs text-slate-200">
               <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
-                <SensitiveData
-                  value={summary.tenantName || summary.tenantId}
-                  fallback="Tenant unavailable"
-                />
+                <SensitiveData value={summary.tenantName || summary.tenantId} fallback="Tenant unavailable" />
               </span>
               <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 capitalize">
-                {summary.operationMode}{isPreview ? " preview" : " live"}
+                {summary.operationMode}
+                {isPreview ? " preview" : " live"}
               </span>
               <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 tabular-nums">
                 {formatDuration(summary.duration)}
@@ -294,6 +320,7 @@ export function ResultsSummary({
             <p className="mt-1 text-2xl font-semibold text-red-200">
               {isPreview
                 ? getOutcomeCount(tasks, "blocked", true) +
+                  getOutcomeCount(tasks, "cancelled", true) +
                   getOutcomeCount(tasks, "warning", true) +
                   getOutcomeCount(tasks, "unfinished", true)
                 : summary.stats.failed}
@@ -312,13 +339,9 @@ export function ResultsSummary({
         <CardHeader className="border-b border-white/10 bg-black/15">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-sky-200">
-                Run evidence
-              </p>
+              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-sky-200">Run evidence</p>
               <CardTitle className="mt-2">Results by category</CardTitle>
-              <CardDescription className="mt-1">
-                Open a category to inspect its tasks.
-              </CardDescription>
+              <CardDescription className="mt-1">Open a category to inspect its tasks.</CardDescription>
             </div>
             {issueData.categories.size > 0 && (
               <Button
@@ -337,12 +360,7 @@ export function ResultsSummary({
         </CardHeader>
 
         <CardContent className="pt-6">
-          <Accordion
-            type="multiple"
-            value={openCategories}
-            onValueChange={setOpenCategories}
-            className="space-y-3"
-          >
+          <Accordion type="multiple" value={openCategories} onValueChange={setOpenCategories} className="space-y-3">
             {visibleCategories.map((category) => {
               const categoryTasks = tasks.filter((task) => task.category === category);
               const filteredTasks = issuesOnly
@@ -351,8 +369,8 @@ export function ResultsSummary({
               const showAll = showAllCategories.has(category);
               const shownTasks = showAll ? filteredTasks : filteredTasks.slice(0, TASK_PREVIEW_LIMIT);
               const outcomes: ResultOutcome[] = isPreview
-                ? ["change", "unchanged", "blocked", "warning", "unfinished"]
-                : ["success", "skipped", "failed", "warning", "unfinished"];
+                ? ["change", "unchanged", "blocked", "cancelled", "warning", "unfinished"]
+                : ["success", "skipped", "blocked", "cancelled", "failed", "warning", "unfinished"];
 
               return (
                 <AccordionItem
@@ -378,7 +396,7 @@ export function ResultsSummary({
                               aria-label={`${presentation.label}: ${count}`}
                               className={cn(
                                 "inline-flex items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] uppercase tracking-[0.1em]",
-                                presentation.className
+                                presentation.className,
                               )}
                             >
                               <presentation.Icon aria-hidden="true" className="size-3" />
@@ -399,10 +417,7 @@ export function ResultsSummary({
                         return (
                           <li
                             key={task.id}
-                            className={cn(
-                              "rounded-lg border bg-slate-950/55 px-3 py-2.5",
-                              presentation.rowClassName
-                            )}
+                            className={cn("rounded-lg border bg-slate-950/55 px-3 py-2.5", presentation.rowClassName)}
                           >
                             <div className="flex items-start gap-3">
                               <presentation.Icon
@@ -414,15 +429,15 @@ export function ResultsSummary({
                                   {task.itemName}
                                 </p>
                                 {(task.error || task.warning) && (
-                                  <p className="mt-1 text-xs leading-5 text-slate-400">
-                                    {task.error || task.warning}
-                                  </p>
+                                  <p className="mt-1 text-xs leading-5 text-slate-400">{task.error || task.warning}</p>
                                 )}
                               </div>
-                              <span className={cn(
-                                "shrink-0 rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em]",
-                                presentation.className
-                              )}>
+                              <span
+                                className={cn(
+                                  "shrink-0 rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em]",
+                                  presentation.className,
+                                )}
+                              >
                                 {presentation.label}
                               </span>
                             </div>

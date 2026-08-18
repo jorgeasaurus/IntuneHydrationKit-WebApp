@@ -6,34 +6,80 @@ import { PrerequisiteCheckResult } from "./prerequisites";
 
 export type CloudEnvironment = "global";
 
-export type OperationMode = "create" | "delete";
+export const OPERATION_MODES = ["create", "delete"] as const;
 
-export type TaskStatus = "pending" | "running" | "success" | "failed" | "skipped";
+export type OperationMode = (typeof OPERATION_MODES)[number];
 
-export type TaskCategory =
-  | "groups"
-  | "filters"
-  | "compliance"
-  | "appProtection"
-  | "win32Apps"
-  | "conditionalAccess"
-  | "enrollment"
-  | "notification"
-  | "baseline"
-  | "cisBaseline";
+export const TASK_STATUSES = [
+  "pending",
+  "running",
+  "success",
+  "failed",
+  "skipped",
+] as const;
 
-export interface HydrationTask {
+export const NON_SKIPPED_TASK_STATUSES = [
+  "pending",
+  "running",
+  "success",
+  "failed",
+] as const;
+
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+export const SKIP_KINDS = ["noOp", "blocked", "cancelled"] as const;
+
+export type SkipKind = (typeof SKIP_KINDS)[number];
+
+export const EXECUTION_OUTCOMES = [
+  "succeeded",
+  "completedWithIssues",
+  "cancelled",
+  "failed",
+] as const;
+
+export const REPORTABLE_EXECUTION_OUTCOMES = [
+  "succeeded",
+  "completedWithIssues",
+  "cancelled",
+] as const;
+
+export type ExecutionOutcome = (typeof EXECUTION_OUTCOMES)[number];
+export type ReportableExecutionOutcome = (typeof REPORTABLE_EXECUTION_OUTCOMES)[number];
+
+export const TASK_CATEGORIES = [
+  "groups",
+  "filters",
+  "compliance",
+  "appProtection",
+  "win32Apps",
+  "conditionalAccess",
+  "enrollment",
+  "notification",
+  "baseline",
+  "cisBaseline",
+] as const;
+
+export type TaskCategory = (typeof TASK_CATEGORIES)[number];
+
+interface HydrationTaskBase {
   id: string;
   category: TaskCategory;
   operation: OperationMode;
   itemName: string;
   templatePath?: string;
-  status: TaskStatus;
   error?: string;
   warning?: string;
   startTime?: Date;
   endTime?: Date;
 }
+
+export type HydrationTask =
+  | (HydrationTaskBase & { status: "skipped"; skipKind: SkipKind })
+  | (HydrationTaskBase & {
+      status: Exclude<TaskStatus, "skipped">;
+      skipKind?: never;
+    });
 
 /**
  * Batch execution statistics

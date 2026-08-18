@@ -3,6 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen, waitFor } from '@testing-library/react'
 import { Navigation } from '@/components/Navigation'
+import {
+  beginExecution,
+  finishExecution,
+  forceResetExecutionSessionForTests,
+  getExecutionState
+} from '@/lib/hydration/executionStateStore'
+import { EXECUTION_RECORD_STORAGE_KEY } from '@/lib/storageKeys'
 
 const push = vi.fn()
 const signIn = vi.fn()
@@ -51,6 +58,8 @@ vi.mock('@/hooks/useWizardState', () => ({
 describe('Navigation', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    sessionStorage.clear()
+    forceResetExecutionSessionForTests()
     usePathname.mockReturnValue('/')
   })
 
@@ -87,6 +96,21 @@ describe('Navigation', () => {
     const user = userEvent.setup()
     useIsAuthenticated.mockReturnValue(true)
     usePathname.mockReturnValue('/templates')
+    const runId = beginExecution({
+      tenantId: 'tenant-1',
+      homeAccountId: 'account-1',
+      operationMode: 'create',
+      isPreview: false,
+      selectedObjectCount: 1
+    })
+    if (runId === null) throw new Error('Expected a test run ID')
+    finishExecution(runId, {
+      endTime: new Date('2026-08-17T04:00:00.000Z'),
+      summary: null,
+      outcome: 'failed',
+      fatalError: 'Test completion'
+    })
+    sessionStorage.setItem(EXECUTION_RECORD_STORAGE_KEY, '{"outcome":"failed"}')
 
     render(<Navigation />)
 
@@ -96,6 +120,8 @@ describe('Navigation', () => {
     await user.click(screen.getByRole('button', { name: /launch wizard/i }))
 
     expect(resetWizard).toHaveBeenCalled()
+    expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).toBeNull()
+    expect(getExecutionState().phase).toBe('idle')
     expect(push).toHaveBeenCalledWith('/wizard')
   })
 
