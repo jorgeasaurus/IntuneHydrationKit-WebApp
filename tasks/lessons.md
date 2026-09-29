@@ -91,3 +91,4 @@
 
 - Describe future version numbers in filter rules as exclusive numeric bounds, not as available OS releases.
 - Prerequisite warnings on the fixed dark wizard need pale text and icons on dark glass; do not rely on dark-mode variants.
+- React 18 custom elements need a literal `class` attribute; verify the rendered DOM before claiming CSS overrides apply.

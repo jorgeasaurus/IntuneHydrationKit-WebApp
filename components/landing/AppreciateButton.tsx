@@ -11,7 +11,7 @@ export function AppreciateButton() {
       {createElement("appreciate-button", {
         "data-key": "pk_c440eace02dec266630193de97790e55",
         "data-label": "Appreciate Intune Hydration Kit",
-        className: "appreciate-widget",
+        class: "appreciate-widget",
       })}
       <Script
         src="https://appreciate-button.com/widget.js"

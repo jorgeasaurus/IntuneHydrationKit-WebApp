@@ -1813,3 +1813,11 @@
 - [x] Configure the public button key; production origin returns HTTP 200.
 - [x] Check TypeScript and the existing landing-page tests.
 - [x] Verify the rendered widget and CSP. Four landing tests and TypeScript pass. Local counting is blocked by the service origin allowlist (403).
+
+## PR #72 review validation (2026-09-29)
+
+- [x] Fix the React 18 custom-element CSS attribute (`class`, not `className`); add a focused key, label, CSS class, and script test. Five landing tests and TypeScript pass.
+- [x] Production-origin widget config and count GET requests return HTTP 200. Count response: total 0, remaining 10. No production click was submitted.
+- [x] Graph beta accepted all ten temporary, unassigned OS filters. Preview matched the Windows 25H2 record (10.0.26200.8875), excluded 10.0.26300.8935, and returned zero for the other nine rules.
+- [x] Delete all ten temporary filters; confirm all 43 original filters and their rules remain unchanged.
+- Scope: app-only Graph validation, not browser delegated-auth validation. No Apple device records were available; positive Apple matching remains untested.
