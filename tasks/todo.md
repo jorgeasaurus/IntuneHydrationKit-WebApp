@@ -1787,3 +1787,29 @@
 - Rounds 3-10 repaired route-safe execution ownership, cancellation and pause semantics, typed terminal evidence, account-bound restore, report fidelity, stop-on-first-error behavior, and focused regression gaps.
 - Round 11 returned zero findings from behavior, structure, and test reviewers.
 - Checks passed: 604 tests, type check, lint, production build, and `git diff --check`.
+
+
+## Assignment filter version properties
+
+- [x] Replace deprecated OS filter properties with bounded version rules.
+- [x] Confirm the cache is memory-only and increment the website version.
+- [x] Check version boundaries and review the diff.
+- [x] Open PR #71.
+
+### Review
+
+- Preserve each Windows build and Apple major version. Tenant validation is required before release.
+
+- Results: 42 focused tests, TypeScript, and diff checks passed. Independent review found no issues. Live tenant validation is pending.
+
+- [x] Add the iOS/iPadOS 27 filter and update its manifest count. The exclusive bound 28 is not a release claim.
+- Validation: 43 focused tests, TypeScript, manifest counts, and diff checks passed.
+
+- [x] Fix prerequisite warning contrast. TenantConfig tests passed (11); authenticated visual validation remains with the local test session.
+
+## Appreciate Button
+
+- [x] Add the landing footer widget, dark-background colors, and CSP origins.
+- [x] Configure the public button key; production origin returns HTTP 200.
+- [x] Check TypeScript and the existing landing-page tests.
+- [x] Verify the rendered widget and CSP. Four landing tests and TypeScript pass. Local counting is blocked by the service origin allowlist (403).

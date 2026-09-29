@@ -12,7 +12,7 @@ export const DEVICE_FILTER_TEMPLATE_MANIFEST = [
   { path: "Filters/Windows-OSVersion-Filters.json", count: 3 },
   { path: "Filters/Windows-VM-Filters.json", count: 12 },
   { path: "Filters/iOS-Filters.json", count: 3 },
-  { path: "Filters/iOS-OSVersion-Filters.json", count: 2 },
+  { path: "Filters/iOS-OSVersion-Filters.json", count: 3 },
   { path: "Filters/macOS-Architecture-Filters.json", count: 2 },
   { path: "Filters/macOS-Filters.json", count: 3 },
   { path: "Filters/macOS-OSVersion-Filters.json", count: 4 },
