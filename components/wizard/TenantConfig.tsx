@@ -418,16 +418,16 @@ export function TenantConfig(): React.JSX.Element {
             )}
 
             {prerequisiteStatus === "warning" && prerequisiteResult && (
-              <Alert className="border-amber-500/30 bg-amber-500/10">
-                <AlertTriangle className="size-4 text-amber-600 dark:text-amber-400" />
-                <AlertTitle className="text-amber-900 dark:text-amber-100">
+              <Alert className="border-amber-300/40 bg-slate-950/80 text-amber-50 backdrop-blur-xl [&>svg]:text-amber-200">
+                <AlertTriangle className="size-4 text-amber-200" />
+                <AlertTitle className="text-amber-50">
                   Prerequisites met with warnings
                 </AlertTitle>
-                <AlertDescription className="text-amber-800 dark:text-amber-200">
+                <AlertDescription className="text-amber-100">
                   <div className="mt-2 space-y-2 text-sm">
                     {prerequisiteResult.warnings.map((warning) => (
                       <div key={warning} className="flex items-start gap-2">
-                        <AlertTriangle className="mt-0.5 size-3 flex-shrink-0 text-amber-600 dark:text-amber-400" />
+                        <AlertTriangle className="mt-0.5 size-3 flex-shrink-0 text-amber-200" />
                         <span>{warning}</span>
                       </div>
                     ))}
