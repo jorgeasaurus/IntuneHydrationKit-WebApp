@@ -478,3 +478,13 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+.appreciate-widget {
+  --appreciate-size: 2rem;
+  --appreciate-default: #38bdf8;
+  --appreciate-hover: #7dd3fc;
+  --appreciate-clicked: #0ea5e9;
+  --appreciate-full: #38bdf8;
+  color: #fff;
+  min-height: 2rem;
+}

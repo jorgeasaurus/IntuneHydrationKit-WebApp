@@ -25,6 +25,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { AppreciateButton } from "@/components/landing/AppreciateButton";
 import { Navigation } from "@/components/Navigation";
 import { WebAppDemo } from "@/components/WebAppDemo";
 import {
@@ -588,7 +589,8 @@ function FinalCta({
 function Footer() {
   return (
     <footer className="border-t py-8">
-      <div className="container mx-auto px-4 sm:px-6">
+      <div className="container mx-auto space-y-6 px-4 sm:px-6">
+        <AppreciateButton />
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground" suppressHydrationWarning>
