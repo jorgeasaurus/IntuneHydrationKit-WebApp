@@ -119,7 +119,9 @@ export async function executeBaselineTask(
 
       } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
         // DeviceConfiguration and UpdatePolicies use deviceConfigurations endpoint
-        const policies = context.cachedDeviceConfigurations ?? await client.getCollection<{ id: string; displayName: string }>(
+        const policies = context.cachedDeviceConfigurations?.length
+          ? context.cachedDeviceConfigurations
+          : await client.getCollection<{ id: string; displayName: string }>(
           "/deviceManagement/deviceConfigurations?$select=id,displayName"
         );
         const existingPolicy = findBaselineMatch("DeviceConfiguration", policyName, policies);
@@ -136,7 +138,9 @@ export async function executeBaselineTask(
 
       } else if (policyType === "DriverUpdateProfiles") {
         // DriverUpdateProfiles endpoint doesn't support $filter, fetch all and filter client-side
-        const policies = context.cachedDriverUpdateProfiles ?? await client.getCollection<{ id: string; displayName: string }>(
+        const policies = context.cachedDriverUpdateProfiles?.length
+          ? context.cachedDriverUpdateProfiles
+          : await client.getCollection<{ id: string; displayName: string }>(
           "/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName"
         );
         const existingProfile = findBaselineMatch("DriverUpdateProfiles", policyName, policies);

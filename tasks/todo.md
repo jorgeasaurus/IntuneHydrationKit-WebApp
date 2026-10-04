@@ -1953,3 +1953,13 @@
 - Omitted type annotations and collection order no longer produce false differences. Returned type conflicts, duplicate member counts, and changed values remain significant. The actual Local Administrators template is covered by regressions.
 - Member differences show baseline/tenant counts. Match IDs, repeated names, and raw paths are closed by default under Technical details. Existing saved runs require a new preview to refresh their evidence.
 - Passed: 104 focused comparison, report, persistence, and UI tests; type check; lint; diff check; React Doctor 100/100. Independent UI review found no issues. No live tenant reads or writes.
+
+# PR 74 Copilot fixes
+
+- [x] Retry empty device configuration and driver inventories; prevent creation if the retry fails.
+- [x] Normalize PowerShell report categories to web categories before comparison.
+- [ ] Verify regressions, push fixes, and request a fresh Copilot review of the new head.
+
+Review cycle 1: three actionable threads on `31d5e63`. Live tenant validation remains required before merge.
+
+Fix validation: 685 tests, type check, lint, and diff check passed. The fresh review result is tracked on PR 74.

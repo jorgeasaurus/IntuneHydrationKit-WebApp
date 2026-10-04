@@ -80,6 +80,42 @@ describe("executeBaselineTask", () => {
     mockCompliancePolicyExistsByName.mockResolvedValue(false);
   });
 
+  describe.each([
+    ["DeviceConfiguration", "cachedDeviceConfigurations", "/deviceManagement/deviceConfigurations?$select=id,displayName"],
+    ["DriverUpdateProfiles", "cachedDriverUpdateProfiles", "/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName"],
+  ] as const)("%s empty-cache recovery", (policyType, cacheKey, endpoint) => {
+    it("checks an empty cache again and skips an existing policy", async () => {
+      const name = "[IHD] Existing Baseline";
+      mockGetCachedTemplates.mockReturnValue([{ displayName: name, _oibPolicyType: policyType }]);
+      const client = createClient();
+      vi.mocked(client.getCollection).mockResolvedValue([{ id: "existing-id", displayName: name }]);
+      const result = await executeBaselineTask(createTask(name), {
+        client, operationMode: "create", isPreview: false, stopOnFirstError: true, [cacheKey]: [],
+      });
+      expect(client.getCollection).toHaveBeenCalledWith(endpoint);
+      expect(result).toMatchObject({ success: true, skipped: true, skipKind: "noOp" });
+      expect(mockCreateDeviceConfigurationPolicy).not.toHaveBeenCalled();
+      expect(mockCreateDriverUpdateProfile).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])("stops when the fresh read fails (preview=%s)", async (isPreview) => {
+      const name = "[IHD] Unverified Baseline";
+      mockGetCachedTemplates.mockReturnValue([{ displayName: name, _oibPolicyType: policyType }]);
+      const client = createClient();
+      vi.mocked(client.getCollection).mockRejectedValue(new Error("Policy inventory could not be read"));
+      const result = await executeBaselineTask(createTask(name), {
+        client, operationMode: "create", isPreview, stopOnFirstError: true, [cacheKey]: [],
+      });
+      expect(client.getCollection).toHaveBeenCalledWith(endpoint);
+      expect(result).toMatchObject({ success: false, skipped: false, error: "Policy inventory could not be read" });
+      expect(mockCreateDeviceConfigurationPolicy).not.toHaveBeenCalled();
+      expect(mockCreateDriverUpdateProfile).not.toHaveBeenCalled();
+      expect(client.post).not.toHaveBeenCalled();
+      expect(client.patch).not.toHaveBeenCalled();
+      expect(client.delete).not.toHaveBeenCalled();
+    });
+  });
+
   it("skips a normalized Settings Catalog match in stop-on-first-error execution", async () => {
     const name = "[IHD] Win - OIB - SC - Device Security - D - Windows Package Manager - v3.5";
     const existingName = name.replace("Manager -", "Manager  -");

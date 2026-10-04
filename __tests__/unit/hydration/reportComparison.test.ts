@@ -113,6 +113,48 @@ describe("local report comparison", () => {
     expect(parseComparisonReport(empty)).toMatchObject({ execution: "preview", tasks: [] });
   });
 
+  it("matches the PowerShell result taxonomy to web task categories", () => {
+    // New-HydrationResult / Invoke-GraphBatchOperation types from PowerShell bb21df3.
+    const categories: Array<[string, HydrationTask["category"]]> = [
+      ["DynamicGroup", "groups"], ["StaticGroup", "groups"],
+      ["DeviceFilter", "filters"], ["CompliancePolicy", "compliance"],
+      ["AppProtection", "appProtection"], ["ConditionalAccessPolicy", "conditionalAccess"],
+      ["WinGetWin32App", "win32Apps"], ["NotificationTemplate", "notification"],
+      ["NotificationTemplateLocalizedMessage", "notification"],
+      ["EnrollmentProfile", "enrollment"], ["EnrollmentTemplate", "enrollment"],
+      ["AutopilotDeploymentProfile", "enrollment"], ["AutopilotDevicePreparation", "enrollment"],
+      ["EnrollmentStatusPage", "enrollment"], ["MacOSDEPEnrollmentProfile", "enrollment"],
+      ["BaselinePolicy", "baseline"], ["BYOD/AppProtection", "baseline"],
+      ["MACOS/IntuneManagement", "baseline"], ["WINDOWS/IntuneManagement", "baseline"],
+      ["WINDOWS365/IntuneManagement", "baseline"], ["CISBaselinePolicy", "cisBaseline"],
+      ["CISBaseline/8.0 - Windows 11 Benchmarks", "cisBaseline"],
+      ["CISBaseline/5.0 - Linux Benchmarks", "cisBaseline"],
+    ];
+    const tasks: HydrationTask[] = categories.map(([type, category], index) => ({
+      id: String(index), category, operation: "create", status: "success", itemName: `Example ${type}`,
+    }));
+    const ps = `# Intune Hydration Summary
+**Mode:** Live
+| Total Operations | ${tasks.length} |
+## All Operations
+| Timestamp | Type | Name | Action | ID | Details |
+|-----------|------|------|--------|-----|---------|
+${categories.map(([type], index) => `| 2026-10-03 19:37:32 | ${type} | ${tasks[index].itemName} | Created | example-id | |`).join("\n")}`;
+    const summary = createSummary("example-tenant", "create", new Date("2026-10-04T02:00:00Z"), new Date("2026-10-04T02:01:00Z"), tasks);
+    const parsedPs = parseComparisonReport(ps);
+    for (const web of [generateJSONReport(summary, tasks, "succeeded", false), generateMarkdownReport(summary, tasks, "succeeded", false)]) {
+      expect(compareReports(parsedPs, parseComparisonReport(web)).differences).toEqual([]);
+    }
+  });
+
+  it.each(["MobileApp", "WinGetRemediation", "Unknown"])("keeps PowerShell-only %s tasks distinct", (type) => {
+    const ps = powershell.replace("WINDOWS/IntuneManagement", type);
+    const parsed = parseComparisonReport(ps);
+    expect(parsed.tasks[0].category).toBe(type);
+    const web = { ...parsed, tasks: [{ ...parsed.tasks[0], category: "Win32 Apps" }, parsed.tasks[1]] };
+    expect(compareReports(parsed, web).differences).toHaveLength(2);
+  });
+
   it("enforces file size, extension and empty-file guards", () => {
     expect(() => validateComparisonFile({ name: "report.md", size: 12 })).not.toThrow();
     expect(() => validateComparisonFile({ name: "report.html", size: 12 })).toThrow("Markdown");

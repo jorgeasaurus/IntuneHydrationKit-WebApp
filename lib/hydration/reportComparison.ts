@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { TASK_CATEGORY_LABELS } from "@/lib/hydration/categoryLabels";
+import type { TaskCategory } from "@/types/hydration";
 
 export const MAX_COMPARISON_FILE_BYTES = 2 * 1024 * 1024;
 
@@ -34,11 +35,39 @@ export function validateComparisonFile(file: Pick<File, "name" | "size">): void 
   if (file.size === 0) throw new Error("The report file is empty.");
 }
 
+// Result Type labels emitted by the PowerShell import and delete functions.
+const POWERSHELL_CATEGORY_KEYS: Record<string, TaskCategory> = {
+  DynamicGroup: "groups",
+  StaticGroup: "groups",
+  DeviceFilter: "filters",
+  CompliancePolicy: "compliance",
+  AppProtection: "appProtection",
+  ConditionalAccessPolicy: "conditionalAccess",
+  WinGetWin32App: "win32Apps",
+  EnrollmentProfile: "enrollment",
+  EnrollmentTemplate: "enrollment",
+  AutopilotDeploymentProfile: "enrollment",
+  AutopilotDevicePreparation: "enrollment",
+  EnrollmentStatusPage: "enrollment",
+  MacOSDEPEnrollmentProfile: "enrollment",
+  NotificationTemplate: "notification",
+  NotificationTemplateLocalizedMessage: "notification",
+  BaselinePolicy: "baseline",
+  CISBaselinePolicy: "cisBaseline",
+};
+
 function canonicalCategory(value: string): string {
   if (/^(BYOD\/AppProtection|(?:WINDOWS|MACOS|WINDOWS365)\/IntuneManagement)$/i.test(value)) {
-    return "OpenIntuneBaseline";
+    return TASK_CATEGORY_LABELS.baseline;
   }
-  return TASK_CATEGORY_LABELS[value as keyof typeof TASK_CATEGORY_LABELS] ?? value;
+  if (/^CISBaseline\/.+/i.test(value)) return TASK_CATEGORY_LABELS.cisBaseline;
+  if (Object.hasOwn(POWERSHELL_CATEGORY_KEYS, value)) {
+    return TASK_CATEGORY_LABELS[POWERSHELL_CATEGORY_KEYS[value]];
+  }
+  // MobileApp, WinGetRemediation, and Unknown have no matching web task category.
+  return Object.hasOwn(TASK_CATEGORY_LABELS, value)
+    ? TASK_CATEGORY_LABELS[value as keyof typeof TASK_CATEGORY_LABELS]
+    : value;
 }
 
 function executionMode(value: string | null): ComparisonReport["execution"] {
