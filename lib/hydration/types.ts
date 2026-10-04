@@ -45,6 +45,7 @@ export interface ExecutionContext {
   operationMode: OperationMode;
   isPreview: boolean;
   stopOnFirstError: boolean;
+  onSequentialTask?: (task: HydrationTask) => void;
   onTaskStart?: (task: HydrationTask) => void;
   onTaskComplete?: (task: HydrationTask) => void;
   onTaskError?: (task: HydrationTask, error: Error) => void;

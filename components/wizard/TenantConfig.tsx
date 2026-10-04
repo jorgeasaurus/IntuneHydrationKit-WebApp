@@ -92,6 +92,234 @@ function createTraceFromResult(result: PrerequisiteCheckResult): ValidationTrace
   };
 }
 
+type HealthCheckContext = {
+  prerequisiteResult: PrerequisiteCheckResult | null;
+  validationTrace: ValidationTraceState;
+};
+
+function getOrganizationCheck({
+  prerequisiteResult,
+  validationTrace,
+}: HealthCheckContext): PrerequisiteTraceItem {
+  return {
+    id: "organization",
+    title: "Graph connectivity",
+    value:
+      validationTrace.organization === "checking" ? (
+        "Querying the organization endpoint…"
+      ) : validationTrace.organization === "pending" ? (
+        "Queued"
+      ) : (
+        <SensitiveData
+          value={prerequisiteResult?.organization?.displayName}
+          fallback="Organization unavailable"
+        />
+      ),
+    detail: prerequisiteResult?.organization
+      ? "Connected to the selected tenant and organization endpoint."
+      : "Confirm the app can resolve tenant organization details.",
+    status: validationTrace.organization,
+    icon: Cloud,
+  };
+}
+
+function getIntuneLicenseCheck({
+  prerequisiteResult,
+  validationTrace,
+}: HealthCheckContext): PrerequisiteTraceItem {
+  const licenses = prerequisiteResult?.licenses;
+  return {
+    id: "intuneLicense",
+    title: "Intune license",
+    value:
+      validationTrace.intuneLicense === "checking"
+        ? "Reading subscribed service plans…"
+        : validationTrace.intuneLicense === "pending"
+          ? "Queued"
+          : !licenses
+            ? "License check failed"
+            : licenses.hasIntuneLicense
+              ? `${licenses.intuneServicePlans.length} service plan(s)`
+              : "No qualifying license",
+    detail: !licenses
+      ? "License details could not be retrieved. Review the validation error and run the checks again."
+      : licenses.hasIntuneLicense
+        ? licenses.intuneServicePlans.join(", ")
+        : "An Intune-capable subscription is required before execution can continue.",
+    status: validationTrace.intuneLicense,
+    icon: ShieldCheck,
+  };
+}
+
+function getConditionalAccessCheck({
+  prerequisiteResult,
+  validationTrace,
+}: HealthCheckContext): PrerequisiteTraceItem {
+  const licenses = prerequisiteResult?.licenses;
+  return {
+    id: "conditionalAccess",
+    title: "Conditional Access readiness",
+    value:
+      validationTrace.conditionalAccess === "checking"
+        ? "Evaluating Entra entitlements…"
+        : validationTrace.conditionalAccess === "pending"
+          ? "Queued"
+          : !licenses
+            ? "License check failed"
+            : licenses.hasPremiumP2License
+              ? "Risk-based CA supported"
+              : licenses.hasConditionalAccessLicense
+                ? "Basic CA only"
+                : "CA will be skipped",
+    detail: !licenses
+      ? "Conditional Access licensing could not be evaluated. Review the validation error and run the checks again."
+      : licenses.hasPremiumP2License
+        ? "Premium P2 found for advanced Conditional Access templates."
+        : licenses.hasConditionalAccessLicense
+          ? "P1-equivalent licensing exists, but risk-based templates will be skipped."
+          : "No qualifying Entra ID Premium license detected for Conditional Access creation.",
+    status: validationTrace.conditionalAccess,
+    icon: Sparkles,
+  };
+}
+
+function getDriverUpdatesCheck({
+  prerequisiteResult,
+  validationTrace,
+}: HealthCheckContext): PrerequisiteTraceItem {
+  const licenses = prerequisiteResult?.licenses;
+  return {
+    id: "driverUpdates",
+    title: "Driver update profiles",
+    value:
+      validationTrace.driverUpdates === "checking"
+        ? "Evaluating Windows entitlements…"
+        : validationTrace.driverUpdates === "pending"
+          ? "Queued"
+          : !licenses
+            ? "License check failed"
+            : licenses.hasWindowsDriverUpdateLicense
+              ? "Windows entitlement detected"
+              : "Will be skipped",
+    detail: !licenses
+      ? "Windows entitlement licensing could not be evaluated. Review the validation error and run the checks again."
+      : licenses.hasWindowsDriverUpdateLicense
+        ? "Windows E3/E5-compatible licensing is available for driver update templates."
+        : "Windows Driver Update profiles require Windows Enterprise or equivalent Microsoft 365 licensing.",
+    status: validationTrace.driverUpdates,
+    icon: KeyRound,
+  };
+}
+
+function TenantValidationNotices({
+  hasAccount,
+  prerequisiteStatus,
+  prerequisiteResult,
+}: {
+  hasAccount: boolean;
+  prerequisiteStatus: PrerequisiteCheckStatus;
+  prerequisiteResult: PrerequisiteCheckResult | null;
+}): React.JSX.Element {
+  return (
+    <>
+      {hasAccount && (
+        <div className="space-y-3 border-t border-border/70 pt-4">
+          {prerequisiteStatus === "success" && prerequisiteResult && (
+            <Alert className="border-emerald-300/45 bg-emerald-500/18 text-emerald-50">
+              <CheckCircle2 className="size-4 text-emerald-200" />
+              <AlertTitle className="text-emerald-50">
+                All prerequisites met
+              </AlertTitle>
+              <AlertDescription className="text-emerald-100">
+                Validation passed. You have the baseline licensing needed to
+                continue with this wizard.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {prerequisiteStatus === "warning" && prerequisiteResult && (
+            <Alert className="border-amber-300/40 bg-slate-950/80 text-amber-50 backdrop-blur-xl [&>svg]:text-amber-200">
+              <AlertTriangle className="size-4 text-amber-200" />
+              <AlertTitle className="text-amber-50">
+                Prerequisites met with warnings
+              </AlertTitle>
+              <AlertDescription className="text-amber-100">
+                <div className="mt-2 space-y-2 text-sm">
+                  {prerequisiteResult.warnings.map((warning) => (
+                    <div key={warning} className="flex items-start gap-2">
+                      <AlertTriangle className="mt-0.5 size-3 flex-shrink-0 text-amber-200" />
+                      <span>{warning}</span>
+                    </div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {prerequisiteStatus === "error" && prerequisiteResult && (
+            <Alert className="border-red-500/30 bg-red-500/10">
+              <XCircle className="size-4 text-red-600 dark:text-red-400" />
+              <AlertTitle className="text-red-800 dark:text-red-200">
+                Prerequisite check failed
+              </AlertTitle>
+              <AlertDescription className="text-red-700 dark:text-red-300">
+                <div className="mt-2 space-y-2 text-sm">
+                  {prerequisiteResult.errors.map((error) => (
+                    <div key={error} className="flex items-start gap-2">
+                      <XCircle className="mt-0.5 size-3 flex-shrink-0" />
+                      <span>{error}</span>
+                    </div>
+                  ))}
+                  {prerequisiteResult.warnings.length > 0 && (
+                    <div className="mt-3 border-t border-red-200 pt-3 dark:border-red-800">
+                      {prerequisiteResult.warnings.map((warning) => (
+                        <div key={warning} className="flex items-start gap-2">
+                          <AlertTriangle className="mt-0.5 size-3 flex-shrink-0" />
+                          <span>{warning}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      )}
+    </>
+  );
+}
+
+function TenantValidationStatus({
+  prerequisiteStatus,
+  prerequisiteResult,
+  validatedAt,
+}: {
+  prerequisiteStatus: PrerequisiteCheckStatus;
+  prerequisiteResult: PrerequisiteCheckResult | null;
+  validatedAt: string | null;
+}): React.JSX.Element {
+  return (
+    <div className="rounded-2xl border border-border/80 bg-background/60 px-4 py-3 text-sm">
+      <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
+        Validation status
+      </p>
+      <p className="mt-2 font-medium">
+        {prerequisiteStatus === "checking"
+          ? "Running checks"
+          : prerequisiteResult?.isValid
+            ? "Ready to continue"
+            : "Action required"}
+      </p>
+      {validatedAt && (
+        <p className="mt-1 text-xs text-muted-foreground">
+          Last checked at {validatedAt} UTC
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function TenantConfig(): React.JSX.Element {
   const {
     state,
@@ -219,91 +447,12 @@ export function TenantConfig(): React.JSX.Element {
       timeZone: "UTC",
     }).format(new Date(prerequisiteResult.timestamp));
   }, [prerequisiteResult?.timestamp, userLocale]);
-  const licenses = prerequisiteResult?.licenses;
-  const healthChecks: PrerequisiteTraceItem[] = [
-    {
-      id: "organization",
-      title: "Graph connectivity",
-      value: validationTrace.organization === "checking"
-        ? "Querying the organization endpoint…"
-        : validationTrace.organization === "pending"
-          ? "Queued"
-          : (
-              <SensitiveData
-                value={prerequisiteResult?.organization?.displayName}
-                fallback="Organization unavailable"
-              />
-            ),
-      detail: prerequisiteResult?.organization
-        ? "Connected to the selected tenant and organization endpoint."
-        : "Confirm the app can resolve tenant organization details.",
-      status: validationTrace.organization,
-      icon: Cloud,
-    },
-    {
-      id: "intuneLicense",
-      title: "Intune license",
-      value: validationTrace.intuneLicense === "checking"
-        ? "Reading subscribed service plans…"
-        : validationTrace.intuneLicense === "pending"
-          ? "Queued"
-          : !licenses
-            ? "License check failed"
-            : licenses.hasIntuneLicense
-              ? `${licenses.intuneServicePlans.length} service plan(s)`
-              : "No qualifying license",
-      detail: !licenses
-        ? "License details could not be retrieved. Review the validation error and run the checks again."
-        : licenses.hasIntuneLicense
-          ? licenses.intuneServicePlans.join(", ")
-          : "An Intune-capable subscription is required before execution can continue.",
-      status: validationTrace.intuneLicense,
-      icon: ShieldCheck,
-    },
-    {
-      id: "conditionalAccess",
-      title: "Conditional Access readiness",
-      value: validationTrace.conditionalAccess === "checking"
-        ? "Evaluating Entra entitlements…"
-        : validationTrace.conditionalAccess === "pending"
-          ? "Queued"
-          : !licenses
-            ? "License check failed"
-            : licenses.hasPremiumP2License
-            ? "Risk-based CA supported"
-            : licenses.hasConditionalAccessLicense
-              ? "Basic CA only"
-              : "CA will be skipped",
-      detail: !licenses
-        ? "Conditional Access licensing could not be evaluated. Review the validation error and run the checks again."
-        : licenses.hasPremiumP2License
-          ? "Premium P2 found for advanced Conditional Access templates."
-          : licenses.hasConditionalAccessLicense
-            ? "P1-equivalent licensing exists, but risk-based templates will be skipped."
-            : "No qualifying Entra ID Premium license detected for Conditional Access creation.",
-      status: validationTrace.conditionalAccess,
-      icon: Sparkles,
-    },
-    {
-      id: "driverUpdates",
-      title: "Driver update profiles",
-      value: validationTrace.driverUpdates === "checking"
-        ? "Evaluating Windows entitlements…"
-        : validationTrace.driverUpdates === "pending"
-          ? "Queued"
-          : !licenses
-            ? "License check failed"
-            : licenses.hasWindowsDriverUpdateLicense
-            ? "Windows entitlement detected"
-            : "Will be skipped",
-      detail: !licenses
-        ? "Windows entitlement licensing could not be evaluated. Review the validation error and run the checks again."
-        : licenses.hasWindowsDriverUpdateLicense
-          ? "Windows E3/E5-compatible licensing is available for driver update templates."
-          : "Windows Driver Update profiles require Windows Enterprise or equivalent Microsoft 365 licensing.",
-      status: validationTrace.driverUpdates,
-      icon: KeyRound,
-    },
+  const healthCheckContext = { prerequisiteResult, validationTrace };
+  const healthChecks = [
+    getOrganizationCheck(healthCheckContext),
+    getIntuneLicenseCheck(healthCheckContext),
+    getConditionalAccessCheck(healthCheckContext),
+    getDriverUpdatesCheck(healthCheckContext),
   ];
 
   return (
@@ -320,23 +469,11 @@ export function TenantConfig(): React.JSX.Element {
             </CardDescription>
           </div>
 
-          <div className="rounded-2xl border border-border/80 bg-background/60 px-4 py-3 text-sm">
-            <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">
-              Validation status
-            </p>
-            <p className="mt-2 font-medium">
-              {prerequisiteStatus === "checking"
-                ? "Running checks"
-                : prerequisiteResult?.isValid
-                  ? "Ready to continue"
-                  : "Action required"}
-            </p>
-            {validatedAt && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Last checked at {validatedAt} UTC
-              </p>
-            )}
-          </div>
+          <TenantValidationStatus
+            prerequisiteStatus={prerequisiteStatus}
+            prerequisiteResult={prerequisiteResult}
+            validatedAt={validatedAt}
+          />
         </div>
       </CardHeader>
 
@@ -402,70 +539,11 @@ export function TenantConfig(): React.JSX.Element {
           onRecheck={handleRecheck}
         />
 
-        {accounts.length > 0 && (
-          <div className="space-y-3 border-t border-border/70 pt-4">
-            {prerequisiteStatus === "success" && prerequisiteResult && (
-              <Alert className="border-emerald-300/45 bg-emerald-500/18 text-emerald-50">
-                <CheckCircle2 className="size-4 text-emerald-200" />
-                <AlertTitle className="text-emerald-50">
-                  All prerequisites met
-                </AlertTitle>
-                <AlertDescription className="text-emerald-100">
-                  Validation passed. You have the baseline licensing needed to continue with this
-                  wizard.
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {prerequisiteStatus === "warning" && prerequisiteResult && (
-              <Alert className="border-amber-300/40 bg-slate-950/80 text-amber-50 backdrop-blur-xl [&>svg]:text-amber-200">
-                <AlertTriangle className="size-4 text-amber-200" />
-                <AlertTitle className="text-amber-50">
-                  Prerequisites met with warnings
-                </AlertTitle>
-                <AlertDescription className="text-amber-100">
-                  <div className="mt-2 space-y-2 text-sm">
-                    {prerequisiteResult.warnings.map((warning) => (
-                      <div key={warning} className="flex items-start gap-2">
-                        <AlertTriangle className="mt-0.5 size-3 flex-shrink-0 text-amber-200" />
-                        <span>{warning}</span>
-                      </div>
-                    ))}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {prerequisiteStatus === "error" && prerequisiteResult && (
-              <Alert className="border-red-500/30 bg-red-500/10">
-                <XCircle className="size-4 text-red-600 dark:text-red-400" />
-                <AlertTitle className="text-red-800 dark:text-red-200">
-                  Prerequisite check failed
-                </AlertTitle>
-                <AlertDescription className="text-red-700 dark:text-red-300">
-                  <div className="mt-2 space-y-2 text-sm">
-                    {prerequisiteResult.errors.map((error) => (
-                      <div key={error} className="flex items-start gap-2">
-                        <XCircle className="mt-0.5 size-3 flex-shrink-0" />
-                        <span>{error}</span>
-                      </div>
-                    ))}
-                    {prerequisiteResult.warnings.length > 0 && (
-                      <div className="mt-3 border-t border-red-200 pt-3 dark:border-red-800">
-                        {prerequisiteResult.warnings.map((warning) => (
-                          <div key={warning} className="flex items-start gap-2">
-                            <AlertTriangle className="mt-0.5 size-3 flex-shrink-0" />
-                            <span>{warning}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-          </div>
-        )}
+        <TenantValidationNotices
+          hasAccount={accounts.length > 0}
+          prerequisiteStatus={prerequisiteStatus}
+          prerequisiteResult={prerequisiteResult}
+        />
 
         <div className="pt-4">
           <Button onClick={handleContinue} disabled={!isValid} className="w-full">

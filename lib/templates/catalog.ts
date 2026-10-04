@@ -1,3 +1,4 @@
+import oibManifest from "@/public/IntuneTemplates/OpenIntuneBaseline/manifest.json";
 import {
   fetchAppProtectionPolicies,
   fetchBaselinePolicyByManifestFile,
@@ -121,7 +122,7 @@ const CATEGORY_METADATA: Record<
   },
   baseline: {
     label: "OpenIntuneBaseline",
-    description: "Curated security baseline payloads indexed from the bundled OpenIntuneBaseline manifest.",
+    description: `Baseline v${oibManifest.windowsVersion} includes macOS, Windows, and BYOD policies.`,
   },
   cisBaseline: {
     label: "CIS Baselines",

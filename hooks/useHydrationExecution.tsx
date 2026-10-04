@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useSyncExternalStore } from "react";
-import { HydrationTask, BatchExecutionStats, BatchProgress } from "@/types/hydration";
+import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { createGraphClient } from "@/lib/graph/client";
 import { buildTaskQueueAsync, executeTasks, ExecutionContext, getEstimatedTaskCount } from "@/lib/hydration/engine";
 import { ActivityMessage } from "@/lib/hydration/types";
 import { createSummary } from "@/lib/hydration/reporter";
 import { useWizardState } from "./useWizardState";
 import { getBatchConfig } from "@/lib/config/batchConfig";
-import { isBatchableCategory } from "@/lib/hydration/batchExecutor";
+import { createRunTelemetry } from "@/lib/hydration/runTelemetry";
+import { createRunProvenance } from "@/lib/hydration/runProvenance";
 import { useSettings } from "./useSettings";
 import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { markTaskSkipped } from "@/lib/hydration/taskTransitions";
@@ -80,6 +81,9 @@ export function useHydrationExecution() {
       return;
     }
     const startTime = new Date();
+    const provenance = createRunProvenance();
+    const batchConfig = getBatchConfig();
+    const telemetry = createRunTelemetry(batchConfig.defaultBatchSize, batchConfig.enableBatching);
     updateExecutionStateForRun(runId, (current) => ({
       ...current,
       startTime,
@@ -106,8 +110,9 @@ export function useHydrationExecution() {
           startTime,
           endTime,
           tasks,
-          undefined,
+          telemetry.snapshot(),
           tenantConfig.tenantName,
+          provenance,
         ),
         outcome: "cancelled",
         fatalError: null,
@@ -169,7 +174,7 @@ export function useHydrationExecution() {
       const client = createGraphClient({
         tenantId: tenantConfig.tenantId,
         homeAccountId: tenantConfig.homeAccountId,
-      });
+      }, telemetry.onBatchDispatch);
 
       // Task update callback for all task events
       const updateTask = (task: HydrationTask) => {
@@ -211,6 +216,7 @@ export function useHydrationExecution() {
         hasConditionalAccessLicense: state.prerequisiteResult?.licenses?.hasConditionalAccessLicense ?? true,
         hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,
         hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true,
+        onSequentialTask: telemetry.onSequentialTask,
         onTaskStart: updateTask,
         onTaskComplete: updateTask,
         onTaskError: updateTask,
@@ -232,32 +238,15 @@ export function useHydrationExecution() {
 
       // Create summary with batch stats
       const endTime = new Date();
-      const batchConfig = getBatchConfig();
-      const usedBatching =
-        batchConfig.enableBatching && operationMode === "create" && !settings.stopOnFirstError;
-
-      // Calculate batch stats
-      let batchStats: BatchExecutionStats | undefined;
-      if (usedBatching) {
-        const batchableTasks = tasks.filter((t) => isBatchableCategory(t.category));
-        const sequentialTasks = tasks.filter((t) => !isBatchableCategory(t.category));
-        batchStats = {
-          batchingEnabled: true,
-          batchSize: batchConfig.defaultBatchSize,
-          batchRequestCount: Math.ceil(batchableTasks.length / batchConfig.defaultBatchSize),
-          batchedTaskCount: batchableTasks.length,
-          sequentialTaskCount: sequentialTasks.length,
-        };
-      }
-
       const summary = createSummary(
         tenantConfig.tenantId,
         operationMode,
         startTime,
         endTime,
         tasks,
-        batchStats,
+        telemetry.snapshot(),
         tenantConfig.tenantName,
+        provenance,
       );
       const outcome = deriveExecutionOutcome(tasks);
 

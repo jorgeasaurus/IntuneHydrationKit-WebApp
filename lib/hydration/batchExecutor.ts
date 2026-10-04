@@ -20,6 +20,7 @@ import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
+import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
 import { sleep, sleepWithExecutionControl, waitWhilePaused, hasODataUnsafeChars, normalizeName, findByNamePrecedence } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
@@ -499,7 +500,7 @@ async function buildBaselineRequestBody(
   }
 
   // Check if policy already exists (cache-first with API fallback)
-  if (await policyExistsInCacheOrApi(policyType as PolicyExistsPolicyType, policyName, context)) {
+  if (await policyExistsInCacheOrApi(policyType as PolicyExistsPolicyType, policyName, context, "[BatchExecutor]", { task, template })) {
     return { skip: true, reason: `${policyType} "${policyName}" already exists` };
   }
 
@@ -1310,7 +1311,8 @@ async function policyExistsInCacheOrApi(
   policyType: PolicyExistsPolicyType,
   policyName: string,
   context: ExecutionContext,
-  logPrefix = "[BatchExecutor]"
+  logPrefix = "[BatchExecutor]",
+  evidence?: { task: HydrationTask; template: Record<string, unknown> }
 ): Promise<boolean> {
   const lowerName = policyName.toLowerCase();
   const normalizedPolicyName = normalizeName(policyName);
@@ -1320,13 +1322,14 @@ async function policyExistsInCacheOrApi(
   const sources: Array<{
     policyType: PolicyExistsPolicyType;
     label: string;
-    matches: () => { name?: string; displayName?: string } | undefined;
+    matches: () => { id: string; name?: string; displayName?: string } | undefined;
     apiCheck?: () => Promise<boolean>;
   }> = [
     {
       policyType: "SettingsCatalog",
       label: "SettingsCatalog",
       matches: () =>
+        evidence ? findBaselineMatch(policyType, policyName, context.cachedSettingsCatalogPolicies) :
         findByNamePrecedence(context.cachedSettingsCatalogPolicies, lowerName, normalizedPolicyName, (p) => p.name, false),
       apiCheck: canQueryApi ? () => settingsCatalogPolicyExists(context.client, policyName) : undefined,
     },
@@ -1343,6 +1346,7 @@ async function policyExistsInCacheOrApi(
       policyType: "DeviceConfiguration",
       label: "DeviceConfiguration",
       matches: () =>
+        evidence ? findBaselineMatch(policyType, policyName, context.cachedDeviceConfigurations) :
         findByNamePrecedence(context.cachedDeviceConfigurations, lowerName, normalizedPolicyName, (p) => p.displayName, false),
       apiCheck: canQueryApi ? () => deviceConfigurationExists(context.client, policyName) : undefined,
     },
@@ -1364,6 +1368,7 @@ async function policyExistsInCacheOrApi(
       policyType: "DriverUpdateProfiles",
       label: "DriverUpdateProfile",
       matches: () =>
+        evidence ? findBaselineMatch(policyType, policyName, context.cachedDriverUpdateProfiles) :
         findByNamePrecedence(context.cachedDriverUpdateProfiles, lowerName, normalizedPolicyName, (p) => p.displayName, false),
     },
     {
@@ -1396,10 +1401,12 @@ async function policyExistsInCacheOrApi(
 
   const existing = source.matches();
   if (existing) {
+    if (evidence) await recordBaselineMatch(evidence.task, evidence.template, existing, policyType, context.client);
     console.log(`${logPrefix} ${source.label} already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name ?? existing.displayName}")`);
     return true;
   }
   if (source.apiCheck && await source.apiCheck()) {
+    if (evidence) evidence.task.drift = { status: "notChecked", differences: [], reason: "An existing policy was found, but its identity was not returned by the lookup." };
     console.log(`${logPrefix} ${source.label} already exists (API fallback), skipping: "${policyName}"`);
     return true;
   }

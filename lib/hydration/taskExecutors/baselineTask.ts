@@ -15,6 +15,7 @@ import {
   createBaselineCompliancePolicy,
 } from "../policyCreators";
 import { escapeODataString, hasODataUnsafeChars } from "../utils";
+import { findBaselineMatch, recordBaselineMatch } from "../baselineEvidence";
 import { resolveOIBOrganizationId } from "../templatePlaceholders";
 import { createAppProtectionPolicy, deleteAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy, AppProtectionTemplate } from "@/lib/templates/loader";
@@ -30,7 +31,7 @@ export async function executeBaselineTask(
   const { client, operationMode: mode, isPreview } = context;
 
   // Get template from cache
-  const cachedBaseline = getCachedTemplates("baseline");
+  const cachedBaseline = context.cachedBaselineTemplates || getCachedTemplates("baseline");
   let template: BaselinePolicy | undefined;
 
   if (cachedBaseline && Array.isArray(cachedBaseline)) {
@@ -57,7 +58,6 @@ export async function executeBaselineTask(
       // Route based on policy type
       if (policyType === "CompliancePolicies") {
         // Compliance policies go to deviceCompliancePolicies endpoint
-        const normalizedPolicyName = policyName.toLowerCase().trim();
         let compliancePolicies = context.cachedCompliancePolicies;
 
         if (
@@ -70,17 +70,17 @@ export async function executeBaselineTask(
           context.cachedCompliancePolicies = compliancePolicies;
         }
 
-        const existingCompliancePolicy = compliancePolicies?.find(
-          (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
-        );
+        const existingCompliancePolicy = findBaselineMatch("CompliancePolicies", policyName, compliancePolicies);
 
         if (existingCompliancePolicy) {
+          await recordBaselineMatch(task, template, existingCompliancePolicy, "CompliancePolicies", client);
           console.log(`[Baseline Task] Compliance policy already exists (cache), skipping: "${policyName}"`);
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
 
         const exists = await compliancePolicyExistsByName(client, policyName);
         if (exists) {
+          task.drift = { status: "notChecked", differences: [], reason: "An existing policy was found, but its identity was not returned by the lookup." };
           console.log(`[Baseline Task] Compliance policy already exists, skipping: "${policyName}"`);
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
@@ -99,10 +99,15 @@ export async function executeBaselineTask(
 
       } else if (policyType === "AppProtection") {
         // App Protection policies - use existing app protection handler
-        const existingPolicy = context.cachedAppProtectionPolicies?.find(
-          (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
-        );
+        const platform = template["@odata.type"] === "#microsoft.graph.iosManagedAppProtection" ? "iOS" : "android";
+        const platformPolicies = context.cachedAppProtectionPolicies?.filter((policy) => {
+          if (policy._platform) return policy._platform === platform;
+          const expectedType = platform === "iOS" ? "#microsoft.graph.iosManagedAppProtection" : "#microsoft.graph.androidManagedAppProtection";
+          return policy["@odata.type"] === expectedType;
+        });
+        const existingPolicy = findBaselineMatch("AppProtection", policyName, platformPolicies);
         if (existingPolicy) {
+          await recordBaselineMatch(task, template, existingPolicy, "AppProtection", client);
           console.log(`[Baseline Task] App Protection policy already exists, skipping: "${policyName}"`);
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
@@ -114,11 +119,12 @@ export async function executeBaselineTask(
 
       } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
         // DeviceConfiguration and UpdatePolicies use deviceConfigurations endpoint
-        const escapedPolicyName = escapeODataString(policyName);
-        const existsResponse = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
-          `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedPolicyName)}'&$select=id,displayName`
+        const policies = context.cachedDeviceConfigurations ?? await client.getCollection<{ id: string; displayName: string }>(
+          "/deviceManagement/deviceConfigurations?$select=id,displayName"
         );
-        if (existsResponse.value && existsResponse.value.length > 0) {
+        const existingPolicy = findBaselineMatch("DeviceConfiguration", policyName, policies);
+        if (existingPolicy) {
+          await recordBaselineMatch(task, template, existingPolicy, "DeviceConfiguration", client);
           console.log(`[Baseline Task] Device Configuration policy already exists, skipping: "${policyName}"`);
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
@@ -130,13 +136,12 @@ export async function executeBaselineTask(
 
       } else if (policyType === "DriverUpdateProfiles") {
         // DriverUpdateProfiles endpoint doesn't support $filter, fetch all and filter client-side
-        const existsResponse = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
-          `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName`
+        const policies = context.cachedDriverUpdateProfiles ?? await client.getCollection<{ id: string; displayName: string }>(
+          "/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName"
         );
-        const existingProfile = existsResponse.value?.find(
-          (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
-        );
+        const existingProfile = findBaselineMatch("DriverUpdateProfiles", policyName, policies);
         if (existingProfile) {
+          await recordBaselineMatch(task, template, existingProfile, "DriverUpdateProfiles", client);
           console.log(`[Baseline Task] Driver Update Profile already exists, skipping: "${policyName}"`);
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
@@ -150,15 +155,10 @@ export async function executeBaselineTask(
         // SettingsCatalog (default) - use configurationPolicies endpoint
         // Use cache-based existence check for consistency with batch executor
         // The $filter API is unreliable for this endpoint
-        let existsInCache = false;
-        if (context.cachedSettingsCatalogPolicies && context.cachedSettingsCatalogPolicies.length > 0) {
-          const normalizedPolicyName = policyName.toLowerCase().trim();
-          existsInCache = context.cachedSettingsCatalogPolicies.some(
-            (p) => p.name?.toLowerCase().trim() === normalizedPolicyName
-          );
-        }
+        const existingSettingsPolicy = findBaselineMatch("SettingsCatalog", policyName, context.cachedSettingsCatalogPolicies);
 
-        if (existsInCache) {
+        if (existingSettingsPolicy) {
+          await recordBaselineMatch(task, template, existingSettingsPolicy, "SettingsCatalog", client);
           console.log(`[Baseline Task] Settings Catalog policy already exists (cache), skipping: "${policyName}"`);
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }

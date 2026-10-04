@@ -134,7 +134,17 @@ function generateManifest() {
     count: data.count,
   }));
 
+  const windowsVersion = fs.readFileSync(path.join(OIB_DIR, '.windows-version'), 'utf8').trim();
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(windowsVersion)) {
+    throw new Error('Invalid OpenIntuneBaseline Windows version');
+  }
+
+  const sourceSha = fs.readFileSync(path.join(OIB_DIR, '.upstream-sha'), 'utf8').trim();
+  if (!/^[a-f0-9]{40}$/.test(sourceSha)) throw new Error('Invalid OpenIntuneBaseline source SHA');
+
   const manifest = {
+    sourceSha,
+    windowsVersion,
     totalFiles: files.length,
     platforms,
     files: files.map(({ path, displayName }) => ({ path, displayName })),

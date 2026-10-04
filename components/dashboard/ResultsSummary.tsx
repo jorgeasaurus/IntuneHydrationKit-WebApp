@@ -15,6 +15,7 @@ import {
   MinusCircle,
   XCircle,
 } from "lucide-react";
+import { ReportComparison } from "@/components/dashboard/ReportComparison";
 import { SensitiveData } from "@/components/SensitiveData";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -29,7 +30,6 @@ import {
   generateReportFilename,
 } from "@/lib/hydration/reporter";
 import { cn } from "@/lib/utils";
-import { formatDateTime } from "@/lib/utils/dateFormat";
 import { isExpectedNoOpSkip } from "@/lib/hydration/executionOutcome";
 import type { HydrationSummary, HydrationTask, ReportableExecutionOutcome } from "@/types/hydration";
 
@@ -73,9 +73,9 @@ const OUTCOME_STYLES: Record<
   skipped: {
     label: "Skipped",
     Icon: MinusCircle,
-    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
-    iconClassName: "text-amber-100",
-    rowClassName: "border-amber-300/15",
+    className: "border-slate-300/25 bg-slate-300/10 text-slate-100",
+    iconClassName: "text-slate-100",
+    rowClassName: "border-slate-300/15",
   },
   failed: {
     label: "Failed",
@@ -94,16 +94,16 @@ const OUTCOME_STYLES: Record<
   unchanged: {
     label: "No change",
     Icon: Minus,
-    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
-    iconClassName: "text-amber-100",
-    rowClassName: "border-amber-300/15",
+    className: "border-slate-300/25 bg-slate-300/10 text-slate-100",
+    iconClassName: "text-slate-100",
+    rowClassName: "border-slate-300/15",
   },
   blocked: {
     label: "Blocked",
     Icon: AlertTriangle,
-    className: "border-red-300/25 bg-red-300/10 text-red-100",
-    iconClassName: "text-red-100",
-    rowClassName: "border-red-300/25 bg-red-950/20",
+    className: "border-amber-300/25 bg-amber-300/10 text-amber-100",
+    iconClassName: "text-amber-100",
+    rowClassName: "border-amber-300/25 bg-amber-950/20",
   },
   cancelled: {
     label: "Cancelled",
@@ -139,6 +139,7 @@ function formatDuration(ms: number): string {
 }
 
 function getTaskOutcome(task: HydrationTask, isPreview: boolean): ResultOutcome {
+  if (isExpectedNoOpSkip(task) && task.drift?.status === "different") return "warning";
   if (!isPreview) {
     if (task.status === "failed") return "failed";
     if (task.status === "pending" || task.status === "running") return "unfinished";
@@ -151,7 +152,7 @@ function getTaskOutcome(task: HydrationTask, isPreview: boolean): ResultOutcome 
     return "success";
   }
 
-  if (task.status === "failed") return "blocked";
+  if (task.status === "failed") return "failed";
   if (task.status === "pending" || task.status === "running") return "unfinished";
   if (task.status === "skipped") {
     if (task.skipKind === "cancelled") return "cancelled";
@@ -164,7 +165,7 @@ function getTaskOutcome(task: HydrationTask, isPreview: boolean): ResultOutcome 
 function isIssueTask(task: HydrationTask, isPreview: boolean): boolean {
   const outcome = getTaskOutcome(task, isPreview);
   return isPreview
-    ? outcome === "blocked" || outcome === "cancelled" || outcome === "warning" || outcome === "unfinished"
+    ? outcome === "failed" || outcome === "blocked" || outcome === "cancelled" || outcome === "warning" || outcome === "unfinished"
     : outcome === "blocked" ||
         outcome === "cancelled" ||
         outcome === "failed" ||
@@ -198,28 +199,13 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
     [summary.categoryBreakdown, tasks],
   );
 
+  const sortedCategories = [...categoryNames].sort((left, right) =>
+    Number(issueData.categories.has(right)) - Number(issueData.categories.has(left))
+  );
   const visibleCategories = issuesOnly
-    ? categoryNames.filter((category) => issueData.categories.has(category))
-    : categoryNames;
+    ? sortedCategories.filter((category) => issueData.categories.has(category))
+    : sortedCategories;
 
-  const actionLabel = summary.operationMode === "create" ? "Created" : "Deleted";
-  const actionCount = summary.operationMode === "create" ? summary.stats.created : summary.stats.deleted;
-  const successRate =
-    summary.stats.total > 0
-      ? Math.round(((summary.stats.created + summary.stats.deleted) / summary.stats.total) * 100)
-      : 0;
-  const receiptTitle =
-    outcome === "cancelled"
-      ? isPreview
-        ? "Preview cancelled"
-        : "Run cancelled"
-      : outcome === "completedWithIssues"
-        ? isPreview
-          ? "Preview complete with issues"
-          : "Run complete with issues"
-        : isPreview
-          ? "Preview complete"
-          : "Run complete";
 
   function handleDownload(fileFormat: "md" | "json" | "csv"): void {
     const content =
@@ -227,7 +213,7 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
         ? generateMarkdownReport(summary, tasks, outcome, isPreview)
         : fileFormat === "json"
           ? generateJSONReport(summary, tasks, outcome, isPreview)
-          : generateCSVReport(tasks, outcome, isPreview);
+          : generateCSVReport(tasks, outcome, isPreview, summary);
     downloadReport(content, generateReportFilename(summary.operationMode, fileFormat, isPreview));
   }
 
@@ -258,82 +244,7 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
         </Alert>
       )}
 
-      <Card
-        className={cn(
-          "overflow-hidden",
-          outcome === "cancelled" || outcome === "completedWithIssues"
-            ? "border-amber-300/35"
-            : "border-emerald-300/25",
-        )}
-      >
-        <CardHeader className="border-b border-white/10 bg-black/15">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-sky-200">
-                {isPreview ? "Preview receipt" : "Run receipt"}
-              </p>
-              <CardTitle
-                className={cn(
-                  "mt-2",
-                  outcome === "cancelled" || outcome === "completedWithIssues" ? "text-amber-100" : "text-emerald-100",
-                )}
-              >
-                {receiptTitle}
-              </CardTitle>
-              <CardDescription className="mt-1">Completed {formatDateTime(summary.endTime)}</CardDescription>
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-xs text-slate-200">
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
-                <SensitiveData value={summary.tenantName || summary.tenantId} fallback="Tenant unavailable" />
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 capitalize">
-                {summary.operationMode}
-                {isPreview ? " preview" : " live"}
-              </span>
-              <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 tabular-nums">
-                {formatDuration(summary.duration)}
-              </span>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="grid grid-cols-2 gap-4 pt-6 sm:grid-cols-4 lg:grid-cols-5">
-          <div>
-            <p className="text-xs text-slate-400">Total</p>
-            <p className="mt-1 text-2xl font-semibold text-white">{summary.stats.total}</p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">{isPreview ? "Changes" : actionLabel}</p>
-            <p className="mt-1 text-2xl font-semibold text-emerald-200">
-              {isPreview ? getOutcomeCount(tasks, "change", true) : actionCount}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">{isPreview ? "No change" : "Skipped"}</p>
-            <p className="mt-1 text-2xl font-semibold text-amber-200">
-              {isPreview ? getOutcomeCount(tasks, "unchanged", true) : summary.stats.skipped}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs text-slate-400">{isPreview ? "Needs attention" : "Failed"}</p>
-            <p className="mt-1 text-2xl font-semibold text-red-200">
-              {isPreview
-                ? getOutcomeCount(tasks, "blocked", true) +
-                  getOutcomeCount(tasks, "cancelled", true) +
-                  getOutcomeCount(tasks, "warning", true) +
-                  getOutcomeCount(tasks, "unfinished", true)
-                : summary.stats.failed}
-            </p>
-          </div>
-          {!isPreview && (
-            <div>
-              <p className="text-xs text-slate-400">Success rate</p>
-              <p className="mt-1 text-2xl font-semibold text-white">{successRate}%</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <ResultReceipt summary={summary} tasks={tasks} isPreview={isPreview} outcome={outcome} />
 
       <Card className="overflow-hidden">
         <CardHeader className="border-b border-white/10 bg-black/15">
@@ -362,14 +273,16 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
         <CardContent className="pt-6">
           <Accordion type="multiple" value={openCategories} onValueChange={setOpenCategories} className="space-y-3">
             {visibleCategories.map((category) => {
-              const categoryTasks = tasks.filter((task) => task.category === category);
+              const categoryTasks = tasks.filter((task) => task.category === category).sort((left, right) =>
+                Number(isIssueTask(right, isPreview)) - Number(isIssueTask(left, isPreview))
+              );
               const filteredTasks = issuesOnly
                 ? categoryTasks.filter((task) => isIssueTask(task, isPreview))
                 : categoryTasks;
               const showAll = showAllCategories.has(category);
               const shownTasks = showAll ? filteredTasks : filteredTasks.slice(0, TASK_PREVIEW_LIMIT);
               const outcomes: ResultOutcome[] = isPreview
-                ? ["change", "unchanged", "blocked", "cancelled", "warning", "unfinished"]
+                ? ["change", "unchanged", "blocked", "failed", "cancelled", "warning", "unfinished"]
                 : ["success", "skipped", "blocked", "cancelled", "failed", "warning", "unfinished"];
 
               return (
@@ -410,41 +323,7 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
                   </AccordionTrigger>
 
                   <AccordionContent className="border-t border-white/10 px-3 pb-3 pt-3 sm:px-4 sm:pb-4">
-                    <ul className="space-y-1.5">
-                      {shownTasks.map((task) => {
-                        const outcome = getTaskOutcome(task, isPreview);
-                        const presentation = OUTCOME_STYLES[outcome];
-                        return (
-                          <li
-                            key={task.id}
-                            className={cn("rounded-lg border bg-slate-950/55 px-3 py-2.5", presentation.rowClassName)}
-                          >
-                            <div className="flex items-start gap-3">
-                              <presentation.Icon
-                                aria-hidden="true"
-                                className={cn("mt-0.5 size-4 shrink-0", presentation.iconClassName)}
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium text-slate-100" title={task.itemName}>
-                                  {task.itemName}
-                                </p>
-                                {(task.error || task.warning) && (
-                                  <p className="mt-1 text-xs leading-5 text-slate-400">{task.error || task.warning}</p>
-                                )}
-                              </div>
-                              <span
-                                className={cn(
-                                  "shrink-0 rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em]",
-                                  presentation.className,
-                                )}
-                              >
-                                {presentation.label}
-                              </span>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
+                    <ResultTaskRows tasks={shownTasks} isPreview={isPreview} />
 
                     {filteredTasks.length > TASK_PREVIEW_LIMIT && (
                       <Button
@@ -492,6 +371,242 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
           </div>
         </CardContent>
       </Card>
+      <ReportComparison />
     </div>
   );
+}
+
+function ResultReceipt({
+  summary,
+  tasks,
+  isPreview = false,
+  outcome,
+}: ResultsSummaryProps): React.JSX.Element {
+  const outcomeLabel = {
+    cancelled: "cancelled",
+    completedWithIssues: "complete with issues",
+    succeeded: "complete",
+  }[outcome];
+  const receiptTitle = `${isPreview ? "Preview" : "Run"} ${outcomeLabel}`;
+
+  return (
+    <Card
+      className={cn(
+        "overflow-hidden",
+        outcome === "cancelled" || outcome === "completedWithIssues"
+          ? "border-amber-300/35"
+          : "border-emerald-300/25",
+      )}
+    >
+      <CardHeader className="border-b border-white/10 bg-black/15">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-[0.24em] text-sky-200">
+              {isPreview ? "Preview receipt" : "Run receipt"}
+            </p>
+            <CardTitle
+              className={cn(
+                "mt-2",
+                outcome === "cancelled" || outcome === "completedWithIssues"
+                  ? "text-amber-100"
+                  : "text-emerald-100",
+              )}
+            >
+              {receiptTitle}
+            </CardTitle>
+            <CardDescription className="mt-1">
+              Completed {summary.endTime.toISOString()} (UTC)
+            </CardDescription>
+          </div>
+
+          <div className="flex flex-wrap gap-2 text-xs text-slate-200">
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5">
+              <SensitiveData
+                value={summary.tenantName || summary.tenantId}
+                fallback="Tenant unavailable"
+              />
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 capitalize">
+              {summary.operationMode}
+              {isPreview ? " preview" : " live"}
+            </span>
+            <span className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 tabular-nums">
+              {formatDuration(summary.duration)}
+            </span>
+          </div>
+        </div>
+      </CardHeader>
+
+      <ReportProvenance summary={summary} />
+      <ResultStatistics summary={summary} tasks={tasks} isPreview={isPreview} />
+    </Card>
+  );
+}
+
+function ResultStatistics({
+  summary,
+  tasks,
+  isPreview = false,
+}: Omit<ResultsSummaryProps, "outcome">): React.JSX.Element {
+  const labels = {
+    create: { preview: "Would create", live: "Created", unchanged: "Already exists" },
+    delete: { preview: "Would delete", live: "Deleted", unchanged: "No change" },
+  }[summary.operationMode];
+  const actionCount = summary.operationMode === "create" ? summary.stats.created : summary.stats.deleted;
+  const attentionCount = tasks.filter((task) => isIssueTask(task, isPreview)).length;
+  const hasFailures = tasks.some((task) => task.status === "failed");
+  const successRate =
+    summary.stats.total > 0
+      ? Math.round(
+          ((summary.stats.created + summary.stats.deleted) /
+            summary.stats.total) *
+            100,
+        )
+      : 0;
+
+  return (
+    <CardContent className="grid grid-cols-2 gap-4 pt-6 sm:grid-cols-4 lg:grid-cols-5">
+      <div>
+        <p className="text-xs text-slate-400">Total</p>
+        <p className="mt-1 text-2xl font-semibold text-white">
+          {summary.stats.total}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-slate-400">
+          {isPreview ? labels.preview : labels.live}
+        </p>
+        <p className="mt-1 text-2xl font-semibold text-emerald-200">
+          {actionCount}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-slate-400">
+          {isPreview ? labels.unchanged : "Skipped"}
+        </p>
+        <p className="mt-1 text-2xl font-semibold text-slate-200">
+          {isPreview
+            ? getOutcomeCount(tasks, "unchanged", true)
+            : getOutcomeCount(tasks, "skipped", false)}
+        </p>
+      </div>
+      <div>
+        <p className="text-xs text-slate-400">Needs attention</p>
+        <p className={cn("mt-1 text-2xl font-semibold", hasFailures ? "text-red-200" : "text-amber-200")}>
+          {attentionCount}
+        </p>
+      </div>
+      {!isPreview && (
+        <div>
+          <p className="text-xs text-slate-400">Success rate</p>
+          <p className="mt-1 text-2xl font-semibold text-white">
+            {successRate}%
+          </p>
+        </div>
+      )}
+    </CardContent>
+  );
+}
+
+function ResultTaskRows({ tasks, isPreview }: { tasks: HydrationTask[]; isPreview: boolean }): React.JSX.Element {
+  const unchanged = tasks.filter((task) => isExpectedNoOpSkip(task) && task.drift?.status !== "different");
+  const unchangedSet = new Set(unchanged);
+  const changes = tasks.filter((task) => !unchangedSet.has(task));
+  return (
+    <div className="space-y-3">
+      <ul className="space-y-1.5">
+        {changes.map((task) => <ResultTaskRow key={task.id} task={task} isPreview={isPreview} />)}
+      </ul>
+      {unchanged.length > 0 && (
+        <details className="rounded-lg border border-slate-300/15 p-3 text-slate-300">
+          <summary className="cursor-pointer text-sm">No change ({unchanged.length})</summary>
+          <ul className="mt-3 space-y-1.5">
+            {unchanged.map((task) => <ResultTaskRow key={task.id} task={task} isPreview={isPreview} />)}
+          </ul>
+        </details>
+      )}
+    </div>
+  );
+}
+
+function ResultTaskRow({ task, isPreview }: { task: HydrationTask; isPreview: boolean }): React.JSX.Element {
+  const presentation = OUTCOME_STYLES[getTaskOutcome(task, isPreview)];
+  return (
+                          <li
+                            className={cn("rounded-lg border bg-slate-950/55 px-3 py-2.5", presentation.rowClassName)}
+                          >
+                            <div className="flex items-start gap-3">
+                              <presentation.Icon
+                                aria-hidden="true"
+                                className={cn("mt-0.5 size-4 shrink-0", presentation.iconClassName)}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium text-slate-100" title={task.itemName}>
+                                  {task.itemName}
+                                </p>
+                                <TaskDecisionEvidence task={task} />
+                              </div>
+                              <span
+                                className={cn(
+                                  "shrink-0 rounded-full border px-2 py-1 font-mono text-[9px] uppercase tracking-[0.1em]",
+                                  presentation.className,
+                                )}
+                              >
+                                {presentation.label}
+                              </span>
+                            </div>
+                          </li>
+  );
+}
+
+function TaskDecisionEvidence({ task }: { task: HydrationTask }): React.JSX.Element {
+  const existingMatch = task.status === "skipped" && task.skipKind === "noOp" && task.match;
+  return (
+    <div className="mt-1 space-y-2 text-xs leading-5 text-slate-300">
+      {existingMatch ? <p>Already exists · {task.match?.matchType} name match</p> : task.error && <p>{task.status === "failed" ? "Error" : "Reason"}: {task.error}</p>}
+      {task.warning && <p>Warning: {task.warning}</p>}
+      {task.drift && <DriftEvidence drift={task.drift} />}
+      {task.match?.portalUrl && <a className="inline-block underline" href={task.match.portalUrl} target="_blank" rel="noreferrer">View matched object</a>}
+      <TaskEvidenceDetails task={task} />
+    </div>
+  );
+}
+
+function TaskEvidenceDetails({ task }: { task: HydrationTask }): React.JSX.Element | null {
+  if (!task.match && !task.drift?.differences.length) return null;
+  return (
+    <details className="rounded-md border border-white/10 px-3 py-2">
+      <summary className="cursor-pointer text-slate-400">Technical details</summary>
+      <div className="mt-2 space-y-2 break-words">
+        {task.match && <div>
+          <p>Matched object: {task.match.name}</p>
+          <p className="break-all">ID: {task.match.id} ({task.match.matchType} match)</p>
+        </div>}
+        {task.drift && task.drift.differences.length > 0 && <div>
+          <p>Fields that differ:</p>
+          <ul className="list-inside list-disc break-all">{task.drift.differences.map((difference) => <li key={difference}><code>{difference}</code></li>)}</ul>
+        </div>}
+      </div>
+    </details>
+  );
+}
+
+function DriftEvidence({ drift }: { drift: NonNullable<HydrationTask["drift"]> }): React.JSX.Element {
+  const labels = { matches: "Configuration matches", different: "Configuration differs", notChecked: "Configuration not checked" };
+  return (
+    <div>
+      <p className="font-medium">{labels[drift.status]}</p>
+      {drift.reason && <p>{drift.reason}</p>}
+    </div>
+  );
+}
+
+function ReportProvenance({ summary }: { summary: HydrationSummary }): React.JSX.Element {
+  const provenance = summary.provenance;
+  const fields = [
+    ["Run ID", provenance?.runId], ["App version", provenance?.appVersion],
+    ["Baseline version", provenance?.baselineVersion], ["Baseline source SHA", provenance?.baselineSourceSha],
+    ["Started (UTC)", summary.startTime.toISOString()], ["Completed (UTC)", summary.endTime.toISOString()],
+  ];
+  return <dl className="grid gap-3 border-b border-white/10 px-6 py-4 text-xs sm:grid-cols-2">{fields.map(([label, value]) => <div key={label}><dt className="text-slate-400">{label}</dt><dd className="mt-1 break-all text-slate-200">{value ?? "Not recorded"}</dd></div>)}</dl>;
 }

@@ -92,3 +92,7 @@
 - Describe future version numbers in filter rules as exclusive numeric bounds, not as available OS releases.
 - Prerequisite warnings on the fixed dark wizard need pale text and icons on dark glass; do not rely on dark-mode variants.
 - React 18 custom elements need a literal `class` attribute; verify the rendered DOM before claiming CSS overrides apply.
+
+- Use the requested baseline release wording in docs and the wizard: include macOS, Windows, and BYOD without a Windows-only release qualifier.
+
+- Treat omitted Graph type annotations as metadata, not missing policy settings. Show a short decision summary first; keep repeated names, object IDs, and raw comparison paths in expandable details.

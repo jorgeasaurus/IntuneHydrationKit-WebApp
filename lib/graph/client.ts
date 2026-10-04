@@ -11,7 +11,7 @@ export class GraphClient {
   private baseUrl: string;
   private readonly expectedAccount?: { tenantId: string; homeAccountId: string };
 
-  constructor(expectedAccount?: { tenantId: string; homeAccountId: string }) {
+  constructor(expectedAccount?: { tenantId: string; homeAccountId: string }, private readonly onBatchDispatch?: (requests: BatchRequest[]) => void) {
     this.baseUrl = getGraphEndpoint();
     this.expectedAccount = expectedAccount;
   }
@@ -298,6 +298,7 @@ export class GraphClient {
     console.log(`[GraphClient] Executing batch with ${requests.length} requests (${version})`);
 
     const headers = await this.getHeaders();
+    this.onBatchDispatch?.(requests);
     const response = await fetch(url, {
       method: "POST",
       headers,
@@ -310,6 +311,6 @@ export class GraphClient {
 /**
  * Create a new Graph API client instance
  */
-export function createGraphClient(expectedAccount?: { tenantId: string; homeAccountId: string }): GraphClient {
-  return new GraphClient(expectedAccount);
+export function createGraphClient(expectedAccount?: { tenantId: string; homeAccountId: string }, onBatchDispatch?: (requests: BatchRequest[]) => void): GraphClient {
+  return new GraphClient(expectedAccount, onBatchDispatch);
 }

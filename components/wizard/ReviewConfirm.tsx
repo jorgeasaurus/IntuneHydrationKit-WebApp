@@ -9,6 +9,7 @@ import { useWizardState } from "@/hooks/useWizardState";
 import { clearExecutionRecord } from "@/lib/hydration/executionRecord";
 import { getExecutionState, resetExecutionSession, subscribeExecutionState } from "@/lib/hydration/executionStateStore";
 import { SensitiveData } from "@/components/SensitiveData";
+import { BaselineChangeReview } from "@/components/wizard/BaselineChangeReview";
 import { ExecutionApprovalCard } from "@/components/wizard/ExecutionApprovalCard";
 import { TEMPLATE_METADATA } from "@/templates";
 import { getEstimatedTaskCount, getEstimatedCategoryCount } from "@/lib/hydration/engine";
@@ -52,6 +53,62 @@ function getOutcomeSummary(operationMode: "create" | "delete" | undefined, isPre
   return "Creates missing objects and skips matches.";
 }
 
+function ReadinessNotices({
+  result,
+}: {
+  result: ReturnType<typeof useWizardState>["state"]["prerequisiteResult"];
+}): React.JSX.Element {
+  return (
+    <>
+      {result && (result.warnings.length > 0 || result.errors.length > 0) && (
+        <Alert className="border-blue-500/30 bg-blue-500/10">
+          {result.errors.length > 0 ? (
+            <AlertTriangle className="size-4" />
+          ) : (
+            <Eye className="size-4" />
+          )}
+          <AlertTitle>Readiness notices</AlertTitle>
+          <AlertDescription className="space-y-2">
+            {result.errors.map((error) => (
+              <p key={`error-${error}`}>{error}</p>
+            ))}
+            {result.warnings.map((warning) => (
+              <p key={`warning-${warning}`}>{warning}</p>
+            ))}
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
+  );
+}
+
+function ActiveExecutionNotice({
+  active,
+  visible,
+}: {
+  active: boolean;
+  visible: boolean;
+}): React.JSX.Element {
+  return (
+    <>
+      {active && (
+        <Alert role="status" aria-live="polite">
+          <AlertTitle>
+            {visible
+              ? "A hydration run is active"
+              : "The previous run is stopping"}
+          </AlertTitle>
+          <AlertDescription>
+            {visible
+              ? "Return to the dashboard to monitor or cancel the current run."
+              : "Wait for the current request to finish before you start another run."}
+          </AlertDescription>
+        </Alert>
+      )}
+    </>
+  );
+}
+
 export function ReviewConfirm(): React.JSX.Element {
   const { state, setConfirmed, previousStep } = useWizardState();
   const [acknowledged, setAcknowledged] = useState(false);
@@ -81,6 +138,9 @@ export function ReviewConfirm(): React.JSX.Element {
       </CardHeader>
 
       <CardContent className="space-y-6">
+        {state.selectedTargets.includes("baseline") && state.operationMode === "create" && (
+          <BaselineChangeReview tenantConfig={state.tenantConfig} selection={state.categorySelections?.baseline ?? state.baselineSelection} />
+        )}
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
             <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Operation</p>
@@ -217,25 +277,7 @@ export function ReviewConfirm(): React.JSX.Element {
               </Alert>
             )}
 
-            {state.prerequisiteResult &&
-              (state.prerequisiteResult.warnings.length > 0 || state.prerequisiteResult.errors.length > 0) && (
-                <Alert className="border-blue-500/30 bg-blue-500/10">
-                  {state.prerequisiteResult.errors.length > 0 ? (
-                    <AlertTriangle className="size-4" />
-                  ) : (
-                    <Eye className="size-4" />
-                  )}
-                  <AlertTitle>Readiness notices</AlertTitle>
-                  <AlertDescription className="space-y-2">
-                    {state.prerequisiteResult.errors.map((error) => (
-                      <p key={`error-${error}`}>{error}</p>
-                    ))}
-                    {state.prerequisiteResult.warnings.map((warning) => (
-                      <p key={`warning-${warning}`}>{warning}</p>
-                    ))}
-                  </AlertDescription>
-                </Alert>
-              )}
+            <ReadinessNotices result={state.prerequisiteResult} />
           </div>
         </div>
 
@@ -247,18 +289,10 @@ export function ReviewConfirm(): React.JSX.Element {
           onApprovedChange={setAcknowledged}
         />
 
-        {hasActiveExecution && (
-          <Alert role="status" aria-live="polite">
-            <AlertTitle>
-              {hasVisibleActiveExecution ? "A hydration run is active" : "The previous run is stopping"}
-            </AlertTitle>
-            <AlertDescription>
-              {hasVisibleActiveExecution
-                ? "Return to the dashboard to monitor or cancel the current run."
-                : "Wait for the current request to finish before you start another run."}
-            </AlertDescription>
-          </Alert>
-        )}
+        <ActiveExecutionNotice
+          active={hasActiveExecution}
+          visible={hasVisibleActiveExecution}
+        />
 
         <div className="flex gap-4">
           <Button variant="outline" onClick={previousStep} className="flex-1">

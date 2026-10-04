@@ -60,53 +60,17 @@ export function ExecutionControls({
   onCancel,
   onDownloadLog,
 }: ExecutionControlsProps) {
-  const [elapsedTime, setElapsedTime] = useState(0);
-
-  // Update elapsed time every second
-  useEffect(() => {
-    if (isCompleted || isPaused) return;
-
-    const interval = setInterval(() => {
-      setElapsedTime(Date.now() - startTime.getTime());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [startTime, isCompleted, isPaused]);
-
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(
-    (t) =>
-      t.status === "success" || t.status === "failed" || t.status === "skipped",
-  ).length;
-
-  // Calculate estimated time remaining
-  const avgTimePerTask = completedTasks > 0 ? elapsedTime / completedTasks : 0;
-  const remainingTasks = totalTasks - completedTasks;
-  const estimatedTimeRemaining = avgTimePerTask * remainingTasks;
-  const displayedElapsedTime =
-    isCompleted && endTime
-      ? Math.max(0, endTime.getTime() - startTime.getTime())
-      : elapsedTime;
-  const executionDescription =
-    outcome === "failed"
-      ? "Execution failed"
-      : outcome === "cancelled"
-        ? "Execution cancelled"
-        : outcome === "completedWithIssues"
-          ? "Execution completed with issues"
-          : isCompleted
-            ? "Execution completed"
-            : isCancelling
-              ? "Cancellation pending"
-              : isPaused
-                ? "Execution paused"
-                : "Execution in progress";
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Execution Controls</CardTitle>
-        <CardDescription>{executionDescription}</CardDescription>
+        <ExecutionDescription
+          outcome={outcome}
+          isCompleted={isCompleted}
+          isCancelling={isCancelling}
+          isPaused={isPaused}
+        />
       </CardHeader>
       <CardContent className="space-y-4">
         {/* Batch Progress Indicator */}
@@ -184,105 +148,209 @@ export function ExecutionControls({
           </section>
         )}
 
-        {/* Timer */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-sm text-muted-foreground">Elapsed Time</p>
-            <p className="text-2xl font-bold font-mono">
-              {formatDuration(displayedElapsedTime)}
-            </p>
-          </div>
-          {!isCompleted && remainingTasks > 0 && completedTasks > 0 && (
-            <div className="space-y-1">
-              <p className="text-sm text-muted-foreground">
-                Estimated Remaining
-              </p>
-              <p className="text-2xl font-bold font-mono">
-                {formatDuration(estimatedTimeRemaining)}
-              </p>
-            </div>
-          )}
-        </div>
+        <ExecutionTiming
+          tasks={tasks}
+          isPaused={isPaused}
+          isCompleted={isCompleted}
+          startTime={startTime}
+          endTime={endTime}
+        />
 
-        {/* Start/End Time */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Started</p>
-            <p className="font-medium">{formatDateTime(startTime)}</p>
-          </div>
-          {isCompleted && (
-            <div>
-              <p className="text-muted-foreground">Completed</p>
-              <p className="font-medium">
-                {endTime ? formatDateTime(endTime) : "Completed"}
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Control Buttons */}
-        {!isCompleted && !isCancelling && (
-          <div className="flex gap-2">
-            {!isPaused ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onPause}
-                disabled={!onPause}
-                className="flex-1"
-              >
-                <Pause className="size-4 mr-2" />
-                Pause
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onResume}
-                disabled={!onResume}
-                className="flex-1"
-              >
-                <Play className="size-4 mr-2" />
-                Resume
-              </Button>
-            )}
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={onCancel}
-              disabled={!onCancel}
-              className="flex-1"
-            >
-              <Square className="size-4 mr-2" />
-              Cancel
-            </Button>
-          </div>
-        )}
-
-        {isCancelling && (
-          <p
-            role="status"
-            aria-live="polite"
-            className="rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm text-amber-100"
-          >
-            Waiting for the active request to finish. No new work will start.
-          </p>
-        )}
-
-        {/* Download Log */}
-        {isCompleted && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onDownloadLog}
-            disabled={!onDownloadLog}
-            className="w-full"
-          >
-            <Download className="size-4 mr-2" />
-            Download Execution Log
-          </Button>
-        )}
+        <ExecutionActions
+          isPaused={isPaused}
+          isCancelling={isCancelling}
+          isCompleted={isCompleted}
+          onPause={onPause}
+          onResume={onResume}
+          onCancel={onCancel}
+          onDownloadLog={onDownloadLog}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+function ExecutionDescription({
+  outcome,
+  isCompleted,
+  isCancelling,
+  isPaused,
+}: Pick<
+  ExecutionControlsProps,
+  "outcome" | "isCompleted" | "isCancelling" | "isPaused"
+>): React.JSX.Element {
+  let executionDescription = "Execution in progress";
+  if (outcome === "failed") executionDescription = "Execution failed";
+  else if (outcome === "cancelled")
+    executionDescription = "Execution cancelled";
+  else if (outcome === "completedWithIssues")
+    executionDescription = "Execution completed with issues";
+  else if (isCompleted) executionDescription = "Execution completed";
+  else if (isCancelling) executionDescription = "Cancellation pending";
+  else if (isPaused) executionDescription = "Execution paused";
+
+  return <CardDescription>{executionDescription}</CardDescription>;
+}
+
+function ExecutionTiming({
+  tasks,
+  isPaused,
+  isCompleted,
+  startTime,
+  endTime,
+}: Pick<
+  ExecutionControlsProps,
+  "tasks" | "isPaused" | "isCompleted" | "startTime" | "endTime"
+>): React.JSX.Element {
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  // Update elapsed time every second
+  useEffect(() => {
+    if (isCompleted || isPaused) return;
+
+    const interval = setInterval(() => {
+      setElapsedTime(Date.now() - startTime.getTime());
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [startTime, isCompleted, isPaused]);
+
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(
+    (t) =>
+      t.status === "success" || t.status === "failed" || t.status === "skipped",
+  ).length;
+
+  // Calculate estimated time remaining
+  const avgTimePerTask = completedTasks > 0 ? elapsedTime / completedTasks : 0;
+  const remainingTasks = totalTasks - completedTasks;
+  const estimatedTimeRemaining = avgTimePerTask * remainingTasks;
+  const displayedElapsedTime =
+    isCompleted && endTime
+      ? Math.max(0, endTime.getTime() - startTime.getTime())
+      : elapsedTime;
+
+  return (
+    <>
+      {/* Timer */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="space-y-1">
+          <p className="text-sm text-muted-foreground">Elapsed Time</p>
+          <p className="text-2xl font-bold font-mono">
+            {formatDuration(displayedElapsedTime)}
+          </p>
+        </div>
+        {!isCompleted && remainingTasks > 0 && completedTasks > 0 && (
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">Estimated Remaining</p>
+            <p className="text-2xl font-bold font-mono">
+              {formatDuration(estimatedTimeRemaining)}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Start/End Time */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+        <div>
+          <p className="text-muted-foreground">Started</p>
+          <p className="font-medium">{formatDateTime(startTime)}</p>
+        </div>
+        {isCompleted && (
+          <div>
+            <p className="text-muted-foreground">Completed</p>
+            <p className="font-medium">
+              {endTime ? formatDateTime(endTime) : "Completed"}
+            </p>
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function ExecutionActions({
+  isPaused,
+  isCancelling,
+  isCompleted,
+  onPause,
+  onResume,
+  onCancel,
+  onDownloadLog,
+}: Pick<
+  ExecutionControlsProps,
+  | "isPaused"
+  | "isCancelling"
+  | "isCompleted"
+  | "onPause"
+  | "onResume"
+  | "onCancel"
+  | "onDownloadLog"
+>): React.JSX.Element {
+  return (
+    <>
+      {/* Control Buttons */}
+      {!isCompleted && !isCancelling && (
+        <div className="flex gap-2">
+          {!isPaused ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onPause}
+              disabled={!onPause}
+              className="flex-1"
+            >
+              <Pause className="size-4 mr-2" />
+              Pause
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onResume}
+              disabled={!onResume}
+              className="flex-1"
+            >
+              <Play className="size-4 mr-2" />
+              Resume
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onCancel}
+            disabled={!onCancel}
+            className="flex-1"
+          >
+            <Square className="size-4 mr-2" />
+            Cancel
+          </Button>
+        </div>
+      )}
+
+      {isCancelling && (
+        <p
+          role="status"
+          aria-live="polite"
+          className="rounded-lg border border-amber-300/25 bg-amber-300/10 px-3 py-2 text-sm text-amber-100"
+        >
+          Waiting for the active request to finish. No new work will start.
+        </p>
+      )}
+
+      {/* Download Log */}
+      {isCompleted && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={onDownloadLog}
+          disabled={!onDownloadLog}
+          className="w-full"
+        >
+          <Download className="size-4 mr-2" />
+          Download Execution Log
+        </Button>
+      )}
+    </>
   );
 }

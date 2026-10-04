@@ -36,6 +36,7 @@ export function deriveExecutionOutcome(tasks: HydrationTask[]): ExecutionOutcome
       task.status === "pending" ||
       task.status === "running" ||
       Boolean(task.warning) ||
+      task.drift?.status === "different" ||
       (task.status === "skipped" && !isExpectedNoOpSkip(task)),
   );
 

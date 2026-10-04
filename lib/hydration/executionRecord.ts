@@ -31,6 +31,15 @@ const taskBaseShape = {
   operation: operationModeSchema,
   itemName: z.string().min(1),
   templatePath: z.string().optional(),
+  match: z.strictObject({
+    id: z.string().min(1), name: z.string().min(1),
+    matchType: z.enum(["exact", "normalized"]),
+    portalUrl: z.string().url().startsWith("https://intune.microsoft.com/").optional(),
+  }).optional(),
+  drift: z.strictObject({
+    status: z.enum(["matches", "different", "notChecked"]),
+    differences: z.array(z.string()), reason: z.string().optional(),
+  }).optional(),
   error: z.string().optional(),
   warning: z.string().optional(),
   startTime: dateSchema.optional(),
@@ -70,6 +79,10 @@ const categoryBreakdownSchema = z.strictObject({
 });
 
 const summarySchema = z.strictObject({
+  provenance: z.strictObject({
+    runId: z.string().min(1), appVersion: z.string().min(1),
+    baselineVersion: z.string().min(1), baselineSourceSha: z.string().regex(/^[a-f0-9]{40}$/),
+  }).optional(),
   tenantId: z.string().min(1),
   tenantName: z.string().optional(),
   operationMode: operationModeSchema,
@@ -172,10 +185,10 @@ const executionRecordSchema = z.union([reportableRecordSchema, failedRecordSchem
     const batchStats = record.summary.batchStats;
     const batchStatsMatch =
       !batchStats ||
-      (record.operationMode === "create" &&
-        batchStats.batchingEnabled &&
-        batchStats.batchedTaskCount + batchStats.sequentialTaskCount === record.tasks.length &&
-        batchStats.batchRequestCount === Math.ceil(batchStats.batchedTaskCount / batchStats.batchSize));
+      (batchStats.batchedTaskCount <= record.tasks.length &&
+        batchStats.sequentialTaskCount <= record.tasks.length &&
+        (batchStats.batchRequestCount > 0 || batchStats.batchedTaskCount === 0) &&
+        (!record.isPreview || (batchStats.batchRequestCount === 0 && batchStats.batchedTaskCount === 0)));
     if (!summaryMatches || !batchStatsMatch) {
       context.addIssue({
         code: "custom",
