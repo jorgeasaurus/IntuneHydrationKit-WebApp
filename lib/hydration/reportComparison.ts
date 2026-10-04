@@ -222,7 +222,12 @@ function comparisonWarnings(first: ComparisonReport, second: ComparisonReport): 
   const timestamps = [first.started, second.started];
   const knownTimes = timestamps.every(time => time && /(?:UTC|Z|[+-]\d{2}:\d{2})$/i.test(time) && Number.isFinite(Date.parse(time)));
   if (!knownTimes) warnings.push("Start time or time zone is unknown. Run order cannot be confirmed.");
-  else if (Date.parse(first.started!) !== Date.parse(second.started!)) warnings.push("Reports have different start times. Tenant state can change between runs.");
+  else {
+    const precision = first.format === "Web JSON" && second.format === "Web JSON" ? 1 : 1000;
+    if (Math.floor(Date.parse(first.started!) / precision) !== Math.floor(Date.parse(second.started!) / precision)) {
+      warnings.push("Reports have different start times. Tenant state can change between runs.");
+    }
+  }
   if ([...first.tasks, ...second.tasks].some(task => /unknown/i.test(task.outcome))) warnings.push("Some task outcomes are unknown or lack a reason.");
   return warnings;
 }

@@ -84,6 +84,12 @@ describe("local report comparison", () => {
     expect(result.warnings).toContain("Reports have different start times. Tenant state can change between runs.");
   });
 
+  it("retains millisecond precision when both reports are JSON", () => {
+    const first = parseComparisonReport(JSON.stringify(jsonReport()));
+    const second = { ...first, started: "2026-10-04T02:36:16.432Z" };
+    expect(compareReports(first, second).warnings).toContain("Reports have different start times. Tenant state can change between runs.");
+  });
+
   it("rejects incomplete reports and unsupported data instead of silently dropping tasks", () => {
     expect(() => parseComparisonReport(markdown.replace("**Total Tasks**: 2", "**Total Tasks**: 3"))).toThrow("complete report");
     expect(() => parseComparisonReport(powershell.replace("| Created |", "| Created | extra |"))).toThrow("invalid operation row");
@@ -98,7 +104,7 @@ describe("local report comparison", () => {
       { id: "3", category: "baseline", operation: "create", itemName: "Example blocked", status: "skipped", skipKind: "blocked", error: "Missing license" },
       { id: "4", category: "baseline", operation: "create", itemName: "Example failed", status: "failed", error: "Request failed" },
     ];
-    const summary = createSummary("example-tenant", "create", new Date("2026-10-04T02:00:00Z"), new Date("2026-10-04T02:01:00Z"), tasks, undefined, undefined, {
+    const summary = createSummary("example-tenant", "create", new Date("2026-10-04T02:00:00.432Z"), new Date("2026-10-04T02:01:00Z"), tasks, undefined, undefined, {
       runId: "example-run", appVersion: "1.0", baselineVersion: "4.0", baselineSourceSha: "example-sha",
     });
     const markdownReport = parseComparisonReport(generateMarkdownReport(summary, tasks, "completedWithIssues", preview));
@@ -140,7 +146,7 @@ describe("local report comparison", () => {
 | Timestamp | Type | Name | Action | ID | Details |
 |-----------|------|------|--------|-----|---------|
 ${categories.map(([type], index) => `| 2026-10-03 19:37:32 | ${type} | ${tasks[index].itemName} | Created | example-id | |`).join("\n")}`;
-    const summary = createSummary("example-tenant", "create", new Date("2026-10-04T02:00:00Z"), new Date("2026-10-04T02:01:00Z"), tasks);
+    const summary = createSummary("example-tenant", "create", new Date("2026-10-04T02:00:00.432Z"), new Date("2026-10-04T02:01:00Z"), tasks);
     const parsedPs = parseComparisonReport(ps);
     for (const web of [generateJSONReport(summary, tasks, "succeeded", false), generateMarkdownReport(summary, tasks, "succeeded", false)]) {
       expect(compareReports(parsedPs, parseComparisonReport(web)).differences).toEqual([]);
