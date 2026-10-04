@@ -1958,8 +1958,19 @@
 
 - [x] Retry empty device configuration and driver inventories; prevent creation if the retry fails.
 - [x] Normalize PowerShell report categories to web categories before comparison.
-- [ ] Verify regressions, push fixes, and request a fresh Copilot review of the new head.
+- [x] Verify regressions, push fixes, and request a fresh Copilot review of the new head.
 
 Review cycle 1: three actionable threads on `31d5e63`. Live tenant validation remains required before merge.
 
 Fix validation: 685 tests, type check, lint, and diff check passed. The fresh review result is tracked on PR 74.
+
+# PR 74 merge verification
+
+- [x] Fix timestamp precision when comparing Markdown and JSON exports.
+- [x] Fix collection alignment when Graph omits a template-owned field.
+- [ ] Pass tests and a fresh Copilot review, then squash merge as requested.
+- [ ] Verify production and preserve resources without exact merge proof.
+
+Cleanup inventory: keep main, dev, the dev backup, production, and dev deployments. Preserve the PR 71 backup and five previews because its exact tip has no merge proof.
+
+Merge review fixes: 15 report-comparison tests and 19 baseline-evidence tests pass. Type check and diff check pass. Fresh review and production results will be reported after completion.

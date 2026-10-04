@@ -75,6 +75,30 @@ interface ComparisonDetails {
   memberCounts?: { baseline: number; tenant: number };
 }
 
+function matchCollection(expected: unknown[], actual: unknown[], path: string, definition: string): ComparisonDetails[] | undefined {
+  const comparisons = expected.map((value, index) => actual.map((candidate) => {
+    const details: ComparisonDetails = { differences: [], missing: [] };
+    compareOwnedFields(value, candidate, `${path}[${index}]`, details, definition);
+    return details;
+  }));
+  const owners = new Map<number, number>();
+  // Reassign partial matches when another item needs the same candidate. Each item is used once.
+  const assign = (index: number, visited: Set<number>): boolean => {
+    for (let candidate = 0; candidate < actual.length; candidate++) {
+      if (visited.has(candidate) || comparisons[index][candidate].differences.length) continue;
+      visited.add(candidate);
+      const owner = owners.get(candidate);
+      if (owner === undefined || assign(owner, visited)) {
+        owners.set(candidate, index);
+        return true;
+      }
+    }
+    return false;
+  };
+  if (!expected.every((_, index) => assign(index, new Set()))) return undefined;
+  return [...owners].map(([candidate, index]) => comparisons[index][candidate]);
+}
+
 function compareOwnedFields(expected: unknown, actual: unknown, path: string, details: ComparisonDetails, definition = ""): void {
   if (expected === undefined) return;
   // Graph can omit type annotations that the export includes. A returned type must still agree.
@@ -88,7 +112,10 @@ function compareOwnedFields(expected: unknown, actual: unknown, path: string, de
     if (!Array.isArray(actual) || expected.length !== actual.length) {
       details.differences.push(path);
     } else {
-      expected.forEach((value, index) => compareOwnedFields(value, actual[index], `${path}[${index}]`, details, definition));
+      const field = path.slice(path.lastIndexOf(".") + 1);
+      const matches = UNORDERED_SETTING_COLLECTIONS.has(field) ? matchCollection(expected, actual, path, definition) : undefined;
+      if (matches) matches.forEach((match) => details.missing.push(...match.missing));
+      else expected.forEach((value, index) => compareOwnedFields(value, actual[index], `${path}[${index}]`, details, definition));
     }
     if (details.differences.length > before && Array.isArray(actual) &&
       definition.endsWith("localusersandgroups_configure_groupconfiguration_accessgroup_users") &&

@@ -148,6 +148,35 @@ describe("local administrator comparison", () => {
     expect(result.differences).toHaveLength(1);
   });
 
+  it("reports incomplete evidence when only one reordered member omits an owned field", () => {
+    const expected = localAdministratorTemplate();
+    memberCollection(expected).push({ ...memberCollection(expected)[0], value: "AnotherMember" });
+    const actual = structuredClone(expected);
+    delete memberCollection(actual)[1].settingValueTemplateReference;
+    memberCollection(actual).reverse();
+    const result = compareBaselinePayloads(expected, actual, "SettingsCatalog");
+    expect(result.status).toBe("notChecked");
+    expect(result.differences).toEqual([]);
+    expect(result.reason).toContain("1 field(s) could not be checked");
+  });
+
+  it("does not reuse a returned member for two baseline members", () => {
+    const expected = localAdministratorTemplate();
+    memberCollection(expected).push({ ...memberCollection(expected)[0] });
+    const actual = structuredClone(expected);
+    memberCollection(actual)[1].value = "DifferentMember";
+    delete memberCollection(actual)[1].settingValueTemplateReference;
+    const result = compareBaselinePayloads(expected, actual, "SettingsCatalog");
+    expect(result.status).toBe("different");
+    expect(result.reason).toContain("baseline: 2; tenant: 2");
+  });
+
+  it("assigns incomplete members without consuming another member's only match", () => {
+    const expected = { simpleSettingCollectionValue: [{ value: "first" }, { value: "second" }] };
+    const actual = { simpleSettingCollectionValue: [{}, { value: "first" }] };
+    expect(compareBaselinePayloads(expected, actual, "SettingsCatalog").status).toBe("notChecked");
+  });
+
   it("detects changed membership even when the counts match", () => {
     const expected = localAdministratorTemplate();
     const actual = structuredClone(expected);
