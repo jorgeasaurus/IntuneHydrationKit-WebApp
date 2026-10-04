@@ -278,7 +278,7 @@ describe('useHydrationExecution', () => {
     expect(mockCreateGraphClient).toHaveBeenCalledWith({
       tenantId: 'tenant-123',
       homeAccountId: 'home-tenant-123'
-    })
+    }, expect.any(Function))
     expect(mockBuildTaskQueueAsync).toHaveBeenCalledWith(
       ['groups', 'enrollment'],
       'create',
@@ -312,11 +312,12 @@ describe('useHydrationExecution', () => {
       {
         batchingEnabled: true,
         batchSize: 5,
-        batchRequestCount: 1,
-        batchedTaskCount: 1,
-        sequentialTaskCount: 1
+        batchRequestCount: 0,
+        batchedTaskCount: 0,
+        sequentialTaskCount: 0
       },
-      'Contoso'
+      'Contoso',
+      expect.objectContaining({ runId: expect.any(String), appVersion: '2.6.52', baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
     )
 
     expect(result.current.tasks).toEqual([
@@ -366,8 +367,9 @@ describe('useHydrationExecution', () => {
       expect.any(Date),
       expect.any(Date),
       tasks,
-      undefined,
-      'Contoso'
+      expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
+      'Contoso',
+      expect.objectContaining({ runId: expect.any(String), appVersion: '2.6.52', baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
     )
   })
 
@@ -450,8 +452,9 @@ describe('useHydrationExecution', () => {
       expect.any(Date),
       expect.any(Date),
       [],
-      undefined,
-      'Contoso'
+      expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
+      'Contoso',
+      expect.objectContaining({ runId: expect.any(String), appVersion: '2.6.52', baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
     )
   })
 

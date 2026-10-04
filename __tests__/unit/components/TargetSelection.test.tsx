@@ -246,6 +246,7 @@ describe('TargetSelection', () => {
     })
 
     render(<TargetSelectionHarness />)
+    expect(screen.getByText("Baseline v4.0 includes macOS, Windows, and BYOD policies.")).toBeInTheDocument()
 
     await user.click(screen.getByLabelText('Entra Groups'))
     expect(await screen.findByLabelText(`${IMPORT_PREFIX}Windows Devices`)).toBeChecked()

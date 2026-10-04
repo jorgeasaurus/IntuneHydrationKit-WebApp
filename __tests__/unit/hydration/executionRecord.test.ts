@@ -68,6 +68,20 @@ describe("execution record storage", () => {
     expect(record?.activityLog[0].timestamp).toBeInstanceOf(Date);
   });
 
+  it("preserves matching evidence, drift, source versions, and retry counts", () => {
+    const record = createRecord();
+    if (!record.summary) throw new Error("Expected a reportable record.");
+    record.tasks[0].match = { id: "existing-id", name: "Existing object", matchType: "normalized", portalUrl: "https://intune.microsoft.com/#view/policy" };
+    record.tasks[0].drift = { status: "different", differences: ["settings[0].value"] };
+    record.outcome = "completedWithIssues";
+    record.summary.provenance = { runId: "run-id", appVersion: "2.6.52", baselineVersion: "4.0", baselineSourceSha: "a".repeat(40) };
+    record.summary.batchStats = { batchingEnabled: true, batchSize: 20, batchRequestCount: 3, batchedTaskCount: 1, sequentialTaskCount: 0 };
+    writeExecutionRecord(sessionStorage, record);
+    expect(readExecutionRecord(sessionStorage)).toEqual(record);
+    record.isPreview = true;
+    expect(() => writeExecutionRecord(sessionStorage, record)).toThrow();
+  });
+
   it("accepts equivalent category summaries with a different key order", () => {
     const record = createRecord();
     if (!record.summary) throw new Error("Expected a reportable record.");

@@ -247,6 +247,7 @@ async function executeSequentialTasks(
       continue;
     }
 
+    context.onSequentialTask?.(task);
     const result = await executeTask(task, context);
     results.push(result);
 

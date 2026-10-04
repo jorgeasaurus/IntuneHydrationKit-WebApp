@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 import cisManifest from "@/public/CISIntuneBaselines/manifest.json";
@@ -7,14 +7,16 @@ import { describe, expect, it } from "vitest";
 
 describe("OpenIntuneBaseline manifest parity", () => {
   it("matches the expected PowerShell inventory and BYOD metadata", () => {
-    expect(manifest.totalFiles).toBe(98);
+    expect(manifest.totalFiles).toBe(102);
+    expect(manifest.windowsVersion).toBe("4.0");
+    expect(manifest.sourceSha).toBe(readFileSync("public/IntuneTemplates/OpenIntuneBaseline/.upstream-sha", "utf8").trim());
 
     expect(
       Object.fromEntries(manifest.platforms.map((platform) => [platform.id, platform.count]))
     ).toEqual({
       BYOD: 2,
       MACOS: 20,
-      WINDOWS: 73,
+      WINDOWS: 77,
       WINDOWS365: 3,
     });
 

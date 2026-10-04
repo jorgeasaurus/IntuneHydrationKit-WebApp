@@ -160,6 +160,7 @@ describe('template catalog', () => {
     expect(catalog.categories.find((category) => category.id === 'notification')?.count).toBe(1)
     expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(4)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(2)
+    expect(catalog.categories.find((category) => category.id === 'baseline')?.description).toBe('Baseline v4.0 includes macOS, Windows, and BYOD policies.')
     expect(catalog.categories.find((category) => category.id === 'cisBaseline')?.count).toBe(1)
 
     const baselineItem = catalog.items.find(

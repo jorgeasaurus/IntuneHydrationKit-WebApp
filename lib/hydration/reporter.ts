@@ -9,7 +9,7 @@ import {
   BatchExecutionStats,
   type ReportableExecutionOutcome,
 } from "@/types/hydration";
-import { formatClockTime, formatFileTimestamp } from "@/lib/utils/dateFormat";
+import { formatFileTimestamp } from "@/lib/utils/dateFormat";
 import { getTaskEvidenceOutcome, type TaskEvidenceOutcome } from "@/lib/hydration/executionOutcome";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 
@@ -33,214 +33,192 @@ function formatUtcDateTime(date: Date): string {
   return date.toISOString().replace("T", " ").slice(0, 19);
 }
 
-/**
- * Generate Markdown report
- */
+function getExportStats(summary: HydrationSummary, isPreview: boolean) {
+  return {
+    ...summary.stats,
+    created: isPreview ? 0 : summary.stats.created,
+    deleted: isPreview ? 0 : summary.stats.deleted,
+    wouldCreate: isPreview ? summary.stats.created : 0,
+    wouldDelete: isPreview ? summary.stats.deleted : 0,
+  };
+}
+
+function getReportOutcome(task: HydrationTask, isPreview: boolean): string {
+  if (isPreview && task.status === "success") {
+    return task.operation === "create" ? "wouldCreate" : "wouldDelete";
+  }
+  return getTaskEvidenceOutcome(task);
+}
+
+function getReportOutcomeLabel(task: HydrationTask, isPreview: boolean): string {
+  if (isPreview && task.status === "success") {
+    return task.operation === "create" ? "Would create" : "Would delete";
+  }
+  return TASK_OUTCOME_LABELS[getTaskEvidenceOutcome(task)];
+}
+
+function getTaskMarkdown(task: HydrationTask, isPreview: boolean): string {
+  const lines = [
+    `${getTaskStatusIcon(task.status)} ${task.itemName}`,
+    `   - Outcome: ${getReportOutcomeLabel(task, isPreview)}`,
+  ];
+  if (task.error) lines.push(`   - ${task.status === "failed" ? "Error" : "Reason"}: ${task.error}`);
+  if (task.warning) lines.push(`   - Warning: ${task.warning}`);
+  if (task.match) {
+    lines.push(`   - Matched object: ${task.match.name} (${task.match.id})`, `   - Match: ${task.match.matchType}`);
+    if (task.match.portalUrl) lines.push(`   - Portal: ${task.match.portalUrl}`);
+  }
+  if (task.drift) {
+    lines.push(`   - Configuration comparison: ${task.drift.status}`);
+    if (task.drift.reason) lines.push(`   - Comparison reason: ${task.drift.reason}`);
+    for (const difference of task.drift.differences) lines.push(`   - Difference: ${difference}`);
+  }
+  if (task.startTime) lines.push(`   - Started: ${formatUtcDateTime(task.startTime)} UTC`);
+  if (task.endTime) lines.push(`   - Completed: ${formatUtcDateTime(task.endTime)} UTC`);
+  if (task.startTime && task.endTime) lines.push(`   - Duration: ${formatDuration(task.endTime.getTime() - task.startTime.getTime())}`);
+  return lines.join("\n") + "\n";
+}
+
+/** Generate a report with explicit preview outcomes and UTC timestamps. */
 export function generateMarkdownReport(
   summary: HydrationSummary,
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
 ): string {
-  const duration = formatDuration(summary.duration);
-  // Render actual UTC time (toISOString), not local time with a hardcoded UTC label
-  const timestamp = `${formatUtcDateTime(summary.startTime)} UTC`;
-
+  const stats = getExportStats(summary, isPreview);
+  const provenance = summary.provenance;
   let markdown = `# Intune Hydration Report
 
 **Tenant ID**: ${summary.tenantId}
 **Operation**: ${summary.operationMode.charAt(0).toUpperCase() + summary.operationMode.slice(1)}
 **Execution**: ${isPreview ? "Preview" : "Live"}
 **Outcome**: ${RUN_OUTCOME_LABELS[outcome]}
-**Date**: ${timestamp}
-**Duration**: ${duration}
+**Started**: ${formatUtcDateTime(summary.startTime)} UTC
+**Completed**: ${formatUtcDateTime(summary.endTime)} UTC
+**Exported**: ${formatUtcDateTime(new Date())} UTC
+**Duration**: ${formatDuration(summary.duration)}
+**Run ID**: ${provenance?.runId ?? "Not recorded"}
+**App version**: ${provenance?.appVersion ?? "Not recorded"}
+**Baseline version**: ${provenance?.baselineVersion ?? "Not recorded"}
+**Baseline Source SHA**: ${provenance?.baselineSourceSha ?? "Not recorded"}
 
 ## Summary
 
-- **Total Tasks**: ${summary.stats.total}
-- **Created**: ${summary.stats.created}
-- **Deleted**: ${summary.stats.deleted}
-- **Skipped**: ${summary.stats.skipped}
-- **Failed**: ${summary.stats.failed}${
-    summary.batchStats
-      ? `
-
-### Batch Execution
-- **Batch Size**: ${summary.batchStats.batchSize}
-- **Batch Requests**: ${summary.batchStats.batchRequestCount}
-- **Batched Tasks**: ${summary.batchStats.batchedTaskCount}
-- **Sequential Tasks**: ${summary.batchStats.sequentialTaskCount}`
-      : ""
-  }
-
-## Category Breakdown
-
+- **Total Tasks**: ${stats.total}
+- **Created**: ${stats.created}
+- **Deleted**: ${stats.deleted}
+- **Would Create**: ${stats.wouldCreate}
+- **Would Delete**: ${stats.wouldDelete}
+- **Skipped**: ${stats.skipped}
+- **Failed**: ${stats.failed}
 `;
-
-  // Add category breakdown
-  for (const [category, stats] of Object.entries(summary.categoryBreakdown)) {
-    const categoryName = getTaskCategoryLabel(category);
-    markdown += `### ${categoryName} (${stats.total})\n`;
-    markdown += `- Success: ${stats.success}\n`;
-    markdown += `- Failed: ${stats.failed}\n\n`;
+  if (summary.batchStats) {
+    const batch = summary.batchStats;
+    markdown += `
+### Batch Execution
+- **Batch Size**: ${batch.batchSize}
+- **Batch Requests**: ${batch.batchRequestCount}
+- **Batched Tasks**: ${batch.batchedTaskCount}
+- **Sequential Checks**: ${batch.sequentialTaskCount}
+Sequential checks include skipped tasks. A batch fallback can count in both paths. Batch requests count emitted requests, including retries.
+`;
   }
-
-  // Add task details
-  markdown += `## Task Details\n\n`;
-
-  const groupedTasks = groupTasksByCategory(tasks);
-
-  for (const [category, categoryTasks] of Object.entries(groupedTasks)) {
+  markdown += "\n## Category Breakdown\n\n";
+  for (const [category, categoryStats] of Object.entries(summary.categoryBreakdown)) {
+    markdown += `### ${getTaskCategoryLabel(category)} (${categoryStats.total})\n`;
+    markdown += `- ${isPreview ? "Would change" : "Success"}: ${categoryStats.success}\n`;
+    markdown += `- Skipped: ${categoryStats.skipped}\n- Failed: ${categoryStats.failed}\n\n`;
+  }
+  markdown += "## Task Details\n\n";
+  for (const [category, categoryTasks] of Object.entries(groupTasksByCategory(tasks))) {
     markdown += `### ${getTaskCategoryLabel(category)}\n\n`;
-
-    for (const task of categoryTasks) {
-      const icon = getTaskStatusIcon(task.status);
-      markdown += `${icon} ${task.itemName}\n`;
-      markdown += `   - Outcome: ${TASK_OUTCOME_LABELS[getTaskEvidenceOutcome(task)]}\n`;
-
-      if (task.error) {
-        markdown += `   - Error: ${task.error}\n`;
-      }
-      if (task.warning) {
-        markdown += `   - Warning: ${task.warning}\n`;
-      }
-      if (task.startTime && task.endTime) {
-        const taskDuration = task.endTime.getTime() - task.startTime.getTime();
-        markdown += `   - Duration: ${formatDuration(taskDuration)}\n`;
-      }
-    }
-
-    markdown += `\n`;
+    markdown += categoryTasks.map((task) => getTaskMarkdown(task, isPreview)).join("") + "\n";
   }
-
-  // Add warnings section if there are any
-  if (summary.warnings.length > 0) {
-    markdown += `## Warnings\n\n`;
-    markdown += `The following policies were created but require manual configuration:\n\n`;
-    for (const warning of summary.warnings) {
-      const warningTime = formatClockTime(warning.timestamp);
-      markdown += `- **[${warningTime}]** ${warning.task}: ${warning.message}\n`;
+  for (const [label, entries] of [["Warnings", summary.warnings], ["Errors", summary.errors]] as const) {
+    if (entries.length === 0) continue;
+    markdown += `## ${label}\n\n`;
+    for (const entry of entries) {
+      markdown += `- **[${formatUtcDateTime(entry.timestamp)} UTC]** ${entry.task}: ${entry.message}\n`;
     }
-    markdown += `\n`;
+    markdown += "\n";
   }
-
-  // Add errors section if there are any
-  if (summary.errors.length > 0) {
-    markdown += `## Errors\n\n`;
-    for (const error of summary.errors) {
-      const errorTime = formatClockTime(error.timestamp);
-      markdown += `- **[${errorTime}]** ${error.task}: ${error.message}\n`;
-    }
-    markdown += `\n`;
-  }
-
-  // Add footer
-  markdown += `---\n\n`;
-  markdown += `*Generated by [Intune Hydration Kit](https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp)*\n`;
-
-  return markdown;
+  return markdown + "---\n\n*Generated by [Intune Hydration Kit](https://github.com/jorgeasaurus/IntuneHydrationKit-WebApp)*\n";
 }
 
-/**
- * Generate JSON report
- */
+/** Generate JSON evidence without counting preview decisions as mutations. */
 export function generateJSONReport(
   summary: HydrationSummary,
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
 ): string {
-  const report = {
+  return JSON.stringify({
     outcome,
     executionMode: isPreview ? "preview" : "live",
-    summary,
+    summary: { ...summary, stats: getExportStats(summary, isPreview) },
     tasks: tasks.map((task) => ({
       id: task.id,
       category: task.category,
       operation: task.operation,
       itemName: task.itemName,
       status: task.status,
-      outcome: getTaskEvidenceOutcome(task),
-      error: task.error,
+      outcome: getReportOutcome(task, isPreview),
+      error: task.status === "failed" ? task.error : undefined,
+      reason: task.status !== "failed" ? task.error : undefined,
       warning: task.warning,
+      match: task.match,
+      drift: task.drift,
       startTime: task.startTime?.toISOString(),
       endTime: task.endTime?.toISOString(),
       duration: task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : null,
     })),
-    metadata: {
-      reportVersion: "1.0",
-      generatedAt: new Date().toISOString(),
-    },
-  };
-
-  return JSON.stringify(report, null, 2);
+    metadata: { reportVersion: "2.0", generatedAt: new Date().toISOString() },
+  }, null, 2);
 }
 
-/**
- * Generate CSV report
- */
+function escapeCSVField(value: string | number): string {
+  let text = String(value);
+  if (/^\s*[=+\-@\t\r]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '\"\"')}"`;
+}
+
+/** Generate CSV task evidence and repeat run metadata on each row. */
 export function generateCSVReport(
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
+  summary?: HydrationSummary,
 ): string {
   const headers = [
-    "Category",
-    "Item Name",
-    "Operation",
-    "Execution Mode",
-    "Run Outcome",
-    "Status",
-    "Outcome",
-    "Error",
-    "Warning",
-    "Start Time (UTC)",
-    "End Time (UTC)",
-    "Duration (ms)",
+    "Category", "Item Name", "Operation", "Execution Mode", "Run Outcome", "Status", "Outcome",
+    "Error", "Reason", "Warning", "Start Time (UTC)", "End Time (UTC)", "Duration (ms)",
+    "Matched Object ID", "Matched Object Name", "Match Type", "Portal URL", "Configuration Comparison",
+    "Differences", "Comparison Reason", "Tenant ID", "Run ID", "App Version", "Baseline Version", "Baseline Source SHA",
+    "Run Start (UTC)", "Run End (UTC)", "Exported (UTC)", "Created", "Deleted", "Would Create", "Would Delete",
   ];
-
-  // Quote-escape every field so commas/quotes/newlines in any value can't break the CSV.
-  // Values starting with =, +, -, @ (or tab/CR) are prefixed with ' to neutralize
-  // spreadsheet formula injection (a policy named "=cmd|..." must not execute in Excel).
-  // Leading whitespace is checked too - Excel trims it before evaluating formulas.
-  const escapeCSVField = (value: string | number): string => {
-    let str = String(value);
-    if (/^\s*[=+\-@\t\r]/.test(str)) {
-      str = `'${str}`;
-    }
-    return `"${str.replace(/"/g, '""')}"`;
-  };
-
-  const rows = tasks.map((task) => {
-    const duration = task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : "";
-
-    return [
-      task.category,
-      task.itemName,
-      task.operation,
-      isPreview ? "preview" : "live",
-      outcome,
-      task.status,
-      getTaskEvidenceOutcome(task),
-      task.error ?? "",
-      task.warning ?? "",
-      task.startTime ? formatUtcDateTime(task.startTime) : "",
-      task.endTime ? formatUtcDateTime(task.endTime) : "",
-      duration,
-    ].map(escapeCSVField);
-  });
-
-  if (rows.length === 0) {
-    rows.push(
-      ["", "", "", isPreview ? "preview" : "live", outcome, "", "", "", "", "", "", ""].map(
-        escapeCSVField,
-      ),
-    );
+  const stats = summary ? getExportStats(summary, isPreview) : null;
+  const provenance = summary?.provenance;
+  const runValues = [
+    summary?.tenantId ?? "", provenance?.runId ?? "", provenance?.appVersion ?? "",
+    provenance?.baselineVersion ?? "", provenance?.baselineSourceSha ?? "",
+    summary ? formatUtcDateTime(summary.startTime) : "", summary ? formatUtcDateTime(summary.endTime) : "",
+    formatUtcDateTime(new Date()), stats?.created ?? "", stats?.deleted ?? "", stats?.wouldCreate ?? "", stats?.wouldDelete ?? "",
+  ];
+  const taskRows = tasks.map((task) => [
+    task.category, task.itemName, task.operation, isPreview ? "preview" : "live", outcome,
+    task.status, getReportOutcome(task, isPreview), task.status === "failed" ? task.error ?? "" : "",
+    task.status !== "failed" ? task.error ?? "" : "", task.warning ?? "",
+    task.startTime ? formatUtcDateTime(task.startTime) : "", task.endTime ? formatUtcDateTime(task.endTime) : "",
+    task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : "",
+    task.match?.id ?? "", task.match?.name ?? "", task.match?.matchType ?? "", task.match?.portalUrl ?? "",
+    task.drift?.status ?? "", task.drift?.differences.join("; ") ?? "", task.drift?.reason ?? "",
+    ...runValues,
+  ]);
+  if (taskRows.length === 0) {
+    taskRows.push(["", "", "", isPreview ? "preview" : "live", outcome, ...Array<string>(15).fill(""), ...runValues]);
   }
-
-  const csv = [headers.map(escapeCSVField), ...rows].map((row) => row.join(",")).join("\n");
-
-  return csv;
+  return [headers, ...taskRows].map((row) => row.map(escapeCSVField).join(",")).join("\n");
 }
 
 /**
@@ -254,6 +232,7 @@ export function createSummary(
   tasks: HydrationTask[],
   batchStats?: BatchExecutionStats,
   tenantName?: string,
+  provenance?: HydrationSummary["provenance"],
 ): HydrationSummary {
   const stats = {
     total: tasks.length,
@@ -321,12 +300,13 @@ export function createSummary(
     errors,
     warnings,
     batchStats,
+    provenance,
   };
 }
 
 export function summaryMatchesExecution(
   summary: HydrationSummary,
-  source: Pick<HydrationSummary, "tenantId" | "tenantName" | "operationMode" | "startTime" | "endTime"> & {
+  source: Pick<HydrationSummary, "tenantId" | "tenantName" | "operationMode" | "startTime" | "endTime" | "provenance"> & {
     tasks: HydrationTask[];
   },
 ): boolean {
@@ -338,6 +318,7 @@ export function summaryMatchesExecution(
     source.tasks,
     summary.batchStats,
     source.tenantName,
+    source.provenance ?? summary.provenance,
   );
   return JSON.stringify(toCanonicalValue(summary)) === JSON.stringify(toCanonicalValue(expected));
 }

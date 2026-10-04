@@ -287,6 +287,21 @@ describe('GraphClient', () => {
   })
 
   describe('batch', () => {
+    it('records only batches dispatched after authentication', async () => {
+      const onDispatch = vi.fn()
+      const client = new GraphClient(undefined, onDispatch)
+      server.use(http.post(`${GRAPH_BASE}/beta/$batch`, () => HttpResponse.json({ responses: [] })))
+      await client.batch([])
+      expect(onDispatch).not.toHaveBeenCalled()
+      const requests = [{ id: '1', method: 'POST' as const, url: '/groups' }]
+      await client.batch(requests)
+      expect(onDispatch).toHaveBeenCalledExactlyOnceWith(requests)
+      const auth = await import('@/lib/auth/authUtils')
+      vi.mocked(auth.getAccessToken).mockRejectedValueOnce(new Error('Session expired'))
+      await expect(client.batch(requests)).rejects.toThrow('Session expired')
+      expect(onDispatch).toHaveBeenCalledTimes(1)
+    })
+
     it('submits the batch request once and does not retry the whole request on transport errors', async () => {
       let requestCount = 0
 

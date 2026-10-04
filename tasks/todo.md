@@ -1821,3 +1821,156 @@
 - [x] Graph beta accepted all ten temporary, unassigned OS filters. Preview matched the Windows 25H2 record (10.0.26200.8875), excluded 10.0.26300.8935, and returned zero for the other nine rules.
 - [x] Delete all ten temporary filters; confirm all 43 original filters and their rules remain unchanged.
 - Scope: app-only Graph validation, not browser delegated-auth validation. No Apple device records were available; positive Apple matching remains untested.
+
+# Launch video
+- [x] Build a 22-second landscape video with the brag skill.
+- [x] Verify product claims and capture the current product demo.
+- [x] Check the composition, render MP4, and inspect key frames.
+- [x] Export the poster and share copy.
+
+## Video review
+- Created `brag-output/brag.mp4`: 22 seconds, 1920 × 1080, 30 fps, with music and demo footage.
+- Hyperframes passed with zero errors, including 300 motion samples. Seven structural warnings were reviewed.
+- Inspected rendered scenes and exported a poster, share copy, and editable composition.
+
+# Windows 11 26H2 filter
+
+- [x] Check the current templates and Microsoft build information.
+- [x] Add the 26H2 filter, update the manifest count, and increment the website version.
+- [x] Run filter and template checks and review the diff.
+
+## 26H2 review
+
+- Added build 26300 using [Microsoft Flight Hub](https://learn.microsoft.com/en-us/windows-insider/flight-hub/). Filter total: 43. Website version: 2.6.50.
+- Passed: 38 tests, type check, template counts, build matching, version consistency, and diff check. Live tenant creation was not tested.
+
+# OpenIntuneBaseline PowerShell parity
+
+- [x] Compare the newest PowerShell branch and confirm the source inventory.
+- [x] Match all 102 importable policies at `jorgeasaurus/IntuneHydrationKit@bb21df326c98ca2a5b69c040033e7a7fb9794324`.
+- [x] Regenerate the manifest, align category counts, and increment the website version.
+- [x] Test exact payload parity, loading, and execution; run type check, lint, and build.
+
+## Parity scope
+
+- Source branch: `fix/42-update-openintunebaseline`. Windows: 77; macOS: 20; Windows 365: 3; BYOD: 2.
+- Remove obsolete bundled policies. Preserve payload values, tenant placeholder replacement, and existing work. Exclude `PolicyManifest.json` from deployment.
+
+## Parity review
+
+- All 102 file paths and bytes match PowerShell `bb21df3` and upstream OIB `1cc71a92abdb9d708c9a3358f323f7894ae81163`. Replaced 25 obsolete paths with 29 current paths.
+- Manifest counts drive category estimates. Sync downloads the recorded commit. Website version: `2.6.52`.
+- Passed: 612 tests, type check, lint, production build, sync check, and diff check. Node 26 tests require `NODE_OPTIONS=--no-experimental-webstorage` for browser storage. Independent review found no issues.
+- Graph calls were mocked. Live tenant creation and deployment were not tested. Existing local changes remain.
+
+# OpenIntuneBaseline strict review loop
+
+- [x] Review baseline parity changes for structure, payload behavior, and test gaps.
+- [x] Fix actionable findings and repeat with a fresh review.
+- [x] Validate the final diff and record the review result.
+
+## Strict review result
+
+- Round 1: independent structure and runtime reviews returned zero actionable findings. No code fixes were required.
+- Final checks passed: `NODE_OPTIONS=--no-experimental-webstorage npm run test:run` (612 tests), `npm run type-check`, `npm run lint`, `npm run build`, and `git diff --check`.
+- All 102 source policy paths and bytes still match PowerShell `bb21df3`. Live tenant operations remain untested. Clean: yes.
+
+# React control-flow complexity
+
+- [x] Fetch the canonical rule recipe with no-cache curl and scan the full app.
+- [x] Confirm all nine occurrences and extract cohesive components or hooks without behavior changes.
+- [x] Run component tests, type check, lint, build, and the full React Doctor scan.
+
+## Scope
+
+- Fix only `react-doctor/no-high-complexity-react-function`; preserve existing work and rule settings. Baseline: nine warnings, score 92.
+- Canonical recipe: https://react.doctor/docs/rules/react-doctor/no-high-complexity-react-function. Component-owned branching must exceed 15; nested callbacks are excluded.
+
+## Complexity review
+
+- Confirmed failure, high confidence: `DashboardPage` mixes run restoration, ownership checks, and controls; `WizardContent` mixes step dispatch with the operator brief. Their own branches trigger the rule.
+- Confirmed failure, high confidence: `DashboardRunView`, `ExecutionControls`, and `ResultsSummary` combine independent navigation, status, timing, result, and action branches.
+- Confirmed failure, high confidence: `ReviewConfirm` combines readiness and active-run notices; `TenantConfig` combines health-check records and validation results.
+- Confirmed failure, high confidence: `CategoryHeader` repeats expansion button branches; `TargetSelectionCategoryView` repeats category selection gates. No nested-callback false positives.
+- Extracted focused render components and `useDashboardRun`; preserved hook order, effects, event behavior, and markup. No rule settings or suppressions added.
+- Passed: 612 tests with `NODE_OPTIONS=--no-experimental-webstorage`, type check, lint, build, and diff check. Independent review confirmed unchanged dashboard effects and wizard mounting behavior.
+- Final `npx react-doctor@latest --verbose`: 225 files, 100/100, zero issues. `--verbose --diff`: 100/100, zero issues. All nine target diagnostics are gone.
+
+# Rebase onto main
+
+- [x] Fetch main and verify the committed dev tree matches release `84740cc`.
+- [x] Save local work and rebase dev onto origin/main without replaying merged commits.
+- [x] Restore local changes, resolve conflicts, and validate.
+
+## Rebase result
+
+- Dev now uses `origin/main` at `98a2cbd`; prior committed tree exactly matched release `84740cc`, so merged commits were not replayed.
+- Restored local changes. Retained main's OS filter rules and warning colors, local version 2.6.52, and both task histories.
+- Recovery: branch `codex/dev-before-main-rebase-20261003` and stash `447b843a20eef917a7cda3ef0f39e51df436d94a`. Nothing pushed.
+- Passed: 625 tests, type check, lint, build, diff check, and React Doctor 100/100 with zero issues.
+
+# Baseline version labels
+
+- [x] Record the upstream Windows release version and keep it current during sync.
+- [x] Show the shared version in template docs and the wizard.
+- [x] Verify labels, manifest generation, and project checks.
+
+## Version label review
+
+- Docs and wizard show Windows baseline v4.0 from the generated manifest. Other platform policy versions remain distinct.
+- Sync reads `WINDOWS/PolicyManifest.json` and saves `.windows-version`; manifest generation validates the version. No metadata files enter the policy inventory.
+- Passed: 21 focused tests, type check, lint, build, diff check, React Doctor 100/100, and a fresh upstream sync in a temporary directory (v4.0, 102 policies).
+
+# Run evidence and report review
+
+- [x] Record exact and normalized OIB matches, read-only setting differences, and pre-run version changes.
+- [x] Capture run identity, source versions, UTC times, and actual batch request counts.
+- [x] Use precise preview outcomes in exports and a decision-focused results view.
+- [x] Compare PowerShell and web reports locally, with mode and time warnings.
+- [x] Verify persistence, focused tests, full tests, build, and React Doctor.
+
+## Design
+
+- Share exact-before-normalized name matching across the baseline review and execution. Scope app protection matches to the correct OS. Compare template-owned fields and report incomplete checks as not checked. Never update or remove an existing policy during review.
+- Save evidence with the run. Count batch requests at dispatch, including retries; do not estimate requests from task counts.
+- Report imports stay in the browser. Differences do not prove that two runs saw the same tenant state.
+
+## Run evidence review
+
+- Added preview-safe exports, run/source metadata, measured batch dispatch counts, baseline match and settings evidence, pre-run version review, and local report comparison. Results show issues first and collapse unchanged items.
+- Independent reviews found and resolved sequential name-match and cross-OS app protection inconsistencies. Partial or unsupported settings reads remain explicitly not checked. No automatic policy updates or deletes were added.
+- Passed: 668 tests, type check, lint, production build, diff check, and full/changed React Doctor scans at 100/100. One build collided with the active development output; the final build passed.
+- Graph behavior was tested with mocks. Live tenant comparison and portal navigation were not tested. No deployment or tenant changes were made.
+
+# Baseline comparison clarity
+
+- [x] Ignore omitted Graph type annotations without hiding conflicting types or real member differences.
+- [x] Show concise comparison reasons and collapse repeated match evidence and raw paths.
+- [x] Test the Local Administrators template and result rendering; run type, lint, and React Doctor checks.
+
+## Comparison clarity review
+
+- Omitted type annotations and collection order no longer produce false differences. Returned type conflicts, duplicate member counts, and changed values remain significant. The actual Local Administrators template is covered by regressions.
+- Member differences show baseline/tenant counts. Match IDs, repeated names, and raw paths are closed by default under Technical details. Existing saved runs require a new preview to refresh their evidence.
+- Passed: 104 focused comparison, report, persistence, and UI tests; type check; lint; diff check; React Doctor 100/100. Independent UI review found no issues. No live tenant reads or writes.
+
+# PR 74 Copilot fixes
+
+- [x] Retry empty device configuration and driver inventories; prevent creation if the retry fails.
+- [x] Normalize PowerShell report categories to web categories before comparison.
+- [x] Verify regressions, push fixes, and request a fresh Copilot review of the new head.
+
+Review cycle 1: three actionable threads on `31d5e63`. Live tenant validation remains required before merge.
+
+Fix validation: 685 tests, type check, lint, and diff check passed. The fresh review result is tracked on PR 74.
+
+# PR 74 merge verification
+
+- [x] Fix timestamp precision when comparing Markdown and JSON exports.
+- [x] Fix collection alignment when Graph omits a template-owned field.
+- [ ] Pass tests and a fresh Copilot review, then squash merge as requested.
+- [ ] Verify production and preserve resources without exact merge proof.
+
+Cleanup inventory: keep main, dev, the dev backup, production, and dev deployments. Preserve the PR 71 backup and five previews because its exact tip has no merge proof.
+
+Merge review fixes: 15 report-comparison tests and 19 baseline-evidence tests pass. Type check and diff check pass. Fresh review and production results will be reported after completion.

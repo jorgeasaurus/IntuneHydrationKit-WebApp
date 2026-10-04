@@ -146,7 +146,7 @@ async function main() {
   );
   fs.mkdirSync(tmpDir, { recursive: true });
 
-  const tarballUrl = `https://github.com/${UPSTREAM_REPO}/archive/${UPSTREAM_BRANCH}.tar.gz`;
+  const tarballUrl = `https://github.com/${UPSTREAM_REPO}/archive/${upstreamSha}.tar.gz`;
   const tarballPath = path.join(tmpDir, "oib.tar.gz");
 
   console.log(`\n▶ Downloading tarball from ${UPSTREAM_BRANCH}...`);
@@ -155,7 +155,7 @@ async function main() {
   console.log("▶ Extracting...");
   run(`tar -xzf "${tarballPath}" -C "${tmpDir}"`);
 
-  // The extracted folder is named OpenIntuneBaseline-<branch>
+  // Extract the snapshot for the recorded upstream commit.
   const extractedDir = fs
     .readdirSync(tmpDir)
     .map((d) => path.join(tmpDir, d))
@@ -167,6 +167,13 @@ async function main() {
     process.exit(1);
   }
   console.log(`  Extracted to: ${path.basename(extractedDir)}`);
+
+  const { oibVersion: windowsVersion } = JSON.parse(
+    fs.readFileSync(path.join(extractedDir, "WINDOWS", "PolicyManifest.json"), "utf8")
+  );
+  if (typeof windowsVersion !== "string" || !/^\d+\.\d+(?:\.\d+)?$/.test(windowsVersion)) {
+    throw new Error("Invalid OpenIntuneBaseline Windows version");
+  }
 
   // 3. Collect before-state for diff reporting
   const beforeFiles = collectFiles(OIB_DIR).filter(
@@ -212,12 +219,13 @@ async function main() {
 
   console.log(`\n  Total files copied: ${totalCopied}`);
 
+  fs.writeFileSync(path.join(OIB_DIR, ".windows-version"), windowsVersion + "\n");
+
+  writeLocalSha(upstreamSha);
+
   // 5. Regenerate manifest
   console.log("\n▶ Regenerating OIB manifest...");
   run("node scripts/generate-oib-manifest.js", { cwd: path.join(__dirname, "..") });
-
-  // 6. Record upstream SHA
-  writeLocalSha(upstreamSha);
 
   // 7. Diff summary
   const afterFiles = collectFiles(OIB_DIR).filter(

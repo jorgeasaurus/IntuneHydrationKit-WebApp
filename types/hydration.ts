@@ -62,12 +62,34 @@ export const TASK_CATEGORIES = [
 
 export type TaskCategory = (typeof TASK_CATEGORIES)[number];
 
+export interface TaskMatchEvidence {
+  id: string;
+  name: string;
+  matchType: "exact" | "normalized";
+  portalUrl?: string;
+}
+
+export interface TaskDriftEvidence {
+  status: "matches" | "different" | "notChecked";
+  differences: string[];
+  reason?: string;
+}
+
+export interface RunProvenance {
+  runId: string;
+  appVersion: string;
+  baselineVersion: string;
+  baselineSourceSha: string;
+}
+
 interface HydrationTaskBase {
   id: string;
   category: TaskCategory;
   operation: OperationMode;
   itemName: string;
   templatePath?: string;
+  match?: TaskMatchEvidence;
+  drift?: TaskDriftEvidence;
   error?: string;
   warning?: string;
   startTime?: Date;
@@ -85,15 +107,15 @@ export type HydrationTask =
  * Batch execution statistics
  */
 export interface BatchExecutionStats {
-  /** Whether batch execution was used */
+  /** Batch execution setting for this run. */
   batchingEnabled: boolean;
   /** Batch size used */
   batchSize: number;
-  /** Number of batch requests sent */
+  /** Dispatched batch requests, including retry attempts. */
   batchRequestCount: number;
-  /** Number of tasks executed via batch */
+  /** Distinct requests submitted in batches. */
   batchedTaskCount: number;
-  /** Number of tasks executed sequentially */
+  /** Tasks checked by the sequential executor, including skips. */
   sequentialTaskCount: number;
 }
 
@@ -116,6 +138,7 @@ export interface BatchProgress {
 }
 
 export interface HydrationSummary {
+  provenance?: RunProvenance;
   tenantId: string;
   tenantName?: string;
   operationMode: OperationMode;
@@ -147,7 +170,7 @@ export interface HydrationSummary {
     message: string;
     timestamp: Date;
   }>;
-  /** Batch execution statistics (optional, present when batching was used) */
+  /** Observed execution counts. Parallel deletes are not included in task path counts. */
   batchStats?: BatchExecutionStats;
 }
 

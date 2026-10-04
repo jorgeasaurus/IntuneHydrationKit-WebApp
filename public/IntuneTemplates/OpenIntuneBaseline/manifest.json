@@ -1,5 +1,7 @@
 {
-  "totalFiles": 98,
+  "sourceSha": "1cc71a92abdb9d708c9a3358f323f7894ae81163",
+  "windowsVersion": "4.0",
+  "totalFiles": 102,
   "platforms": [
     {
       "id": "BYOD",
@@ -14,7 +16,7 @@
     {
       "id": "WINDOWS",
       "name": "Windows",
-      "count": 73
+      "count": 77
     },
     {
       "id": "WINDOWS365",
@@ -112,20 +114,40 @@
       "displayName": "MacOS - OIB - Updates - D - Update Configuration - v1.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - Compliance - U - Defender for Endpoint - v3.1.json",
-      "displayName": "Win - OIB - Compliance - U - Defender for Endpoint - v3.1"
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Defender - U - Real-Time Protection - v4.0.json",
+      "displayName": "Win - OIB - CP - Defender - U - Real-Time Protection - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - Compliance - U - Device Health - v3.1.json",
-      "displayName": "Win - OIB - Compliance - U - Device Health - v3.1"
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Defender - U - Security Intelligence - v4.0.json",
+      "displayName": "Win - OIB - CP - Defender - U - Security Intelligence - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - Compliance - U - Device Security - v3.1.json",
-      "displayName": "Win - OIB - Compliance - U - Device Security - v3.1"
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Device Health - U - BitLocker - v4.0.json",
+      "displayName": "Win - OIB - CP - Device Health - U - BitLocker - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - Compliance - U - Password - v3.1.json",
-      "displayName": "Win - OIB - Compliance - U - Password - v3.1"
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Device Health - U - Code Integrity - v4.0.json",
+      "displayName": "Win - OIB - CP - Device Health - U - Code Integrity - v4.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Device Health - U - SecureBoot - v4.0.json",
+      "displayName": "Win - OIB - CP - Device Health - U - SecureBoot - v4.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Device Security - U - Antispyware - v4.0.json",
+      "displayName": "Win - OIB - CP - Device Security - U - Antispyware - v4.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Device Security - U - Antivirus - v4.0.json",
+      "displayName": "Win - OIB - CP - Device Security - U - Antivirus - v4.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Device Security - U - Firewall - v4.0.json",
+      "displayName": "Win - OIB - CP - Device Security - U - Firewall - v4.0"
+    },
+    {
+      "path": "WINDOWS/IntuneManagement/CompliancePolicies/Win - OIB - CP - Device Security - U - TPM - v4.0.json",
+      "displayName": "Win - OIB - CP - Device Security - U - TPM - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/DeviceConfiguration/Win - OIB - TP - Health Monitoring - D - Endpoint Analytics - v3.4.json",
@@ -152,12 +174,12 @@
       "displayName": "Win - OIB - ES - Attack Surface Reduction - D - ASR Rules (L2) - v3.7"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Defender Antivirus - D - AV Configuration - v3.3.json",
-      "displayName": "Win - OIB - ES - Defender Antivirus - D - AV Configuration - v3.3"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Defender Antivirus - D - AV Configuration - v4.0.json",
+      "displayName": "Win - OIB - ES - Defender Antivirus - D - AV Configuration - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Defender Antivirus - D - Security Experience - v3.3.json",
-      "displayName": "Win - OIB - ES - Defender Antivirus - D - Security Experience - v3.3"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Defender Antivirus - D - Security Experience - v4.0.json",
+      "displayName": "Win - OIB - ES - Defender Antivirus - D - Security Experience - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Defender Antivirus Updates - Ring 1 - Pilot - v3.4.json",
@@ -196,28 +218,24 @@
       "displayName": "Win - OIB - ES - Windows Hello for Business - D - WHfB Configuration - v3.2"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Windows LAPS - D - LAPS Configuration - v3.1.json",
-      "displayName": "Win - OIB - ES - Windows LAPS - D - LAPS Configuration - v3.1"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Windows LAPS - D - LAPS Configuration (24H2+) - v3.6.json",
-      "displayName": "Win - OIB - ES - Windows LAPS - D - LAPS Configuration (24H2+) - v3.6"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - ES - Windows LAPS - D - LAPS Configuration - v4.0.json",
+      "displayName": "Win - OIB - ES - Windows LAPS - D - LAPS Configuration - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Credential Management - D - Passwordless - v3.3.json",
       "displayName": "Win - OIB - SC - Credential Management - D - Passwordless - v3.3"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v3.8.json",
-      "displayName": "Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v3.8"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v4.0.json",
+      "displayName": "Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Administrator Protection - v3.7.json",
       "displayName": "Win - OIB - SC - Device Security - D - Administrator Protection - v3.7"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Audit and Event Logging - v3.7.json",
-      "displayName": "Win - OIB - SC - Device Security - D - Audit and Event Logging - v3.7"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Audit and Event Logging - v4.0.json",
+      "displayName": "Win - OIB - SC - Device Security - D - Audit and Event Logging - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Config Refresh - v3.2.json",
@@ -228,12 +246,8 @@
       "displayName": "Win - OIB - SC - Device Security - D - Enhanced Phishing Protection - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Local Security Policies - v3.0.json",
-      "displayName": "Win - OIB - SC - Device Security - D - Local Security Policies - v3.0"
-    },
-    {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Local Security Policies (24H2+) - v3.6.json",
-      "displayName": "Win - OIB - SC - Device Security - D - Local Security Policies (24H2+) - v3.6"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Local Security Policies - v4.0.json",
+      "displayName": "Win - OIB - SC - Device Security - D - Local Security Policies - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Location and Privacy - v3.2.json",
@@ -252,12 +266,12 @@
       "displayName": "Win - OIB - SC - Device Security - D - Remote Desktop Services and RPC - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Script File Associations - v3.4.json",
-      "displayName": "Win - OIB - SC - Device Security - D - Script File Associations - v3.4"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Script File Associations - v4.0.json",
+      "displayName": "Win - OIB - SC - Device Security - D - Script File Associations - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Security Hardening - v3.7.json",
-      "displayName": "Win - OIB - SC - Device Security - D - Security Hardening - v3.7"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Security Hardening - v4.0.json",
+      "displayName": "Win - OIB - SC - Device Security - D - Security Hardening - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Timezone - v3.4.json",
@@ -268,8 +282,8 @@
       "displayName": "Win - OIB - SC - Device Security - D - User Rights - v3.7"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Windows Package Manager  - v3.5.json",
-      "displayName": "Win - OIB - SC - Device Security - D - Windows Package Manager  - v3.5"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Windows Package Manager - v3.5.json",
+      "displayName": "Win - OIB - SC - Device Security - D - Windows Package Manager - v3.5"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Windows Subsystem for Linux - v3.2.json",
@@ -280,8 +294,8 @@
       "displayName": "Win - OIB - SC - Device Security - U - Device Guard, Credential Guard and HVCI - v3.7"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - U - Power and Device Lock - v3.6.json",
-      "displayName": "Win - OIB - SC - Device Security - U - Power and Device Lock - v3.6"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - U - Power and Device Lock - v4.0.json",
+      "displayName": "Win - OIB - SC - Device Security - U - Power and Device Lock - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - U - Windows Sandbox - v3.4.json",
@@ -292,36 +306,40 @@
       "displayName": "Win - OIB - SC - Device Security - U - Windows Spotlight and Org Messages - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Internet Explorer (Legacy) - D - Security - v3.1.1.json",
-      "displayName": "Win - OIB - SC - Internet Explorer (Legacy) - D - Security - v3.1.1"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Internet Explorer (Legacy) - D - Security - v4.0.json",
+      "displayName": "Win - OIB - SC - Internet Explorer (Legacy) - D - Security - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Accounts - D - Configuration - v3.2.json",
       "displayName": "Win - OIB - SC - Microsoft Accounts - D - Configuration - v3.2"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - D - Security - v3.8.json",
-      "displayName": "Win - OIB - SC - Microsoft Edge - D - Security - v3.8"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - D - Security - v4.0.json",
+      "displayName": "Win - OIB - SC - Microsoft Edge - D - Security - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - D - Updates - v3.6.json",
-      "displayName": "Win - OIB - SC - Microsoft Edge - D - Updates - v3.6"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - D - Updates - v4.0.json",
+      "displayName": "Win - OIB - SC - Microsoft Edge - D - Updates - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - Extensions - v3.1.json",
       "displayName": "Win - OIB - SC - Microsoft Edge - U - Extensions - v3.1"
     },
     {
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - Management - v4.0.json",
+      "displayName": "Win - OIB - SC - Microsoft Edge - U - Management - v4.0"
+    },
+    {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - Password Management - v3.0.json",
       "displayName": "Win - OIB - SC - Microsoft Edge - U - Password Management - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - Profiles, Sign-In and Sync - v3.0.json",
-      "displayName": "Win - OIB - SC - Microsoft Edge - U - Profiles, Sign-In and Sync - v3.0"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - Profiles, Sign-In and Sync - v4.0.json",
+      "displayName": "Win - OIB - SC - Microsoft Edge - U - Profiles, Sign-In and Sync - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - User Experience - v3.8.json",
-      "displayName": "Win - OIB - SC - Microsoft Edge - U - User Experience - v3.8"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Edge - U - User Experience - v4.0.json",
+      "displayName": "Win - OIB - SC - Microsoft Edge - U - User Experience - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Office - D - Security - v3.6.json",
@@ -336,8 +354,8 @@
       "displayName": "Win - OIB - SC - Microsoft Office - U - Config and Experience - v3.6"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Office - U - Security - v3.6.json",
-      "displayName": "Win - OIB - SC - Microsoft Office - U - Security - v3.6"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft Office - U - Security - v4.0.json",
+      "displayName": "Win - OIB - SC - Microsoft Office - U - Security - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Microsoft OneDrive - D - Configuration - v3.2.json",
@@ -360,8 +378,8 @@
       "displayName": "Win - OIB - SC - Network Security - D - Disable NTLM - v3.8"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Apps - D - In-Box App Removal - v3.7.json",
-      "displayName": "Win - OIB - SC - Windows Apps - D - In-Box App Removal - v3.7"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Apps - D - In-Box App Removal - v4.0.json",
+      "displayName": "Win - OIB - SC - Windows Apps - D - In-Box App Removal - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Hello for Business - D - Cloud Kerberos Trust - v3.5.json",
@@ -372,7 +390,7 @@
       "displayName": "Win - OIB - SC - Windows Update for Business - D - Delivery Optimisation - v3.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Update for Business - D - Data and Telemetry - v3.0.json",
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows Update for Business - D - Reports and Telemetry - v3.0.json",
       "displayName": "Win - OIB - SC - Windows Update for Business - D - Reports and Telemetry - v3.0"
     },
     {
@@ -380,8 +398,8 @@
       "displayName": "Win - OIB - SC - Windows User Experience - D - Automatic Restart Sign-On - v3.8"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - D - Feature Configuration - v3.8.json",
-      "displayName": "Win - OIB - SC - Windows User Experience - D - Feature Configuration - v3.8"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - D - Feature Configuration - v4.0.json",
+      "displayName": "Win - OIB - SC - Windows User Experience - D - Feature Configuration - v4.0"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Windows User Experience - D - Settings Sync - v3.7.json",

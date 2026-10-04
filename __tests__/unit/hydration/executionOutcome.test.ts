@@ -51,6 +51,14 @@ describe("execution outcomes", () => {
     ).toBe("completedWithIssues");
   });
 
+  it("reports confirmed configuration differences as issues", () => {
+    const task = skippedTask("noOp", "Already exists");
+    task.drift = { status: "different", differences: ["settings"] };
+    expect(deriveExecutionOutcome([task])).toBe("completedWithIssues");
+    task.drift = { status: "notChecked", differences: [], reason: "Read unavailable" };
+    expect(deriveExecutionOutcome([task])).toBe("succeeded");
+  });
+
   it("keeps cancellation distinct from other issues", () => {
     expect(
       deriveExecutionOutcome(

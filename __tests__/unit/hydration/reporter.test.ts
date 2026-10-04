@@ -4,7 +4,8 @@ import {
   generateJSONReport,
   generateCSVReport,
   createSummary,
-  generateReportFilename
+  generateReportFilename,
+  summaryMatchesExecution
 } from '@/lib/hydration/reporter'
 import type { HydrationSummary, HydrationTask } from '@/types/hydration'
 
@@ -250,7 +251,7 @@ describe('reporter', () => {
       const jsonString = generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false)
       const report = JSON.parse(jsonString)
 
-      expect(report.metadata.reportVersion).toBe('1.0')
+      expect(report.metadata.reportVersion).toBe('2.0')
       expect(report.metadata.generatedAt).toBeTruthy()
     })
 
@@ -276,9 +277,8 @@ describe('reporter', () => {
       const csv = generateCSVReport(mockTasks, 'completedWithIssues', false)
       const lines = csv.split('\n')
 
-      expect(lines[0]).toBe(
-        '"Category","Item Name","Operation","Execution Mode","Run Outcome","Status","Outcome","Error","Warning","Start Time (UTC)","End Time (UTC)","Duration (ms)"'
-      )
+      expect(lines[0]).toContain('"Error","Reason","Warning"')
+      expect(lines[0]).toContain('"Run ID","App Version","Baseline Version","Baseline Source SHA"')
       expect(lines[4]).toContain('"live","completedWithIssues","skipped","noOp"')
     })
 
@@ -491,6 +491,67 @@ describe('reporter', () => {
       )
 
       expect(summary.errors).toHaveLength(0) // No error because error field is undefined
+    })
+  })
+
+  describe('report evidence', () => {
+    const provenance = { runId: 'run-123', appVersion: '2.6.53', baselineVersion: '4.0', baselineSourceSha: 'abc123' }
+
+    it.each(['create', 'delete'] as const)('exports preview %s decisions without mutation counts', (operation) => {
+      const task: HydrationTask = { ...mockTasks[0], operation }
+      const summary = createSummary('tenant', operation, mockSummary.startTime, mockSummary.endTime, [task], undefined, undefined, provenance)
+      const before = JSON.stringify(summary)
+      const report = JSON.parse(generateJSONReport(summary, [task], 'succeeded', true))
+      expect(report.summary.stats).toMatchObject({ created: 0, deleted: 0, wouldCreate: operation === 'create' ? 1 : 0, wouldDelete: operation === 'delete' ? 1 : 0 })
+      expect(report.tasks[0].outcome).toBe(operation === 'create' ? 'wouldCreate' : 'wouldDelete')
+      const markdown = generateMarkdownReport(summary, [task], 'succeeded', true)
+      expect(markdown).toContain('- **Created**: 0')
+      expect(markdown).toContain('- **Deleted**: 0')
+      expect(markdown).toContain(operation === 'create' ? '- **Would Create**: 1' : '- **Would Delete**: 1')
+      expect(markdown).toContain(operation === 'create' ? 'Outcome: Would create' : 'Outcome: Would delete')
+      const csvLines = generateCSVReport([task], 'succeeded', true, summary).split('\n')
+      const headers: string[] = JSON.parse(`[${csvLines[0]}]`)
+      const values: string[] = JSON.parse(`[${csvLines[1]}]`)
+      expect(Object.fromEntries(headers.map((header, index) => [header, values[index]]))).toMatchObject({ Created: '0', Deleted: '0', Outcome: operation === 'create' ? 'wouldCreate' : 'wouldDelete' })
+      expect(JSON.stringify(summary)).toBe(before)
+    })
+
+    it('keeps no-op reasons separate from errors and preserves match and drift evidence', () => {
+      const task: HydrationTask = {
+        ...mockTasks[3], status: 'skipped', skipKind: 'noOp', error: 'Already exists',
+        match: { id: 'object-1', name: 'Existing policy', matchType: 'normalized', portalUrl: 'https://intune.microsoft.com/' },
+        drift: { status: 'different', differences: ['settings.choice'], reason: 'Current values differ' },
+      }
+      const summary = createSummary('tenant', 'create', mockSummary.startTime, mockSummary.endTime, [task], undefined, undefined, provenance)
+      const report = JSON.parse(generateJSONReport(summary, [task], 'succeeded', false))
+      expect(report.tasks[0]).toMatchObject({ reason: 'Already exists', match: task.match, drift: task.drift })
+      expect(report.tasks[0]).not.toHaveProperty('error')
+      expect(report.summary.errors).toEqual([])
+      const markdown = generateMarkdownReport(summary, [task], 'succeeded', false)
+      expect(markdown).toContain('Reason: Already exists')
+      expect(markdown).not.toContain('Error: Already exists')
+      expect(markdown).toContain('Matched object: Existing policy (object-1)')
+      expect(markdown).toContain('Difference: settings.choice')
+    })
+
+    it('exports run provenance and UTC timestamps in every format, including empty CSV', () => {
+      const summary = createSummary('tenant', 'create', mockSummary.startTime, mockSummary.endTime, [], undefined, undefined, provenance)
+      const markdown = generateMarkdownReport(summary, [], 'cancelled', true)
+      expect(markdown).toContain('**Started**: 2024-01-15 10:00:00 UTC')
+      expect(markdown).toContain('**Completed**: 2024-01-15 10:10:00 UTC')
+      expect(markdown).toMatch(/\*\*Exported\*\*: .+ UTC/)
+      for (const value of Object.values(provenance)) expect(markdown).toContain(value)
+      const report = JSON.parse(generateJSONReport(summary, [], 'cancelled', true))
+      expect(report.summary.provenance).toEqual(provenance)
+      expect(report.summary.startTime).toBe('2024-01-15T10:00:00.000Z')
+      expect(report.metadata.generatedAt).toMatch(/Z$/)
+      const lines = generateCSVReport([], 'cancelled', true, summary).split('\n')
+      const headers: string[] = JSON.parse(`[${lines[0]}]`)
+      const values: string[] = JSON.parse(`[${lines[1]}]`)
+      expect(values).toHaveLength(headers.length)
+      expect(Object.fromEntries(headers.map((header, index) => [header, values[index]]))).toMatchObject({ 'Run ID': 'run-123', 'App Version': '2.6.53', 'Baseline Version': '4.0', 'Baseline Source SHA': 'abc123', 'Run Start (UTC)': '2024-01-15 10:00:00', 'Run End (UTC)': '2024-01-15 10:10:00' })
+      expect(summaryMatchesExecution(summary, { ...summary, tasks: [] })).toBe(true)
+      expect(summaryMatchesExecution(summary, { ...summary, provenance: { ...provenance, runId: 'different' }, tasks: [] })).toBe(false)
     })
   })
 

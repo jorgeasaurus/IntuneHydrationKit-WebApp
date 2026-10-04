@@ -39,7 +39,8 @@ vi.mock("@/lib/hydration/policyCreators", () => ({
   createBaselineCompliancePolicy: mockCreateBaselineCompliancePolicy,
 }));
 
-vi.mock("@/lib/hydration/utils", () => ({
+vi.mock("@/lib/hydration/utils", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/lib/hydration/utils")>(),
   escapeODataString: mockEscapeODataString,
   hasODataUnsafeChars: mockHasODataUnsafeChars,
 }));
@@ -55,7 +56,7 @@ function createClient() {
   return {
     delete: vi.fn(),
     get: vi.fn(),
-    getCollection: vi.fn(),
+    getCollection: vi.fn().mockResolvedValue([]),
     patch: vi.fn(),
     post: vi.fn(),
   } as unknown as ExecutionContext["client"];
@@ -77,6 +78,83 @@ describe("executeBaselineTask", () => {
     mockEscapeODataString.mockImplementation((value: string) => value);
     mockHasODataUnsafeChars.mockReturnValue(false);
     mockCompliancePolicyExistsByName.mockResolvedValue(false);
+  });
+
+  describe.each([
+    ["DeviceConfiguration", "cachedDeviceConfigurations", "/deviceManagement/deviceConfigurations?$select=id,displayName"],
+    ["DriverUpdateProfiles", "cachedDriverUpdateProfiles", "/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName"],
+  ] as const)("%s empty-cache recovery", (policyType, cacheKey, endpoint) => {
+    it("checks an empty cache again and skips an existing policy", async () => {
+      const name = "[IHD] Existing Baseline";
+      mockGetCachedTemplates.mockReturnValue([{ displayName: name, _oibPolicyType: policyType }]);
+      const client = createClient();
+      vi.mocked(client.getCollection).mockResolvedValue([{ id: "existing-id", displayName: name }]);
+      const result = await executeBaselineTask(createTask(name), {
+        client, operationMode: "create", isPreview: false, stopOnFirstError: true, [cacheKey]: [],
+      });
+      expect(client.getCollection).toHaveBeenCalledWith(endpoint);
+      expect(result).toMatchObject({ success: true, skipped: true, skipKind: "noOp" });
+      expect(mockCreateDeviceConfigurationPolicy).not.toHaveBeenCalled();
+      expect(mockCreateDriverUpdateProfile).not.toHaveBeenCalled();
+    });
+
+    it.each([false, true])("stops when the fresh read fails (preview=%s)", async (isPreview) => {
+      const name = "[IHD] Unverified Baseline";
+      mockGetCachedTemplates.mockReturnValue([{ displayName: name, _oibPolicyType: policyType }]);
+      const client = createClient();
+      vi.mocked(client.getCollection).mockRejectedValue(new Error("Policy inventory could not be read"));
+      const result = await executeBaselineTask(createTask(name), {
+        client, operationMode: "create", isPreview, stopOnFirstError: true, [cacheKey]: [],
+      });
+      expect(client.getCollection).toHaveBeenCalledWith(endpoint);
+      expect(result).toMatchObject({ success: false, skipped: false, error: "Policy inventory could not be read" });
+      expect(mockCreateDeviceConfigurationPolicy).not.toHaveBeenCalled();
+      expect(mockCreateDriverUpdateProfile).not.toHaveBeenCalled();
+      expect(client.post).not.toHaveBeenCalled();
+      expect(client.patch).not.toHaveBeenCalled();
+      expect(client.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  it("skips a normalized Settings Catalog match in stop-on-first-error execution", async () => {
+    const name = "[IHD] Win - OIB - SC - Device Security - D - Windows Package Manager - v3.5";
+    const existingName = name.replace("Manager -", "Manager  -");
+    mockGetCachedTemplates.mockReturnValue([{ name, _oibPolicyType: "SettingsCatalog", settings: [] }]);
+    const current = createTask(name);
+    const client = createClient();
+    vi.mocked(client.get).mockResolvedValue({ name: existingName, settings: [] });
+    const result = await executeBaselineTask(current, {
+      client, operationMode: "create", isPreview: false, stopOnFirstError: true,
+      cachedSettingsCatalogPolicies: [{ id: "old-policy", name: existingName }],
+    });
+    expect(result).toMatchObject({ skipped: true, skipKind: "noOp" });
+    expect(current.match).toMatchObject({ id: "old-policy", name: existingName, matchType: "normalized" });
+    expect(mockCreateSettingsCatalogPolicy).not.toHaveBeenCalled();
+  });
+
+  it("does not let an Android name match block a new iOS baseline policy", async () => {
+    const name = "[IHD] Shared BYOD Policy";
+    mockGetCachedTemplates.mockReturnValue([{ displayName: name, "@odata.type": "#microsoft.graph.iosManagedAppProtection", _oibPolicyType: "AppProtection" }]);
+    mockCreateAppProtectionPolicy.mockResolvedValue({ id: "created-ios" });
+    const result = await executeBaselineTask(createTask(name), {
+      client: createClient(), operationMode: "create", isPreview: false, stopOnFirstError: true,
+      cachedAppProtectionPolicies: [{ id: "android-policy", displayName: name, description: "", _platform: "android" }],
+    });
+    expect(result).toMatchObject({ skipped: false, createdId: "created-ios" });
+    expect(mockCreateAppProtectionPolicy).toHaveBeenCalledOnce();
+  });
+
+  it("records a same-platform app protection match from prefetch platform tags", async () => {
+    const name = "[IHD] Shared BYOD Policy";
+    mockGetCachedTemplates.mockReturnValue([{ displayName: name, "@odata.type": "#microsoft.graph.iosManagedAppProtection", _oibPolicyType: "AppProtection" }]);
+    const current = createTask(name);
+    const result = await executeBaselineTask(current, {
+      client: createClient(), operationMode: "create", isPreview: true, stopOnFirstError: true,
+      cachedAppProtectionPolicies: [{ id: "android-policy", displayName: name, description: "", _platform: "android" }, { id: "ios-policy", displayName: name, description: "", _platform: "iOS" }],
+    });
+    expect(result).toMatchObject({ skipped: true, skipKind: "noOp" });
+    expect(current.match?.id).toBe("ios-policy");
+    expect(mockCreateAppProtectionPolicy).not.toHaveBeenCalled();
   });
 
   it("returns a failure when the baseline template cannot be found", async () => {

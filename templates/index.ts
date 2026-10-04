@@ -2,6 +2,7 @@
  * Central export for all Intune Hydration Kit templates
  */
 
+import oibManifest from "@/public/IntuneTemplates/OpenIntuneBaseline/manifest.json";
 import { DEVICE_FILTER_TEMPLATE_COUNT } from "./filterManifest";
 import {
   DYNAMIC_GROUP_TEMPLATE_COUNT,
@@ -32,8 +33,8 @@ export const TEMPLATE_METADATA = {
   },
   baseline: {
     displayName: "OpenIntuneBaseline",
-    description: "Security baseline policies (Windows, macOS)",
-    count: 93,
+    description: `Baseline v${oibManifest.windowsVersion} includes macOS, Windows, and BYOD policies.`,
+    count: oibManifest.totalFiles,
     icon: "ShieldCheck",
   },
   compliance: {

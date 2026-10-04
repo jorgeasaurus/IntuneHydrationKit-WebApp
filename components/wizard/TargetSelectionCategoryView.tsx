@@ -155,37 +155,15 @@ function CategoryHeader({
         </div>
         <p className="text-sm text-muted-foreground">{target.description}</p>
       </div>
-      {isSelected && isExpanded ? (
-        <button
-          type="button"
-          aria-label={categoryButtonLabel}
-          aria-expanded="true"
-          className="text-muted-foreground hover:text-foreground transition-colors p-1"
-          onClick={handleCategoryButtonClick}
-        >
-          {categoryButtonContent}
-        </button>
-      ) : isSelected ? (
-        <button
-          type="button"
-          aria-label={categoryButtonLabel}
-          aria-expanded="false"
-          className="text-muted-foreground hover:text-foreground transition-colors p-1"
-          onClick={handleCategoryButtonClick}
-        >
-          {categoryButtonContent}
-        </button>
-      ) : (
-        <button
-          type="button"
-          aria-label={categoryButtonLabel}
-          aria-expanded="false"
-          className="text-muted-foreground hover:text-foreground transition-colors p-1"
-          onClick={handleCategoryButtonClick}
-        >
-          {categoryButtonContent}
-        </button>
-      )}
+      <button
+        type="button"
+        aria-label={categoryButtonLabel}
+        aria-expanded={isSelected && isExpanded}
+        className="text-muted-foreground hover:text-foreground transition-colors p-1"
+        onClick={handleCategoryButtonClick}
+      >
+        {categoryButtonContent}
+      </button>
     </div>
   );
 }
@@ -502,6 +480,29 @@ function GenericCategoryPanel({
   );
 }
 
+function CategoryPanel({
+  model,
+  target,
+  items,
+  selected,
+  isLoading,
+}: {
+  model: TargetSelectionViewModel;
+  target: Target;
+  items: CategoryItem[];
+  selected: Set<string>;
+  isLoading: boolean;
+}) {
+  switch (target.id) {
+    case "cisBaseline":
+      return <CISPolicyPanel model={model} />;
+    case "baseline":
+      return <BaselinePolicyPanel model={model} selected={selected} isLoading={isLoading} />;
+    default:
+      return <GenericCategoryPanel model={model} target={target} items={items} selected={selected} isLoading={isLoading} />;
+  }
+}
+
 export function TargetSelectionCategoryView({
   model,
   target,
@@ -536,14 +537,8 @@ export function TargetSelectionCategoryView({
         isLoading={isLoading}
         targetCountLabel={targetCountLabel}
       />
-      {target.id === "cisBaseline" && targets.includes("cisBaseline") && isExpanded && (
-        <CISPolicyPanel model={model} />
-      )}
-      {target.id === "baseline" && targets.includes("baseline") && isExpanded && (
-        <BaselinePolicyPanel model={model} selected={selected} isLoading={isLoading} />
-      )}
-      {target.id !== "cisBaseline" && target.id !== "baseline" && targets.includes(target.id) && isExpanded && (
-        <GenericCategoryPanel
+      {targets.includes(target.id) && isExpanded && (
+        <CategoryPanel
           model={model}
           target={target}
           items={items}

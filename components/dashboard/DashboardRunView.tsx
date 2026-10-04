@@ -96,37 +96,13 @@ export function DashboardRunView({
 
   return (
     <div className="relative z-10 min-h-screen">
-      <AppNavigation
-        brandHref={isCompleted ? "/" : null}
-        eyebrow={
-          <span className="font-mono text-[11px] uppercase tracking-[0.28em] text-hydrate">
-            {isCompleted ? "Execution record" : "Live execution"}
-          </span>
-        }
-        title="Hydration Dashboard"
-        description={
-          <>
-            {getOperationText(operationMode, isPreview, isCompleted)} in{" "}
-            <SensitiveData
-              value={tenantName || tenantId}
-              fallback="the selected tenant"
-            />
-          </>
-        }
-        actions={
-          isCompleted ? (
-            <Button
-              variant="outline"
-              onClick={onStartNewHydration}
-              className="nav-action size-9 px-0 sm:w-auto sm:px-4"
-            >
-              <RotateCcw className="size-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only">
-                Start New Hydration
-              </span>
-            </Button>
-          ) : null
-        }
+      <RunNavigation
+        isCompleted={isCompleted}
+        operationMode={operationMode}
+        isPreview={isPreview}
+        tenantName={tenantName}
+        tenantId={tenantId}
+        onStartNewHydration={onStartNewHydration}
       />
 
       <main className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
@@ -181,33 +157,107 @@ export function DashboardRunView({
 
         <ActivityLog messages={activityLog} />
 
-        {isCompleted && summary && outcome && outcome !== "failed" && (
-          <div className="space-y-5">
-            {!isPreview &&
-              operationMode === "create" &&
-              tasks.some((task) => task.category === "conditionalAccess") && (
-                <Alert className="border-amber-500/60 bg-card/95 text-card-foreground shadow-lg shadow-slate-950/15 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400">
-                  <AlertTriangle className="size-4" />
-                  <AlertTitle>Conditional Access follow-up</AlertTitle>
-                  <AlertDescription>
-                    Review Conditional Access policies in Intune before you
-                    enable them in production.
-                  </AlertDescription>
-                </Alert>
-              )}
-            <ResultsSummary
-              summary={summary}
-              tasks={tasks}
-              isPreview={isPreview}
-              outcome={outcome}
-            />
-          </div>
-        )}
-        {isCompleted && !summary && tasks.length > 0 && (
-          <TaskList tasks={tasks} />
-        )}
-        {!isCompleted && <TaskList tasks={tasks} />}
+        <RunResults
+          isCompleted={isCompleted}
+          summary={summary}
+          outcome={outcome}
+          tasks={tasks}
+          isPreview={isPreview}
+          operationMode={operationMode}
+        />
       </main>
     </div>
+  );
+}
+
+function RunNavigation({
+  isCompleted,
+  operationMode,
+  isPreview,
+  tenantName,
+  tenantId,
+  onStartNewHydration,
+}: Pick<
+  DashboardRunViewProps,
+  | "operationMode"
+  | "isPreview"
+  | "tenantName"
+  | "tenantId"
+  | "onStartNewHydration"
+> & { isCompleted: boolean }): React.JSX.Element {
+  return (
+    <AppNavigation
+      brandHref={isCompleted ? "/" : null}
+      eyebrow={
+        <span className="font-mono text-[11px] uppercase tracking-[0.28em] text-hydrate">
+          {isCompleted ? "Execution record" : "Live execution"}
+        </span>
+      }
+      title="Hydration Dashboard"
+      description={
+        <>
+          {getOperationText(operationMode, isPreview, isCompleted)} in{" "}
+          <SensitiveData
+            value={tenantName || tenantId}
+            fallback="the selected tenant"
+          />
+        </>
+      }
+      actions={
+        isCompleted ? (
+          <Button
+            variant="outline"
+            onClick={onStartNewHydration}
+            className="nav-action size-9 px-0 sm:w-auto sm:px-4"
+          >
+            <RotateCcw className="size-4 sm:mr-2" />
+            <span className="sr-only sm:not-sr-only">Start New Hydration</span>
+          </Button>
+        ) : null
+      }
+    />
+  );
+}
+
+function RunResults({
+  isCompleted,
+  summary,
+  outcome,
+  tasks,
+  isPreview,
+  operationMode,
+}: Pick<
+  DashboardRunViewProps,
+  "summary" | "outcome" | "tasks" | "isPreview" | "operationMode"
+> & { isCompleted: boolean }): React.JSX.Element {
+  return (
+    <>
+      {isCompleted && summary && outcome && outcome !== "failed" && (
+        <div className="space-y-5">
+          {!isPreview &&
+            operationMode === "create" &&
+            tasks.some((task) => task.category === "conditionalAccess") && (
+              <Alert className="border-amber-500/60 bg-card/95 text-card-foreground shadow-lg shadow-slate-950/15 [&>svg]:text-amber-600 dark:[&>svg]:text-amber-400">
+                <AlertTriangle className="size-4" />
+                <AlertTitle>Conditional Access follow-up</AlertTitle>
+                <AlertDescription>
+                  Review Conditional Access policies in Intune before you enable
+                  them in production.
+                </AlertDescription>
+              </Alert>
+            )}
+          <ResultsSummary
+            summary={summary}
+            tasks={tasks}
+            isPreview={isPreview}
+            outcome={outcome}
+          />
+        </div>
+      )}
+      {isCompleted && !summary && tasks.length > 0 && (
+        <TaskList tasks={tasks} />
+      )}
+      {!isCompleted && <TaskList tasks={tasks} />}
+    </>
   );
 }
