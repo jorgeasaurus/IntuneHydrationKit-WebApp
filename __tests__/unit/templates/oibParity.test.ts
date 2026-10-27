@@ -101,4 +101,41 @@ describe("bundled OpenIntuneBaseline PowerShell parity", () => {
     expectNoExportMetadata(payload);
     expect(JSON.stringify(policy)).toBe(source);
   });
+
+  it("keeps the Script File Associations user-context PowerShell warning through create", async () => {
+    const manifest = await fetchOIBManifest();
+    const file = manifest!.files.find((item) => item.path.endsWith(
+      "Win - OIB - SC - Device Security - D - Script File Associations - v4.0.json"
+    ));
+    expect(file).toBeDefined();
+    expect(file!.policyType).toBe("SettingsCatalog");
+
+    const policy = await fetchBaselinePolicyByManifestFile(file!);
+    expect(policy).not.toBeNull();
+    expect(policy!.description).toContain(
+      "WARNING: Deploying will break running any PowerShell scripts from Intune in the User context"
+    );
+    expect(policy!.description).toContain("OIBID:887CEFEC-6882-49E0-A237-91F8D02B2CAB");
+
+    const source = JSON.stringify(policy);
+    const post = vi.fn().mockResolvedValue({ id: "created-policy" });
+    await createSettingsCatalogPolicy(
+      { post } as unknown as Parameters<typeof createSettingsCatalogPolicy>[0],
+      policy!
+    );
+
+    expect(post).toHaveBeenCalledOnce();
+    const [endpoint, payload] = post.mock.calls[0];
+    expect(endpoint).toBe("/deviceManagement/configurationPolicies");
+    expect(payload.name).toBe(
+      "[IHD] Win - OIB - SC - Device Security - D - Script File Associations - v4.0"
+    );
+    expect(payload.description).toContain(
+      "WARNING: Deploying will break running any PowerShell scripts from Intune in the User context"
+    );
+    expect(payload.description).toContain("Imported by Intune Hydration Kit");
+    expect(payload).not.toHaveProperty("displayName");
+    expectNoExportMetadata(payload);
+    expect(JSON.stringify(policy)).toBe(source);
+  });
 });
