@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import packageJson from '@/package.json'
 import type { BatchProgress, HydrationSummary, HydrationTask, WizardState } from '@/types/hydration'
 import type { AppSettings } from '@/types/hydration'
 import type { PrerequisiteCheckResult } from '@/types/prerequisites'
@@ -317,7 +318,7 @@ describe('useHydrationExecution', () => {
         sequentialTaskCount: 0
       },
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: '2.6.52', baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
     )
 
     expect(result.current.tasks).toEqual([
@@ -369,7 +370,7 @@ describe('useHydrationExecution', () => {
       tasks,
       expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: '2.6.52', baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
     )
   })
 
@@ -454,7 +455,7 @@ describe('useHydrationExecution', () => {
       [],
       expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: '2.6.52', baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
     )
   })
 
