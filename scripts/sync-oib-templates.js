@@ -168,11 +168,13 @@ async function main() {
   }
   console.log(`  Extracted to: ${path.basename(extractedDir)}`);
 
-  const { oibVersion: windowsVersion } = JSON.parse(
+  const { oibVersion } = JSON.parse(
     fs.readFileSync(path.join(extractedDir, "WINDOWS", "PolicyManifest.json"), "utf8")
   );
+  // Upstream has used both "4.0" and "v4.0.1"; store the bare number since the UI adds the "v".
+  const windowsVersion = typeof oibVersion === "string" ? oibVersion.trim().replace(/^v/i, "") : oibVersion;
   if (typeof windowsVersion !== "string" || !/^\d+\.\d+(?:\.\d+)?$/.test(windowsVersion)) {
-    throw new Error("Invalid OpenIntuneBaseline Windows version");
+    throw new Error(`Invalid OpenIntuneBaseline Windows version: ${JSON.stringify(oibVersion)}`);
   }
 
   // 3. Collect before-state for diff reporting
