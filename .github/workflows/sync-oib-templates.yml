@@ -63,6 +63,13 @@ jobs:
           echo "deleted=${DELETED}" >> "$GITHUB_OUTPUT"
           echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
 
+      - name: Bump website version
+        if: steps.check.outputs.status == 'update-available'
+        id: version
+        run: |
+          VERSION=$(npm version patch --no-git-tag-version)
+          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
       - name: Create Pull Request
         if: steps.check.outputs.status == 'update-available'
         uses: peter-evans/create-pull-request@v7
@@ -90,6 +97,8 @@ jobs:
             | Modified | ${{ steps.changes.outputs.modified }} |
             | Deleted | ${{ steps.changes.outputs.deleted }} |
             | **Total** | **${{ steps.changes.outputs.total }}** |
+
+            Website version bumped to `${{ steps.version.outputs.version }}`.
 
             ---
             *This PR was automatically created by the [Sync OpenIntuneBaseline Templates](${{ github.server_url }}/${{ github.repository }}/actions/workflows/sync-oib-templates.yml) workflow.*
