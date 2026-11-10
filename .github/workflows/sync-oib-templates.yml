@@ -17,6 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: dev
           fetch-depth: 1
 
       - name: Setup Node.js
@@ -73,6 +74,7 @@ jobs:
             Upstream: SkipToTheEndpoint/OpenIntuneBaseline@${{ steps.sha.outputs.upstream_sha }}
             Files changed: ${{ steps.changes.outputs.total }} (added: ${{ steps.changes.outputs.added }}, modified: ${{ steps.changes.outputs.modified }}, deleted: ${{ steps.changes.outputs.deleted }})
           branch: chore/sync-oib-templates
+          base: dev
           delete-branch: true
           title: "chore: update OpenIntuneBaseline templates"
           labels: dependencies,automated
