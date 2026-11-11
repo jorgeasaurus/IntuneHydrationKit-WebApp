@@ -5,6 +5,15 @@ on:
     # Every Monday at 08:00 UTC
     - cron: "0 8 * * 1"
   workflow_dispatch:
+  # Re-run when dev's version changes so an open sync PR is rebased onto the
+  # new dev version and re-bumped above it.
+  push:
+    branches: [dev]
+    paths: [package.json]
+
+concurrency:
+  group: sync-oib-templates
+  cancel-in-progress: false
 
 permissions:
   contents: write
