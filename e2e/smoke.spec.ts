@@ -31,6 +31,11 @@ test.describe("Landing Page", () => {
         errors.push(text);
       }
     });
+    // Production builds load Vercel Analytics from /_vercel/insights. Only the
+    // Vercel edge serves that path, so a local `next start` returns 404.
+    await page.route("**/_vercel/insights/**", (route) =>
+      route.fulfill({ contentType: "application/javascript", body: "" })
+    );
     await page.goto("/");
     await expect(
       page.getByRole("heading", { name: /intune hydration kit/i })
