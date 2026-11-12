@@ -14,6 +14,8 @@ import {
   cancelExecution,
   forceResetExecutionSessionForTests,
   getExecutionState,
+  pauseExecution,
+  recordPauseWait,
   resumeExecution,
   shouldCancelExecution,
   shouldPauseExecution,
@@ -66,6 +68,7 @@ function startRun(overrides: Partial<ExecutionContext> = {}) {
     onStatusUpdate: (message) => messages.push(message),
     shouldCancel: () => shouldCancelExecution(runId),
     shouldPause: () => shouldPauseExecution(runId),
+    onPauseWait: (waiting) => recordPauseWait(runId, waiting),
     ...overrides,
   };
   return { runId, context, messages };
@@ -178,5 +181,51 @@ describe("run controls in the engine", () => {
 
     expect(setExecutionControls).toHaveBeenCalledTimes(2);
     expect(setExecutionControls).toHaveBeenLastCalledWith(undefined);
+  });
+
+  it("records no paused time when Pause is clicked during the last task", async () => {
+    const { runId, context } = startRun({ stopOnFirstError: true });
+    server.use(
+      http.post(`${GRAPH_BASE}/beta/deviceManagement/assignmentFilters`, () => {
+        pauseExecution(runId);
+        return HttpResponse.json({ id: "filter-1", displayName: FILTER }, { status: 201 });
+      })
+    );
+
+    const results = await executeTasks([task("filters", FILTER)], context);
+
+    expect(results).toEqual([expect.objectContaining({ success: true })]);
+    expect(getExecutionState().phase).toBe("paused");
+    expect(getExecutionState().pausedMs).toBe(0);
+    expect(getExecutionState().pauseStartedAt).toBeNull();
+  });
+
+  it("records the time that the engine really waits while paused", async () => {
+    const { runId, context } = startRun({ stopOnFirstError: true });
+    let posts = 0;
+    server.use(
+      http.post(`${GRAPH_BASE}/beta/deviceManagement/assignmentFilters`, () => {
+        posts++;
+        if (posts === 1) pauseExecution(runId);
+        return HttpResponse.json({ id: `filter-${posts}`, displayName: posts === 1 ? FILTER : `${FILTER} 2` }, { status: 201 });
+      })
+    );
+    cacheTemplates("filters", [
+      { displayName: FILTER, description: "d", platform: "windows10AndLater", rule: '(device.osVersion -startsWith "10")' },
+      { displayName: `${FILTER} 2`, description: "d", platform: "windows10AndLater", rule: '(device.osVersion -startsWith "11")' },
+    ]);
+    const second = { ...task("filters", `${FILTER} 2`), id: "filters-2" };
+
+    const run = executeTasks([task("filters", FILTER), second], context);
+    await waitFor(() => getExecutionState().pauseStartedAt !== null);
+    expect(posts).toBe(1);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    resumeExecution(runId);
+    await run;
+
+    expect(posts).toBe(2);
+    expect(getExecutionState().pauseStartedAt).toBeNull();
+    expect(getExecutionState().pausedMs).toBeGreaterThanOrEqual(350);
+    expect(getExecutionState().pausedMs).toBeLessThan(3000);
   });
 });

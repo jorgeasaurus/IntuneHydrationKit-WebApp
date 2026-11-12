@@ -89,6 +89,7 @@ const summarySchema = z.strictObject({
   startTime: dateSchema,
   endTime: dateSchema,
   duration: z.number().nonnegative(),
+  pausedDuration: z.number().positive().optional(),
   stats: z.strictObject({
     total: z.number().int().nonnegative(),
     created: z.number().int().nonnegative(),
@@ -121,6 +122,8 @@ const recordBase = z.strictObject({
   activityLog: z.array(activityMessageSchema),
   startTime: dateSchema.nullable(),
   endTime: dateSchema,
+  /** Paused time of the run. Records saved before this field was added do not have it. */
+  pausedMs: z.number().nonnegative().optional(),
 });
 
 const reportableRecordSchema = recordBase.extend({
@@ -171,6 +174,16 @@ const executionRecordSchema = z.union([reportableRecordSchema, failedRecordSchem
       path: ["outcome"],
     });
   }
+  if (
+    record.pausedMs &&
+    (record.startTime === null || record.pausedMs > record.endTime.getTime() - record.startTime.getTime())
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Paused time is longer than the run.",
+      path: ["pausedMs"],
+    });
+  }
   if (record.summary) {
     const summaryMatches =
       record.startTime !== null &&
@@ -181,6 +194,7 @@ const executionRecordSchema = z.union([reportableRecordSchema, failedRecordSchem
         startTime: record.startTime,
         endTime: record.endTime,
         tasks: record.tasks,
+        pausedMs: record.pausedMs,
       });
     const batchStats = record.summary.batchStats;
     const batchStatsMatch =

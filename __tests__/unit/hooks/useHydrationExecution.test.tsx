@@ -301,7 +301,8 @@ describe('useHydrationExecution', () => {
         hasPremiumP2License: false,
         hasWindowsDriverUpdateLicense: true,
         shouldCancel: expect.any(Function),
-        shouldPause: expect.any(Function)
+        shouldPause: expect.any(Function),
+        onPauseWait: expect.any(Function)
       })
     )
     expect(mockCreateSummary).toHaveBeenCalledWith(
@@ -318,7 +319,8 @@ describe('useHydrationExecution', () => {
         sequentialTaskCount: 0
       },
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) }),
+      0
     )
 
     expect(result.current.tasks).toEqual([
@@ -370,7 +372,8 @@ describe('useHydrationExecution', () => {
       tasks,
       expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) }),
+      0
     )
   })
 
@@ -455,7 +458,8 @@ describe('useHydrationExecution', () => {
       [],
       expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) }),
+      0
     )
   })
 

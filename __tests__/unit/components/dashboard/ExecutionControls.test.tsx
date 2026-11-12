@@ -115,7 +115,7 @@ describe('ExecutionControls', () => {
     expect(onResume).toHaveBeenCalledTimes(1)
   })
 
-  it('excludes paused time from elapsed time and the estimate', async () => {
+  it('excludes the recorded engine pause from elapsed time and the estimate', async () => {
     const props = {
       tasks: activeTasks,
       isCancelling: false,
@@ -132,15 +132,17 @@ describe('ExecutionControls', () => {
     expect(screen.getByText('8s')).toBeInTheDocument()
     expect(screen.getByText('4s')).toBeInTheDocument()
 
-    rerender(<ExecutionControls {...props} isPaused />)
+    // The engine starts to wait.
+    const pauseStartedAt = new Date(Date.now())
+    rerender(<ExecutionControls {...props} isPaused pauseStartedAt={pauseStartedAt} />)
     await act(async () => {
       await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
     })
     expect(screen.getByText('8s')).toBeInTheDocument()
 
-    rerender(<ExecutionControls {...props} isPaused={false} />)
-    // Right after resume, before the next one-second tick, the elapsed time
-    // must not drop to 0s.
+    // The engine wait ends: the store closes the interval into pausedMs.
+    rerender(<ExecutionControls {...props} isPaused={false} pausedMs={5 * 60 * 1000} />)
+    // Right after resume, before the next tick, the elapsed time must not drop to 0s.
     expect(screen.getByText('8s')).toBeInTheDocument()
     expect(screen.queryByText('0s')).not.toBeInTheDocument()
     await act(async () => {
@@ -156,9 +158,75 @@ describe('ExecutionControls', () => {
         isCompleted
         outcome="succeeded"
         endTime={new Date(Date.now())}
+        pausedMs={5 * 60 * 1000}
       />
     )
     expect(screen.getByText('10s')).toBeInTheDocument()
+  })
+
+  it('subtracts nothing when Pause is clicked during the last task and the engine never waits', async () => {
+    const props = {
+      tasks: activeTasks,
+      isCancelling: false,
+      outcome: null,
+      startTime,
+    }
+    const { rerender } = render(<ExecutionControls {...props} isPaused={false} isCompleted={false} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    expect(screen.getByText('8s')).toBeInTheDocument()
+
+    // Phase is "paused", but the engine still runs the last task (no pause wait).
+    rerender(<ExecutionControls {...props} isPaused isCompleted={false} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(30 * 1000)
+    })
+    expect(screen.getByText('38s')).toBeInTheDocument()
+
+    rerender(
+      <ExecutionControls {...props} isPaused={false} isCompleted endTime={new Date(Date.now())} />
+    )
+    expect(screen.getByText('38s')).toBeInTheDocument()
+  })
+
+  it('shows the same active duration after a remount', () => {
+    const props = {
+      tasks: activeTasks,
+      isPaused: false,
+      isCancelling: false,
+      isCompleted: true,
+      outcome: 'succeeded' as const,
+      startTime,
+      endTime: new Date(startTime.getTime() + 70 * 1000),
+      pausedMs: 60 * 1000,
+    }
+    const { unmount } = render(<ExecutionControls {...props} />)
+    expect(screen.getByText('10s')).toBeInTheDocument()
+    unmount()
+
+    render(<ExecutionControls {...props} />)
+    expect(screen.getByText('10s')).toBeInTheDocument()
+    expect(screen.queryByText('1m 10s')).not.toBeInTheDocument()
+  })
+
+  it('freezes elapsed time during an open engine pause after a remount', async () => {
+    // The pause wait started 60s ago, 7s after the start, before this component mounted.
+    render(
+      <ExecutionControls
+        tasks={activeTasks}
+        isPaused
+        isCancelling={false}
+        isCompleted={false}
+        outcome={null}
+        startTime={new Date(startTime.getTime() - 60 * 1000)}
+        pauseStartedAt={new Date(startTime.getTime() - 53 * 1000)}
+      />
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(screen.getByText('7s')).toBeInTheDocument()
   })
 
   it('offers log download controls after completion', () => {
@@ -222,35 +290,5 @@ describe('ExecutionControls', () => {
 
     expect(screen.getByText('Execution cancelled')).toBeInTheDocument()
     expect(screen.getByText('3s')).toBeInTheDocument()
-  })
-  it('excludes an open pause when the run completes while paused', async () => {
-    const props = {
-      tasks: activeTasks,
-      isCancelling: false,
-      outcome: null,
-      startTime,
-    }
-    const { rerender } = render(
-      <ExecutionControls {...props} isPaused={false} isCompleted={false} />
-    )
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000)
-    })
-    rerender(<ExecutionControls {...props} isPaused isCompleted={false} />)
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60 * 1000)
-    })
-
-    rerender(
-      <ExecutionControls
-        {...props}
-        isPaused
-        isCompleted
-        endTime={new Date(Date.now())}
-      />
-    )
-
-    expect(screen.getByText('8s')).toBeInTheDocument()
-    expect(screen.queryByText('1m 8s')).not.toBeInTheDocument()
   })
 })

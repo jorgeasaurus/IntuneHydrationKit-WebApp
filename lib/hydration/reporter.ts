@@ -97,7 +97,7 @@ export function generateMarkdownReport(
 **Started**: ${formatUtcDateTime(summary.startTime)} UTC
 **Completed**: ${formatUtcDateTime(summary.endTime)} UTC
 **Exported**: ${formatUtcDateTime(new Date())} UTC
-**Duration**: ${formatDuration(summary.duration)}
+**Duration**: ${formatDuration(summary.duration)}${summary.pausedDuration ? ` (active time; paused for ${formatDuration(summary.pausedDuration)})` : ""}
 **Run ID**: ${provenance?.runId ?? "Not recorded"}
 **App version**: ${provenance?.appVersion ?? "Not recorded"}
 **Baseline version**: ${provenance?.baselineVersion ?? "Not recorded"}
@@ -233,6 +233,7 @@ export function createSummary(
   batchStats?: BatchExecutionStats,
   tenantName?: string,
   provenance?: HydrationSummary["provenance"],
+  pausedMs = 0,
 ): HydrationSummary {
   const stats = {
     total: tasks.length,
@@ -294,7 +295,8 @@ export function createSummary(
     operationMode,
     startTime,
     endTime,
-    duration: endTime.getTime() - startTime.getTime(),
+    duration: Math.max(0, endTime.getTime() - startTime.getTime() - pausedMs),
+    ...(pausedMs > 0 ? { pausedDuration: pausedMs } : {}),
     stats,
     categoryBreakdown,
     errors,
@@ -308,6 +310,7 @@ export function summaryMatchesExecution(
   summary: HydrationSummary,
   source: Pick<HydrationSummary, "tenantId" | "tenantName" | "operationMode" | "startTime" | "endTime" | "provenance"> & {
     tasks: HydrationTask[];
+    pausedMs?: number;
   },
 ): boolean {
   const expected = createSummary(
@@ -319,6 +322,7 @@ export function summaryMatchesExecution(
     summary.batchStats,
     source.tenantName,
     source.provenance ?? summary.provenance,
+    source.pausedMs ?? 0,
   );
   return JSON.stringify(toCanonicalValue(summary)) === JSON.stringify(toCanonicalValue(expected));
 }

@@ -33,6 +33,8 @@ interface DashboardRunViewProps {
   activityLog: ActivityMessage[];
   startTime: Date | null;
   endTime: Date | null;
+  pausedMs: number;
+  pauseStartedAt: Date | null;
   operationMode: OperationMode;
   isPreview: boolean;
   tenantName?: string;
@@ -71,6 +73,8 @@ export function DashboardRunView({
   activityLog,
   startTime,
   endTime,
+  pausedMs,
+  pauseStartedAt,
   operationMode,
   isPreview,
   tenantName,
@@ -157,6 +161,8 @@ export function DashboardRunView({
             outcome={outcome}
             startTime={controlsStartTime}
             endTime={endTime}
+            pausedMs={pausedMs}
+            pauseStartedAt={pauseStartedAt}
             batchProgress={batchProgress}
             onPause={onPause}
             onResume={onResume}

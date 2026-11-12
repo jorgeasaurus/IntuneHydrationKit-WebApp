@@ -25,6 +25,10 @@ interface ExecutionControlsProps {
   outcome: ExecutionOutcome | null;
   startTime: Date;
   endTime?: Date | null;
+  /** Total time of closed engine pause waits, in milliseconds. */
+  pausedMs?: number;
+  /** Start of the open engine pause wait, or null. */
+  pauseStartedAt?: Date | null;
   batchProgress?: BatchProgress | null;
   onPause?: () => void;
   onResume?: () => void;
@@ -46,72 +50,47 @@ function formatDuration(ms: number): string {
   }
 }
 
-interface PauseTracking {
-  /** Total paused time of closed pause intervals. */
-  pausedMs: number;
-  /** Start of the open pause interval, or null when not paused. */
-  pausedAt: number | null;
-}
-
 /**
- * Elapsed run time without paused intervals. The run state has no pause
- * timestamps, so this component records them when `isPaused` changes. A pause
- * that started before this component mounted counts from the mount time.
+ * Elapsed run time without paused time. The execution layer records the time that
+ * the engine really waited while paused (`pausedMs` for closed waits, `pauseStartedAt`
+ * for an open wait), so the value is the same after a remount or a page refresh.
+ * A pause that the engine has not reached yet (the current task still runs) is
+ * active time.
  */
 function useActiveElapsedTime(
   startTime: Date,
   endTime: Date | null,
-  isPaused: boolean,
   isCompleted: boolean,
+  pausedMs: number,
+  pauseStartedAt: Date | null,
 ): number {
-  const [now, setNow] = useState(() => Date.now());
-  const [tracking, setTracking] = useState<PauseTracking>(() => ({
-    pausedMs: 0,
-    pausedAt: isPaused && !isCompleted ? Date.now() : null,
-  }));
-  const pausedNow = isPaused && !isCompleted;
+  // The clock keeps the paused total of its last tick. When a pause wait closes,
+  // `pausedMs` grows before the next tick, and the stale clock would show a lower value.
+  const [clock, setClock] = useState(() => ({ now: Date.now(), pausedMs }));
+  const isTicking = !isCompleted && pauseStartedAt === null;
 
-  // Open or close a pause interval when the pause state changes.
+  // Tick every second while the engine is active. The first tick comes at once,
+  // so the clock is current again when a pause wait ends.
   useEffect(() => {
-    // `now` stops ticking during a pause. Refresh it when the run is active
-    // again so a closed pause is not subtracted from a stale clock.
-    if (!pausedNow && !isCompleted) setNow(Date.now());
-    setTracking((prev) => {
-      if (pausedNow && prev.pausedAt === null) {
-        return { ...prev, pausedAt: Date.now() };
-      }
-      if (!pausedNow && prev.pausedAt !== null) {
-        const closedAt = isCompleted && endTime ? endTime.getTime() : Date.now();
-        return {
-          pausedMs: prev.pausedMs + Math.max(0, closedAt - prev.pausedAt),
-          pausedAt: null,
-        };
-      }
-      return prev;
-    });
-  }, [endTime, isCompleted, pausedNow]);
+    if (!isTicking) return;
 
-  // Tick every second while the run is active.
-  useEffect(() => {
-    if (isCompleted || isPaused) return;
+    const tick = () => setClock({ now: Date.now(), pausedMs });
+    const firstTick = setTimeout(tick, 0);
+    const interval = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(firstTick);
+      clearInterval(interval);
+    };
+  }, [isTicking, pausedMs]);
 
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, [isCompleted, isPaused]);
-
-  const until = isCompleted && endTime
-    ? endTime.getTime()
-    : pausedNow
-      ? (tracking.pausedAt ?? now)
-      : now;
-  // A pause interval can still be open for one render after the run resumes
-  // or completes, before the effect above closes it. Subtract it here too.
-  const openPauseMs =
-    tracking.pausedAt === null ? 0 : Math.max(0, until - tracking.pausedAt);
-  return Math.max(
-    0,
-    until - startTime.getTime() - tracking.pausedMs - openPauseMs,
-  );
+  const start = startTime.getTime();
+  if (isCompleted && endTime) {
+    return Math.max(0, endTime.getTime() - start - pausedMs);
+  }
+  if (pauseStartedAt) {
+    return Math.max(0, pauseStartedAt.getTime() - start - pausedMs);
+  }
+  return Math.max(0, clock.now - start - clock.pausedMs);
 }
 
 export function ExecutionControls({
@@ -122,6 +101,8 @@ export function ExecutionControls({
   outcome,
   startTime,
   endTime,
+  pausedMs = 0,
+  pauseStartedAt = null,
   batchProgress,
   onPause,
   onResume,
@@ -218,10 +199,11 @@ export function ExecutionControls({
 
         <ExecutionTiming
           tasks={tasks}
-          isPaused={isPaused}
           isCompleted={isCompleted}
           startTime={startTime}
           endTime={endTime}
+          pausedMs={pausedMs}
+          pauseStartedAt={pauseStartedAt}
         />
 
         <ExecutionActions
@@ -262,19 +244,21 @@ function ExecutionDescription({
 
 function ExecutionTiming({
   tasks,
-  isPaused,
   isCompleted,
   startTime,
   endTime,
+  pausedMs,
+  pauseStartedAt,
 }: Pick<
   ExecutionControlsProps,
-  "tasks" | "isPaused" | "isCompleted" | "startTime" | "endTime"
->): React.JSX.Element {
+  "tasks" | "isCompleted" | "startTime" | "endTime"
+> & { pausedMs: number; pauseStartedAt: Date | null }): React.JSX.Element {
   const displayedElapsedTime = useActiveElapsedTime(
     startTime,
     endTime ?? null,
-    isPaused,
     isCompleted,
+    pausedMs,
+    pauseStartedAt,
   );
 
   const totalTasks = tasks.length;

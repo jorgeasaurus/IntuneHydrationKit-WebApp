@@ -54,6 +54,8 @@ export interface ExecutionContext {
   onStatusUpdate?: (message: ActivityMessage) => void;
   shouldCancel?: () => boolean;
   shouldPause?: () => boolean;
+  /** Reports the start (true) and end (false) of a real engine wait while paused. */
+  onPauseWait?: (waiting: boolean) => void;
   // Pre-fetched data caches to avoid repeated API calls
   cachedAppProtectionPolicies?: TenantAppProtectionPolicy[];
   cachedIntuneGroups?: DeviceGroup[];

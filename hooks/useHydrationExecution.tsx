@@ -19,7 +19,9 @@ import {
   finishExecution,
   forceResetExecutionSessionForTests,
   getExecutionState,
+  getPausedMsAt,
   pauseExecution,
+  recordPauseWait,
   resetExecutionSession,
   resumeExecution,
   shouldCancelExecution,
@@ -113,6 +115,7 @@ export function useHydrationExecution() {
           telemetry.snapshot(),
           tenantConfig.tenantName,
           provenance,
+          getPausedMsAt(endTime),
         ),
         outcome: "cancelled",
         fatalError: null,
@@ -224,6 +227,7 @@ export function useHydrationExecution() {
         onStatusUpdate: updateStatus,
         shouldCancel: () => shouldCancelExecution(runId),
         shouldPause: () => shouldPauseExecution(runId),
+        onPauseWait: (waiting) => recordPauseWait(runId, waiting),
       };
 
       // Execute tasks with pause/cancel support
@@ -247,6 +251,7 @@ export function useHydrationExecution() {
         telemetry.snapshot(),
         tenantConfig.tenantName,
         provenance,
+        getPausedMsAt(endTime),
       );
       const outcome = deriveExecutionOutcome(tasks);
 
