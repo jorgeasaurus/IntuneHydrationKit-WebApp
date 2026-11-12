@@ -443,7 +443,7 @@ function ConfigurationsSection() {
             </h2>
             <p className="text-base leading-7 text-muted-foreground">
               The app groups the template catalog by what admins actually need
-              to reason about: profiles, policy controls, targeting, and run
+              to reason about: baselines, policy controls, targeting, and run
               customization.
             </p>
           </div>

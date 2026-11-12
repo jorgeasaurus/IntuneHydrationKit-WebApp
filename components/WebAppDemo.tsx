@@ -13,28 +13,42 @@ import {
   Filter,
   Loader2,
 } from "lucide-react";
+import { LANDING_TEMPLATE_COUNTS } from "@/components/landing/landingContent";
 
 type Phase = "configure" | "deploying" | "complete";
 
 const CATEGORIES = [
-  { id: "groups", label: "Dynamic Groups", icon: Users, count: 47 },
-  { id: "filters", label: "Device Filters", icon: Filter, count: 29 },
-  { id: "compliance", label: "Compliance Policies", icon: Shield, count: 16 },
-  { id: "baseline", label: "Security Baselines", icon: FileCheck, count: 795 },
+  { id: "groups", label: "Entra Groups", icon: Users, count: LANDING_TEMPLATE_COUNTS.groups },
+  { id: "filters", label: "Device Filters", icon: Filter, count: LANDING_TEMPLATE_COUNTS.filters },
+  {
+    id: "compliance",
+    label: "Compliance Policies",
+    icon: Shield,
+    count: LANDING_TEMPLATE_COUNTS.compliance,
+  },
+  {
+    id: "baseline",
+    label: "Security Baselines",
+    icon: FileCheck,
+    count: LANDING_TEMPLATE_COUNTS.baseline + LANDING_TEMPLATE_COUNTS.cisBaseline,
+  },
 ];
 
 const DEPLOYMENT_TASKS = [
-  "Creating Dynamic Groups...",
+  "Creating Entra Groups...",
   "Deploying Device Filters...",
   "Configuring Compliance Policies...",
   "Applying Security Baselines...",
   "Setting up Conditional Access...",
 ];
 
+const DEMO_TOTAL = CATEGORIES.reduce((total, category) => total + category.count, 0);
+const DEMO_SKIPPED = 39;
+
 const FINAL_STATS = {
-  total: 927,
-  created: 888,
-  skipped: 39,
+  total: DEMO_TOTAL,
+  created: DEMO_TOTAL - DEMO_SKIPPED,
+  skipped: DEMO_SKIPPED,
   failed: 0,
 };
 

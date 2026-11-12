@@ -3,6 +3,7 @@ import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { WebAppDemo } from '@/components/WebAppDemo'
+import { LANDING_TEMPLATE_COUNTS } from '@/components/landing/landingContent'
 
 vi.mock('framer-motion', async () => {
   const React = await import('react')
@@ -66,7 +67,7 @@ describe('demo showcase components', () => {
     })
 
     expect(screen.getByText('Deploying')).toBeInTheDocument()
-    expect(screen.getByText('Creating Dynamic Groups...')).toBeInTheDocument()
+    expect(screen.getByText('Creating Entra Groups...')).toBeInTheDocument()
 
     act(() => {
       vi.advanceTimersByTime(4080)
@@ -74,7 +75,11 @@ describe('demo showcase components', () => {
 
     expect(screen.getByText('Deployment Complete')).toBeInTheDocument()
     expect(screen.getByText('All configurations deployed successfully')).toBeInTheDocument()
-    expect(screen.getByText('888')).toBeInTheDocument()
+    const counts = LANDING_TEMPLATE_COUNTS
+    const demoTotal =
+      counts.groups + counts.filters + counts.compliance + counts.baseline + counts.cisBaseline
+    expect(screen.getByText(String(demoTotal))).toBeInTheDocument()
+    expect(screen.getByText(String(demoTotal - 39))).toBeInTheDocument()
 
     act(() => {
       vi.advanceTimersByTime(4000)
@@ -82,4 +87,5 @@ describe('demo showcase components', () => {
 
     expect(screen.getByText('Select Categories')).toBeInTheDocument()
   })
+
 })
