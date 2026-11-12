@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { signIn } from "@/lib/auth/authUtils";
+import { isSignInReplaced, signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import { useWizardState } from "@/hooks/useWizardState";
 import { Terminal, Github, Menu } from "lucide-react";
@@ -47,6 +47,8 @@ export function Navigation() {
       resetHydrationFlow(sessionStorage, resetWizard);
       router.push("/wizard");
     } catch (error) {
+      // A newer click replaced this attempt, and its popup is still open.
+      if (isSignInReplaced(error)) return;
       toast.error("Failed to sign in. Please try again.");
       console.error("Sign in error:", error);
     }

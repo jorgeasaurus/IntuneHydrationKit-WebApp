@@ -1,4 +1,9 @@
-import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
+import {
+  AccountInfo,
+  InteractionRequiredAuthError,
+  BrowserAuthError,
+  BrowserAuthErrorCodes,
+} from "@azure/msal-browser";
 import {
   msalInstance,
   loginRequest,
@@ -123,6 +128,17 @@ export async function signIn(): Promise<AccountInfo> {
     return response.account;
   }
   throw new Error("Sign in failed: No account returned");
+}
+
+/**
+ * True when a newer signIn call cancelled this one. The newer popup is still open,
+ * so the caller must not show a sign-in error.
+ */
+export function isSignInReplaced(error: unknown): boolean {
+  return (
+    error instanceof BrowserAuthError &&
+    error.errorCode === BrowserAuthErrorCodes.interactionInProgressCancelled
+  );
 }
 
 /**

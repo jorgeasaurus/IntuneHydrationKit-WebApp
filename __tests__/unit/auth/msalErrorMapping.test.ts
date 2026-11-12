@@ -25,7 +25,11 @@ vi.mock("@/lib/auth/msalConfig", () => ({
   initializeMsal: vi.fn(),
 }));
 
-import { getAccessToken, InteractionRequiredError } from "@/lib/auth/authUtils";
+import {
+  getAccessToken,
+  InteractionRequiredError,
+  isSignInReplaced,
+} from "@/lib/auth/authUtils";
 
 const account = {
   homeAccountId: "home-id",
@@ -69,5 +73,19 @@ describe("getAccessToken with msal-browser v5 errors", () => {
 
     await expect(getAccessToken()).rejects.toBe(serverError);
     expect(msalInstance.acquireTokenPopup).not.toHaveBeenCalled();
+  });
+});
+
+describe("isSignInReplaced", () => {
+  it("is true only for the error MSAL gives a sign-in that a newer click cancelled", () => {
+    expect(
+      isSignInReplaced(
+        new BrowserAuthError(BrowserAuthErrorCodes.interactionInProgressCancelled, "")
+      )
+    ).toBe(true);
+    expect(
+      isSignInReplaced(new BrowserAuthError(BrowserAuthErrorCodes.interactionInProgress, ""))
+    ).toBe(false);
+    expect(isSignInReplaced(new Error("interaction_in_progress_cancelled"))).toBe(false);
   });
 });
