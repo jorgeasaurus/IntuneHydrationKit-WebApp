@@ -88,8 +88,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${dmSans.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
-        {/* Rendered outside MsalProvider (which gates SSR) so the JSON-LD is
-            always present in the server HTML for crawlers. */}
+        {/* JSON-LD for crawlers. It does not need the MSAL context. */}
         <StructuredData />
         <MsalProvider>
           <SettingsProvider>
