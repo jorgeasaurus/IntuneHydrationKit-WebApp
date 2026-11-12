@@ -17,6 +17,7 @@ interface WizardContextType {
   setBaselineSelection: (selection: BaselineSelection) => void;
   setCategorySelections: (selections: CategorySelections) => void;
   setConfirmed: (confirmed: boolean) => void;
+  setUpdateExisting: (updateExisting: boolean) => void;
   setPrerequisiteResult: (result: PrerequisiteCheckResult) => void;
   resetWizard: () => void;
   nextStep: () => void;
@@ -93,6 +94,10 @@ export function WizardProvider({ children }: { children: ReactNode }) {
     setState((prev) => ({ ...prev, confirmed }));
   }, []);
 
+  const setUpdateExisting = useCallback((updateExisting: boolean) => {
+    setState((prev) => ({ ...prev, updateExisting }));
+  }, []);
+
   const setPrerequisiteResult = useCallback((result: PrerequisiteCheckResult) => {
     setState((prev) => ({ ...prev, prerequisiteResult: result }));
   }, []);
@@ -123,6 +128,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       setBaselineSelection,
       setCategorySelections,
       setConfirmed,
+      setUpdateExisting,
       setPrerequisiteResult,
       resetWizard,
       nextStep,
@@ -139,6 +145,7 @@ export function WizardProvider({ children }: { children: ReactNode }) {
       setBaselineSelection,
       setCategorySelections,
       setConfirmed,
+      setUpdateExisting,
       setPrerequisiteResult,
       resetWizard,
       nextStep,

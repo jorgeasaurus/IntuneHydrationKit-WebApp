@@ -42,6 +42,9 @@ const taskBaseShape = {
     status: z.enum(["matches", "different", "notChecked"]),
     differences: z.array(z.string()), reason: z.string().optional(),
   }).optional(),
+  update: z.strictObject({
+    objectId: z.string().min(1), applied: z.boolean(), differences: z.array(z.string()),
+  }).optional(),
   createdObject: z.strictObject({
     id: z.string().min(1),
     policyType: z.string().min(1).optional(),
@@ -99,6 +102,7 @@ const summarySchema = z.strictObject({
   stats: z.strictObject({
     total: z.number().int().nonnegative(),
     created: z.number().int().nonnegative(),
+    updated: z.number().int().positive().optional(),
     deleted: z.number().int().nonnegative(),
     skipped: z.number().int().nonnegative(),
     failed: z.number().int().nonnegative(),

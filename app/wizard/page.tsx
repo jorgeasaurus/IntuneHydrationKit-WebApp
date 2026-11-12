@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   ChevronRight,
   FileCheck2,
+  GitCompare,
   Home,
   Layers3,
   LogOut,
@@ -167,6 +168,12 @@ function WizardContent() {
             <Button variant="outline" onClick={() => setShowSettings(true)} className="size-9 px-0 sm:w-auto sm:px-3">
               <Settings2 className="size-4 sm:mr-2" />
               <span className="sr-only sm:not-sr-only">Settings</span>
+            </Button>
+            <Button variant="outline" asChild className="size-9 px-0 sm:w-auto sm:px-3">
+              <Link href="/drift">
+                <GitCompare aria-hidden="true" className="size-4 sm:mr-2" />
+                <span className="sr-only sm:not-sr-only">Drift Scan</span>
+              </Link>
             </Button>
             <Button variant="outline" asChild className="size-9 px-0 sm:w-auto sm:px-3">
               <Link href="/">

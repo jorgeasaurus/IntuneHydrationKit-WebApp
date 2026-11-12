@@ -73,7 +73,11 @@ export function useHydrationExecution() {
    * Run a new execution: build its queue, then run the queue through the engine.
    * Wizard runs and runs that continue an earlier run use this same path.
    */
-  const runExecution = useCallback(async (configuration: ExecutionRunConfiguration, buildQueue: QueueBuilder) => {
+  const runExecution = useCallback(async (
+    configuration: ExecutionRunConfiguration,
+    buildQueue: QueueBuilder,
+    options: { updateExisting?: boolean } = {},
+  ) => {
     const { operationMode } = configuration;
     const runId = beginExecution(configuration);
     if (runId === null) {
@@ -211,6 +215,9 @@ export function useHydrationExecution() {
         operationMode,
         isPreview: configuration.isPreview,
         stopOnFirstError: settings.stopOnFirstError,
+        // Only the wizard can pass true, after its own confirmation. A retry, resume, or live
+        // run of a preview never carries the choice forward: it skips existing objects.
+        updateExisting: operationMode === "create" && options.updateExisting === true,
         hasConditionalAccessLicense: configuration.licenses?.hasConditionalAccessLicense ?? true,
         hasPremiumP2License: configuration.licenses?.hasPremiumP2License ?? true,
         hasWindowsDriverUpdateLicense: configuration.licenses?.hasWindowsDriverUpdateLicense ?? true,
@@ -325,6 +332,7 @@ export function useHydrationExecution() {
         shouldCancel,
         onProgress,
       }),
+      { updateExisting: state.updateExisting === true },
     );
   }, [runExecution, state]);
 

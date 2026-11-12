@@ -46,6 +46,8 @@ export interface ExecutionContext {
   operationMode: OperationMode;
   isPreview: boolean;
   stopOnFirstError: boolean;
+  /** Create runs only: update existing kit objects that differ from the template (updateResolver.ts). */
+  updateExisting?: boolean;
   onSequentialTask?: (task: HydrationTask) => void;
   onTaskStart?: (task: HydrationTask) => void;
   onTaskComplete?: (task: HydrationTask) => void;

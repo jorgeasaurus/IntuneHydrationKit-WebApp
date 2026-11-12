@@ -13,6 +13,7 @@ import {
 } from "@/lib/graph/compliance";
 import { createV2CompliancePolicy } from "../policyCreators";
 import { requireTenantCache } from "../utils";
+import { namesMatchIgnoringImportPrefix } from "../existingObjects";
 import { getCachedTemplates, ComplianceTemplate } from "@/lib/templates/loader";
 
 type V2ComplianceTemplate = ComplianceTemplate & {
@@ -21,24 +22,10 @@ type V2ComplianceTemplate = ComplianceTemplate & {
   technologies?: string;
 };
 
-function stripImportPrefix(name: string): string {
-  return name.replace(/^\[ihd\]\s/i, "");
-}
+const namesMatch = namesMatchIgnoringImportPrefix;
 
-function namesMatch(left: string | undefined, right: string | undefined): boolean {
-  if (!left || !right) {
-    return false;
-  }
-
-  const normalizedLeft = left.toLowerCase();
-  const normalizedRight = right.toLowerCase();
-  return (
-    normalizedLeft === normalizedRight ||
-    stripImportPrefix(normalizedLeft) === stripImportPrefix(normalizedRight)
-  );
-}
-
-function isV2ComplianceTemplate(
+/** A V2 (Settings Catalog) compliance template has platforms or technologies and no OData type. */
+export function isV2ComplianceTemplate(
   template: ComplianceTemplate | CompliancePolicy
 ): template is V2ComplianceTemplate {
   return !template["@odata.type"] && ("platforms" in template || "technologies" in template);

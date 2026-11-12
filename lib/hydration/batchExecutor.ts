@@ -32,6 +32,8 @@ import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
+import { findExistingFilter, findExistingGroup } from "./existingObjects";
+import { getExistingSkipReason } from "./updateResolver";
 import {
   sleepWithExecutionControl,
   waitWhilePaused,
@@ -189,13 +191,7 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
   // Without a loaded cache, the sequential executor fails the task with the prefetch error.
   if (!context.cachedIntuneGroups) return { type: "error", reason: "Group cache is not loaded" };
   console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups.length} cached groups`);
-  const templateName = template!.displayName.toLowerCase();
-  const templateNameStripped = templateName.startsWith("[ihd] ") ? templateName.slice(6) : templateName;
-  const existingGroup = context.cachedIntuneGroups.find((g) => {
-    const cachedName = g.displayName.toLowerCase();
-    const cachedNameStripped = cachedName.startsWith("[ihd] ") ? cachedName.slice(6) : cachedName;
-    return cachedName === templateName || cachedNameStripped === templateNameStripped;
-  });
+  const existingGroup = findExistingGroup(context.cachedIntuneGroups, template.displayName);
   if (existingGroup) {
     console.log(`[BatchExecutor:groups] ✗ Group already exists: "${task.itemName}"`);
     return { type: "skip", reason: "Group already exists" };
@@ -266,9 +262,7 @@ function buildFilterRequestBody(task: HydrationTask, context: ExecutionContext):
   // Check if already exists in cache.
   // Without a loaded cache, the sequential executor fails the task with the prefetch error.
   if (!context.cachedFilters) return { type: "error", reason: "Filter cache is not loaded" };
-  const existingFilter = context.cachedFilters.find(
-    (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
-  );
+  const existingFilter = findExistingFilter(context.cachedFilters, template.displayName);
   if (existingFilter) return { type: "skip", reason: "Filter already exists" };
 
   // Build full filter template
@@ -514,6 +508,8 @@ async function prepareTaskForBatch(
   switch (task.category) {
     case "groups": {
       const result = buildGroupRequestBody(task, context);
+      // An existing group goes to the sequential executor, which runs the update checks.
+      if (result.type === "skip" && context.updateExisting) return { type: "sequential" };
       if (result.type === "skip") return { type: "skip", reason: result.reason, skipKind: "noOp" };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
@@ -524,6 +520,8 @@ async function prepareTaskForBatch(
 
     case "filters": {
       const result = buildFilterRequestBody(task, context);
+      // An existing filter goes to the sequential executor, which runs the update checks.
+      if (result.type === "skip" && context.updateExisting) return { type: "sequential" };
       if (result.type === "skip") return { type: "skip", reason: result.reason, skipKind: "noOp" };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
@@ -686,7 +684,8 @@ export async function executeTasksInBatches(
 
   // Immediately add skipped tasks to results
   const skipTime = new Date();
-  for (const { task, reason, skipKind } of skippedTasks) {
+  for (const { task, reason: skipReason, skipKind } of skippedTasks) {
+    const reason = getExistingSkipReason(task, skipReason, context) ?? skipReason;
     // Update task status and error reason before notifying
     markTaskSkipped(task, skipKind, reason); // Set skip reason on task object for UI display
     task.startTime = skipTime;

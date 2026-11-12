@@ -40,16 +40,25 @@ function formatUtcDateTime(date: Date): string {
 }
 
 function getExportStats(summary: HydrationSummary, isPreview: boolean) {
+  const updated = summary.stats.updated ?? 0;
   return {
     ...summary.stats,
     created: isPreview ? 0 : summary.stats.created,
+    updated: isPreview ? 0 : updated,
     deleted: isPreview ? 0 : summary.stats.deleted,
     wouldCreate: isPreview ? summary.stats.created : 0,
+    wouldUpdate: isPreview ? updated : 0,
     wouldDelete: isPreview ? summary.stats.deleted : 0,
   };
 }
 
+/** True when a successful task updated an existing kit object (or would, in preview). */
+export function isUpdateTask(task: HydrationTask): boolean {
+  return task.status === "success" && task.operation === "create" && task.update !== undefined;
+}
+
 function getReportOutcome(task: HydrationTask, isPreview: boolean): string {
+  if (isUpdateTask(task)) return isPreview ? "wouldUpdate" : "updated";
   if (isPreview && task.status === "success") {
     return task.operation === "create" ? "wouldCreate" : "wouldDelete";
   }
@@ -57,6 +66,7 @@ function getReportOutcome(task: HydrationTask, isPreview: boolean): string {
 }
 
 function getReportOutcomeLabel(task: HydrationTask, isPreview: boolean): string {
+  if (isUpdateTask(task)) return isPreview ? "Would update" : "Updated";
   if (isPreview && task.status === "success") {
     return task.operation === "create" ? "Would create" : "Would delete";
   }
@@ -78,6 +88,10 @@ function getTaskMarkdown(task: HydrationTask, isPreview: boolean, portalLink: Po
     lines.push(portalLink.target === "object"
       ? `   - Created object in portal: ${portalLink.href}`
       : `   - Portal list (${portalLink.label}): ${portalLink.href}`);
+  }
+  if (task.update) {
+    lines.push(`   - Updated object: ${task.update.objectId}`);
+    for (const difference of task.update.differences) lines.push(`   - Updated setting: ${difference}`);
   }
   if (task.drift) {
     lines.push(`   - Configuration comparison: ${task.drift.status}`);
@@ -122,7 +136,7 @@ export function generateMarkdownReport(
 - **Deleted**: ${stats.deleted}
 - **Would Create**: ${stats.wouldCreate}
 - **Would Delete**: ${stats.wouldDelete}
-- **Skipped**: ${stats.skipped}
+${summary.stats.updated ? `- **Updated**: ${stats.updated}\n- **Would Update**: ${stats.wouldUpdate}\n` : ""}- **Skipped**: ${stats.skipped}
 - **Failed**: ${stats.failed}
 `;
   if (summary.batchStats) {
@@ -182,6 +196,7 @@ export function generateJSONReport(
       warning: task.warning,
       match: task.match,
       drift: task.drift,
+      update: task.update,
       portalLink: getJSONPortalLink(portalLinks.get(task.id)),
       startTime: task.startTime?.toISOString(),
       endTime: task.endTime?.toISOString(),
@@ -195,7 +210,8 @@ function getJSONPortalLink(link: PortalLink | undefined) {
   return link ? { url: link.href, target: link.target, label: link.label } : undefined;
 }
 
-function escapeCSVField(value: string | number): string {
+/** Quote a CSV field and neutralize spreadsheet formula prefixes. */
+export function escapeCSVField(value: string | number): string {
   let text = String(value);
   if (/^\s*[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '\"\"')}"`;
@@ -213,9 +229,9 @@ export function generateCSVReport(
     "Category", "Item Name", "Operation", "Execution Mode", "Run Outcome", "Status", "Outcome",
     "Error", "Reason", "Warning", "Start Time (UTC)", "End Time (UTC)", "Duration (ms)",
     "Matched Object ID", "Matched Object Name", "Match Type", "Portal URL", "Configuration Comparison",
-    "Differences", "Comparison Reason", "Tenant ID", "Run ID", "App Version", "Baseline Version", "Baseline Source SHA",
-    "Run Start (UTC)", "Run End (UTC)", "Exported (UTC)", "Created", "Deleted", "Would Create", "Would Delete",
-    "Created Object Portal URL",
+    "Differences", "Comparison Reason", "Updated Settings", "Tenant ID", "Run ID", "App Version", "Baseline Version",
+    "Baseline Source SHA", "Run Start (UTC)", "Run End (UTC)", "Exported (UTC)", "Created", "Deleted", "Would Create",
+    "Would Delete", "Updated", "Would Update", "Created Object Portal URL",
   ];
   const stats = summary ? getExportStats(summary, isPreview) : null;
   const provenance = summary?.provenance;
@@ -224,6 +240,7 @@ export function generateCSVReport(
     provenance?.baselineVersion ?? "", provenance?.baselineSourceSha ?? "",
     summary ? formatUtcDateTime(summary.startTime) : "", summary ? formatUtcDateTime(summary.endTime) : "",
     formatUtcDateTime(new Date()), stats?.created ?? "", stats?.deleted ?? "", stats?.wouldCreate ?? "", stats?.wouldDelete ?? "",
+    stats?.updated ?? "", stats?.wouldUpdate ?? "",
   ];
   const taskRows = tasks.map((task) => [
     task.category, task.itemName, task.operation, isPreview ? "preview" : "live", outcome,
@@ -233,11 +250,12 @@ export function generateCSVReport(
     task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : "",
     task.match?.id ?? "", task.match?.name ?? "", task.match?.matchType ?? "", task.match?.portalUrl ?? "",
     task.drift?.status ?? "", task.drift?.differences.join("; ") ?? "", task.drift?.reason ?? "",
+    task.update?.differences.join("; ") ?? "",
     ...runValues,
     getCSVPortalUrl(portalLinks.get(task.id)),
   ]);
   if (taskRows.length === 0) {
-    taskRows.push(["", "", "", isPreview ? "preview" : "live", outcome, ...Array<string>(15).fill(""), ...runValues, ""]);
+    taskRows.push(["", "", "", isPreview ? "preview" : "live", outcome, ...Array<string>(16).fill(""), ...runValues, ""]);
   }
   return [headers, ...taskRows].map((row) => row.map(escapeCSVField).join(",")).join("\n");
 }
@@ -261,9 +279,12 @@ export function createSummary(
   provenance?: HydrationSummary["provenance"],
   pausedMs = 0,
 ): HydrationSummary {
+  const updated = tasks.filter(isUpdateTask).length;
   const stats = {
     total: tasks.length,
-    created: tasks.filter((t) => t.status === "success" && t.operation === "create").length,
+    created: tasks.filter((t) => t.status === "success" && t.operation === "create" && !isUpdateTask(t)).length,
+    // Added only when a task updated an object, so summaries of earlier runs still match their tasks.
+    ...(updated > 0 ? { updated } : {}),
     deleted: tasks.filter((t) => t.status === "success" && t.operation === "delete").length,
     skipped: tasks.filter((t) => t.status === "skipped").length,
     failed: tasks.filter((t) => t.status === "failed").length,
