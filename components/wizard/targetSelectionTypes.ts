@@ -72,6 +72,8 @@ export interface TargetSelectionNavigationModel {
 export interface TargetSelectionProfilesModel {
   /** True when the current selection is complete and can be saved as a profile. */
   canSave: boolean;
+  /** True while a profile apply loads catalogs. The selection must not change or leave the step. */
+  isApplying: boolean;
   getCurrentSelection: () => ScopeSelection;
   /**
    * Replace the current selection. Returns the profile items that no longer exist, or null

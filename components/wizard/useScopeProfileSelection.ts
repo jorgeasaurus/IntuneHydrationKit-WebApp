@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
 import type { TaskCategory } from "@/types/hydration";
 import type { CISBaselineManifest, OIBManifest } from "@/lib/templates/loader";
 import { TARGETS, type CategoryItem } from "@/components/wizard/targetSelectionModel";
@@ -44,6 +44,7 @@ function catalogUnavailable(category: string): ProfileError {
 
 /** Save the current target selection as a profile selection, and apply a profile selection. */
 export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) {
+  const [isApplying, setIsApplying] = useState(false);
   const getCurrentSelection = (): ScopeSelection => {
     const items: Record<string, string[]> = {};
     for (const target of options.targets) {
@@ -61,9 +62,9 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
    *
    * The apply is authoritative: it discards async selection writes (category defaults,
    * platform filters, Select All) that started before it wrote. Returns null when a later
-   * apply replaced this one, so this one writes nothing.
+   * apply replaced this one or the step unmounted, so this one writes nothing.
    */
-  const applySelection = async (selection: ScopeSelection): Promise<DroppedProfileItem[] | null> => {
+  const resolveAndApply = async (selection: ScopeSelection): Promise<DroppedProfileItem[] | null> => {
     options.invalidatePendingSelectionUpdates();
     const isCurrent = options.startSelectionUpdate();
     const known = selection.targets.filter(isKnownTarget);
@@ -109,5 +110,15 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
     return resolved.dropped;
   };
 
-  return { getCurrentSelection, applySelection };
+  /** Apply a profile. While it runs, the step disables the controls that change or leave the selection. */
+  const applySelection = async (selection: ScopeSelection): Promise<DroppedProfileItem[] | null> => {
+    setIsApplying(true);
+    try {
+      return await resolveAndApply(selection);
+    } finally {
+      setIsApplying(false);
+    }
+  };
+
+  return { getCurrentSelection, applySelection, isApplying };
 }

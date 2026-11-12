@@ -298,7 +298,7 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     ensureCISManifest: data.ensureCISManifest,
   });
   const handleContinue = () => {
-    if (isValid) persistSelection();
+    if (isValid && !profileSelection.isApplying) persistSelection();
   };
 
   return {
@@ -362,7 +362,8 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       continue: handleContinue,
     },
     profiles: {
-      canSave: isValid,
+      canSave: isValid && !profileSelection.isApplying,
+      isApplying: profileSelection.isApplying,
       getCurrentSelection: profileSelection.getCurrentSelection,
       applySelection: profileSelection.applySelection,
     },

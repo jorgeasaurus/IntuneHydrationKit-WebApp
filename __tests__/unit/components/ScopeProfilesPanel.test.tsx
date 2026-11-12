@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, renderHook, screen, waitFor, within } from '@testing-library/react'
 import { TargetSelectionView } from '@/components/wizard/TargetSelectionView'
 import { useTargetSelectionController } from '@/components/wizard/useTargetSelectionController'
 import { SCOPE_PROFILES_STORAGE_KEY } from '@/lib/storageKeys'
@@ -111,6 +111,58 @@ describe('ScopeProfilesPanel', () => {
     fetchOIBManifestMock.mockResolvedValue(OIB_MANIFEST)
     fetchCISBaselineManifestMock.mockResolvedValue(null)
     fetchNotificationTemplatesMock.mockResolvedValue([{ displayName: 'First Warning', localizedMessages: [] }])
+  })
+
+  it('locks the selection and the step navigation while a profile applies', async () => {
+    const user = userEvent.setup()
+    const load = deferred<unknown[]>()
+    fetchDynamicGroupsMock.mockReturnValue(load.promise)
+    writeProfiles(localStorage, addProfile([], 'Groups', { targets: ['groups'], items: { groups: ['Windows Devices'] } }))
+    renderWithState({
+      selectedTargets: ['filters'],
+      categorySelections: { filters: { selectedItems: ['Windows Filter'] } },
+    })
+    const review = screen.getByRole('button', { name: 'Review Selection' })
+    expect(review).toBeEnabled()
+
+    await user.click(screen.getByRole('button', { name: 'Apply profile Groups' }))
+    expect(review).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Back' })).toBeDisabled()
+    expect(screen.getByLabelText('Device Filters')).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Select All' })).toBeDisabled()
+    expect(screen.getByText(/applying a scope profile\. Wait until it finishes/)).toBeInTheDocument()
+    await user.click(review)
+    expect(nextStep).not.toHaveBeenCalled()
+
+    await act(async () => {
+      load.resolve([{ displayName: 'Windows Devices', description: 'Windows', membershipRule: 'rule' }])
+    })
+    expect(await screen.findByText(/Applied profile "Groups"\./)).toBeInTheDocument()
+    expect(review).toBeEnabled()
+    expect(screen.queryByText(/applying a scope profile/)).not.toBeInTheDocument()
+    await user.click(review)
+    expect(setCategorySelections).toHaveBeenCalledWith({ groups: { selectedItems: ['Windows Devices'] } })
+  })
+
+  it('writes nothing when the step unmounts before the apply finishes', async () => {
+    const load = deferred<unknown[]>()
+    fetchDynamicGroupsMock.mockReturnValue(load.promise)
+    renderWithState()
+    const { result, unmount } = renderHook(() => useTargetSelectionController())
+    let applied!: Promise<unknown>
+    act(() => {
+      applied = result.current.profiles.applySelection({ targets: ['groups'], items: { groups: ['Windows Devices'] } })
+    })
+    unmount()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    load.resolve([{ displayName: 'Windows Devices', description: 'Windows', membershipRule: 'rule' }])
+
+    await expect(applied).resolves.toBeNull()
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+    expect(setSelectedTargets).not.toHaveBeenCalled()
+    expect(setCategorySelections).not.toHaveBeenCalled()
+    expect(nextStep).not.toHaveBeenCalled()
   })
 
   it('never stores or applies the update-existing choice', async () => {

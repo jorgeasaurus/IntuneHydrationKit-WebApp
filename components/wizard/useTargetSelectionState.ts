@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TaskCategory, OIBPlatformId, CategorySelections } from "@/types/hydration";
 
 function getInitialSelectedItems(
@@ -46,6 +46,10 @@ export function useTargetSelectionState(
   const invalidatePendingSelectionUpdates = () => {
     selectionGeneration.current += 1;
   };
+  // When the step unmounts, no pending async write may continue.
+  useEffect(() => () => {
+    selectionGeneration.current += 1;
+  }, []);
 
   const toggleItem = (category: TaskCategory, itemName: string) => {
     setSelectedItems(prev => {
