@@ -115,25 +115,24 @@ export const loginRequest = {
  */
 export const msalInstance = new PublicClientApplication(msalConfig);
 
+let msalInitPromise: Promise<void> | null = null;
+const initializeInstance = msalInstance.initialize.bind(msalInstance);
+
+/**
+ * msal-react's MsalProvider calls `instance.initialize()` and so does initializeMsal.
+ * MSAL marks the instance initialized only when initialization ends, so two concurrent calls
+ * both run it (msal-browser v5 then warns about a second instance). All callers share one run.
+ */
+msalInstance.initialize = (request) => {
+  msalInitPromise ??= initializeInstance(request).then(() => {
+    console.log("[MSAL] Instance initialized successfully");
+  });
+  return msalInitPromise;
+};
+
 /**
  * Initialize MSAL instance - must be called before any authentication operations
  */
-let msalInitialized = false;
-let msalInitPromise: Promise<void> | null = null;
-
-export async function initializeMsal(): Promise<void> {
-  if (msalInitialized) {
-    return;
-  }
-
-  if (msalInitPromise) {
-    return msalInitPromise;
-  }
-
-  msalInitPromise = msalInstance.initialize().then(() => {
-    msalInitialized = true;
-    console.log("[MSAL] Instance initialized successfully");
-  });
-
-  return msalInitPromise;
+export function initializeMsal(): Promise<void> {
+  return msalInstance.initialize();
 }

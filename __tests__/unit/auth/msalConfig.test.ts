@@ -141,4 +141,34 @@ describe("msalConfig", () => {
     await module.initializeMsal();
     expect(mocks.initialize).toHaveBeenCalledTimes(1);
   });
+
+  it("shares one initialization with msal-react, which calls instance.initialize()", async () => {
+    let resolveInitialize: (() => void) | undefined;
+    mocks.initialize.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveInitialize = resolve;
+      })
+    );
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const module = await importModule();
+
+    // msal-react's MsalProvider effect runs before the app's own effect.
+    const providerCall = module.msalInstance.initialize();
+    const appCall = module.initializeMsal();
+
+    expect(mocks.initialize).toHaveBeenCalledTimes(1);
+    expect(appCall).toBe(providerCall);
+    resolveInitialize?.();
+    await Promise.all([providerCall, appCall]);
+  });
+
+  it("keeps an initialization failure for every caller", async () => {
+    const failure = new Error("crypto unavailable");
+    mocks.initialize.mockRejectedValueOnce(failure);
+    const module = await importModule();
+
+    await expect(module.msalInstance.initialize()).rejects.toBe(failure);
+    await expect(module.initializeMsal()).rejects.toBe(failure);
+    expect(mocks.initialize).toHaveBeenCalledTimes(1);
+  });
 });

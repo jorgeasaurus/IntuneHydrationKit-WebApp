@@ -2,7 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@azure/msal-browser", () => ({
   LogLevel: {},
-  PublicClientApplication: class {},
+  PublicClientApplication: class {
+    initialize() {
+      return Promise.resolve();
+    }
+  },
 }));
 
 import nextConfig from "../../../next.config";
