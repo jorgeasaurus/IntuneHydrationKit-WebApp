@@ -107,7 +107,13 @@ function describeSummary(summary: TemplateSettingsSummary): string {
     : `${formatted} configured propert${count === 1 ? "y" : "ies"}. Nested values use dotted paths.`;
 }
 
-function SettingsSection({ summary }: { summary: TemplateSettingsSummary | null }) {
+function SettingsSection({
+  summary,
+  payloadLoaded,
+}: {
+  summary: TemplateSettingsSummary | null;
+  payloadLoaded: boolean;
+}) {
   return (
     <section aria-labelledby="template-settings-heading" className="space-y-4">
       <h2 id="template-settings-heading" className="text-xl font-bold text-foreground">
@@ -137,7 +143,9 @@ function SettingsSection({ summary }: { summary: TemplateSettingsSummary | null 
         </>
       ) : (
         <p className="text-sm leading-6 text-muted-foreground">
-          No summary is available for this template shape. The JSON below shows every value.
+          {payloadLoaded
+            ? "No summary is available for this template shape. The JSON below shows every value."
+            : "No summary is available because the payload for this template could not load."}
         </p>
       )}
     </section>
@@ -240,7 +248,10 @@ export function TemplateDetailPage({ item, payload }: TemplateDetailPageProps) {
               </header>
 
               <DetailsSection item={item} odataType={getPayloadODataType(payload)} />
-              <SettingsSection summary={summarizeTemplateSettings(payload)} />
+              <SettingsSection
+                summary={payload === null ? null : summarizeTemplateSettings(payload)}
+                payloadLoaded={payload !== null}
+              />
               {scripts.length > 0 ? <ScriptsSection scripts={scripts} /> : null}
               <JsonSection json={json} />
             </article>

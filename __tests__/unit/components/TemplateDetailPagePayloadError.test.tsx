@@ -59,6 +59,11 @@ describe('/templates/[id] when the payload does not load', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: '7-Zip - [IHD]' })).toBeInTheDocument()
     expect(screen.getByText('The payload for this template could not load.')).toBeInTheDocument()
+    // The settings section must not point at JSON that is not there.
+    expect(
+      screen.getByText('No summary is available because the payload for this template could not load.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText(/The JSON below shows every value/)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Copy JSON' })).not.toBeInTheDocument()
     expect(consoleError).toHaveBeenCalledWith(expect.stringContaining('win32-apps--7-zip'))
   })
