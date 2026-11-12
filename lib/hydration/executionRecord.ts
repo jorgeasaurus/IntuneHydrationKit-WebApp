@@ -4,6 +4,7 @@ import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { summaryMatchesExecution } from "@/lib/hydration/reporter";
 import { ACTIVITY_MESSAGE_TYPES } from "@/lib/hydration/types";
 import {
+  CLOUD_ENVIRONMENTS,
   OPERATION_MODES,
   NON_SKIPPED_TASK_STATUSES,
   REPORTABLE_EXECUTION_OUTCOMES,
@@ -39,6 +40,10 @@ const taskBaseShape = {
   drift: z.strictObject({
     status: z.enum(["matches", "different", "notChecked"]),
     differences: z.array(z.string()), reason: z.string().optional(),
+  }).optional(),
+  createdObject: z.strictObject({
+    id: z.string().min(1),
+    policyType: z.string().min(1).optional(),
   }).optional(),
   error: z.string().optional(),
   warning: z.string().optional(),
@@ -115,6 +120,8 @@ const recordBase = z.strictObject({
   tenantId: z.string().min(1),
   homeAccountId: z.string().min(1),
   tenantName: z.string().optional(),
+  /** Cloud of the run. The admin portal links use it. Records saved before this field was added do not have it. */
+  cloudEnvironment: z.enum(CLOUD_ENVIRONMENTS).optional(),
   operationMode: operationModeSchema,
   isPreview: z.boolean(),
   selectedObjectCount: z.number().int().nonnegative(),
@@ -153,6 +160,17 @@ const executionRecordSchema = z.union([reportableRecordSchema, failedRecordSchem
     context.addIssue({
       code: "custom",
       message: "Task operation does not match the execution record.",
+      path: ["tasks"],
+    });
+  }
+  if (
+    record.tasks.some(
+      (task) => task.createdObject && (record.isPreview || task.operation !== "create" || task.status !== "success"),
+    )
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Only successful live create tasks can have a created object.",
       path: ["tasks"],
     });
   }

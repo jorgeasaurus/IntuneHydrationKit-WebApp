@@ -1,6 +1,7 @@
 import type { ActivityMessage } from "@/lib/hydration/types";
 import type {
   BatchProgress,
+  CloudEnvironment,
   ExecutionOutcome,
   HydrationSummary,
   HydrationTask,
@@ -11,6 +12,8 @@ export interface ExecutionRunConfiguration {
   tenantId: string;
   homeAccountId: string;
   tenantName?: string;
+  /** Cloud of the run. The admin portal links use it. */
+  cloudEnvironment?: CloudEnvironment;
   operationMode: OperationMode;
   isPreview: boolean;
   selectedObjectCount: number;

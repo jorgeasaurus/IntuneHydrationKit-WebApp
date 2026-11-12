@@ -298,6 +298,117 @@ describe('DashboardPage', () => {
     expect(screen.getByText('Graph session expired.')).toBeInTheDocument()
   })
 
+  describe('created object links', () => {
+    const startTime = new Date('2026-08-17T01:00:00.000Z')
+    const endTime = new Date('2026-08-17T01:00:02.000Z')
+    const linkName = 'Open in Entra admin center: All Windows Devices'
+    const createConfiguration = {
+      ...runConfiguration,
+      operationMode: 'create' as const,
+      cloudEnvironment: 'global' as const
+    }
+    const createdTask = {
+      id: 'group-1',
+      category: 'groups',
+      operation: 'create',
+      itemName: 'All Windows Devices',
+      status: 'success',
+      createdObject: { id: 'group-object-id' },
+      startTime,
+      endTime
+    } satisfies HydrationTask
+    const createSummary = {
+      tenantId: 'tenant-id',
+      tenantName: 'Delete Test Tenant',
+      operationMode: 'create',
+      startTime,
+      endTime,
+      duration: 2000,
+      stats: { total: 1, created: 1, deleted: 0, skipped: 0, failed: 0 },
+      categoryBreakdown: { groups: { total: 1, success: 1, skipped: 0, failed: 0 } },
+      errors: [],
+      warnings: []
+    } satisfies HydrationSummary
+
+    function expectGroupLink(): void {
+      const links = screen.getAllByRole('link', { name: linkName })
+      expect(links.length).toBeGreaterThan(0)
+      links.forEach((link) => expect(link).toHaveAttribute('href', expect.stringContaining('groupId/group-object-id')))
+    }
+
+    it('shows the link while the run is still in progress', () => {
+      useHydrationExecutionMock.mockReturnValue(
+        createExecutionState({
+          tasks: [
+            createdTask,
+            { id: 'group-2', category: 'groups', operation: 'create', itemName: 'All macOS Devices', status: 'running' }
+          ],
+          configuration: createConfiguration,
+          phase: 'running',
+          isRunning: true,
+          startTime
+        })
+      )
+
+      renderPage()
+
+      expect(screen.getByRole('link', { name: linkName })).toHaveAttribute(
+        'href',
+        'https://entra.microsoft.com/#view/Microsoft_AAD_IAM/GroupDetailsMenuBlade/~/Overview/groupId/group-object-id'
+      )
+      expect(screen.getAllByRole('link', { name: /Open in/ })).toHaveLength(1)
+    })
+
+    it('keeps the link after a refresh restores the saved run', async () => {
+      useHydrationExecutionMock.mockReturnValue(
+        createExecutionState({
+          tasks: [createdTask],
+          configuration: createConfiguration,
+          phase: 'completed',
+          isCompleted: true,
+          startTime,
+          endTime,
+          summary: createSummary,
+          outcome: 'succeeded'
+        })
+      )
+      const live = renderPage()
+      await waitFor(() => expect(readExecutionRecord(sessionStorage)?.tasks[0].createdObject).toEqual({ id: 'group-object-id' }))
+      expect(readExecutionRecord(sessionStorage)?.cloudEnvironment).toBe('global')
+      live.unmount()
+
+      // A page refresh: the in-memory run and the wizard state are gone. Only the saved record stays.
+      useHydrationExecutionMock.mockReturnValue(createExecutionState())
+      useWizardStateMock.mockReturnValue({
+        state: { ...createWizardState().state, confirmed: false, tenantConfig: undefined },
+        resetWizard
+      })
+      renderPage()
+
+      await waitFor(() => expect(screen.getByText('Run complete')).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /Dynamic Groups/ }))
+      expectGroupLink()
+    })
+
+    it('shows no link for a preview run', () => {
+      useWizardStateMock.mockReturnValue(createWizardState(true))
+      useHydrationExecutionMock.mockReturnValue(
+        createExecutionState({
+          tasks: [createdTask],
+          configuration: { ...createConfiguration, isPreview: true },
+          phase: 'running',
+          isRunning: true,
+          startTime
+        })
+      )
+
+      renderPage()
+
+      expect(screen.getByText('All Windows Devices')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /Open in/ })).not.toBeInTheDocument()
+    })
+  })
+
   it('restores the completed dashboard after a refresh', async () => {
     getActiveAccount.mockImplementation(() => ({
       tenantId: 'tenant-id',

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, History, RotateCcw, Settings2 } from "lucide-react";
 import { AppNavigation } from "@/components/AppNavigation";
@@ -17,15 +17,15 @@ import { RunStatusAnnouncer } from "@/components/dashboard/RunStatusAnnouncer";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { useCreatedObjectLinks } from "@/hooks/useCreatedObjectLinks";
 import { useRunCompletionNotification } from "@/hooks/useRunCompletionNotification";
 import { useRunWakeLock } from "@/hooks/useRunWakeLock";
 import { useSettings } from "@/hooks/useSettings";
-import type { PortalLink } from "@/lib/utils/portalLinks";
+import { getCreatedObjectLinks, type PortalLink } from "@/lib/utils/portalLinks";
 import type { ActivityMessage } from "@/lib/hydration/types";
 import type { ExecutionState } from "@/lib/hydration/executionStateStore";
 import type {
   BatchProgress,
+  CloudEnvironment,
   ExecutionOutcome,
   HydrationSummary,
   HydrationTask,
@@ -46,6 +46,8 @@ interface DashboardRunViewProps {
   isPreview: boolean;
   tenantName?: string;
   tenantId?: string;
+  /** Cloud of the run. Without it, no admin portal links show. */
+  cloudEnvironment?: CloudEnvironment;
   selectedObjectCount: number;
   phase: ExecutionState["phase"];
   batchProgress: BatchProgress | null;
@@ -86,6 +88,7 @@ export function DashboardRunView({
   isPreview,
   tenantName,
   tenantId,
+  cloudEnvironment,
   selectedObjectCount,
   phase,
   batchProgress,
@@ -109,7 +112,10 @@ export function DashboardRunView({
     (task) => task.status === "success",
   ).length;
   const controlsStartTime = startTime ?? (isCompleted ? endTime : null);
-  const portalLinks = useCreatedObjectLinks(tasks, isPreview);
+  const portalLinks = useMemo(
+    () => getCreatedObjectLinks(tasks, cloudEnvironment, isPreview),
+    [cloudEnvironment, isPreview, tasks],
+  );
   const { settings } = useSettings();
   useRunWakeLock();
   useRunCompletionNotification(settings.notifyOnCompletion);

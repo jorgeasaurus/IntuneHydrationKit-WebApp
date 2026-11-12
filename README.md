@@ -48,7 +48,7 @@ The web app gives administrators a guided browser interface for the workflow in 
 | --- | --- | --- |
 | Entra groups and device filters | Compliance policies, enrollment profiles, and notifications | Security baselines, Conditional Access, app protection, mobile apps, and Win32 apps |
 
-The web app supports Global commercial tenants. Use the PowerShell module for US Government, Germany, and China tenants.
+The web app supports the Global (commercial) cloud only. For sovereign clouds, such as US Government (GCC High, DoD) and China (21Vianet), use the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit).
 
 ## Built with
 
@@ -119,7 +119,6 @@ Edit `.env.local` with your values:
 NEXT_PUBLIC_MSAL_CLIENT_ID=your-client-id-here
 NEXT_PUBLIC_MSAL_AUTHORITY=https://login.microsoftonline.com/common
 NEXT_PUBLIC_MSAL_REDIRECT_URI=http://localhost:3000
-NEXT_PUBLIC_CLOUD_ENVIRONMENT=global
 ```
 
 ### 4. Set Up Entra ID App Registration
@@ -194,25 +193,18 @@ The application uses a four-stage process.
 
 | Stage | Purpose | Result |
 | ---: | --- | --- |
-| **01** | **Connect** — Enter the tenant. Confirm the Global commercial cloud. Sign in with Microsoft Entra ID. | The app verifies the tenant session. |
+| **01** | **Connect** — Sign in with Microsoft Entra ID. The app uses the Global commercial cloud only. | The app verifies the tenant session. |
 | **02** | **Choose an operation** — Select Create, Preview, or Delete. | The operation is selected. |
 | **03** | **Select targets** — Choose policy categories and individual templates. | The app creates an execution queue for the selected items. |
 | **04** | **Review and run** — Check the object counts. Confirm the operation. Start the execution. | The app shows live progress and creates a downloadable report. |
 
 ## Configuration
 
-### Cloud Environments
+### Cloud Environment
 
-The web app currently supports the following Microsoft cloud environment:
+The web app supports the Global (commercial) cloud only. The wizard shows the cloud as fixed text. There is no cloud selector and no cloud setting.
 
-- **global** - Commercial cloud (default)
-
-For sovereign and government clouds, use the IntuneHydrationKit PowerShell module:
-
-- **usgov** - US Government (GCC High)
-- **usgovdod** - US Government (DoD)
-- **germany** - Germany cloud
-- **china** - China (21Vianet)
+The web app does not support sovereign clouds, such as US Government (GCC High, DoD) and China (21Vianet). For these clouds, use the [IntuneHydrationKit PowerShell module](https://github.com/jorgeasaurus/IntuneHydrationKit).
 
 ### Operation Modes
 
