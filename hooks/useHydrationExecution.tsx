@@ -13,6 +13,8 @@ import { createRunProvenance } from "@/lib/hydration/runProvenance";
 import { useSettings } from "./useSettings";
 import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { markTaskSkipped } from "@/lib/hydration/taskTransitions";
+import { getWizardRunLicenses, getWizardRunScope } from "@/lib/hydration/runScope";
+import { buildRerunTaskQueue, type RerunPlan } from "@/lib/hydration/rerun";
 import {
   beginExecution,
   cancelExecution,
@@ -28,7 +30,13 @@ import {
   shouldPauseExecution,
   subscribeExecutionState,
   updateExecutionStateForRun,
+  type ExecutionRunConfiguration,
 } from "@/lib/hydration/executionStateStore";
+
+type QueueBuilder = (options: {
+  shouldCancel: () => boolean;
+  onProgress: (message: string, type?: ActivityMessage["type"]) => void;
+}) => Promise<HydrationTask[]>;
 
 let activityIdCounter = 0;
 
@@ -62,23 +70,12 @@ export function useHydrationExecution() {
   );
 
   /**
-   * Start execution
+   * Run a new execution: build its queue, then run the queue through the engine.
+   * Wizard runs and runs that continue an earlier run use this same path.
    */
-  const startExecution = useCallback(async () => {
-    const { tenantConfig, operationMode } = state;
-    if (!tenantConfig || !operationMode || state.selectedTargets.length === 0) {
-      throw new Error("Invalid wizard state. Please complete the wizard first.");
-    }
-
-    const runId = beginExecution({
-      tenantId: tenantConfig.tenantId,
-      homeAccountId: tenantConfig.homeAccountId,
-      tenantName: tenantConfig.tenantName,
-      cloudEnvironment: tenantConfig.cloudEnvironment,
-      operationMode,
-      isPreview: state.isPreview,
-      selectedObjectCount: getEstimatedTaskCount(state.selectedTargets, state.categorySelections),
-    });
+  const runExecution = useCallback(async (configuration: ExecutionRunConfiguration, buildQueue: QueueBuilder) => {
+    const { operationMode } = configuration;
+    const runId = beginExecution(configuration);
     if (runId === null) {
       console.log("[Execution Hook] Execution already in progress, ignoring duplicate call");
       return;
@@ -108,13 +105,13 @@ export function useHydrationExecution() {
       return {
         endTime,
         summary: createSummary(
-          tenantConfig.tenantId,
+          configuration.tenantId,
           operationMode,
           startTime,
           endTime,
           tasks,
           telemetry.snapshot(),
-          tenantConfig.tenantName,
+          configuration.tenantName,
           provenance,
           getPausedMsAt(endTime),
         ),
@@ -141,10 +138,7 @@ export function useHydrationExecution() {
       emitQueueProgress("Building task queue...");
 
       // Build task queue with real templates from local IntuneTemplates directory
-      tasks = await buildTaskQueueAsync(state.selectedTargets, operationMode, {
-        selectedCISCategories: state.selectedCISCategories,
-        baselineSelection: state.baselineSelection,
-        categorySelections: state.categorySelections,
+      tasks = await buildQueue({
         shouldCancel: () => shouldCancelExecution(runId),
         onProgress: emitQueueProgress,
       });
@@ -176,8 +170,8 @@ export function useHydrationExecution() {
 
       // Create Graph client
       const client = createGraphClient({
-        tenantId: tenantConfig.tenantId,
-        homeAccountId: tenantConfig.homeAccountId,
+        tenantId: configuration.tenantId,
+        homeAccountId: configuration.homeAccountId,
       }, telemetry.onBatchDispatch);
 
       // Task update callback for all task events
@@ -213,13 +207,13 @@ export function useHydrationExecution() {
       // Create execution context
       const context: ExecutionContext = {
         client,
-        tenantId: tenantConfig.tenantId,
+        tenantId: configuration.tenantId,
         operationMode,
-        isPreview: state.isPreview,
+        isPreview: configuration.isPreview,
         stopOnFirstError: settings.stopOnFirstError,
-        hasConditionalAccessLicense: state.prerequisiteResult?.licenses?.hasConditionalAccessLicense ?? true,
-        hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,
-        hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true,
+        hasConditionalAccessLicense: configuration.licenses?.hasConditionalAccessLicense ?? true,
+        hasPremiumP2License: configuration.licenses?.hasPremiumP2License ?? true,
+        hasWindowsDriverUpdateLicense: configuration.licenses?.hasWindowsDriverUpdateLicense ?? true,
         onSequentialTask: telemetry.onSequentialTask,
         onTaskStart: updateTask,
         onTaskComplete: updateTask,
@@ -231,8 +225,12 @@ export function useHydrationExecution() {
         onPauseWait: (waiting) => recordPauseWait(runId, waiting),
       };
 
-      // Execute tasks with pause/cancel support
-      await executeTasks(tasks, context);
+      // Execute tasks with pause/cancel support. A retry can queue a task that is already
+      // failed (its template is no longer available); the engine runs only pending tasks.
+      await executeTasks(
+        tasks.filter((task) => task.status === "pending"),
+        context,
+      );
       if (
         shouldCancelExecution(runId) &&
         tasks.some((task) => task.status === "pending" || task.status === "running")
@@ -244,13 +242,13 @@ export function useHydrationExecution() {
       // Create summary with batch stats
       const endTime = new Date();
       const summary = createSummary(
-        tenantConfig.tenantId,
+        configuration.tenantId,
         operationMode,
         startTime,
         endTime,
         tasks,
         telemetry.snapshot(),
-        tenantConfig.tenantName,
+        configuration.tenantName,
         provenance,
         getPausedMsAt(endTime),
       );
@@ -297,7 +295,63 @@ export function useHydrationExecution() {
         finishExecution(runId, terminalState);
       }
     }
-  }, [appendActivityMessage, settings.stopOnFirstError, state]);
+  }, [appendActivityMessage, settings.stopOnFirstError]);
+
+  /**
+   * Start execution from the confirmed wizard.
+   */
+  const startExecution = useCallback(async () => {
+    const { tenantConfig, operationMode } = state;
+    if (!tenantConfig || !operationMode || state.selectedTargets.length === 0) {
+      throw new Error("Invalid wizard state. Please complete the wizard first.");
+    }
+    const scope = getWizardRunScope(state);
+    const configuration: ExecutionRunConfiguration = {
+      tenantId: tenantConfig.tenantId,
+      homeAccountId: tenantConfig.homeAccountId,
+      tenantName: tenantConfig.tenantName,
+      cloudEnvironment: tenantConfig.cloudEnvironment,
+      operationMode,
+      isPreview: state.isPreview,
+      selectedObjectCount: getEstimatedTaskCount(state.selectedTargets, state.categorySelections),
+      scope,
+      licenses: getWizardRunLicenses(state),
+    };
+    await runExecution(configuration, ({ shouldCancel, onProgress }) =>
+      buildTaskQueueAsync(scope.selectedTargets, operationMode, {
+        selectedCISCategories: scope.selectedCISCategories,
+        baselineSelection: scope.baselineSelection,
+        categorySelections: scope.categorySelections,
+        shouldCancel,
+        onProgress,
+      }),
+    );
+  }, [runExecution, state]);
+
+  /**
+   * Start a new run that continues from an earlier run (retry, resume, or a preview run for real).
+   * It uses the same engine path as a wizard run.
+   */
+  const startRerun = useCallback(
+    async (plan: RerunPlan) => {
+      const { configuration } = plan;
+      const scope = configuration.scope;
+      await runExecution(configuration, ({ shouldCancel, onProgress }) => {
+        if (plan.kind === "live") {
+          if (!scope) throw new Error("The run has no saved scope.");
+          return buildTaskQueueAsync(scope.selectedTargets, configuration.operationMode, {
+            selectedCISCategories: scope.selectedCISCategories,
+            baselineSelection: scope.baselineSelection,
+            categorySelections: scope.categorySelections,
+            shouldCancel,
+            onProgress,
+          });
+        }
+        return buildRerunTaskQueue(plan.sourceTasks, configuration.operationMode, { shouldCancel, onProgress });
+      });
+    },
+    [runExecution],
+  );
 
   /**
    * Pause execution
@@ -346,6 +400,7 @@ export function useHydrationExecution() {
     isCompleted: executionState.phase === "completed",
     isBuildingQueue: executionState.phase === "building",
     startExecution,
+    startRerun,
     pause,
     resume,
     cancel,

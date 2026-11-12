@@ -12,6 +12,7 @@ type ExecutionHookState = ReturnType<typeof useHydrationExecution>
 
 const push = vi.fn()
 const startExecution = vi.fn().mockResolvedValue(undefined)
+const startRerun = vi.fn().mockResolvedValue(undefined)
 const useWizardStateMock = vi.fn()
 const useHydrationExecutionMock = vi.fn()
 const resetWizard = vi.fn()
@@ -104,6 +105,7 @@ function createExecutionState(overrides: Partial<ExecutionHookState> = {}): Exec
     batchProgress: null,
     activityLog: [],
     startExecution,
+    startRerun,
     pause: vi.fn(),
     resume: vi.fn(),
     cancel: vi.fn(),
