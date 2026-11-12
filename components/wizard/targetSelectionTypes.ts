@@ -5,6 +5,7 @@ import type {
   OSPlatformFilterId,
   Target,
 } from "@/components/wizard/targetSelectionModel";
+import type { DroppedProfileItem, ScopeSelection } from "@/lib/profiles/scopeProfiles";
 
 export interface TargetSelectionSearchModel {
   query: string;
@@ -68,6 +69,14 @@ export interface TargetSelectionNavigationModel {
   continue: () => void;
 }
 
+export interface TargetSelectionProfilesModel {
+  /** True when the current selection is complete and can be saved as a profile. */
+  canSave: boolean;
+  getCurrentSelection: () => ScopeSelection;
+  /** Replace the current selection. Returns the profile items that no longer exist. */
+  applySelection: (selection: ScopeSelection) => Promise<DroppedProfileItem[]>;
+}
+
 export interface TargetSelectionViewModel {
   search: TargetSelectionSearchModel;
   platformFilters: TargetSelectionPlatformFilterModel;
@@ -76,4 +85,5 @@ export interface TargetSelectionViewModel {
   expansion: TargetSelectionExpansionModel;
   actions: TargetSelectionActionsModel;
   navigation: TargetSelectionNavigationModel;
+  profiles: TargetSelectionProfilesModel;
 }

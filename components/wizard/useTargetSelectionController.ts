@@ -16,6 +16,7 @@ import {
 import type { TargetSelectionViewModel } from "@/components/wizard/targetSelectionTypes";
 import { useTargetSelectionBulkActions } from "@/components/wizard/useTargetSelectionBulkActions";
 import { useTargetSelectionData } from "@/components/wizard/useTargetSelectionData";
+import { useScopeProfileSelection } from "@/components/wizard/useScopeProfileSelection";
 import { useTargetSelectionPersistence } from "@/components/wizard/useTargetSelectionPersistence";
 import { useTargetSelectionState } from "@/components/wizard/useTargetSelectionState";
 
@@ -278,6 +279,18 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     setCategorySelections: wizard.setCategorySelections,
     nextStep: wizard.nextStep,
   });
+  const profileSelection = useScopeProfileSelection({
+    targets: selectionState.targets,
+    selectedItems: selectionState.selectedItems,
+    selectedCISPolicies: selectionState.selectedCISPolicies,
+    setTargets: selectionState.setTargets,
+    setSelectedItems: selectionState.setSelectedItems,
+    setSelectedCISPolicies: selectionState.setSelectedCISPolicies,
+    setExpandedCategories: data.setExpandedCategories,
+    ensureAllCategoryItems: data.ensureAllCategoryItems,
+    ensureBaselineManifest: data.ensureBaselineManifest,
+    ensureCISManifest: data.ensureCISManifest,
+  });
   const handleContinue = () => {
     if (isValid) persistSelection();
   };
@@ -341,6 +354,11 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     navigation: {
       previousStep: wizard.previousStep,
       continue: handleContinue,
+    },
+    profiles: {
+      canSave: isValid,
+      getCurrentSelection: profileSelection.getCurrentSelection,
+      applySelection: profileSelection.applySelection,
     },
   };
 }

@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Search } from "lucide-react";
 import { TargetSelectionCategoryView } from "@/components/wizard/TargetSelectionCategoryView";
 import { TargetSelectionConsole } from "@/components/wizard/TargetSelectionConsole";
+import { ScopeProfilesPanel } from "@/components/wizard/ScopeProfilesPanel";
 import type { TargetSelectionViewModel } from "@/components/wizard/targetSelectionTypes";
 
 export function TargetSelectionView({ model }: { model: TargetSelectionViewModel }) {
@@ -23,6 +24,8 @@ export function TargetSelectionView({ model }: { model: TargetSelectionViewModel
       </CardHeader>
       <CardContent className="space-y-6">
         <TargetSelectionConsole model={model} />
+
+        <ScopeProfilesPanel model={model} />
 
         <div className="space-y-4">
           {data.filteredTargets.length === 0 && search.normalized && (

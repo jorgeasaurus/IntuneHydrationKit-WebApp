@@ -1,0 +1,221 @@
+import userEvent from '@testing-library/user-event'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { render, screen, waitFor, within } from '@testing-library/react'
+import { TargetSelectionView } from '@/components/wizard/TargetSelectionView'
+import { useTargetSelectionController } from '@/components/wizard/useTargetSelectionController'
+import { SCOPE_PROFILES_STORAGE_KEY } from '@/lib/storageKeys'
+import { addProfile, serializeProfilesExport, writeProfiles } from '@/lib/profiles/scopeProfiles'
+import type { OIBManifest } from '@/lib/templates/loader'
+import type { WizardState } from '@/types/hydration'
+
+const setSelectedTargets = vi.fn()
+const setSelectedCISCategories = vi.fn()
+const setBaselineSelection = vi.fn()
+const setCategorySelections = vi.fn()
+const setConfirmed = vi.fn()
+const nextStep = vi.fn()
+const previousStep = vi.fn()
+const useWizardStateMock = vi.fn()
+const fetchOIBManifestMock = vi.fn()
+const fetchDynamicGroupsMock = vi.fn()
+const fetchStaticGroupsMock = vi.fn()
+const fetchFiltersMock = vi.fn()
+const fetchCISBaselineManifestMock = vi.fn()
+
+vi.mock('@/hooks/useWizardState', () => ({
+  useWizardState: () => useWizardStateMock(),
+}))
+
+vi.mock('@/lib/templates/loader', async () => {
+  const actual = await vi.importActual('@/lib/templates/loader')
+  return {
+    ...actual,
+    fetchOIBManifest: (...args: unknown[]) => fetchOIBManifestMock(...args),
+    fetchDynamicGroups: (...args: unknown[]) => fetchDynamicGroupsMock(...args),
+    fetchStaticGroups: (...args: unknown[]) => fetchStaticGroupsMock(...args),
+    fetchFilters: (...args: unknown[]) => fetchFiltersMock(...args),
+    fetchCISBaselineManifest: (...args: unknown[]) => fetchCISBaselineManifestMock(...args),
+  }
+})
+
+function jsonFile(contents: string, name: string, type = 'application/json'): File {
+  const file = new File([contents], name, { type })
+  Object.defineProperty(file, 'text', { value: async () => contents })
+  return file
+}
+
+function Harness() {
+  return <TargetSelectionView model={useTargetSelectionController()} />
+}
+
+const OIB_MANIFEST = {
+  totalFiles: 1,
+  platforms: [{ id: 'WINDOWS', name: 'Windows', count: 1 }],
+  files: [{ path: 'windows/policy-1.json', platform: 'WINDOWS', policyType: 'Settings Catalog', displayName: 'Windows Baseline' }],
+} as unknown as OIBManifest
+
+function renderWithState(overrides: Partial<WizardState> = {}) {
+  useWizardStateMock.mockReturnValue({
+    state: {
+      currentStep: 3,
+      isPreview: false,
+      selectedTargets: [],
+      selectedCISCategories: [],
+      confirmed: false,
+      operationMode: 'create',
+      tenantConfig: {
+        tenantId: '11111111-1111-1111-1111-111111111111',
+        homeAccountId: 'home-account-secret',
+        tenantName: 'Contoso Secret Tenant',
+        cloudEnvironment: 'global',
+      },
+      ...overrides,
+    } satisfies WizardState,
+    setSelectedTargets,
+    setSelectedCISCategories,
+    setBaselineSelection,
+    setCategorySelections,
+    setConfirmed,
+    nextStep,
+    previousStep,
+  })
+  return render(<Harness />)
+}
+
+describe('ScopeProfilesPanel', () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+    localStorage.clear()
+    fetchDynamicGroupsMock.mockResolvedValue([
+      { displayName: 'Windows Devices', description: 'Windows', membershipRule: '(device.deviceOSType -eq "Windows")' },
+    ])
+    fetchStaticGroupsMock.mockResolvedValue([])
+    fetchFiltersMock.mockResolvedValue([{ displayName: 'Windows Filter', description: 'Windows', platform: 'Windows', rule: '' }])
+    fetchOIBManifestMock.mockResolvedValue(OIB_MANIFEST)
+    fetchCISBaselineManifestMock.mockResolvedValue(null)
+  })
+
+  it('saves the current selection without tenant data', async () => {
+    const user = userEvent.setup()
+    renderWithState({
+      selectedTargets: ['groups', 'baseline'],
+      categorySelections: {
+        groups: { selectedItems: ['Windows Devices'] },
+        baseline: { platforms: [], selectedPolicies: ['windows/policy-1.json'], excludedPolicies: [] },
+      },
+    })
+
+    expect(screen.getByText('No saved profiles yet.')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save selection as profile' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Save selection as profile' })
+    await user.type(within(dialog).getByLabelText('Profile name'), 'Windows baseline')
+    await user.click(within(dialog).getByRole('button', { name: 'Save profile' }))
+
+    expect(await screen.findByRole('status', { name: '' })).toBeDefined()
+    expect(screen.getByText('Saved profile "Windows baseline".')).toBeInTheDocument()
+    const raw = localStorage.getItem(SCOPE_PROFILES_STORAGE_KEY) ?? ''
+    expect(raw).toContain('Windows Devices')
+    expect(raw).toContain('windows/policy-1.json')
+    for (const secret of ['11111111-1111-1111-1111-111111111111', 'home-account-secret', 'Contoso Secret Tenant', 'operationMode', 'confirmed']) {
+      expect(raw).not.toContain(secret)
+    }
+    expect(setConfirmed).not.toHaveBeenCalled()
+  })
+
+  it('applies a profile, lists dropped items, and does not skip review', async () => {
+    const user = userEvent.setup()
+    writeProfiles(
+      localStorage,
+      addProfile([], 'Old scope', {
+        targets: ['groups', 'baseline', 'filters'],
+        items: {
+          groups: ['Windows Devices', 'Retired Group'],
+          baseline: ['windows/policy-1.json', 'windows/removed.json'],
+          filters: [],
+        },
+      }),
+    )
+    renderWithState()
+
+    await user.click(screen.getByRole('button', { name: 'Apply profile Old scope' }))
+
+    const dropped = await screen.findByRole('list', { name: 'Profile items not applied' })
+    expect(within(dropped).getByText('Entra Groups: Retired Group')).toBeInTheDocument()
+    expect(within(dropped).getByText('OpenIntuneBaseline: windows/removed.json')).toBeInTheDocument()
+    expect(within(dropped).getByText(/Device Filters: the full category/)).toBeInTheDocument()
+    expect(screen.getByText(/Applied profile "Old scope" with 3 items not applied/)).toBeInTheDocument()
+
+    expect(screen.getByLabelText('Entra Groups')).toBeChecked()
+    expect(screen.getByLabelText('OpenIntuneBaseline')).toBeChecked()
+    expect(screen.getByLabelText('Device Filters')).not.toBeChecked()
+    expect(nextStep).not.toHaveBeenCalled()
+    expect(setConfirmed).not.toHaveBeenCalled()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    expect(setCategorySelections).toHaveBeenCalledWith({
+      groups: { selectedItems: ['Windows Devices'] },
+      baseline: { platforms: [], selectedPolicies: ['windows/policy-1.json'], excludedPolicies: [] },
+    })
+    expect(nextStep).toHaveBeenCalledTimes(1)
+    expect(setConfirmed).not.toHaveBeenCalled()
+  })
+
+  it('keeps the selection when a catalog cannot load', async () => {
+    const user = userEvent.setup()
+    fetchCISBaselineManifestMock.mockResolvedValue(null)
+    writeProfiles(localStorage, addProfile([], 'CIS', { targets: ['cisBaseline'], items: { cisBaseline: ['cis/a.json'] } }))
+    renderWithState({
+      selectedTargets: ['groups'],
+      categorySelections: { groups: { selectedItems: ['Windows Devices'] } },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Apply profile CIS' }))
+    expect(await screen.findByText(/cannot load the CIS .* catalog/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Entra Groups')).toBeChecked()
+    expect(screen.queryByRole('list', { name: 'Profile items not applied' })).not.toBeInTheDocument()
+  })
+
+  it('renames and deletes a profile after confirmation', async () => {
+    const user = userEvent.setup()
+    writeProfiles(localStorage, addProfile([], 'First', { targets: ['groups'], items: { groups: ['Windows Devices'] } }))
+    renderWithState()
+
+    await user.click(screen.getByRole('button', { name: 'Rename profile First' }))
+    const renameDialog = await screen.findByRole('dialog', { name: 'Rename profile' })
+    const input = within(renameDialog).getByLabelText('Profile name')
+    await user.clear(input)
+    await user.type(input, 'Second')
+    await user.click(within(renameDialog).getByRole('button', { name: 'Rename' }))
+    expect(await screen.findByText('Second')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete profile Second' }))
+    const confirm = await screen.findByRole('dialog', { name: 'Delete profile?' })
+    await user.click(within(confirm).getByRole('button', { name: 'Cancel' }))
+    expect(screen.getByText('Second')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Delete profile Second' }))
+    await user.click(within(await screen.findByRole('dialog', { name: 'Delete profile?' })).getByRole('button', { name: 'Delete profile' }))
+    expect(await screen.findByText('No saved profiles yet.')).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(SCOPE_PROFILES_STORAGE_KEY) ?? '{}').profiles).toEqual([])
+  })
+
+  it('imports a valid file and rejects a bad file with a message', async () => {
+    const user = userEvent.setup({ applyAccept: false })
+    renderWithState()
+    const input = screen.getByLabelText('Import scope profile file')
+
+    await user.upload(input, jsonFile('{"format":"other"}', 'bad.json'))
+    expect(await screen.findByText(/not a scope profile export/)).toBeInTheDocument()
+
+    await user.upload(input, jsonFile('hello', 'notes.txt', 'text/plain'))
+    expect(await screen.findByText(/Select a JSON profile file/)).toBeInTheDocument()
+
+    const exported = serializeProfilesExport(
+      addProfile([], 'Shared', { targets: ['groups'], items: { groups: ['Windows Devices'] } }),
+    )
+    await user.upload(input, jsonFile(exported, 'profiles.json'))
+    expect(await screen.findByText('Imported 1 profile.')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Apply profile Shared' })).toBeInTheDocument())
+  })
+})
