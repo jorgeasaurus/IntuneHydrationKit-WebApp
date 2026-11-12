@@ -23,7 +23,7 @@ vi.mock("@/lib/templates/loader", async (importOriginal) => {
 });
 
 import { buildTaskQueueAsync, getEstimatedCategoryCount } from "@/lib/hydration/taskQueue";
-import { clearCategoryCache } from "@/lib/templates/loader";
+import { clearCategoryCache, getCachedTemplates } from "@/lib/templates/loader";
 
 const BASELINE_POLICIES = Array.from({ length: 8 }, (_, index) => ({
   name: `[IHD] OIB Policy ${index + 1}`,
@@ -110,6 +110,72 @@ describe("taskQueue selection handling across runs", () => {
   it("queues every template when there is no selection object for the category", async () => {
     const tasks = await buildTaskQueueAsync(["filters"], "create", { categorySelections: {} });
     expect(tasks.map((task) => task.itemName)).toEqual(["Filter A", "Filter B"]);
+  });
+
+  describe("incomplete template loads", () => {
+    const failFilterB = async (report?: { failedFiles: string[] }) => {
+      report?.failedFiles.push("Filters/filter-b.json");
+      return [{ displayName: "Filter A" }];
+    };
+
+    it("does not reuse a list with a failed file request, and caches a later complete load", async () => {
+      mockFetchFilters.mockImplementationOnce(failFilterB);
+
+      const firstRun = await buildTaskQueueAsync(["filters"], "create", {
+        categorySelections: { filters: { selectedItems: ["Filter A"] } },
+      });
+      expect(firstRun.map((task) => task.itemName)).toEqual(["Filter A"]);
+      // The partial list is still readable for this run's executors.
+      expect(getCachedTemplates("filters")).toEqual([{ displayName: "Filter A" }]);
+
+      const secondRun = await buildTaskQueueAsync(["filters"], "create", {
+        categorySelections: { filters: { selectedItems: ["Filter A", "Filter B"] } },
+      });
+      expect(mockFetchFilters).toHaveBeenCalledTimes(2);
+      expect(secondRun.map((task) => task.itemName)).toEqual(["Filter A", "Filter B"]);
+
+      await buildTaskQueueAsync(["filters"], "create");
+      expect(mockFetchFilters).toHaveBeenCalledTimes(2);
+    });
+
+    it.each(["create", "delete"] as const)(
+      "reports a selected template that failed to load in %s mode instead of dropping it",
+      async (operationMode) => {
+        mockFetchFilters.mockImplementationOnce(failFilterB);
+
+        await expect(
+          buildTaskQueueAsync(["filters"], operationMode, {
+            categorySelections: { filters: { selectedItems: ["Filter A", "Filter B"] } },
+          }),
+        ).rejects.toThrow(
+          /Could not load 1 Device Filters template file\(s\): Filters\/filter-b\.json\. Selected templates not loaded: Filter B\./,
+        );
+        expect(getCachedTemplates("filters")).toBeNull();
+      },
+    );
+
+    it("reports a failed load when every template of the category is queued", async () => {
+      mockFetchFilters.mockImplementationOnce(failFilterB);
+
+      await expect(buildTaskQueueAsync(["filters"], "create")).rejects.toThrow(/Filters\/filter-b\.json/);
+      expect(getCachedTemplates("filters")).toBeNull();
+    });
+
+    it("reports a selected OpenIntuneBaseline file that failed to load", async () => {
+      const [loaded, failed] = BASELINE_POLICIES;
+      mockFetchBaselinePolicies.mockImplementationOnce(async (report?: { failedFiles: string[] }) => {
+        report?.failedFiles.push(failed._oibFilePath);
+        return [{ ...loaded }];
+      });
+      const paths = [loaded._oibFilePath, failed._oibFilePath];
+
+      await expect(
+        buildTaskQueueAsync(["baseline"], "create", {
+          baselineSelection: baselineSelection(paths),
+          categorySelections: { baseline: baselineSelection(paths) },
+        }),
+      ).rejects.toThrow(`Selected templates not loaded: ${failed._oibFilePath}.`);
+    });
   });
 
   it("estimates zero objects for an explicit empty selection", () => {

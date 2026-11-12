@@ -26,10 +26,12 @@ import {
   fetchBaselinePolicies,
   getCachedTemplates,
   cacheTemplates,
+  type TemplateLoadReport,
 } from "@/lib/templates/loader";
 
 type TemplateItem = { displayName: string } & Record<string, unknown>;
 type QueueOptions = Omit<BuildTaskQueueOptions, "selectedCategories" | "operationMode">;
+type TemplateLoad = (throwIfCancelled: () => void, report: TemplateLoadReport) => Promise<TemplateItem[]>;
 
 function getTaskDedupKey(task: HydrationTask): string {
   return task.templatePath || task.itemName;
@@ -59,15 +61,15 @@ function getTemplateSelectionKey(category: TaskCategory, template: TemplateItem)
   return template.displayName;
 }
 
-async function fetchAllGroups(throwIfCancelled: () => void): Promise<TemplateItem[]> {
-  const dynamicGroups = await fetchDynamicGroups();
+async function fetchAllGroups(throwIfCancelled: () => void, report: TemplateLoadReport): Promise<TemplateItem[]> {
+  const dynamicGroups = await fetchDynamicGroups(report);
   throwIfCancelled();
-  const staticGroups = await fetchStaticGroups();
+  const staticGroups = await fetchStaticGroups(report);
   return [...dynamicGroups, ...staticGroups] as unknown as TemplateItem[];
 }
 
-async function fetchEnrollmentTemplates(): Promise<TemplateItem[]> {
-  const profiles = (await fetchEnrollmentProfiles()) as Array<{ displayName?: string; name?: string }>;
+async function fetchEnrollmentTemplates(_throwIfCancelled: () => void, report: TemplateLoadReport): Promise<TemplateItem[]> {
+  const profiles = (await fetchEnrollmentProfiles(report)) as Array<{ displayName?: string; name?: string }>;
   return profiles.map((profile) => ({
     ...profile,
     displayName: profile.displayName || profile.name || "Unknown Profile",
@@ -82,8 +84,11 @@ function getTemplateSource(
   category: TaskCategory,
   selectedKeys: Set<string> | undefined,
   options?: QueueOptions,
-): { cacheKey: string; load: (throwIfCancelled: () => void) => Promise<TemplateItem[]> } {
-  const asItems = <T>(load: () => Promise<T[]> | T[]) => async () => (await load()) as unknown as TemplateItem[];
+): { cacheKey: string; load: TemplateLoad } {
+  const asItems =
+    <T>(load: (report: TemplateLoadReport) => Promise<T[]> | T[]): TemplateLoad =>
+    async (_throwIfCancelled, report) =>
+      (await load(report)) as unknown as TemplateItem[];
 
   switch (category) {
     case "groups":
@@ -110,12 +115,39 @@ function getTemplateSource(
       }
       return {
         cacheKey: `${category}-${cisCategories.toSorted().join(",")}`,
-        load: asItems(() => fetchCISBaselinePoliciesByCategories(cisCategories)),
+        load: asItems((report) => fetchCISBaselinePoliciesByCategories(cisCategories, report)),
       };
     }
     default:
       return { cacheKey: category, load: async () => [] };
   }
+}
+
+function formatList(values: string[], limit = 5): string {
+  const shown = values.slice(0, limit).join(", ");
+  return values.length > limit ? `${shown} and ${values.length - limit} more` : shown;
+}
+
+/**
+ * Check an incomplete template load. Throws when a template this run needs is missing,
+ * so it is reported instead of silently dropped from the queue.
+ */
+function assertIncompleteLoadCoversSelection(
+  category: TaskCategory,
+  label: string,
+  templates: TemplateItem[],
+  selectedKeys: Set<string> | undefined,
+  failedFiles: string[],
+): void {
+  const loadedKeys = new Set(templates.map((template) => getTemplateSelectionKey(category, template)));
+  const missingKeys = selectedKeys ? [...selectedKeys].filter((key) => !loadedKeys.has(key)) : [];
+  if (selectedKeys && missingKeys.length === 0) return;
+
+  const missingDetail = selectedKeys ? ` Selected templates not loaded: ${formatList(missingKeys)}.` : "";
+  throw new Error(
+    `Could not load ${failedFiles.length} ${label} template file(s): ${formatList(failedFiles)}.${missingDetail} ` +
+      "Check your connection and start the run again.",
+  );
 }
 
 /**
@@ -170,16 +202,27 @@ export async function buildTaskQueueAsync(
       emit?.(`No ${label.toLowerCase()} items are selected`, "info");
     } else {
       const source = getTemplateSource(category, selectedKeys, options);
-      const cached = getCachedTemplates(source.cacheKey) as TemplateItem[] | null;
+      // An incomplete list from an earlier failed load is never reused; it is reloaded instead.
+      const cached = getCachedTemplates(source.cacheKey, { completeOnly: true }) as TemplateItem[] | null;
       let templates: TemplateItem[];
       if (cached) {
         emit?.(`Using ${cached.length} cached templates for ${label}`, "info");
         templates = cached;
       } else {
         emit?.(`Fetching templates for ${label}...`);
-        templates = await loadTemplates(() => source.load(throwIfCancelled));
-        // Only the complete, unfiltered template list is cached. The selection is applied per run.
-        cacheTemplates(source.cacheKey, templates);
+        const report: TemplateLoadReport = { failedFiles: [] };
+        templates = await loadTemplates(() => source.load(throwIfCancelled, report));
+        const complete = report.failedFiles.length === 0;
+        if (!complete) {
+          assertIncompleteLoadCoversSelection(category, label, templates, selectedKeys, report.failedFiles);
+          emit?.(
+            `${report.failedFiles.length} ${label.toLowerCase()} template file(s) failed to load; every selected template loaded`,
+            "warning",
+          );
+        }
+        // Only the unfiltered template list is cached; the selection is applied per run. An incomplete
+        // list stays readable for this run's executors but is reloaded by the next run.
+        cacheTemplates(source.cacheKey, templates, { complete });
       }
 
       items = selectedKeys
