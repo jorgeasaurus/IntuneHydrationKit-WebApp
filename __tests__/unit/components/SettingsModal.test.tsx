@@ -108,16 +108,11 @@ describe('SettingsModal', () => {
     expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual(DEFAULT_SETTINGS)
   })
 
-  it('resets settings back to defaults immediately', async () => {
+  it('persists reset defaults only after save', async () => {
     const user = userEvent.setup()
+    const stored = { stopOnFirstError: true, demoMode: true }
 
-    window.localStorage.setItem(
-      'app-settings:v1',
-      JSON.stringify({
-        stopOnFirstError: false,
-        demoMode: true,
-      })
-    )
+    window.localStorage.setItem('app-settings:v1', JSON.stringify(stored))
 
     render(
       <SettingsProvider>
@@ -127,8 +122,32 @@ describe('SettingsModal', () => {
 
     await user.click(screen.getByRole('button', { name: /reset to defaults/i }))
 
+    expect(screen.getByRole('switch', { name: /stop on first error/i })).not.toBeChecked()
+    expect(screen.getByRole('switch', { name: /demo mode/i })).not.toBeChecked()
+    expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual(stored)
+
+    await user.click(screen.getByRole('button', { name: /save changes/i }))
+
     await waitFor(() => {
       expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual(DEFAULT_SETTINGS)
     })
+  })
+
+  it('keeps stored settings when reset is followed by cancel', async () => {
+    const user = userEvent.setup()
+    const stored = { stopOnFirstError: true, demoMode: true }
+
+    window.localStorage.setItem('app-settings:v1', JSON.stringify(stored))
+
+    render(
+      <SettingsProvider>
+        <SettingsModal open onOpenChange={vi.fn()} />
+      </SettingsProvider>
+    )
+
+    await user.click(screen.getByRole('button', { name: /reset to defaults/i }))
+    await user.click(screen.getByRole('button', { name: /cancel/i }))
+
+    expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual(stored)
   })
 })
