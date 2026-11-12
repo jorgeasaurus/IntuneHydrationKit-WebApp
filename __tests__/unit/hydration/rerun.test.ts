@@ -33,8 +33,10 @@ import {
   TEMPLATE_UNAVAILABLE_MESSAGE,
   buildRerunTaskQueue,
   createRerunPlan,
+  getRerunAvailability,
   getRerunBlockReason,
   getResumeTasks,
+  getSavedRecordAction,
   getRetryTasks,
   type RerunSource,
 } from "@/lib/hydration/rerun";
@@ -95,6 +97,40 @@ describe("getRerunBlockReason", () => {
     ["no signed-in account", { homeAccountId: null, tenantId: null }],
   ])("blocks %s", (_label, active) => {
     expect(getRerunBlockReason(source(), active)).toMatch(/sign in/i);
+  });
+});
+
+describe("saved record handling", () => {
+  const active = { homeAccountId: "home-1", tenantId: "tenant-1" };
+  const checkpoint = { ...source(), tasks: [task("1", "pending")], activityLog: [], startTime: null, endTime: null, outcome: null, summary: null, fatalError: null, checkpointAt: new Date() } as unknown as Parameters<typeof getSavedRecordAction>[0];
+  const finished = { ...source(), tasks: [], activityLog: [], startTime: null, endTime: new Date(), outcome: "failed", summary: null, fatalError: "x" } as unknown as Parameters<typeof getSavedRecordAction>[0];
+
+  it("restores an interrupted run of the same account, and keeps one of another account without restoring it", () => {
+    expect(getSavedRecordAction(checkpoint, active, false)).toBe("restore");
+    expect(getSavedRecordAction(checkpoint, { ...active, tenantId: "tenant-2" }, false)).toBe("foreignInterrupted");
+    expect(getSavedRecordAction(checkpoint, { ...active, homeAccountId: "home-2" }, false)).toBe("foreignInterrupted");
+  });
+
+  it("ignores a checkpoint while its run is still in memory", () => {
+    expect(getSavedRecordAction(checkpoint, active, true)).toBe("ignore");
+  });
+
+  it("clears a completed run of another account, as before", () => {
+    expect(getSavedRecordAction(finished, active, false)).toBe("restore");
+    expect(getSavedRecordAction(finished, { ...active, tenantId: "tenant-2" }, false)).toBe("clear");
+  });
+
+  it("offers nothing while a run is active, with a reason", () => {
+    const availability = getRerunAvailability({
+      restoredRecord: finished,
+      liveRun: { configuration: null, tasks: [] },
+      phase: "running",
+      active,
+    });
+    expect(availability.disabledReason).toMatch(/A run is active/);
+    expect(
+      getRerunAvailability({ restoredRecord: null, liveRun: { configuration: null, tasks: [] }, phase: "running", active }).source,
+    ).toBeNull();
   });
 });
 

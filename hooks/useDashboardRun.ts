@@ -7,13 +7,23 @@ import { useHydrationExecution } from "@/hooks/useHydrationExecution";
 import { useWizardState } from "@/hooks/useWizardState";
 import {
   clearHydrationSession,
+  isExecutionCheckpoint,
   readExecutionRecord,
   writeExecutionRecord,
   type ExecutionRecord,
 } from "@/lib/hydration/executionRecord";
 import { getEstimatedTaskCount } from "@/lib/hydration/engine";
 import type { CloudEnvironment, ExecutionOutcome, HydrationSummary, HydrationTask, OperationMode, WizardState } from "@/types/hydration";
-import type { ExecutionState } from "@/lib/hydration/executionStateStore";
+import { getExecutionState, type ExecutionState } from "@/lib/hydration/executionStateStore";
+import { startRunCheckpoints } from "@/lib/hydration/runCheckpoint";
+import { downloadReport, generateJSONReport, generateReportFilename } from "@/lib/hydration/reporter";
+import { getCreatedObjectLinks } from "@/lib/utils/portalLinks";
+import {
+  createRerunPlan,
+  getRerunAvailability,
+  getSavedRecordAction,
+  type RerunKind,
+} from "@/lib/hydration/rerun";
 import type { ActivityMessage } from "@/lib/hydration/types";
 
 interface DashboardRun {
@@ -58,7 +68,32 @@ function getLiveDashboardRun(execution: ExecutionState, state: WizardState): Das
 }
 
 function getRestoredDashboardRun(record: ExecutionRecord): DashboardRun {
-  return { ...record, pausedMs: record.pausedMs ?? 0, pauseStartedAt: null };
+  return {
+    ...record,
+    // An interrupted run has no end time. Its last saved progress is the closest known time.
+    endTime: record.endTime ?? (isExecutionCheckpoint(record) ? record.checkpointAt : null),
+    pausedMs: record.pausedMs ?? 0,
+    pauseStartedAt: null,
+  };
+}
+
+const RUN_START_MESSAGES: Record<RerunKind, string> = {
+  retry: "Retry run started.",
+  resume: "Resumed run started.",
+  live: "Live run started.",
+};
+
+/** Download of the JSON report of a run, or undefined when the run has no report. */
+function createReportDownload(run: DashboardRun): (() => void) | undefined {
+  const { summary, outcome } = run;
+  if (!summary || !outcome || outcome === "failed") return undefined;
+  return () => {
+    const links = getCreatedObjectLinks(run.tasks, run.cloudEnvironment, run.isPreview);
+    downloadReport(
+      generateJSONReport(summary, run.tasks, outcome, run.isPreview, links),
+      generateReportFilename(run.operationMode, "json", run.isPreview),
+    );
+  };
 }
 
 function hasDifferentOwner(
@@ -77,6 +112,10 @@ export function useDashboardRun() {
   const hasStartedRef = useRef(false);
   const [restoredRecord, setRestoredRecord] = useState<ExecutionRecord | null>(null);
   const [hasCheckedRecord, setHasCheckedRecord] = useState(false);
+  /** True when an interrupted run of a different account or tenant is saved. Its details are not shown. */
+  const [hasForeignInterruptedRun, setHasForeignInterruptedRun] = useState(false);
+  /** Polite screen reader text for the start of a run that continues an earlier run. */
+  const [runStartMessage, setRunStartMessage] = useState("");
   const { instance, accounts } = useMsal();
   const activeAccount = instance.getActiveAccount() ?? accounts[0] ?? null;
   const activeHomeAccountId = activeAccount?.homeAccountId ?? null;
@@ -95,27 +134,30 @@ export function useDashboardRun() {
     fatalError,
     activityLog,
     startExecution,
+    startRerun,
     reset,
   } = execution;
+
+  // Save the progress of the active run, so that an interrupted run can be resumed.
+  useEffect(() => startRunCheckpoints({ storage: sessionStorage, eventTarget: window }), []);
 
   useEffect(() => {
     if (!activeHomeAccountId || !activeTenantId) return;
     const record = readExecutionRecord(sessionStorage);
-    if (
-      record &&
-      record.homeAccountId === activeHomeAccountId &&
-      record.tenantId === activeTenantId
-    ) {
-      setRestoredRecord(record);
-    } else if (record) {
-      clearHydrationSession(sessionStorage);
-    }
+    const action = getSavedRecordAction(
+      record,
+      { homeAccountId: activeHomeAccountId, tenantId: activeTenantId },
+      getExecutionState().phase !== "idle",
+    );
+    setHasForeignInterruptedRun(action === "foreignInterrupted");
+    if (action === "restore") setRestoredRecord(record);
+    if (action === "clear") clearHydrationSession(sessionStorage);
     setHasCheckedRecord(true);
   }, [activeHomeAccountId, activeTenantId]);
 
   useEffect(() => {
     if (!hasCheckedRecord) return;
-    if (restoredRecord) return;
+    if (restoredRecord || hasForeignInterruptedRun) return;
     if (phase !== "idle") return;
     if (!state.confirmed) {
       // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- wizard confirmation lives in client context
@@ -127,7 +169,7 @@ export function useDashboardRun() {
     startExecution().catch(() => {
       // The execution hook records and displays the actionable error.
     });
-  }, [hasCheckedRecord, restoredRecord, router, phase, startExecution, state.confirmed]);
+  }, [hasCheckedRecord, hasForeignInterruptedRun, restoredRecord, router, phase, startExecution, state.confirmed]);
 
   useEffect(() => {
     if (!isCompleted || !outcome || !endTime || !configuration) return;
@@ -139,6 +181,8 @@ export function useDashboardRun() {
       operationMode: configuration.operationMode,
       isPreview: configuration.isPreview,
       selectedObjectCount: configuration.selectedObjectCount,
+      scope: configuration.scope,
+      licenses: configuration.licenses,
       tasks,
       activityLog,
       startTime,
@@ -207,12 +251,41 @@ export function useDashboardRun() {
     URL.revokeObjectURL(url);
   }
 
+  const handleDownloadReport = createReportDownload(displayRun);
+
   function handleStartNewHydration(): void {
     clearHydrationSession(sessionStorage);
     reset();
     setRestoredRecord(null);
+    setHasForeignInterruptedRun(false);
     resetWizard();
     router.push("/wizard");
+  }
+
+  const {
+    source: rerunSource,
+    disabledReason: rerunDisabledReason,
+    isInterrupted,
+  } = getRerunAvailability({
+    restoredRecord,
+    liveRun: { configuration, tasks },
+    phase,
+    active: { homeAccountId: activeHomeAccountId, tenantId: activeTenantId },
+  });
+
+  /** Start a new run that continues from the displayed run. */
+  function handleRerun(kind: RerunKind): void {
+    if (!rerunSource || rerunDisabledReason) return;
+    if (kind === "resume" && !isInterrupted) return;
+    if (kind === "live" && !rerunSource.isPreview) return;
+    const plan = createRerunPlan(kind, rerunSource);
+    // The wizard must not start its own run after the displayed record is removed.
+    hasStartedRef.current = true;
+    setRestoredRecord(null);
+    setRunStartMessage(`${RUN_START_MESSAGES[kind]} ${plan.configuration.selectedObjectCount} items in scope.`);
+    startRerun(plan).catch(() => {
+      // The execution hook records and displays the actionable error.
+    });
   }
 
   return {
@@ -222,7 +295,14 @@ export function useDashboardRun() {
     selectedObjectCount,
     restoredRecord,
     ownerMismatch,
+    isInterrupted,
+    hasForeignInterruptedRun,
+    rerunSource,
+    rerunDisabledReason,
+    runStartMessage,
+    handleRerun,
     handleDownloadLog,
+    handleDownloadReport,
     handleStartNewHydration,
   };
 }

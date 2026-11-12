@@ -7,7 +7,8 @@
  * prefetch, the same existence checks, and the same delete resolver and safety checks.
  */
 
-import type { ExecutionRunConfiguration } from "@/lib/hydration/executionStateStore";
+import { isExecutionCheckpoint, type ExecutionRecord } from "@/lib/hydration/executionRecord";
+import type { ExecutionRunConfiguration, ExecutionState } from "@/lib/hydration/executionStateStore";
 import type { RunScope } from "@/lib/hydration/runScope";
 import { buildTaskQueueAsync, getEstimatedTaskCount } from "@/lib/hydration/engine";
 import type { ActivityMessage } from "@/lib/hydration/types";
@@ -79,6 +80,68 @@ export function getRerunBlockReason(
 /** The scope that "Run this for real" uses, or null when the preview cannot run for real. */
 export function getLiveRunScope(source: RerunSource): RunScope | null {
   return source.isPreview && source.scope ? source.scope : null;
+}
+
+/** Number of tasks (retry, resume) or estimated objects (live) of the new run. */
+export function getRerunObjectCount(kind: RerunKind, source: RerunSource): number {
+  if (kind === "retry") return getRetryTasks(source.tasks).length;
+  if (kind === "resume") return getResumeTasks(source.tasks).length;
+  const scope = getLiveRunScope(source);
+  return scope ? getEstimatedTaskCount(scope.selectedTargets, scope.categorySelections) : 0;
+}
+
+/**
+ * What the dashboard does with the saved record when it loads.
+ * - "restore": show the record of the signed-in account (a completed or an interrupted run).
+ * - "foreignInterrupted": keep an interrupted run of another account, without its details.
+ * - "ignore": a checkpoint of the run that is still in memory; the live state is shown.
+ * - "clear": remove a completed run of another account.
+ */
+export function getSavedRecordAction(
+  record: ExecutionRecord | null,
+  active: { homeAccountId: string; tenantId: string },
+  runInMemory: boolean,
+): "restore" | "foreignInterrupted" | "ignore" | "clear" | "none" {
+  if (!record) return "none";
+  const owned = record.homeAccountId === active.homeAccountId && record.tenantId === active.tenantId;
+  if (isExecutionCheckpoint(record)) {
+    if (runInMemory) return "ignore";
+    return owned ? "restore" : "foreignInterrupted";
+  }
+  return owned ? "restore" : "clear";
+}
+
+const ACTIVE_RUN_REASON = "A run is active. Wait until it completes before you start another run.";
+
+/**
+ * The run that a new run can continue from (the restored record, or the completed live run),
+ * and the reason why no new run can start now.
+ */
+export function getRerunAvailability({
+  restoredRecord,
+  liveRun,
+  phase,
+  active,
+}: {
+  restoredRecord: ExecutionRecord | null;
+  liveRun: { configuration: ExecutionRunConfiguration | null; tasks: HydrationTask[] };
+  phase: ExecutionState["phase"];
+  active: ActiveAccount;
+}): { source: RerunSource | null; disabledReason: string | null; isInterrupted: boolean } {
+  const source: RerunSource | null =
+    restoredRecord ??
+    (phase === "completed" && liveRun.configuration ? { ...liveRun.configuration, tasks: liveRun.tasks } : null);
+  const isRunActive = phase !== "idle" && phase !== "completed";
+  const disabledReason = !source
+    ? null
+    : isRunActive
+      ? ACTIVE_RUN_REASON
+      : getRerunBlockReason(source, active);
+  return {
+    source,
+    disabledReason,
+    isInterrupted: Boolean(restoredRecord && isExecutionCheckpoint(restoredRecord)),
+  };
 }
 
 /** Create the plan of a new run that continues from the earlier run. */

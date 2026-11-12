@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { AlertTriangle, RotateCcw, Settings2 } from "lucide-react";
 import { AppNavigation } from "@/components/AppNavigation";
 import { SensitiveData } from "@/components/SensitiveData";
@@ -55,14 +55,22 @@ interface DashboardRunViewProps {
   onCancel?: () => void;
   onDownloadLog: () => void;
   onStartNewHydration: () => void;
+  /** True when the run stopped before a terminal state (for example after a refresh). */
+  isInterrupted?: boolean;
+  /** Notice that shows above the run, for example for an interrupted run. */
+  notice?: ReactNode;
+  /** Actions that continue from a completed run. */
+  rerunActions?: ReactNode;
 }
 
 function getOperationText(
   operationMode: OperationMode,
   isPreview: boolean,
   isCompleted: boolean,
+  isInterrupted: boolean,
 ): string {
   const operation = operationMode === "delete" ? "Delete" : "Create";
+  if (isInterrupted) return `${operation} ${isPreview ? "preview" : "run"} interrupted`;
   if (isPreview) {
     return isCompleted
       ? `${operation} preview completed`
@@ -96,6 +104,9 @@ export function DashboardRunView({
   onCancel,
   onDownloadLog,
   onStartNewHydration,
+  isInterrupted = false,
+  notice,
+  rerunActions,
 }: DashboardRunViewProps): React.JSX.Element {
   const isBuildingQueue = phase === "building";
   const isPaused = phase === "paused";
@@ -123,6 +134,7 @@ export function DashboardRunView({
     <div className="relative z-10 min-h-screen">
       <RunNavigation
         isCompleted={isCompleted}
+        isInterrupted={isInterrupted}
         operationMode={operationMode}
         isPreview={isPreview}
         tenantName={tenantName}
@@ -139,9 +151,11 @@ export function DashboardRunView({
           totalTaskCount={tasks.length}
           successTaskCount={successTaskCount}
           isBuildingQueue={isBuildingQueue}
-          isCompleted={isCompleted}
+          isCompleted={isCompleted && !isInterrupted}
           outcome={outcome}
         />
+
+        {notice}
 
         <RunStatusAnnouncer
           tasks={tasks}
@@ -150,15 +164,17 @@ export function DashboardRunView({
           announceOutcome={Boolean(summary) && outcome !== "failed"}
         />
 
-        <RunNotices
-          isCompleted={isCompleted}
-          summary={summary}
-          fatalError={fatalError}
-          isPreview={isPreview}
-          operationMode={operationMode}
-          isBuildingQueue={isBuildingQueue}
-          taskCount={tasks.length}
-        />
+        {!isInterrupted && (
+          <RunNotices
+            isCompleted={isCompleted}
+            summary={summary}
+            fatalError={fatalError}
+            isPreview={isPreview}
+            operationMode={operationMode}
+            isBuildingQueue={isBuildingQueue}
+            taskCount={tasks.length}
+          />
+        )}
 
         {!isCompleted && tasks.length > 0 && (
           <ProgressBar
@@ -168,7 +184,7 @@ export function DashboardRunView({
           />
         )}
 
-        {controlsStartTime && (
+        {controlsStartTime && !isInterrupted && (
           <ExecutionControls
             tasks={tasks}
             isPaused={isPaused}
@@ -191,6 +207,8 @@ export function DashboardRunView({
 
         <ActivityLog messages={activityLog} />
 
+        {isCompleted && rerunActions}
+
         <RunResults
           isCompleted={isCompleted}
           summary={summary}
@@ -207,6 +225,7 @@ export function DashboardRunView({
 
 function RunNavigation({
   isCompleted,
+  isInterrupted,
   operationMode,
   isPreview,
   tenantName,
@@ -219,7 +238,7 @@ function RunNavigation({
   | "tenantName"
   | "tenantId"
   | "onStartNewHydration"
-> & { isCompleted: boolean }): React.JSX.Element {
+> & { isCompleted: boolean; isInterrupted: boolean }): React.JSX.Element {
   const [showSettings, setShowSettings] = useState(false);
 
   return (
@@ -234,7 +253,7 @@ function RunNavigation({
       title="Hydration Dashboard"
       description={
         <>
-          {getOperationText(operationMode, isPreview, isCompleted)} in{" "}
+          {getOperationText(operationMode, isPreview, isCompleted, isInterrupted)} in{" "}
           <SensitiveData
             value={tenantName || tenantId}
             fallback="the selected tenant"
