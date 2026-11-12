@@ -208,7 +208,7 @@ describe("resolveDeleteTarget", () => {
   });
 
   it("fails for a category without a delete resolver", async () => {
-    const resolution = await resolveDeleteTarget(createTask("notification", "[IHD] Notice"), createContext());
+    const resolution = await resolveDeleteTarget(createTask("win32Apps", "[IHD] App"), createContext());
 
     expect(resolution).toMatchObject({ action: "fail" });
   });

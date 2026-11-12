@@ -4,7 +4,9 @@
 
 import { PrerequisiteCheckResult } from "./prerequisites";
 
-export type CloudEnvironment = "global";
+export const CLOUD_ENVIRONMENTS = ["global"] as const;
+
+export type CloudEnvironment = (typeof CLOUD_ENVIRONMENTS)[number];
 
 export const OPERATION_MODES = ["create", "delete"] as const;
 
@@ -87,6 +89,13 @@ export interface TaskUpdateEvidence {
   differences: string[];
 }
 
+/** The object that a successful live create made. The admin portal link uses it. */
+export interface TaskCreatedObject {
+  id: string;
+  /** OpenIntuneBaseline policy type (`_oibPolicyType`). Baseline tasks only. */
+  policyType?: string;
+}
+
 export interface RunProvenance {
   runId: string;
   appVersion: string;
@@ -103,6 +112,7 @@ interface HydrationTaskBase {
   match?: TaskMatchEvidence;
   drift?: TaskDriftEvidence;
   update?: TaskUpdateEvidence;
+  createdObject?: TaskCreatedObject;
   error?: string;
   warning?: string;
   startTime?: Date;
@@ -263,6 +273,7 @@ export interface CategorySelections {
   appProtection?: CategorySelection;
   win32Apps?: CategorySelection;
   enrollment?: CategorySelection;
+  notification?: CategorySelection;
   baseline?: BaselineSelection;
   cisBaseline?: CategorySelection;
 }

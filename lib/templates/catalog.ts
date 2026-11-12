@@ -15,6 +15,7 @@ import {
   CISBaselineManifestFile,
   OIBManifestFile,
 } from "@/lib/templates/loader";
+import { IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
 import { getWin32AppTemplates } from "@/templates/win32Apps";
 import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { TaskCategory } from "@/types/hydration";
@@ -54,6 +55,8 @@ export type TemplateDocumentationPayloadSource =
 
 export interface TemplateDocumentationItem {
   id: string;
+  /** URL-safe, unique id of the detail page at /templates/{slug}. */
+  slug: string;
   category: TaskCategory;
   categoryLabel: string;
   displayName: string;
@@ -64,6 +67,9 @@ export interface TemplateDocumentationItem {
   sourcePath?: string;
   payloadSource: TemplateDocumentationPayloadSource;
 }
+
+/** A catalog item before the catalog assigns its unique slug. */
+type TemplateDocumentationItemDraft = Omit<TemplateDocumentationItem, "slug">;
 
 export interface TemplateDocumentationCatalog {
   items: TemplateDocumentationItem[];
@@ -207,7 +213,7 @@ function createItemId(category: TaskCategory, seed: string): string {
   return `${category}:${seed}`;
 }
 
-function sortItems(items: TemplateDocumentationItem[]): TemplateDocumentationItem[] {
+function sortItems(items: TemplateDocumentationItemDraft[]): TemplateDocumentationItemDraft[] {
   return items.toSorted((left, right) => {
     const categoryDiff =
       TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.indexOf(left.category) -
@@ -336,7 +342,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     (oibManifest?.platforms ?? []).map((platform) => [platform.id, platform.name])
   );
 
-  const groupItems: TemplateDocumentationItem[] = [
+  const groupItems: TemplateDocumentationItemDraft[] = [
     ...dynamicGroups.map((group) => ({
       id: createItemId("groups", group.displayName),
       category: "groups" as const,
@@ -367,7 +373,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     })),
   ];
 
-  const filterItems: TemplateDocumentationItem[] = filters.map((filter) => ({
+  const filterItems: TemplateDocumentationItemDraft[] = filters.map((filter) => ({
     id: createItemId("filters", filter.displayName),
     category: "filters",
     categoryLabel: CATEGORY_METADATA.filters.label,
@@ -383,7 +389,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     payloadSource: inlinePayloadSource(filter),
   }));
 
-  const complianceItems: TemplateDocumentationItem[] = compliancePolicies.map((policy) => ({
+  const complianceItems: TemplateDocumentationItemDraft[] = compliancePolicies.map((policy) => ({
     id: createItemId("compliance", policy.displayName),
     category: "compliance",
     categoryLabel: CATEGORY_METADATA.compliance.label,
@@ -397,7 +403,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     payloadSource: inlinePayloadSource(policy),
   }));
 
-  const conditionalAccessItems: TemplateDocumentationItem[] =
+  const conditionalAccessItems: TemplateDocumentationItemDraft[] =
     conditionalAccessPolicies.map((policy) => ({
       id: createItemId("conditionalAccess", policy.displayName),
       category: "conditionalAccess",
@@ -411,7 +417,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       payloadSource: inlinePayloadSource(policy),
     }));
 
-  const appProtectionItems: TemplateDocumentationItem[] =
+  const appProtectionItems: TemplateDocumentationItemDraft[] =
     appProtectionPolicies.map((policy) => ({
       id: createItemId("appProtection", policy.displayName),
       category: "appProtection",
@@ -426,7 +432,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       payloadSource: inlinePayloadSource(policy),
     }));
 
-  const enrollmentItems: TemplateDocumentationItem[] = (
+  const enrollmentItems: TemplateDocumentationItemDraft[] = (
     enrollmentProfiles as Array<Record<string, unknown>>
   ).map((profile) => {
     const displayName =
@@ -449,7 +455,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     };
   });
 
-  const notificationItems: TemplateDocumentationItem[] = (
+  const notificationItems: TemplateDocumentationItemDraft[] = (
     notificationTemplates as Array<Record<string, unknown>>
   ).map((template) => {
     const displayName =
@@ -466,7 +472,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     };
   });
 
-  const win32AppItems: TemplateDocumentationItem[] = getWin32AppTemplates().map((app) => ({
+  const win32AppItems: TemplateDocumentationItemDraft[] = getWin32AppTemplates().map((app) => ({
     id: createItemId("win32Apps", app.id),
     category: "win32Apps",
     categoryLabel: CATEGORY_METADATA.win32Apps.label,
@@ -482,7 +488,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     payloadSource: win32PayloadSource(app),
   }));
 
-  const baselineItems: TemplateDocumentationItem[] = (oibManifest?.files ?? []).map((file) => ({
+  const baselineItems: TemplateDocumentationItemDraft[] = (oibManifest?.files ?? []).map((file) => ({
     id: createItemId("baseline", file.path),
     category: "baseline",
     categoryLabel: CATEGORY_METADATA.baseline.label,
@@ -503,7 +509,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ])
   );
 
-  const cisItems: TemplateDocumentationItem[] = (cisManifest?.files ?? []).map((file) => ({
+  const cisItems: TemplateDocumentationItemDraft[] = (cisManifest?.files ?? []).map((file) => ({
     id: createItemId("cisBaseline", file.path),
     category: "cisBaseline",
     categoryLabel: CATEGORY_METADATA.cisBaseline.label,
@@ -518,7 +524,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     payloadSource: cisPayloadSource(file),
   }));
 
-  const items = sortItems([
+  const items = assignTemplateSlugs(sortItems([
     ...groupItems,
     ...filterItems,
     ...complianceItems,
@@ -529,7 +535,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ...notificationItems,
     ...baselineItems,
     ...cisItems,
-  ]);
+  ]));
 
   const categories = TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.map((category) =>
     getCategorySummary(
@@ -576,6 +582,100 @@ export async function loadTemplateDocumentationPayload(
     }
     default:
       return null;
+  }
+}
+
+function toSlugPart(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+/**
+ * Returns the base slug for a catalog item. The slug comes from the item id
+ * (category and display name or manifest path). It removes the "[IHD] " import
+ * prefix and the ".json" extension, so the URL stays short and readable.
+ */
+export function getTemplateBaseSlug(item: Pick<TemplateDocumentationItem, "id" | "category">): string {
+  const seed = item.id
+    .slice(item.category.length + 1)
+    .replace(IMPORT_PREFIX, "")
+    .replace(/\.json$/i, "");
+  const category = item.category.replace(/([a-z0-9])([A-Z])/g, "$1-$2");
+
+  return `${toSlugPart(category)}--${toSlugPart(seed)}`;
+}
+
+/** Returns a short, stable hash of a value (32-bit FNV-1a in base 36). */
+function hashSlugSeed(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
+
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * Gives each item its detail page slug. Items that share a base slug (for
+ * example, file names that differ only in spaces) all get a hash of their id
+ * added, so no item depends on the order of the others.
+ */
+function assignTemplateSlugs(items: TemplateDocumentationItemDraft[]): TemplateDocumentationItem[] {
+  const baseSlugs = items.map(getTemplateBaseSlug);
+  const counts = new Map<string, number>();
+  baseSlugs.forEach((slug) => counts.set(slug, (counts.get(slug) ?? 0) + 1));
+
+  return items.map((item, index) => {
+    const baseSlug = baseSlugs[index];
+    const slug =
+      (counts.get(baseSlug) ?? 0) > 1 ? `${baseSlug}-${hashSlugSeed(item.id)}` : baseSlug;
+    return { ...item, slug };
+  });
+}
+
+/** Returns the catalog item that has the slug, or undefined. */
+export function findTemplateBySlug(
+  items: readonly TemplateDocumentationItem[],
+  slug: string
+): TemplateDocumentationItem | undefined {
+  return items.find((item) => item.slug === slug);
+}
+
+/** Returns the site path of the detail page for a catalog item. */
+export function getTemplatePath(item: Pick<TemplateDocumentationItem, "slug">): string {
+  return `/templates/${item.slug}`;
+}
+
+/** Returns the origin of a catalog item: OpenIntuneBaseline, CIS, or the kit itself. */
+export function getTemplateSourceLabel(item: Pick<TemplateDocumentationItem, "payloadSource">): string {
+  switch (item.payloadSource.kind) {
+    case "oib":
+      return "OpenIntuneBaseline";
+    case "cis":
+      return "CIS Intune Benchmarks";
+    default:
+      return "Intune Hydration Kit";
+  }
+}
+
+/** Returns the path of the bundled file in the repository, when the catalog knows it. */
+export function getTemplateFilePath(
+  item: Pick<TemplateDocumentationItem, "payloadSource" | "sourcePath">
+): string | undefined {
+  switch (item.payloadSource.kind) {
+    case "oib":
+      return `public/IntuneTemplates/OpenIntuneBaseline/${item.payloadSource.file.path}`;
+    case "cis":
+      return `public/CISIntuneBaselines/${item.payloadSource.file.path}`;
+    case "win32":
+      return `public${item.payloadSource.template.packageUrl}`;
+    default:
+      return item.sourcePath;
   }
 }
 

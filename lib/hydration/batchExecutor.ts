@@ -69,6 +69,7 @@ import {
 } from "./conditionalAccessBatch";
 import { DeviceGroup, DeviceFilter } from "@/types/graph";
 import { markTaskSkipped } from "./taskTransitions";
+import { recordCreatedObject } from "./createdObject";
 import { getTaskCategoryLabel } from "./categoryLabels";
 
 function markPreparedTasksCancelled(
@@ -931,6 +932,7 @@ async function executeBatchGroup(
           const createdId = (response.body as Record<string, unknown>)?.id as string | undefined;
           task.status = "success";
           task.endTime = new Date();
+          recordCreatedObject(task, createdId, context);
           results.push({ task, success: true, skipped: false, createdId });
           context.onTaskComplete?.(task);
 
@@ -1125,6 +1127,7 @@ async function resolveUnknownCreateOutcomes(
         console.log(`[BatchExecutor] "${item.task.itemName}" was created despite the error (ID: ${object.id})`);
         item.task.status = "success";
         item.task.endTime = new Date();
+        recordCreatedObject(item.task, object.id, context);
         results.push({ task: item.task, success: true, skipped: false, createdId: object.id });
         context.onTaskComplete?.(item.task);
         updateCacheAfterCreate(item, { id: item.request.id, status: 201, body: object }, context);

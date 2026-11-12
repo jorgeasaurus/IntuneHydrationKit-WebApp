@@ -26,6 +26,7 @@ vi.mock('@/lib/templates/catalog', () => ({
     loadTemplateDocumentationCatalog(...args),
   loadTemplateDocumentationPayload: (...args: unknown[]) =>
     loadTemplateDocumentationPayload(...args),
+  getTemplatePath: (item: { slug: string }) => `/templates/${item.slug}`,
   getPlatformFilterOrder: (platforms: Array<string | undefined>) =>
     Array.from(new Set(platforms.filter(Boolean))),
   TEMPLATE_DOCUMENTATION_CATEGORY_ORDER: [

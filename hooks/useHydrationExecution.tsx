@@ -11,7 +11,6 @@ import { getBatchConfig } from "@/lib/config/batchConfig";
 import { createRunTelemetry } from "@/lib/hydration/runTelemetry";
 import { createRunProvenance } from "@/lib/hydration/runProvenance";
 import { useSettings } from "./useSettings";
-import { recordCreatedObjects } from "./useCreatedObjectLinks";
 import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { markTaskSkipped } from "@/lib/hydration/taskTransitions";
 import {
@@ -75,6 +74,7 @@ export function useHydrationExecution() {
       tenantId: tenantConfig.tenantId,
       homeAccountId: tenantConfig.homeAccountId,
       tenantName: tenantConfig.tenantName,
+      cloudEnvironment: tenantConfig.cloudEnvironment,
       operationMode,
       isPreview: state.isPreview,
       selectedObjectCount: getEstimatedTaskCount(state.selectedTargets, state.categorySelections),
@@ -233,8 +233,7 @@ export function useHydrationExecution() {
       };
 
       // Execute tasks with pause/cancel support
-      const results = await executeTasks(tasks, context);
-      recordCreatedObjects(runId, tenantConfig.cloudEnvironment, results);
+      await executeTasks(tasks, context);
       if (
         shouldCancelExecution(runId) &&
         tasks.some((task) => task.status === "pending" || task.status === "running")

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getPortalLink } from '@/lib/utils/portalLinks'
-import type { CloudEnvironment, TaskCategory } from '@/types/hydration'
+import { getCreatedObjectLinks, getPortalLink } from '@/lib/utils/portalLinks'
+import type { CloudEnvironment, HydrationTask, TaskCategory } from '@/types/hydration'
 
 const base = { cloud: 'global' as const, objectId: 'abc-123', objectName: 'All Windows Devices' }
 
@@ -64,5 +64,33 @@ describe('getPortalLink', () => {
 
   it('encodes the object ID in the route', () => {
     expect(getPortalLink({ ...base, category: 'groups', objectId: 'a/b#c' })?.href).toMatch(/groupId\/a%2Fb%23c$/)
+  })
+})
+
+describe('getCreatedObjectLinks', () => {
+  const created: HydrationTask = {
+    id: 'group-1', category: 'groups', operation: 'create', itemName: 'All Windows Devices', status: 'success',
+    createdObject: { id: 'group-id' },
+  }
+
+  it('builds links from the created object on each task', () => {
+    const baseline: HydrationTask = {
+      id: 'baseline-1', category: 'baseline', operation: 'create', itemName: 'Win - OIB - Defender', status: 'success',
+      createdObject: { id: 'policy-id', policyType: 'SettingsCatalog' },
+    }
+    const links = getCreatedObjectLinks([created, baseline], 'global', false)
+    expect(links.get('group-1')?.href).toMatch(/groupId\/group-id$/)
+    expect(links.get('baseline-1')).toMatchObject({ target: 'list', label: 'Open Configuration profiles in Intune' })
+  })
+
+  it('builds no link for a preview run, a run without a cloud, or a task without a successful create', () => {
+    expect(getCreatedObjectLinks([created], 'global', true).size).toBe(0)
+    expect(getCreatedObjectLinks([created], undefined, false).size).toBe(0)
+    const others: HydrationTask[] = [
+      { ...created, id: 'running', status: 'running' },
+      { ...created, id: 'delete', operation: 'delete' },
+      { id: 'plain', category: 'groups', operation: 'create', itemName: 'Plain', status: 'success' },
+    ]
+    expect(getCreatedObjectLinks(others, 'global', false).size).toBe(0)
   })
 })
