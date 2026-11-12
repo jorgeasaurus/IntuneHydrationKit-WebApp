@@ -98,8 +98,28 @@ export async function getServerTemplateBySlug(
   return findTemplateBySlug(catalog.items, slug);
 }
 
-/** Loads the import-ready payload of a catalog item on the server. */
-export function loadServerTemplatePayload(item: TemplateDocumentationItem): Promise<unknown> {
+export type ServerTemplatePayloadResult =
+  | { status: "ready"; payload: unknown }
+  | { status: "error"; error: string };
+
+/**
+ * Loads the import-ready payload of a catalog item on the server. A missing or
+ * unreadable file gives an error result instead of an exception. OIB and CIS
+ * loaders report a failure as null; the Win32 loader throws.
+ */
+export async function loadServerTemplatePayload(
+  item: TemplateDocumentationItem
+): Promise<ServerTemplatePayloadResult> {
   installPublicFileFetch();
-  return loadTemplateDocumentationPayload(item);
+  try {
+    const payload = await loadTemplateDocumentationPayload(item);
+    return payload === null || payload === undefined
+      ? { status: "error", error: `The payload file for "${item.displayName}" could not be read.` }
+      : { status: "ready", payload };
+  } catch (error) {
+    return {
+      status: "error",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
 }

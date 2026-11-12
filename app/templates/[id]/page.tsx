@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PHASE_PRODUCTION_BUILD } from "next/constants";
 import { notFound } from "next/navigation";
 import { TemplateDetailPage } from "@/components/templates/TemplateDetailPage";
 import {
@@ -38,6 +39,18 @@ export default async function TemplatePage({ params }: TemplatePageProps) {
     notFound();
   }
 
-  const payload = await loadServerTemplatePayload(item);
-  return <TemplateDetailPage item={item} payload={payload} />;
+  const result = await loadServerTemplatePayload(item);
+  if (result.status === "error") {
+    // Every payload is a bundled file. At build time a missing file is a packaging
+    // error, so the build stops. In other renders (for example `next dev`), the page
+    // shows its "could not load" state instead of an error page.
+    if (process.env.NEXT_PHASE === PHASE_PRODUCTION_BUILD) {
+      throw new Error(`Template payload for ${item.slug} did not load: ${result.error}`);
+    }
+
+    console.error(`[templates] Payload for ${item.slug} did not load: ${result.error}`);
+    return <TemplateDetailPage item={item} payload={null} />;
+  }
+
+  return <TemplateDetailPage item={item} payload={result.payload} />;
 }
