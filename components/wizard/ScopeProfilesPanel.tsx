@@ -48,6 +48,7 @@ export function ScopeProfilesPanel({ model }: { model: TargetSelectionViewModel 
     setStatus(`Applying profile "${profile.name}"…`);
     try {
       const dropped = await model.profiles.applySelection(profile.selection);
+      if (dropped === null) return;
       setApplied({ name: profile.name, dropped });
       setStatus(dropped.length === 0
         ? `Applied profile "${profile.name}". Review the selection, then continue.`

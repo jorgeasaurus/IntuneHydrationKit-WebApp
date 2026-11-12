@@ -6,7 +6,7 @@ import { TargetSelectionView } from '@/components/wizard/TargetSelectionView'
 import { useTargetSelectionController } from '@/components/wizard/useTargetSelectionController'
 import { SCOPE_PROFILES_STORAGE_KEY } from '@/lib/storageKeys'
 import { addProfile, serializeProfilesExport, writeProfiles } from '@/lib/profiles/scopeProfiles'
-import type { OIBManifest } from '@/lib/templates/loader'
+import type { CISBaselineManifest, OIBManifest } from '@/lib/templates/loader'
 import type { WizardState } from '@/types/hydration'
 
 const setSelectedTargets = vi.fn()
@@ -21,6 +21,7 @@ const fetchOIBManifestMock = vi.fn()
 const fetchDynamicGroupsMock = vi.fn()
 const fetchStaticGroupsMock = vi.fn()
 const fetchFiltersMock = vi.fn()
+const fetchNotificationTemplatesMock = vi.fn()
 const fetchCISBaselineManifestMock = vi.fn()
 
 vi.mock('@/hooks/useWizardState', () => ({
@@ -35,6 +36,7 @@ vi.mock('@/lib/templates/loader', async () => {
     fetchDynamicGroups: (...args: unknown[]) => fetchDynamicGroupsMock(...args),
     fetchStaticGroups: (...args: unknown[]) => fetchStaticGroupsMock(...args),
     fetchFilters: (...args: unknown[]) => fetchFiltersMock(...args),
+    fetchNotificationTemplates: (...args: unknown[]) => fetchNotificationTemplatesMock(...args),
     fetchCISBaselineManifest: (...args: unknown[]) => fetchCISBaselineManifestMock(...args),
   }
 })
@@ -54,6 +56,18 @@ const OIB_MANIFEST = {
   platforms: [{ id: 'WINDOWS', name: 'Windows', count: 1 }],
   files: [{ path: 'windows/policy-1.json', platform: 'WINDOWS', policyType: 'Settings Catalog', displayName: 'Windows Baseline' }],
 } as unknown as OIBManifest
+
+const CIS_MANIFEST = {
+  totalFiles: 1,
+  categories: [{ id: 'cis-windows-11', folder: 'Windows 11 Benchmarks', name: 'Windows 11 Benchmarks', description: '', count: 1 }],
+  files: [{ path: 'cis/windows/policy-1.json', category: 'Windows 11 Benchmarks', subcategory: 'Windows', displayName: 'Windows CIS' }],
+} as unknown as CISBaselineManifest
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((done) => { resolve = done })
+  return { promise, resolve }
+}
 
 function renderWithState(overrides: Partial<WizardState> = {}) {
   useWizardStateMock.mockReturnValue({
@@ -94,6 +108,76 @@ describe('ScopeProfilesPanel', () => {
     fetchFiltersMock.mockResolvedValue([{ displayName: 'Windows Filter', description: 'Windows', platform: 'Windows', rule: '' }])
     fetchOIBManifestMock.mockResolvedValue(OIB_MANIFEST)
     fetchCISBaselineManifestMock.mockResolvedValue(null)
+    fetchNotificationTemplatesMock.mockResolvedValue([{ displayName: 'First Warning', localizedMessages: [] }])
+  })
+
+  it('saves and applies notification templates like any other category', async () => {
+    const user = userEvent.setup()
+    writeProfiles(
+      localStorage,
+      addProfile([], 'Notices', {
+        targets: ['notification'],
+        items: { notification: ['First Warning', 'Retired Warning'] },
+      }),
+    )
+    renderWithState()
+
+    await user.click(screen.getByRole('button', { name: 'Apply profile Notices' }))
+    const dropped = await screen.findByRole('list', { name: 'Profile items not applied' })
+    expect(within(dropped).getByText('Notification Templates: Retired Warning')).toBeInTheDocument()
+    expect(screen.getByLabelText('Notification Templates')).toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    expect(setCategorySelections).toHaveBeenCalledWith({ notification: { selectedItems: ['First Warning'] } })
+
+    await user.click(screen.getByRole('button', { name: 'Save selection as profile' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Save selection as profile' })
+    await user.type(within(dialog).getByLabelText('Profile name'), 'Notices again')
+    await user.click(within(dialog).getByRole('button', { name: 'Save profile' }))
+    const stored = JSON.parse(localStorage.getItem(SCOPE_PROFILES_STORAGE_KEY) ?? '{}')
+    expect(stored.profiles[1].selection).toEqual({ targets: ['notification'], items: { notification: ['First Warning'] } })
+  })
+
+  it('waits for a CIS catalog load that is already running', async () => {
+    const user = userEvent.setup()
+    const cisLoad = deferred<CISBaselineManifest | null>()
+    fetchCISBaselineManifestMock.mockReturnValue(cisLoad.promise)
+    writeProfiles(localStorage, addProfile([], 'CIS', { targets: ['cisBaseline'], items: { cisBaseline: ['cis/windows/policy-1.json'] } }))
+    renderWithState()
+
+    // Selecting the category starts the CIS catalog load.
+    await user.click(screen.getByLabelText('CIS Intune Baselines'))
+    await user.click(screen.getByRole('button', { name: 'Apply profile CIS' }))
+    cisLoad.resolve(CIS_MANIFEST)
+
+    expect(await screen.findByText(/Applied profile "CIS"\. Review the selection/)).toBeInTheDocument()
+    expect(screen.queryByText(/cannot load/)).not.toBeInTheDocument()
+    expect(fetchCISBaselineManifestMock).toHaveBeenCalledTimes(1)
+  })
+
+  it('keeps the applied scope when a category load that started earlier finishes later', async () => {
+    const user = userEvent.setup()
+    const lateLoad = deferred<unknown[]>()
+    const groups = [
+      { displayName: 'Windows Devices', description: 'Windows', membershipRule: 'rule' },
+      { displayName: 'Mac Devices', description: 'macOS', membershipRule: 'rule' },
+    ]
+    fetchDynamicGroupsMock.mockReturnValueOnce(lateLoad.promise).mockResolvedValue(groups)
+    writeProfiles(localStorage, addProfile([], 'Windows only', { targets: ['groups'], items: { groups: ['Windows Devices'] } }))
+    renderWithState()
+
+    // Selecting the category starts a load that selects every group when it finishes.
+    await user.click(screen.getByLabelText('Entra Groups'))
+    await user.click(screen.getByRole('button', { name: 'Apply profile Windows only' }))
+    expect(await screen.findByText(/Applied profile "Windows only"\./)).toBeInTheDocument()
+
+    lateLoad.resolve(groups)
+    await waitFor(() => expect(screen.getByLabelText('Mac Devices')).toBeInTheDocument())
+    expect(screen.getByLabelText('Mac Devices')).not.toBeChecked()
+    expect(screen.getByLabelText('Windows Devices')).toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    expect(setCategorySelections).toHaveBeenCalledWith({ groups: { selectedItems: ['Windows Devices'] } })
   })
 
   it('saves the current selection without tenant data', async () => {

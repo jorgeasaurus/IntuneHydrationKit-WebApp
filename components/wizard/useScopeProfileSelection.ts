@@ -18,6 +18,8 @@ interface ScopeProfileSelectionOptions {
   setSelectedItems: Dispatch<SetStateAction<Record<string, Set<string>>>>;
   setSelectedCISPolicies: Dispatch<SetStateAction<Set<string>>>;
   setExpandedCategories: Dispatch<SetStateAction<Set<TaskCategory>>>;
+  startSelectionUpdate: () => () => boolean;
+  invalidatePendingSelectionUpdates: () => void;
   ensureAllCategoryItems: (categories: TaskCategory[]) => Promise<Record<string, CategoryItem[]>>;
   ensureBaselineManifest: () => Promise<OIBManifest | null>;
   ensureCISManifest: () => Promise<CISBaselineManifest | null>;
@@ -56,8 +58,14 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
    * Load the catalogs that the profile uses, keep the items that still exist, and replace the
    * current selection. The wizard confirmation does not change. Throws ProfileError when a
    * catalog cannot load, so that the scope never changes from a partial catalog.
+   *
+   * The apply is authoritative: it discards async selection writes (category defaults,
+   * platform filters, Select All) that started before it wrote. Returns null when a later
+   * apply replaced this one, so this one writes nothing.
    */
-  const applySelection = async (selection: ScopeSelection): Promise<DroppedProfileItem[]> => {
+  const applySelection = async (selection: ScopeSelection): Promise<DroppedProfileItem[] | null> => {
+    options.invalidatePendingSelectionUpdates();
+    const isCurrent = options.startSelectionUpdate();
     const known = selection.targets.filter(isKnownTarget);
     const regular = known.filter((target) => target !== "baseline" && target !== "cisBaseline");
     const catalog: Record<string, ReadonlySet<string>> = {};
@@ -83,6 +91,10 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
       if (!manifest || manifest.files.length === 0) throw catalogUnavailable("cisBaseline");
       catalog.cisBaseline = new Set(manifest.files.map((file) => file.path));
     }
+
+    if (!isCurrent()) return null;
+    // Discard the async writes that started while the catalogs loaded.
+    options.invalidatePendingSelectionUpdates();
 
     const resolved = resolveSelection(selection, catalog);
     const targets = resolved.selection.targets.filter(isKnownTarget);

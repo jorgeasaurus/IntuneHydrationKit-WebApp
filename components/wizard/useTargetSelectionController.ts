@@ -45,14 +45,17 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     ensureBaselineManifest: data.ensureBaselineManifest,
     ensureCISManifest: data.ensureCISManifest,
     ensureAllCategoryItems: data.ensureAllCategoryItems,
+    startSelectionUpdate: selectionState.startSelectionUpdate,
   });
 
   const selectedPlatformFilters = bulkActions.selectedPlatformFilters;
   const normalizedSearch = searchQuery.toLowerCase().trim();
 
   const selectDefaultItemsForCategory = async (category: TaskCategory) => {
+    const isCurrent = selectionState.startSelectionUpdate();
     if (category === "cisBaseline") {
       const manifest = await data.ensureCISManifest();
+      if (!isCurrent()) return;
       if (manifest && selectionState.selectedCISPolicies.size === 0) {
         if (selectedPlatformFilters.size > 0) {
           const platforms = [...selectedPlatformFilters] as OSPlatformFilterId[];
@@ -65,6 +68,7 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     }
 
     const items = await data.ensureCategoryItems(category);
+    if (!isCurrent()) return;
     const currentSelection = selectionState.selectedItems[category];
     if (currentSelection && currentSelection.size > 0) {
       return;
@@ -287,6 +291,8 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     setSelectedItems: selectionState.setSelectedItems,
     setSelectedCISPolicies: selectionState.setSelectedCISPolicies,
     setExpandedCategories: data.setExpandedCategories,
+    startSelectionUpdate: selectionState.startSelectionUpdate,
+    invalidatePendingSelectionUpdates: selectionState.invalidatePendingSelectionUpdates,
     ensureAllCategoryItems: data.ensureAllCategoryItems,
     ensureBaselineManifest: data.ensureBaselineManifest,
     ensureCISManifest: data.ensureCISManifest,

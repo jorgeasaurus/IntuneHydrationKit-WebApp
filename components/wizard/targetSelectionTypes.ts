@@ -73,8 +73,11 @@ export interface TargetSelectionProfilesModel {
   /** True when the current selection is complete and can be saved as a profile. */
   canSave: boolean;
   getCurrentSelection: () => ScopeSelection;
-  /** Replace the current selection. Returns the profile items that no longer exist. */
-  applySelection: (selection: ScopeSelection) => Promise<DroppedProfileItem[]>;
+  /**
+   * Replace the current selection. Returns the profile items that no longer exist, or null
+   * when a later apply replaced this one.
+   */
+  applySelection: (selection: ScopeSelection) => Promise<DroppedProfileItem[] | null>;
 }
 
 export interface TargetSelectionViewModel {
