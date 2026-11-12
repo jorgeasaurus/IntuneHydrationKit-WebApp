@@ -214,11 +214,27 @@ export async function buildTaskQueueAsync(
         templates = await loadTemplates(() => source.load(throwIfCancelled, report));
         const complete = report.failedFiles.length === 0;
         if (!complete) {
-          assertIncompleteLoadCoversSelection(category, label, templates, selectedKeys, report.failedFiles);
-          emit?.(
-            `${report.failedFiles.length} ${label.toLowerCase()} template file(s) failed to load; every selected template loaded`,
-            "warning",
-          );
+          // A delete with a direct selection queues the selected tenant object names as they
+          // are, so it does not need the templates. CIS is the exception: its selection is a
+          // list of file paths that the templates map to display names.
+          const queuesSelectionDirectly =
+            operationMode === "delete" &&
+            category !== "cisBaseline" &&
+            !!selection &&
+            "selectedItems" in selection &&
+            !!selection.selectedItems?.length;
+          if (queuesSelectionDirectly) {
+            emit?.(
+              `${report.failedFiles.length} ${label.toLowerCase()} template file(s) failed to load; the selected items are queued by name`,
+              "warning",
+            );
+          } else {
+            assertIncompleteLoadCoversSelection(category, label, templates, selectedKeys, report.failedFiles);
+            emit?.(
+              `${report.failedFiles.length} ${label.toLowerCase()} template file(s) failed to load; every selected template loaded`,
+              "warning",
+            );
+          }
         }
         // Only the unfiltered template list is cached; the selection is applied per run. An incomplete
         // list stays readable for this run's executors but is reloaded by the next run.
