@@ -18,6 +18,28 @@ import {
   type Target,
 } from "@/components/wizard/targetSelectionModel";
 
+/** Label style for a policy group name inside its expand button. */
+const GROUP_NAME_CLASS = "text-sm font-medium leading-none cursor-pointer";
+
+/** Partial selection keeps the half-tone fill and also reports aria-checked="mixed". */
+const GROUP_CHECKBOX_CLASS =
+  "data-[state=indeterminate]:bg-primary/50 data-[state=indeterminate]:text-primary-foreground";
+
+function getGroupCheckedState(fullySelected: boolean, partiallySelected: boolean): boolean | "indeterminate" {
+  if (fullySelected) return true;
+  return partiallySelected ? "indeterminate" : false;
+}
+
+/** DOM ids for a policy group. Group keys can contain spaces, which are not valid in id references. */
+function getGroupIds(prefix: string, key: string): { name: string; count: string; panel: string } {
+  const safeKey = key.replace(/[^A-Za-z0-9_-]/g, "-");
+  return {
+    name: `${prefix}-name-${safeKey}`,
+    count: `${prefix}-count-${safeKey}`,
+    panel: `${prefix}-panel-${safeKey}`,
+  };
+}
+
 interface TargetSelectionCategoryViewProps {
   model: TargetSelectionViewModel;
   target: Target;
@@ -224,34 +246,42 @@ function CISPolicyPanel({ model }: { model: TargetSelectionViewModel }) {
             const displaySelected = normalized ? selectedMatchingInCategory : selectedInCategory;
 
             if (normalized && currentFilteredCount === 0) return null;
+            const groupIds = getGroupIds("cis-cat", category.folder);
 
             return (
               <div key={category.folder} className="border rounded-md bg-background">
                 <div className="flex items-center p-3 gap-2">
                   <Checkbox
                     id={`cis-cat-${category.folder}`}
-                    checked={isCISCategoryFullySelected(category.folder)}
-                    className={isCISCategoryPartiallySelected(category.folder) ? "data-[state=checked]:bg-primary/50" : ""}
+                    checked={getGroupCheckedState(
+                      isCISCategoryFullySelected(category.folder),
+                      isCISCategoryPartiallySelected(category.folder)
+                    )}
+                    aria-labelledby={groupIds.name}
+                    aria-describedby={groupIds.count}
+                    className={GROUP_CHECKBOX_CLASS}
                     onCheckedChange={() => toggleCISCategoryPolicies(category.folder)}
                   />
                   <button
                     type="button"
+                    aria-expanded={isCatExpanded}
+                    aria-controls={groupIds.panel}
                     className="flex-1 flex items-center justify-between cursor-pointer text-left"
                     onClick={() => toggleCISCategoryExpanded(category.folder)}
                   >
                     <div>
-                      <Label className="font-medium cursor-pointer">{category.name}</Label>
-                      <p className="text-xs text-muted-foreground">
+                      <span id={groupIds.name} className={GROUP_NAME_CLASS}>{category.name}</span>
+                      <p id={groupIds.count} className="text-xs text-muted-foreground">
                         {displaySelected} of {currentDisplayCount} policies{normalized ? " matching" : " selected"}
                       </p>
                     </div>
-                    <span className="inline-flex size-6 items-center justify-center rounded-md">
+                    <span aria-hidden="true" className="inline-flex size-6 items-center justify-center rounded-md">
                       {isCatExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                     </span>
                   </button>
                 </div>
                 {isCatExpanded && (
-                  <div className="border-t px-3 py-2 space-y-1 max-h-64 overflow-y-auto">
+                  <div id={groupIds.panel} className="border-t px-3 py-2 space-y-1 max-h-64 overflow-y-auto">
                     {filteredCategoryPolicies.length > 0 ? (
                       filteredCategoryPolicies.map(policy => (
                         <div key={policy.path} className="flex items-center gap-x-2 py-1 px-2 rounded hover:bg-muted/50">
@@ -347,36 +377,44 @@ function BaselinePolicyPanel({
             const displaySelected = normalized ? selectedMatchingInPlatform : selectedInPlatform;
 
             if (normalized && currentFilteredCount === 0) return null;
+            const groupIds = getGroupIds("platform", platformId);
 
             return (
               <div key={platformId} className="border rounded-md bg-background">
                 <div className="flex items-center p-3 gap-2">
                   <Checkbox
                     id={`platform-${platformId}`}
-                    checked={isPlatformFullySelected(platformId)}
-                    className={isPlatformPartiallySelected(platformId) ? "data-[state=checked]:bg-primary/50" : ""}
+                    checked={getGroupCheckedState(
+                      isPlatformFullySelected(platformId),
+                      isPlatformPartiallySelected(platformId)
+                    )}
+                    aria-labelledby={groupIds.name}
+                    aria-describedby={groupIds.count}
+                    className={GROUP_CHECKBOX_CLASS}
                     onCheckedChange={() => togglePlatformPolicies(platformId)}
                   />
                   <button
                     type="button"
+                    aria-expanded={isPlatExpanded}
+                    aria-controls={groupIds.panel}
                     className="flex-1 flex items-center justify-between cursor-pointer text-left"
                     onClick={() => togglePlatformExpanded(platformId)}
                   >
                     <div>
-                      <Label className="font-medium cursor-pointer">
+                      <span id={groupIds.name} className={GROUP_NAME_CLASS}>
                         {platform.name || PLATFORM_NAMES[platformId]}
-                      </Label>
-                      <p className="text-xs text-muted-foreground">
+                      </span>
+                      <p id={groupIds.count} className="text-xs text-muted-foreground">
                         {displaySelected} of {currentDisplayCount} policies{normalized ? " matching" : " selected"}
                       </p>
                     </div>
-                    <span className="inline-flex size-6 items-center justify-center rounded-md">
+                    <span aria-hidden="true" className="inline-flex size-6 items-center justify-center rounded-md">
                       {isPlatExpanded ? <ChevronDown className="size-4" /> : <ChevronRight className="size-4" />}
                     </span>
                   </button>
                 </div>
                 {isPlatExpanded && (
-                  <div className="border-t px-3 py-2 space-y-1 max-h-64 overflow-y-auto">
+                  <div id={groupIds.panel} className="border-t px-3 py-2 space-y-1 max-h-64 overflow-y-auto">
                     {filteredPlatformPolicies.length > 0 ? (
                       filteredPlatformPolicies.map(policy => (
                         <div key={policy.path} className="flex items-center gap-x-2 py-1 px-2 rounded hover:bg-muted/50">

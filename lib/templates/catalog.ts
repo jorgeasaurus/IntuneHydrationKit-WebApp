@@ -59,7 +59,7 @@ export interface TemplateDocumentationItem {
   displayName: string;
   description: string;
   subcategory?: string;
-  platform?: string;
+  platform?: TemplatePlatform;
   itemType: string;
   sourcePath?: string;
   payloadSource: TemplateDocumentationPayloadSource;
@@ -130,20 +130,37 @@ const CATEGORY_METADATA: Record<
   },
 };
 
-const PLATFORM_ORDER = [
+/**
+ * Canonical platform labels for the /templates Platform filter, in display
+ * order. Every catalog item has one of these values or no platform.
+ */
+export const TEMPLATE_PLATFORMS = [
   "Windows",
   "macOS",
   "iOS/iPadOS",
   "Android",
   "Linux",
   "Identity",
-  "Cross-platform",
-];
+] as const;
 
-const OIB_PLATFORM_LABELS: Record<string, string> = {
+export type TemplatePlatform = (typeof TEMPLATE_PLATFORMS)[number];
+
+/** Graph device filter platform values mapped to canonical labels. */
+const FILTER_PLATFORM_LABELS: Record<string, TemplatePlatform> = {
+  android: "Android",
+  androidForWork: "Android",
+  iOS: "iOS/iPadOS",
+  macOS: "macOS",
+  windows10AndLater: "Windows",
+};
+
+/**
+ * OIB manifest platform folders mapped to canonical labels. BYOD holds
+ * Android and iOS app protection, so its platform comes from the file name.
+ */
+const OIB_PLATFORM_LABELS: Record<string, TemplatePlatform> = {
   WINDOWS: "Windows",
   MACOS: "macOS",
-  BYOD: "BYOD (Bring Your Own Device)",
   WINDOWS365: "Windows",
 };
 
@@ -215,7 +232,7 @@ function getCategorySummary(
   };
 }
 
-function detectPlatform(value: string): string | undefined {
+function detectPlatform(value: string): TemplatePlatform | undefined {
   const normalized = value.toLowerCase();
 
   if (
@@ -259,7 +276,9 @@ function detectPlatform(value: string): string | undefined {
   return undefined;
 }
 
-function pickPlatform(...values: Array<string | undefined>): string | undefined {
+function pickPlatform(
+  ...values: Array<string | undefined>
+): TemplatePlatform | undefined {
   const detected =
     values
       .map((value) => (value ? detectPlatform(value) : undefined))
@@ -313,7 +332,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     fetchCISBaselineManifest(),
   ]);
 
-  const oibPlatformLabels = Object.fromEntries(
+  const oibSourceLabels: Record<string, string> = Object.fromEntries(
     (oibManifest?.platforms ?? []).map((platform) => [platform.id, platform.name])
   );
 
@@ -357,7 +376,9 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       filter.description,
       "Device assignment filter imported by Intune Hydration Kit."
     ),
-    platform: filter.platform,
+    platform:
+      FILTER_PLATFORM_LABELS[filter.platform] ??
+      pickPlatform(filter.platform, filter.displayName),
     itemType: "Assignment Filter",
     payloadSource: inlinePayloadSource(filter),
   }));
@@ -467,11 +488,9 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     categoryLabel: CATEGORY_METADATA.baseline.label,
     displayName: file.displayName,
     description: `${file.policyType} template from the bundled OpenIntuneBaseline catalog.`,
-    subcategory: file.platform,
+    subcategory: oibSourceLabels[file.platform] ?? file.platform,
     platform:
-      oibPlatformLabels[file.platform] ??
-      OIB_PLATFORM_LABELS[file.platform] ??
-      pickPlatform(file.platform, file.displayName),
+      OIB_PLATFORM_LABELS[file.platform] ?? pickPlatform(file.displayName),
     itemType: file.policyType,
     sourcePath: file.path,
     payloadSource: oibPayloadSource(file),
@@ -560,23 +579,10 @@ export async function loadTemplateDocumentationPayload(
   }
 }
 
-export function getPlatformFilterOrder(platforms: string[]): string[] {
-  return platforms.toSorted((left, right) => {
-    const leftIndex = PLATFORM_ORDER.indexOf(left);
-    const rightIndex = PLATFORM_ORDER.indexOf(right);
-
-    if (leftIndex === -1 && rightIndex === -1) {
-      return left.localeCompare(right);
-    }
-
-    if (leftIndex === -1) {
-      return 1;
-    }
-
-    if (rightIndex === -1) {
-      return -1;
-    }
-
-    return leftIndex - rightIndex;
-  });
+/** Returns the canonical platforms present in the list, in display order. */
+export function getPlatformFilterOrder(
+  platforms: ReadonlyArray<TemplatePlatform | undefined>
+): TemplatePlatform[] {
+  const present = new Set(platforms);
+  return TEMPLATE_PLATFORMS.filter((platform) => present.has(platform));
 }
