@@ -11,7 +11,7 @@
  *   display name.
  * - A Conditional Access policy is read again and must be in the "disabled" state.
  * - An object with assignments is not deleted. A notification template that a compliance
- *   policy uses is not deleted.
+ *   policy or an enrollment notification uses is not deleted.
  * - Preview mode runs the same checks with GET requests only.
  */
 
@@ -90,9 +90,9 @@ export const DELETE_REASONS = {
     `Policy has ${count} active assignment(s). Remove the assignments before you delete it.`,
   noNotificationMarker:
     "Not created by Intune Hydration Kit (the display name is not an [IHD] name from the kit notification templates)",
-  notificationInUse: (policies: string[]) =>
-    `Notification template is used by ${policies.length} compliance policy action(s): ${policies.join(", ")}. ` +
-    "Remove it from the noncompliance actions before you delete it.",
+  notificationInUse: (users: string[]) =>
+    `Notification template is used by ${users.length} object(s): ${users.join(", ")}. ` +
+    "Remove it from the compliance actions and enrollment notifications before you delete it.",
 } as const;
 
 type CachedObject = {
@@ -247,9 +247,9 @@ const SOURCES = {
     hasMarker: (item) => hasNotificationTemplateMarker(item.displayName, getKitNotificationTemplateNames()),
     noMarkerReason: DELETE_REASONS.noNotificationMarker,
     getInUseReason: async (context, target) => {
-      const policies = await getNotificationTemplateReferences(context.client, target.id);
-      return policies.length > 0
-        ? { count: policies.length, reason: DELETE_REASONS.notificationInUse(policies) }
+      const users = await getNotificationTemplateReferences(context.client, target.id);
+      return users.length > 0
+        ? { count: users.length, reason: DELETE_REASONS.notificationInUse(users) }
         : undefined;
     },
   },

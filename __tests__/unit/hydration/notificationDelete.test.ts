@@ -11,7 +11,9 @@ const ENDPOINT = "/deviceManagement/notificationMessageTemplates";
 const V1_REFERENCES =
   "/deviceManagement/deviceCompliancePolicies?$select=id,displayName&$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)";
 const V2_REFERENCES =
-  "/deviceManagement/compliancePolicies?$select=id,name&$expand=scheduledActions($expand=scheduledActionConfigurations)";
+  "/deviceManagement/compliancePolicies?$select=id,name&$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)";
+const ENROLLMENT_CONFIGURATIONS = "/deviceManagement/deviceEnrollmentConfigurations";
+const NOTIFICATION_TYPE = "#microsoft.graph.deviceEnrollmentNotificationConfiguration";
 const KIT_NAME = "[IHD] First Alert";
 
 type TenantTemplate = { id: string; displayName?: string };
@@ -37,6 +39,7 @@ function createClient({
   tenant = [{ id: "tmpl-id", displayName: KIT_NAME }] as TenantTemplate[],
   v1Policies = [] as Array<Record<string, unknown>>,
   v2Policies = [] as Array<Record<string, unknown>>,
+  enrollmentConfigurations = [] as Array<Record<string, unknown>>,
 } = {}) {
   return {
     get: vi.fn(async (endpoint: string) => {
@@ -48,6 +51,7 @@ function createClient({
     getCollection: vi.fn(async (endpoint: string) => {
       if (endpoint === V1_REFERENCES) return v1Policies;
       if (endpoint === V2_REFERENCES) return v2Policies;
+      if (endpoint === ENROLLMENT_CONFIGURATIONS) return enrollmentConfigurations;
       throw new Error(`Unexpected list read ${endpoint}`);
     }),
     post: vi.fn(),
@@ -82,7 +86,17 @@ describe("notification template delete", () => {
   it("deletes a kit template that no compliance policy uses", async () => {
     const client = createClient({
       v1Policies: [{ id: "p1", displayName: "Other policy", scheduledActionsForRule: [blockAction("other-id")] }],
-      v2Policies: [{ id: "p2", name: "Linux", scheduledActions: [] }],
+      v2Policies: [{ id: "p2", name: "Linux", scheduledActionsForRule: [] }],
+      enrollmentConfigurations: [
+        { "@odata.type": "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration", id: "esp", displayName: "ESP" },
+        {
+          "@odata.type": NOTIFICATION_TYPE,
+          id: "en1",
+          displayName: "Other notification",
+          notificationMessageTemplateId: "other-id",
+          notificationTemplates: ["email_other-id"],
+        },
+      ],
     });
     const context = createContext(client);
 
@@ -93,6 +107,7 @@ describe("notification template delete", () => {
     expect(client.get).toHaveBeenCalledWith(`${ENDPOINT}/tmpl-id`, "beta");
     expect(client.getCollection).toHaveBeenCalledWith(V1_REFERENCES);
     expect(client.getCollection).toHaveBeenCalledWith(V2_REFERENCES);
+    expect(client.getCollection).toHaveBeenCalledWith(ENROLLMENT_CONFIGURATIONS);
     expect(client.delete).toHaveBeenCalledWith(`${ENDPOINT}/tmpl-id`, "beta");
     expect(context.cachedNotificationTemplates).toEqual([]);
   });
@@ -140,7 +155,7 @@ describe("notification template delete", () => {
     ],
     [
       "a Settings Catalog compliance policy",
-      { v2Policies: [{ id: "p2", name: "Linux Compliance", scheduledActions: [blockAction("tmpl-id")] }] },
+      { v2Policies: [{ id: "p2", name: "Linux Compliance", scheduledActionsForRule: [blockAction("tmpl-id")] }] },
       "Linux Compliance",
     ],
   ])("blocks a template that %s uses", async (_label, lists, policyName) => {
@@ -154,6 +169,63 @@ describe("notification template delete", () => {
       checks: { marker: "present", references: 1 },
     });
     expect(resolution.action === "skip" && resolution.reason).toContain(policyName);
+    expect(client.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [
+      "notificationMessageTemplateId",
+      { notificationMessageTemplateId: "TMPL-ID", notificationTemplates: [] },
+    ],
+    [
+      "a notificationTemplates entry",
+      { notificationMessageTemplateId: "00000000-0000-0000-0000-000000000000", notificationTemplates: ["push_tmpl-id"] },
+    ],
+    [
+      "a notificationTemplates entry on a configuration identified by its configuration type",
+      { deviceEnrollmentConfigurationType: "enrollmentNotificationsConfiguration", notificationTemplates: ["email_tmpl-id"] },
+    ],
+  ])("blocks a template that an enrollment notification uses through %s", async (_label, fields) => {
+    const odataType = "deviceEnrollmentConfigurationType" in fields ? {} : { "@odata.type": NOTIFICATION_TYPE };
+    const client = createClient({
+      enrollmentConfigurations: [{ ...odataType, id: "en1", displayName: "Enrollment Alert", ...fields }],
+    });
+
+    const result = await executeDeleteTask(createTask(), createContext(client));
+
+    expect(result).toMatchObject({ success: false, skipped: true, skipKind: "blocked" });
+    expect(result.error).toContain('enrollment notification "Enrollment Alert"');
+    expect(client.delete).not.toHaveBeenCalled();
+  });
+
+  it("fails without a delete when the enrollment configurations cannot be read", async () => {
+    const client = createClient();
+    client.getCollection.mockImplementation(async (endpoint: string) => {
+      if (endpoint === ENROLLMENT_CONFIGURATIONS) throw new Error("[403] Forbidden");
+      return [];
+    });
+
+    const result = await executeDeleteTask(createTask(), createContext(client));
+
+    expect(result).toMatchObject({ success: false, skipped: false });
+    expect(result.error).toContain("[403] Forbidden");
+    expect(client.delete).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["has no type", { id: "x", displayName: "Unknown" }, "Could not determine the type"],
+    [
+      "is a notification without template fields",
+      { "@odata.type": NOTIFICATION_TYPE, id: "en1", displayName: "Partial" },
+      "Could not read the notification templates",
+    ],
+  ])("fails without a delete when an enrollment configuration %s", async (_label, configuration, message) => {
+    const client = createClient({ enrollmentConfigurations: [configuration] });
+
+    const result = await executeDeleteTask(createTask(), createContext(client));
+
+    expect(result).toMatchObject({ success: false, skipped: false });
+    expect(result.error).toContain(message);
     expect(client.delete).not.toHaveBeenCalled();
   });
 
@@ -204,7 +276,7 @@ describe("notification template delete", () => {
     ["without its action list", { v1Policies: [{ id: "p1", displayName: "No actions" }] }],
     [
       "with an action without its configurations",
-      { v2Policies: [{ id: "p2", name: "No configurations", scheduledActions: [{}] }] },
+      { v2Policies: [{ id: "p2", name: "No configurations", scheduledActionsForRule: [{}] }] },
     ],
   ])("fails without a delete when a policy comes back %s", async (_label, lists) => {
     const client = createClient(lists);

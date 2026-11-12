@@ -4,8 +4,8 @@
  *
  * A notification message template has no description field. The kit marks its
  * templates in the display name (see hasNotificationTemplateMarker). Compliance
- * policies refer to a template by ID in their noncompliance actions; a template
- * has no assignments.
+ * policies (noncompliance actions) and enrollment notifications refer to a template
+ * by ID; a template has no assignments.
  */
 
 import { isRunCancelledError } from "@/lib/utils/retry";
@@ -100,16 +100,66 @@ const REFERENCING_COLLECTIONS = [
   {
     label: "Settings Catalog compliance policy",
     endpoint: "/deviceManagement/compliancePolicies",
-    actionsProperty: "scheduledActions",
+    // Graph beta deviceManagementCompliancePolicy uses the same navigation property name.
+    actionsProperty: "scheduledActionsForRule",
     nameProperty: "name",
   },
 ] as const;
 
+export const ENROLLMENT_CONFIGURATIONS_ENDPOINT = "/deviceManagement/deviceEnrollmentConfigurations";
+const ENROLLMENT_NOTIFICATION_ODATA_TYPE = "#microsoft.graph.deviceenrollmentnotificationconfiguration";
+const ENROLLMENT_NOTIFICATION_CONFIGURATION_TYPE = "enrollmentnotificationsconfiguration";
+
 /**
- * Get the names of the compliance policies whose noncompliance actions send this
- * notification template. Reads every compliance policy with its actions expanded.
- * Throws when a list cannot be read, or when a policy comes back without its action
- * list, so the caller does not delete a template that it could not check.
+ * Whether an enrollment notification configuration sends the template. Graph keeps the
+ * template ID in notificationMessageTemplateId and in notificationTemplates, as
+ * "<templateType>_<templateId>" entries. Throws when the configuration has neither field.
+ */
+function enrollmentNotificationRefersTo(configuration: Record<string, unknown>, target: string, name: string): boolean {
+  const { notificationMessageTemplateId: templateId, notificationTemplates: entries } = configuration;
+  if (typeof templateId !== "string" && !Array.isArray(entries)) {
+    throw new Error(`Could not read the notification templates of enrollment notification "${name}"`);
+  }
+  if (typeof templateId === "string" && templateId.toLowerCase() === target) return true;
+  return (
+    Array.isArray(entries) &&
+    entries.some((entry) => typeof entry === "string" && entry.toLowerCase().split("_").pop() === target)
+  );
+}
+
+/**
+ * Get the enrollment notifications that send this template. Reads every enrollment
+ * configuration without $select: the template fields exist only on the derived type
+ * deviceEnrollmentNotificationConfiguration, and a list read without $select returns
+ * the properties of each derived type. Throws when the list cannot be read, or when a
+ * configuration cannot be classified or read, so the template is not deleted.
+ */
+async function getEnrollmentNotificationReferences(client: GraphClient, target: string): Promise<string[]> {
+  const configurations = await client.getCollection<Record<string, unknown>>(ENROLLMENT_CONFIGURATIONS_ENDPOINT);
+  const references: string[] = [];
+  for (const configuration of configurations) {
+    const name = String(configuration.displayName ?? configuration.id);
+    const odataType = configuration["@odata.type"];
+    const configurationType = configuration.deviceEnrollmentConfigurationType;
+    if (typeof odataType !== "string" && typeof configurationType !== "string") {
+      throw new Error(`Could not determine the type of enrollment configuration "${name}"`);
+    }
+    const isNotification =
+      (typeof odataType === "string" && odataType.toLowerCase() === ENROLLMENT_NOTIFICATION_ODATA_TYPE) ||
+      (typeof configurationType === "string" &&
+        configurationType.toLowerCase() === ENROLLMENT_NOTIFICATION_CONFIGURATION_TYPE);
+    if (isNotification && enrollmentNotificationRefersTo(configuration, target, name)) {
+      references.push(`enrollment notification "${name}"`);
+    }
+  }
+  return references;
+}
+
+/**
+ * Get the objects that send this notification template: compliance policies (their
+ * noncompliance actions) and enrollment notifications. Each entry names the object.
+ * Throws when a list cannot be read, or when an object comes back without the fields
+ * that the check needs, so the caller does not delete a template that it could not check.
  */
 export async function getNotificationTemplateReferences(
   client: GraphClient,
@@ -140,10 +190,11 @@ export async function getNotificationTemplateReferences(
         return configurations.some((item) => item.notificationTemplateId?.toLowerCase() === target);
       });
       if (refersToTemplate) {
-        references.push(String(policy[collection.nameProperty] ?? policy.id));
+        references.push(`${collection.label} "${String(policy[collection.nameProperty] ?? policy.id)}"`);
       }
     }
   }
 
+  references.push(...(await getEnrollmentNotificationReferences(client, target)));
   return references;
 }
