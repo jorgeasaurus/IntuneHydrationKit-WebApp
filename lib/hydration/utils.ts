@@ -4,7 +4,70 @@
  * Common utility functions used across the hydration engine
  */
 
-import type { ExecutionContext, TenantCacheKey } from "./types";
+import {
+  getAllTemplateCacheKeys,
+  getCachedTemplates,
+  type BaselinePolicy,
+  type CISBaselinePolicy,
+} from "@/lib/templates/loader";
+import type { HydrationTask } from "@/types/hydration";
+import type { CISPolicyType, ExecutionContext, TenantCacheKey } from "./types";
+
+/**
+ * Policy type of a baseline template: a CIS policy type, or App Protection.
+ */
+export type BaselinePolicyType = CISPolicyType | "AppProtection";
+
+/**
+ * Find the OpenIntuneBaseline template of a task.
+ */
+export function findBaselineTemplate(task: HydrationTask, context: ExecutionContext): BaselinePolicy | undefined {
+  const templates = context.cachedBaselineTemplates || getCachedTemplates("baseline");
+  if (!Array.isArray(templates)) return undefined;
+  return (templates as BaselinePolicy[]).find((policy) => (policy.name || policy.displayName) === task.itemName);
+}
+
+/**
+ * Find the CIS baseline template of a task. CIS templates are cached under keys like
+ * "cisBaseline-cis-windows-11,cis-browser", so every CIS cache key is searched.
+ */
+export function findCISBaselineTemplate(task: HydrationTask): CISBaselinePolicy | undefined {
+  const lookupKey = task.templatePath || task.itemName;
+  const cacheKeys = getAllTemplateCacheKeys().filter((key) => key.startsWith("intune-hydration-templates-cisBaseline"));
+  for (const key of cacheKeys) {
+    const cached = getCachedTemplates(key.replace("intune-hydration-templates-", ""));
+    if (!Array.isArray(cached)) continue;
+    const template = (cached as CISBaselinePolicy[]).find(
+      (policy) => policy._cisFilePath === lookupKey || (policy.name || policy.displayName) === lookupKey
+    );
+    if (template) return template;
+  }
+  return undefined;
+}
+
+/**
+ * Policy type of an OpenIntuneBaseline template, from the manifest folder (_oibPolicyType).
+ * Returns undefined when the folder is not known.
+ */
+export function getOIBPolicyType(template: { _oibPolicyType?: unknown }): BaselinePolicyType | undefined {
+  switch (template._oibPolicyType) {
+    case "AppProtection":
+      return "AppProtection";
+    case "SettingsCatalog":
+      return "SettingsCatalog";
+    case "DeviceConfiguration":
+    case "UpdatePolicies": // WUfB rings use the deviceConfigurations endpoint
+      return "DeviceConfiguration";
+    case "DriverUpdateProfiles":
+      return "DriverUpdateProfiles";
+    case "V2Compliance":
+      return "V2Compliance";
+    case "CompliancePolicies": // The baseline executor creates these as deviceCompliancePolicies
+      return "V1Compliance";
+    default:
+      return undefined;
+  }
+}
 
 /**
  * Display labels for the prefetched tenant caches.

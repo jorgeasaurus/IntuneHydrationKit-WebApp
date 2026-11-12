@@ -32,7 +32,15 @@ import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
-import { sleepWithExecutionControl, waitWhilePaused, normalizeName, findByNamePrecedence } from "./utils";
+import {
+  sleepWithExecutionControl,
+  waitWhilePaused,
+  normalizeName,
+  findByNamePrecedence,
+  findBaselineTemplate,
+  findCISBaselineTemplate,
+  getOIBPolicyType,
+} from "./utils";
 import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   buildCISGroupPolicyConfigurationPayload,
@@ -40,12 +48,9 @@ import {
 } from "./policyCreators";
 import {
   getCachedTemplates,
-  getAllTemplateCacheKeys,
   GroupTemplate,
   FilterTemplate,
   ConditionalAccessTemplate,
-  CISBaselinePolicy,
-  BaselinePolicy,
 } from "@/lib/templates/loader";
 import {
   CONDITIONAL_ACCESS_POLICIES_ENDPOINT,
@@ -337,24 +342,7 @@ async function buildBaselineRequestBody(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<BaselineBuildResult> {
-  // Use templates from context (passed directly from engine) or fallback to global cache
-  const cachedPolicies = context.cachedBaselineTemplates || getCachedTemplates("baseline");
-  let template: BaselinePolicy | undefined;
-
-  console.log(`[BatchExecutor:baseline] Looking for "${task.itemName}" in ${cachedPolicies?.length || 0} cached policies (source: ${context.cachedBaselineTemplates ? 'context' : 'global cache'})`);
-
-  if (cachedPolicies && Array.isArray(cachedPolicies)) {
-    // Log first few policy names to help debug
-    if (cachedPolicies.length > 0) {
-      const sampleNames = (cachedPolicies as BaselinePolicy[]).slice(0, 3).map(p => p.name || p.displayName);
-      console.log(`[BatchExecutor:baseline] Sample cached names: ${sampleNames.join(', ')}`);
-    }
-
-    template = (cachedPolicies as BaselinePolicy[]).find(
-      (p) => (p.name || p.displayName) === task.itemName
-    );
-  }
-
+  let template = findBaselineTemplate(task, context);
   if (!template) {
     console.log(`[BatchExecutor:baseline] ✗ No template found for "${task.itemName}"`);
     return null;
@@ -364,40 +352,9 @@ async function buildBaselineRequestBody(
 
   const policyName = (template.name || template.displayName) as string;
 
-  // Use _oibPolicyType from manifest for OIB baselines, fallback to detection
-  const oibPolicyType = template._oibPolicyType as string | undefined;
-
-  // Map OIB policy types to batch-compatible types
-  let policyType: string;
-  if (oibPolicyType) {
-    // OIB manifest provides explicit policy type
-    switch (oibPolicyType) {
-      case "AppProtection":
-        policyType = "AppProtection";
-        break;
-      case "SettingsCatalog":
-        policyType = "SettingsCatalog";
-        break;
-      case "DeviceConfiguration":
-      case "UpdatePolicies": // WUfB rings use deviceConfigurations endpoint
-        policyType = "DeviceConfiguration";
-        break;
-      case "DriverUpdateProfiles":
-        policyType = "DriverUpdateProfiles";
-        break;
-      case "V2Compliance":
-        policyType = "V2Compliance";
-        break;
-      default:
-        // Fall back to detection for unknown types
-        policyType = detectCISPolicyType(template as Record<string, unknown>);
-    }
-    console.log(`[BatchExecutor] OIB policy "${policyName}" type from manifest: ${oibPolicyType} -> ${policyType}`);
-  } else {
-    // No OIB type set, use detection (shouldn't happen for OIB)
-    policyType = detectCISPolicyType(template as Record<string, unknown>);
-    console.log(`[BatchExecutor] OIB policy "${policyName}" type detected: ${policyType}`);
-  }
+  // Use _oibPolicyType from the manifest, fall back to detection for unknown folders
+  const policyType = getOIBPolicyType(template) ?? detectCISPolicyType(template as Record<string, unknown>);
+  console.log(`[BatchExecutor] OIB policy "${policyName}" type: ${template._oibPolicyType || "(none)"} -> ${policyType}`);
 
   // Only batch SettingsCatalog, DeviceConfiguration, GroupPolicyConfiguration,
   // DriverUpdateProfiles, and V2Compliance.
@@ -472,37 +429,9 @@ async function buildCISBaselineRequestBody(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<BaselineBuildResult> {
-  // CIS templates are cached with keys like "cisBaseline-cis-windows-11,cis-browser"
-  // We need to search all matching cache keys
-  let template: CISBaselinePolicy | undefined;
-
-  const allKeys = getAllTemplateCacheKeys();
-  const cacheKeys = allKeys.filter(k => k.startsWith("intune-hydration-templates-cisBaseline"));
-  const cisLookupKey = task.templatePath || task.itemName;
-  console.log(`[BatchExecutor] CIS lookup for "${cisLookupKey}" - found ${cacheKeys.length} cache keys:`, cacheKeys);
-
-  for (const key of cacheKeys) {
-    const cacheKey = key.replace("intune-hydration-templates-", "");
-    const cached = getCachedTemplates(cacheKey);
-    if (cached && Array.isArray(cached)) {
-      for (const policy of cached as CISBaselinePolicy[]) {
-        if (
-          policy._cisFilePath === cisLookupKey ||
-          (policy.name || policy.displayName) === cisLookupKey
-        ) {
-          template = policy;
-          break;
-        }
-      }
-      if (template) {
-        console.log(`[BatchExecutor] Found template for "${cisLookupKey}" in cache key: ${cacheKey}`);
-        break;
-      }
-    }
-  }
-
+  const template = findCISBaselineTemplate(task);
   if (!template) {
-    console.log(`[BatchExecutor] No template found for CIS task: "${cisLookupKey}"`);
+    console.log(`[BatchExecutor] No template found for CIS task: "${task.templatePath || task.itemName}"`);
     return null;
   }
 
@@ -1433,7 +1362,14 @@ export async function executeDeletesInParallel(
       continue;
     }
 
-    const resolution = await resolveDeleteTarget(task, context);
+    let resolution: Awaited<ReturnType<typeof resolveDeleteTarget>>;
+    try {
+      resolution = await resolveDeleteTarget(task, context);
+    } catch (error) {
+      if (!isRunCancelledError(error)) throw error;
+      markPendingTasksCancelled(tasks, results, context);
+      return results;
+    }
     if (context.shouldCancel?.()) {
       markPendingTasksCancelled(tasks, results, context);
       return results;

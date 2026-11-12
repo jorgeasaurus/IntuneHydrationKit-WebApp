@@ -1,6 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { executeDeleteTask, resolveDeleteTarget } from "@/lib/hydration/deleteResolver";
+import { cacheTemplates, clearCategoryCache, type BaselinePolicy } from "@/lib/templates/loader";
+import { RunCancelledError } from "@/lib/utils/retry";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask, TaskCategory } from "@/types/hydration";
 
@@ -147,5 +149,115 @@ describe("executeDeleteTask", () => {
 
     expect(result).toMatchObject({ success: true, skipped: false });
     expect(context.cachedFilters).toEqual([]);
+  });
+});
+
+describe("delete retry policy", () => {
+  it("sends one DELETE per task; the Graph client owns the retries", async () => {
+    const context = createContext({
+      cachedFilters: [{ id: "busy-id", displayName: "[IHD] Busy", description: MARKER }] as never,
+    });
+    vi.mocked(context.client.delete).mockRejectedValue(Object.assign(new Error("[429] TooManyRequests"), { status: 429 }));
+
+    const result = await executeDeleteTask(createTask("filters", "[IHD] Busy"), context);
+
+    expect(result).toMatchObject({ success: false, skipped: false, error: "[429] TooManyRequests" });
+    expect(context.client.delete).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a cancelled run as cancelled", async () => {
+    const context = createContext({
+      cachedFilters: [{ id: "slow-id", displayName: "[IHD] Slow", description: MARKER }] as never,
+    });
+    vi.mocked(context.client.delete).mockRejectedValue(new RunCancelledError());
+
+    const result = await executeDeleteTask(createTask("filters", "[IHD] Slow"), context);
+
+    expect(result).toMatchObject({ success: false, skipped: true, skipKind: "cancelled" });
+  });
+});
+
+describe("policy type narrows the caches for baseline deletes", () => {
+  const driverCacheFailed = {
+    prefetchErrors: { cachedDriverUpdateProfiles: "[403] No Windows Driver Update license" },
+  } satisfies Partial<ExecutionContext>;
+
+  afterEach(() => {
+    clearCategoryCache("cisBaseline-test");
+  });
+
+  it("does not fail an OIB Settings Catalog task because the driver update cache failed", async () => {
+    const task = createTask("baseline", "[IHD] Win - OIB - Defender");
+    const context = createContext({
+      ...driverCacheFailed,
+      cachedBaselineTemplates: [
+        { name: task.itemName, _oibPolicyType: "SettingsCatalog" } as unknown as BaselinePolicy,
+      ],
+      cachedSettingsCatalogPolicies: [],
+    });
+
+    const resolution = await resolveDeleteTarget(task, context);
+
+    expect(resolution).toEqual({ action: "skip", skipKind: "noOp", reason: "Not found in tenant" });
+  });
+
+  it("still fails an OIB driver update task when its cache failed", async () => {
+    const task = createTask("baseline", "[IHD] Win - OIB - WUfB Drivers");
+    const context = createContext({
+      ...driverCacheFailed,
+      cachedBaselineTemplates: [
+        { displayName: task.itemName, _oibPolicyType: "DriverUpdateProfiles" } as unknown as BaselinePolicy,
+      ],
+      cachedSettingsCatalogPolicies: [],
+    });
+
+    const resolution = await resolveDeleteTarget(task, context);
+
+    expect(resolution).toMatchObject({ action: "fail", reason: expect.stringContaining("Driver Update profiles") });
+  });
+
+  it("searches every cache (fail closed) when the policy type is not known", async () => {
+    const task = createTask("baseline", "[IHD] Unknown type");
+    const context = createContext({
+      ...driverCacheFailed,
+      cachedBaselineTemplates: [{ name: task.itemName, _oibPolicyType: "" } as unknown as BaselinePolicy],
+      cachedSettingsCatalogPolicies: [],
+      cachedV2CompliancePolicies: [],
+      cachedCompliancePolicies: [],
+      cachedDeviceConfigurations: [],
+      cachedGroupPolicyConfigurations: [],
+      cachedSecurityIntents: [],
+      cachedAppProtectionPolicies: [],
+    });
+
+    const resolution = await resolveDeleteTarget(task, context);
+
+    expect(resolution).toMatchObject({ action: "fail" });
+  });
+
+  it("uses the detected CIS policy type", async () => {
+    const task = createTask("cisBaseline", "[IHD] CIS - Device Health");
+    cacheTemplates("cisBaseline-test", [
+      { name: task.itemName, "@odata.type": "#microsoft.graph.deviceManagementCompliancePolicy" },
+    ]);
+    const context = createContext({
+      prefetchErrors: { cachedDeviceConfigurations: "[500] Internal", cachedDriverUpdateProfiles: "[403] Forbidden" },
+      cachedV2CompliancePolicies: [{ id: "v2-id", name: "[IHD] Other", description: MARKER }],
+      cachedSettingsCatalogPolicies: [{ id: "sc-id", name: task.itemName, description: MARKER }],
+    });
+
+    const resolution = await resolveDeleteTarget(task, context);
+
+    expect(resolution).toMatchObject({ action: "delete", target: { id: "sc-id" } });
+  });
+
+  it("reports a CIS task as not found when only unrelated caches failed", async () => {
+    const task = createTask("cisBaseline", "[IHD] CIS - Missing");
+    cacheTemplates("cisBaseline-test", [{ name: task.itemName, settings: [] }]);
+    const context = createContext({ ...driverCacheFailed, cachedSettingsCatalogPolicies: [] });
+
+    const resolution = await resolveDeleteTarget(task, context);
+
+    expect(resolution).toEqual({ action: "skip", skipKind: "noOp", reason: "Not found in tenant" });
   });
 });

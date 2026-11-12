@@ -22,9 +22,18 @@ import {
 } from "@/lib/graph/conditionalAccess";
 import { findEnrollmentProfileForDelete } from "@/lib/graph/enrollment";
 import { IMPORT_PREFIX, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { isRunCancelledError } from "@/lib/utils/retry";
 import { HydrationTask } from "@/types/hydration";
+import { detectCISPolicyType } from "./policyDetection";
 import { ExecutionContext, ExecutionResult, TenantCacheKey } from "./types";
-import { findExistingByName, requireTenantCache, sleepWithExecutionControl } from "./utils";
+import {
+  BaselinePolicyType,
+  findBaselineTemplate,
+  findCISBaselineTemplate,
+  findExistingByName,
+  getOIBPolicyType,
+  requireTenantCache,
+} from "./utils";
 
 /**
  * Tenant object that a delete task resolved to.
@@ -218,6 +227,40 @@ const CATEGORY_SOURCES: Partial<Record<HydrationTask["category"], DeleteSource[]
   ],
 };
 
+/**
+ * Caches to search when the policy type of a baseline task is known. The caches match
+ * the endpoints that the create path uses for each type. A cache that failed to load
+ * for another type then does not fail the task.
+ */
+const POLICY_TYPE_SOURCES: Partial<Record<BaselinePolicyType, DeleteSource[]>> = {
+  SettingsCatalog: [SOURCES.settingsCatalog],
+  // V2 policies sometimes appear in the Settings Catalog list too
+  V2Compliance: [SOURCES.v2Compliance, SOURCES.settingsCatalog],
+  V1Compliance: [SOURCES.v1Compliance],
+  DeviceConfiguration: [SOURCES.deviceConfiguration],
+  GroupPolicyConfiguration: [SOURCES.groupPolicyConfiguration],
+  SecurityIntent: [SOURCES.securityIntent],
+  DriverUpdateProfiles: [SOURCES.driverUpdate],
+  AppProtection: [SOURCES.appProtection],
+};
+
+/**
+ * Caches to search for a task. For a baseline task with a known policy type, only the
+ * caches of that type. Otherwise every cache of the category (fail closed: a cache that
+ * did not load stops a "not found" result).
+ */
+function getDeleteSources(task: HydrationTask, context: ExecutionContext): DeleteSource[] | undefined {
+  let policyType: BaselinePolicyType | undefined;
+  if (task.category === "baseline") {
+    const template = findBaselineTemplate(task, context);
+    policyType = template && getOIBPolicyType(template);
+  } else if (task.category === "cisBaseline") {
+    const template = findCISBaselineTemplate(task);
+    policyType = template && detectCISPolicyType(template as Record<string, unknown>);
+  }
+  return (policyType && POLICY_TYPE_SOURCES[policyType]) || CATEGORY_SOURCES[task.category];
+}
+
 function stripImportPrefix(name: string): string {
   return name.toLowerCase().startsWith(IMPORT_PREFIX.toLowerCase()) ? name.slice(IMPORT_PREFIX.length) : name;
 }
@@ -348,7 +391,7 @@ async function resolve(task: HydrationTask, context: ExecutionContext): Promise<
   if (task.category === "enrollment") {
     found = await findEnrollmentObject(task, context);
   } else {
-    const sources = CATEGORY_SOURCES[task.category];
+    const sources = getDeleteSources(task, context);
     if (!sources) {
       return { action: "fail", reason: `Delete is not supported for category "${task.category}"` };
     }
@@ -390,6 +433,8 @@ export async function resolveDeleteTarget(task: HydrationTask, context: Executio
   try {
     return await resolve(task, context);
   } catch (error) {
+    // A cancelled run is not a failed safety check. The caller marks the task cancelled.
+    if (isRunCancelledError(error)) throw error;
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[Delete] Safety checks failed for "${task.itemName}" - not deleted:`, message);
     return { action: "fail", reason: `Safety checks did not complete, so the object was not deleted: ${message}` };
@@ -430,55 +475,34 @@ export type DeleteRequestOutcome =
   | { status: "failed"; error: Error };
 
 /**
- * Send the DELETE request for a resolved object, with the delete retry rules, and
- * remove the object from its cache when it is gone.
+ * Send the DELETE request for a resolved object and remove the object from its cache
+ * when it is gone. GraphClient.delete applies the retry policy (Retry-After, bounded
+ * retries) and reads the object again after a 5xx or network error, so this function
+ * sends the request once.
  */
 export async function sendDeleteRequest(
   task: HydrationTask,
   target: DeleteTarget,
   context: ExecutionContext
 ): Promise<DeleteRequestOutcome> {
-  // Retry logic for transient 400 errors
-  const maxRetries = 3;
-  let lastError: Error = new Error("Unknown error after retries");
-
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      await context.client.delete(target.url, target.apiVersion);
+  try {
+    await context.client.delete(target.url, target.apiVersion);
+  } catch (error) {
+    if (isRunCancelledError(error)) {
+      return { status: "cancelled" };
+    }
+    const lastError = error instanceof Error ? error : new Error(String(error));
+    // ResourceNotFound means that the resource is gone
+    if (lastError.message.toLowerCase().includes("resourcenotfound")) {
+      console.log(`[Delete] "${task.itemName}" - ResourceNotFound, treating as success`);
       removeFromCache(target, context);
       return { status: "deleted" };
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      const message = lastError.message;
-
-      // Check if it's a ResourceNotFound error - this means success (resource is gone)
-      if (message.toLowerCase().includes("resourcenotfound")) {
-        console.log(`[Delete] "${task.itemName}" - ResourceNotFound, treating as success`);
-        removeFromCache(target, context);
-        return { status: "deleted" };
-      }
-
-      // Check if it's a 429 (throttled) or 400 error (transient backend issue) but NOT ResourceNotFound.
-      // Match only the bracketed status marker - a bare "400" would match any
-      // error message containing "400" (IDs, counts) and retry non-transient failures.
-      const is429Error = /\[429\]|TooManyRequests/.test(message);
-      const is400Error = /\[400\]/.test(message);
-      const isRetryable = (is429Error || is400Error) && attempt < maxRetries - 1;
-      if (!isRetryable) {
-        return { status: "failed", error: lastError };
-      }
-
-      const retryDelay = is429Error
-        ? (attempt + 1) * 3000 // 3s, 6s, 9s for throttling
-        : (attempt + 1) * 500; // 500ms, 1000ms, 1500ms for transient
-      console.log(`[Delete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms (${is429Error ? "throttled" : "transient"})`);
-      if ((await sleepWithExecutionControl(retryDelay, context)) === "cancelled") {
-        return { status: "cancelled" };
-      }
     }
+    return { status: "failed", error: lastError };
   }
 
-  return { status: "failed", error: lastError };
+  removeFromCache(target, context);
+  return { status: "deleted" };
 }
 
 /**
