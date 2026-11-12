@@ -101,6 +101,7 @@ describe("createWin32AppFromPackage", () => {
         method: "POST",
         headers: {
           Authorization: "Bearer graph-access-token",
+          "Content-Type": "application/octet-stream",
           "x-intune-content-file-endpoint": "/deviceAppManagement/mobileApps/app-id/microsoft.graph.win32LobApp/contentVersions/content-id/files/file-id",
           "x-intune-upload-url": "https://upload.example/package",
         },
@@ -227,7 +228,10 @@ describe("createWin32AppFromPackage", () => {
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response(
-        JSON.stringify({ error: "Azure Storage block upload failed: 403 Forbidden" }),
+        JSON.stringify({
+          error: "Azure Storage rejected the upload signature.",
+          code: "azureStorageAuthorizationFailed",
+        }),
         { status: 502, headers: { "Content-Type": "application/json" } }
       ))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
@@ -265,10 +269,57 @@ describe("createWin32AppFromPackage", () => {
       expect.objectContaining({
         headers: {
           Authorization: "Bearer graph-access-token",
+          "Content-Type": "application/octet-stream",
           "x-intune-content-file-endpoint": "/deviceAppManagement/mobileApps/app-id/microsoft.graph.win32LobApp/contentVersions/content-id/files/file-id",
           "x-intune-upload-url": "https://upload.example/renewed",
         },
       })
+    );
+  });
+
+  it("does not renew the upload URL for a generic relay failure", async () => {
+    const postNoRetry = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "app-id" })
+      .mockResolvedValueOnce({ id: "content-id" })
+      .mockResolvedValueOnce({ id: "file-id" });
+    const post = vi.fn().mockResolvedValue({});
+    const get = vi.fn().mockResolvedValueOnce({
+      uploadState: "azureStorageUriRequestSuccess",
+      azureStorageUri: "https://upload.example/package",
+    });
+    const deleteApp = vi.fn().mockResolvedValue(undefined);
+    const client = { postNoRetry, post, get, delete: deleteApp };
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(
+      JSON.stringify({ error: "Azure Storage upload failed." }),
+      { status: 502, headers: { "Content-Type": "application/json" } }
+    )));
+
+    await expect(createWin32AppFromPackage(
+      client as never,
+      SEVEN_ZIP_WIN32_APP,
+      {
+        encryptedContent: new Blob(["encrypted-content"]),
+        encryptedContentName: "IntunePackage.intunewin",
+        setupFile: "Install-WinGetPackage.ps1",
+        unencryptedContentSize: 42,
+        encryptionInfo: {
+          encryptionKey: "key",
+          macKey: "mac-key",
+          initializationVector: "iv",
+          mac: "mac",
+          profileIdentifier: "ProfileVersion1",
+          fileDigest: "digest",
+          fileDigestAlgorithm: "SHA256",
+        },
+      },
+      "detected"
+    )).rejects.toThrow("Azure Storage upload failed.");
+
+    expect(post).not.toHaveBeenCalledWith(
+      expect.stringContaining("/renewUpload"),
+      expect.anything(),
+      expect.anything()
     );
   });
 
