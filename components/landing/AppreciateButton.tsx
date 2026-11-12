@@ -1,7 +1,9 @@
 "use client";
 
-import { createElement, useEffect, useState } from "react";
+import { createElement, useSyncExternalStore } from "react";
 import Script from "next/script";
+
+const subscribeToNothing = () => () => {};
 
 /**
  * Render the configured appreciation widget on the landing page.
@@ -12,11 +14,12 @@ import Script from "next/script";
  * keeps tokens, with the wizard and dashboard. No third-party code runs there.
  */
 export function AppreciateButton() {
-  const [isTopLevel, setIsTopLevel] = useState(false);
-
-  useEffect(() => {
-    setIsTopLevel(window.self === window.top);
-  }, []);
+  // False on the server and during hydration, then the real value in the browser.
+  const isTopLevel = useSyncExternalStore(
+    subscribeToNothing,
+    () => window.self === window.top,
+    () => false,
+  );
 
   return (
     <div className="flex items-center justify-center gap-3 text-sm text-white">
