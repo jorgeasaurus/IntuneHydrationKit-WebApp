@@ -18,7 +18,13 @@ const APPRECIATE_WIDGET_ORIGIN = "https://appreciate-button.com";
  * into statically generated pages. A nonce policy needs middleware and makes
  * every page dynamic. 'unsafe-eval' is for the development server only.
  */
-function buildContentSecurityPolicy({ allowAppreciateWidget }: { allowAppreciateWidget: boolean }): string {
+function buildContentSecurityPolicy({
+  allowAppreciateWidget,
+  allowSameOriginFraming = false,
+}: {
+  allowAppreciateWidget: boolean;
+  allowSameOriginFraming?: boolean;
+}): string {
   const widgetOrigins = allowAppreciateWidget ? [APPRECIATE_WIDGET_ORIGIN] : [];
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
@@ -37,14 +43,16 @@ function buildContentSecurityPolicy({ allowAppreciateWidget }: { allowAppreciate
       ...widgetOrigins,
     ],
     // MSAL renews tokens in a hidden iframe when no refresh token is usable.
-    "frame-src": MSAL_AUTHORITY_ORIGINS,
+    // The iframe starts at the login host and ends at the redirect URI on this
+    // origin, so 'self' is needed too. MsalProvider wraps every page.
+    "frame-src": ["'self'", ...MSAL_AUTHORITY_ORIGINS],
     "style-src": ["'self'", "'unsafe-inline'"],
     "img-src": ["'self'", "data:", "https:"],
     "font-src": ["'self'", "data:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
     "form-action": ["'self'"],
-    "frame-ancestors": ["'none'"],
+    "frame-ancestors": [allowSameOriginFraming ? "'self'" : "'none'"],
   };
 
   return Object.entries(directives)
@@ -69,6 +77,11 @@ const COMMON_SECURITY_HEADERS = [
 // split protects only documents that load these routes directly.
 const TOKEN_ROUTE_SOURCES = ["/wizard", "/wizard/:path*", "/dashboard", "/dashboard/:path*"];
 
+// The MSAL redirect URI is the site origin (lib/auth/msalConfig.ts), so the
+// silent renewal iframe lands on "/". Only this path may be framed, and only by
+// this origin. The source matches "/" exactly, not its subpaths.
+const MSAL_REDIRECT_SOURCE = "/";
+
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
@@ -76,9 +89,14 @@ const nextConfig: NextConfig = {
   async headers() {
     const landingPolicy = buildContentSecurityPolicy({ allowAppreciateWidget: true });
     const tokenRoutePolicy = buildContentSecurityPolicy({ allowAppreciateWidget: false });
+    const redirectTargetPolicy = buildContentSecurityPolicy({
+      allowAppreciateWidget: true,
+      allowSameOriginFraming: true,
+    });
 
     // When two entries set the same header, Next.js uses the last entry. The
-    // token route entries come after the catch-all so that they replace its CSP.
+    // token route and redirect entries come after the catch-all so that they
+    // replace its values.
     return [
       {
         source: "/:path*",
@@ -91,6 +109,13 @@ const nextConfig: NextConfig = {
         source,
         headers: [{ key: "Content-Security-Policy", value: tokenRoutePolicy }],
       })),
+      {
+        source: MSAL_REDIRECT_SOURCE,
+        headers: [
+          { key: "Content-Security-Policy", value: redirectTargetPolicy },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+        ],
+      },
     ];
   },
 };
