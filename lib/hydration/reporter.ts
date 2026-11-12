@@ -12,6 +12,12 @@ import {
 import { formatFileTimestamp } from "@/lib/utils/dateFormat";
 import { getTaskEvidenceOutcome, type TaskEvidenceOutcome } from "@/lib/hydration/executionOutcome";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
+import type { PortalLink } from "@/lib/utils/portalLinks";
+
+/** Admin portal links for created objects, keyed by task ID. */
+type PortalLinks = ReadonlyMap<string, PortalLink>;
+
+const NO_PORTAL_LINKS: PortalLinks = new Map();
 
 const TASK_OUTCOME_LABELS: Record<TaskEvidenceOutcome, string> = {
   pending: "Pending",
@@ -57,7 +63,7 @@ function getReportOutcomeLabel(task: HydrationTask, isPreview: boolean): string 
   return TASK_OUTCOME_LABELS[getTaskEvidenceOutcome(task)];
 }
 
-function getTaskMarkdown(task: HydrationTask, isPreview: boolean): string {
+function getTaskMarkdown(task: HydrationTask, isPreview: boolean, portalLink: PortalLink | undefined): string {
   const lines = [
     `${getTaskStatusIcon(task.status)} ${task.itemName}`,
     `   - Outcome: ${getReportOutcomeLabel(task, isPreview)}`,
@@ -67,6 +73,11 @@ function getTaskMarkdown(task: HydrationTask, isPreview: boolean): string {
   if (task.match) {
     lines.push(`   - Matched object: ${task.match.name} (${task.match.id})`, `   - Match: ${task.match.matchType}`);
     if (task.match.portalUrl) lines.push(`   - Portal: ${task.match.portalUrl}`);
+  }
+  if (portalLink) {
+    lines.push(portalLink.target === "object"
+      ? `   - Created object in portal: ${portalLink.href}`
+      : `   - Portal list (${portalLink.label}): ${portalLink.href}`);
   }
   if (task.drift) {
     lines.push(`   - Configuration comparison: ${task.drift.status}`);
@@ -85,6 +96,7 @@ export function generateMarkdownReport(
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
+  portalLinks: PortalLinks = NO_PORTAL_LINKS,
 ): string {
   const stats = getExportStats(summary, isPreview);
   const provenance = summary.provenance;
@@ -133,7 +145,7 @@ Sequential checks include skipped tasks. A batch fallback can count in both path
   markdown += "## Task Details\n\n";
   for (const [category, categoryTasks] of Object.entries(groupTasksByCategory(tasks))) {
     markdown += `### ${getTaskCategoryLabel(category)}\n\n`;
-    markdown += categoryTasks.map((task) => getTaskMarkdown(task, isPreview)).join("") + "\n";
+    markdown += categoryTasks.map((task) => getTaskMarkdown(task, isPreview, portalLinks.get(task.id))).join("") + "\n";
   }
   for (const [label, entries] of [["Warnings", summary.warnings], ["Errors", summary.errors]] as const) {
     if (entries.length === 0) continue;
@@ -152,6 +164,7 @@ export function generateJSONReport(
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
+  portalLinks: PortalLinks = NO_PORTAL_LINKS,
 ): string {
   return JSON.stringify({
     outcome,
@@ -169,12 +182,17 @@ export function generateJSONReport(
       warning: task.warning,
       match: task.match,
       drift: task.drift,
+      portalLink: getJSONPortalLink(portalLinks.get(task.id)),
       startTime: task.startTime?.toISOString(),
       endTime: task.endTime?.toISOString(),
       duration: task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : null,
     })),
     metadata: { reportVersion: "2.0", generatedAt: new Date().toISOString() },
   }, null, 2);
+}
+
+function getJSONPortalLink(link: PortalLink | undefined) {
+  return link ? { url: link.href, target: link.target, label: link.label } : undefined;
 }
 
 function escapeCSVField(value: string | number): string {
@@ -189,6 +207,7 @@ export function generateCSVReport(
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
   summary?: HydrationSummary,
+  portalLinks: PortalLinks = NO_PORTAL_LINKS,
 ): string {
   const headers = [
     "Category", "Item Name", "Operation", "Execution Mode", "Run Outcome", "Status", "Outcome",
@@ -196,6 +215,7 @@ export function generateCSVReport(
     "Matched Object ID", "Matched Object Name", "Match Type", "Portal URL", "Configuration Comparison",
     "Differences", "Comparison Reason", "Tenant ID", "Run ID", "App Version", "Baseline Version", "Baseline Source SHA",
     "Run Start (UTC)", "Run End (UTC)", "Exported (UTC)", "Created", "Deleted", "Would Create", "Would Delete",
+    "Created Object Portal URL",
   ];
   const stats = summary ? getExportStats(summary, isPreview) : null;
   const provenance = summary?.provenance;
@@ -214,11 +234,17 @@ export function generateCSVReport(
     task.match?.id ?? "", task.match?.name ?? "", task.match?.matchType ?? "", task.match?.portalUrl ?? "",
     task.drift?.status ?? "", task.drift?.differences.join("; ") ?? "", task.drift?.reason ?? "",
     ...runValues,
+    getCSVPortalUrl(portalLinks.get(task.id)),
   ]);
   if (taskRows.length === 0) {
-    taskRows.push(["", "", "", isPreview ? "preview" : "live", outcome, ...Array<string>(15).fill(""), ...runValues]);
+    taskRows.push(["", "", "", isPreview ? "preview" : "live", outcome, ...Array<string>(15).fill(""), ...runValues, ""]);
   }
   return [headers, ...taskRows].map((row) => row.map(escapeCSVField).join(",")).join("\n");
+}
+
+/** The CSV column holds per-object links only. A list link does not identify the object. */
+function getCSVPortalUrl(link: PortalLink | undefined): string {
+  return link?.target === "object" ? link.href : "";
 }
 
 /**
