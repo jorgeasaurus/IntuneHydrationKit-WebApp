@@ -39,6 +39,7 @@ import {
   findByNamePrecedence,
   findBaselineTemplate,
   findCISBaselineTemplate,
+  getLicenseSkipReason,
   getOIBPolicyType,
 } from "./utils";
 import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
@@ -503,6 +504,11 @@ async function prepareTaskForBatch(
   let endpoint = "";
   let apiVersion: ApiVersion = "beta";
 
+  const licenseSkipReason = getLicenseSkipReason(task, context);
+  if (licenseSkipReason) {
+    return { type: "skip", reason: licenseSkipReason, skipKind: "blocked" };
+  }
+
   switch (task.category) {
     case "groups": {
       const result = buildGroupRequestBody(task, context);
@@ -531,11 +537,6 @@ async function prepareTaskForBatch(
     }
 
     case "conditionalAccess": {
-      // Skip all CA policies if tenant lacks Entra ID Premium P1 license
-      if (context.hasConditionalAccessLicense === false) {
-        return { type: "skip", reason: "No Entra ID Premium (P1) license", skipKind: "blocked" };
-      }
-
       // Check if policy already exists in the prefetched tenant cache
       const exists = await policyExistsInCache("ConditionalAccess", task.itemName, context);
       if (exists === undefined) return { type: "sequential" };

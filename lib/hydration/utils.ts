@@ -4,6 +4,7 @@
  * Common utility functions used across the hydration engine
  */
 
+import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import {
   getAllTemplateCacheKeys,
   getCachedTemplates,
@@ -12,6 +13,44 @@ import {
 } from "@/lib/templates/loader";
 import type { HydrationTask } from "@/types/hydration";
 import type { CISPolicyType, ExecutionContext, TenantCacheKey } from "./types";
+
+export const LICENSE_SKIP_REASONS = {
+  conditionalAccess: "No Entra ID Premium (P1) license",
+  premiumP2: "Requires Premium P2 license",
+  driverUpdate: "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)",
+} as const;
+
+function isDriverUpdateTask(task: HydrationTask): boolean {
+  const name = task.itemName.toLowerCase();
+  return name.includes("wufb drivers") || name.includes("driver update");
+}
+
+/**
+ * License check before a create is dispatched, used by the batch and the sequential path.
+ * Returns the skip reason when the tenant does not have the license that the object needs.
+ * Delete is not checked, so existing kit objects can be removed after a license change.
+ */
+export function getLicenseSkipReason(task: HydrationTask, context: ExecutionContext): string | undefined {
+  if (task.operation !== "create") return undefined;
+
+  if (task.category === "conditionalAccess") {
+    if (context.hasConditionalAccessLicense === false) return LICENSE_SKIP_REASONS.conditionalAccess;
+    if (context.hasPremiumP2License === false) {
+      const templates = getCachedTemplates("conditionalAccess");
+      const template = Array.isArray(templates)
+        ? (templates as Array<{ displayName?: string; conditions?: Record<string, unknown> }>).find(
+            (policy) => policy.displayName === task.itemName
+          )
+        : undefined;
+      if (template && policyRequiresPremiumP2(template)) return LICENSE_SKIP_REASONS.premiumP2;
+    }
+  }
+
+  if (context.hasWindowsDriverUpdateLicense === false && isDriverUpdateTask(task)) {
+    return LICENSE_SKIP_REASONS.driverUpdate;
+  }
+  return undefined;
+}
 
 /**
  * Policy type of a baseline template: a CIS policy type, or App Protection.

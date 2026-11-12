@@ -8,7 +8,6 @@ import { ConditionalAccessPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
 import { executeDeleteTask } from "../deleteResolver";
 import { createConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
-import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
 import { normalizeName, requireTenantCache } from "../utils";
 
@@ -58,37 +57,7 @@ export async function executeConditionalAccessTask(
       return { task, success: false, skipped: false, error: "Template not found" };
     }
 
-    // Check if tenant has Entra ID Premium P1 license (required for ALL CA policies)
-    if (context.hasConditionalAccessLicense === false) {
-      console.log(
-        `[Conditional Access] Skipped: ${template.displayName} - no Entra ID Premium (P1) license`
-      );
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "blocked",
-        error: "No Entra ID Premium (P1) license",
-      };
-    }
-
-    // Check if policy requires Premium P2 and tenant doesn't have it (PowerShell parity)
-    if (
-      context.hasPremiumP2License === false &&
-      policyRequiresPremiumP2(template as ConditionalAccessPolicy)
-    ) {
-      console.log(
-        `[Conditional Access] Skipped: ${template.displayName} - requires Azure AD Premium P2 license (uses risk-based conditions)`
-      );
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "blocked",
-        error: "Requires Premium P2 license",
-      };
-    }
-
+    // The Premium P1/P2 license checks run before dispatch (getLicenseSkipReason in utils.ts).
     const existingPolicy = findCachedConditionalAccessPolicy(
       template.displayName,
       requireTenantCache(context, "cachedConditionalAccessPolicies")

@@ -28,7 +28,7 @@ import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
-import { sleep, sleepWithExecutionControl, waitWhilePaused, TENANT_CACHE_LABELS } from "./utils";
+import { getLicenseSkipReason, sleep, sleepWithExecutionControl, waitWhilePaused, TENANT_CACHE_LABELS } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage, TenantCacheKey } from "./types";
 import { executeGroupTask } from "./taskExecutors/groupTask";
 import { executeFilterTask } from "./taskExecutors/filterTask";
@@ -183,18 +183,11 @@ async function executeTask(
   try {
     let result: ExecutionResult;
 
-    // Check for Windows Driver Update license requirement
-    const isDriverUpdateProfile = task.itemName.toLowerCase().includes("wufb drivers") ||
-      task.itemName.toLowerCase().includes("driver update");
-
-    // Create only: a delete task goes to the delete resolver on both delete paths,
-    // so that existing kit objects can be removed after a license change.
-    if (task.operation === "create" && isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
-      markTaskSkipped(
-        task,
-        "blocked",
-        "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)"
-      );
+    // The same license check as the batch path. Create only: a delete task goes to the
+    // delete resolver, so that existing kit objects can be removed after a license change.
+    const licenseSkipReason = getLicenseSkipReason(task, context);
+    if (licenseSkipReason) {
+      markTaskSkipped(task, "blocked", licenseSkipReason);
       task.endTime = new Date();
       context.onTaskComplete?.(task);
       return {
