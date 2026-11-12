@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
+import { useRunHistoryRecorder } from "@/hooks/useRunHistoryRecorder";
 import { useWizardState } from "@/hooks/useWizardState";
 import {
   clearHydrationSession,
@@ -94,6 +95,7 @@ export function useDashboardRun() {
     startExecution,
     reset,
   } = execution;
+  useRunHistoryRecorder(execution);
 
   useEffect(() => {
     if (!activeHomeAccountId || !activeTenantId) return;

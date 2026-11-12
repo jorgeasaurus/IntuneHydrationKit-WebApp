@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, RotateCcw, Settings2 } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, History, RotateCcw, Settings2 } from "lucide-react";
 import { AppNavigation } from "@/components/AppNavigation";
 import { SensitiveData } from "@/components/SensitiveData";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -245,6 +246,14 @@ function RunNavigation({
             <Settings2 aria-hidden="true" className="size-4 sm:mr-2" />
             <span className="sr-only sm:not-sr-only">Settings</span>
           </Button>
+          {isCompleted && (
+            <Button variant="outline" asChild className="nav-action size-9 px-0 sm:w-auto sm:px-3">
+              <Link href="/history">
+                <History aria-hidden="true" className="size-4 sm:mr-2" />
+                <span className="sr-only sm:not-sr-only">Run history</span>
+              </Link>
+            </Button>
+          )}
           {isCompleted && (
             <Button
               variant="outline"

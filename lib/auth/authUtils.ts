@@ -3,6 +3,7 @@ import { msalInstance, loginRequest, getAuthorityUrl, initializeMsal } from "./m
 import { markLeavingForSignOut, notifySignOut } from "./sessionEvents";
 import { clearHydrationSession } from "@/lib/hydration/executionRecord";
 import { resetExecutionSession } from "@/lib/hydration/executionStateStore";
+import { clearRunHistory } from "@/lib/history/runHistory";
 
 /**
  * Get the active account from MSAL.
@@ -117,14 +118,16 @@ export async function signIn(): Promise<AccountInfo> {
 }
 
 /**
- * Clear all app data from sessionStorage (tenant results and template caches) and
+ * Clear all app data from sessionStorage (tenant results, run history, and template caches) and
  * in-memory session state. Prevents cross-tenant/cross-user data leakage on shared browsers.
- * App settings in localStorage are device preferences without tenant data, so they stay.
+ * App settings and scope profiles in localStorage are device preferences without tenant data,
+ * so they stay.
  */
 function clearSessionData(): void {
   if (typeof window === "undefined") return;
 
   clearHydrationSession(sessionStorage);
+  clearRunHistory(sessionStorage);
   resetExecutionSession();
   notifySignOut();
 }

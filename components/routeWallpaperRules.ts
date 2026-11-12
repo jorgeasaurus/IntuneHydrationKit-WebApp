@@ -2,6 +2,7 @@ const WALLPAPER_ROUTES = new Set([
   "/",
   "/wizard",
   "/dashboard",
+  "/history",
   "/templates",
 ]);
 
