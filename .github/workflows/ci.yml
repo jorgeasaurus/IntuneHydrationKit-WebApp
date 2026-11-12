@@ -51,7 +51,8 @@ jobs:
 
   e2e:
     name: Signed-out browser tests
-    runs-on: ubuntu-latest
+    # Playwright 1.57 has no browser build for the ubuntu-latest (26.04) image.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
