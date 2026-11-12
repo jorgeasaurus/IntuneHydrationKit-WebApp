@@ -1,4 +1,4 @@
-import type { CloudEnvironment, TaskCategory } from "@/types/hydration";
+import type { CloudEnvironment, HydrationTask, TaskCategory } from "@/types/hydration";
 
 /**
  * Admin portal links for objects that a run created.
@@ -150,4 +150,33 @@ export function getPortalLink({ cloud, category, objectId, objectName, policyTyp
     accessibleName: `${label} (list that contains ${objectName})`,
     target: "list",
   };
+}
+
+const NO_LINKS: ReadonlyMap<string, PortalLink> = new Map();
+
+/**
+ * Portal links for the objects that the tasks created, keyed by task ID.
+ * Only successful live create tasks with a created object get a link.
+ * A run without a known cloud gets no links.
+ */
+export function getCreatedObjectLinks(
+  tasks: readonly HydrationTask[],
+  cloud: CloudEnvironment | undefined,
+  isPreview: boolean,
+): ReadonlyMap<string, PortalLink> {
+  if (!cloud || isPreview) return NO_LINKS;
+  const links = new Map<string, PortalLink>();
+  for (const task of tasks) {
+    const { createdObject } = task;
+    if (!createdObject || task.status !== "success" || task.operation !== "create") continue;
+    const link = getPortalLink({
+      cloud,
+      category: task.category,
+      objectId: createdObject.id,
+      objectName: task.itemName,
+      policyType: createdObject.policyType,
+    });
+    if (link) links.set(task.id, link);
+  }
+  return links.size > 0 ? links : NO_LINKS;
 }
