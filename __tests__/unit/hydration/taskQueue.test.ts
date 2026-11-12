@@ -160,7 +160,7 @@ describe("taskQueue", () => {
       { displayName: "Dynamic Group A" },
       { displayName: "Dynamic Group B" },
       { displayName: "Static Group A" },
-    ]);
+    ], { complete: true });
     expect(tasks.map((task) => task.itemName)).toEqual([
       "Dynamic Group B",
       "Static Group A",
@@ -304,7 +304,7 @@ describe("taskQueue", () => {
 
     expect(mockFetchCISBaselinePolicies).toHaveBeenCalledTimes(1);
     expect(mockFetchCISBaselinePoliciesByCategories).not.toHaveBeenCalled();
-    expect(mockCacheTemplates).toHaveBeenCalledWith("cisBaseline", expect.any(Array));
+    expect(mockCacheTemplates).toHaveBeenCalledWith("cisBaseline", expect.any(Array), { complete: true });
     expect(tasks).toHaveLength(2);
     expect(tasks.map((task) => task.itemName)).toEqual([
       "Known CIS Policy",

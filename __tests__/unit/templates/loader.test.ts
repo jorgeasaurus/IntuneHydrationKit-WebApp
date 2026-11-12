@@ -440,6 +440,62 @@ describe("template loader", () => {
     expect(getCachedTemplates("module-test")).toBeNull();
   });
 
+  it("reports failed and thrown file requests while returning the files it could read", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.endsWith("Windows-Compliance-Policy.json")) {
+        return { ok: false, status: 503, statusText: "Service Unavailable" };
+      }
+      if (url.endsWith("iOS-Compliance-Basic.json")) {
+        throw new TypeError("Failed to fetch");
+      }
+      return {
+        ok: true,
+        statusText: "OK",
+        json: async () => ({ "@odata.type": "#microsoft.graph.test", displayName: url.split("/").pop() }),
+      };
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const report = { failedFiles: [] as string[] };
+    const policies = await fetchCompliancePolicies(report);
+
+    expect(policies).toHaveLength(8);
+    expect(report.failedFiles).toEqual([
+      "Compliance/Windows-Compliance-Policy.json",
+      "Compliance/iOS-Compliance-Basic.json",
+    ]);
+  });
+
+  it("reports a missing OIB policy file", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => ({ ok: false, status: 500, statusText: "Server Error" })),
+    );
+
+    const report = { failedFiles: [] as string[] };
+    const file = { path: "WINDOWS/SettingsCatalog/a.json", platform: "WINDOWS", policyType: "SettingsCatalog", displayName: "A" };
+    await expect(fetchBaselinePolicyByManifestFile(file, report)).resolves.toBeNull();
+    expect(report.failedFiles).toEqual(["WINDOWS/SettingsCatalog/a.json"]);
+  });
+
+  it("hides an incomplete cache entry from complete-only reads until a complete list replaces it", () => {
+    cacheTemplates("incomplete-test", [{ displayName: "Partial" }], { complete: false });
+    expect(getCachedTemplates("incomplete-test")).toEqual([{ displayName: "Partial" }]);
+    expect(getCachedTemplates("incomplete-test", { completeOnly: true })).toBeNull();
+
+    cacheTemplates("incomplete-test", [{ displayName: "Partial" }, { displayName: "Full" }]);
+    expect(getCachedTemplates("incomplete-test", { completeOnly: true })).toHaveLength(2);
+
+    cacheTemplates("incomplete-test", [], { complete: false });
+    clearCategoryCache("incomplete-test");
+    cacheTemplates("incomplete-test", [{ displayName: "Again" }]);
+    expect(getCachedTemplates("incomplete-test", { completeOnly: true })).toEqual([{ displayName: "Again" }]);
+    clearCategoryCache("incomplete-test");
+  });
+
   it("transforms OIB manifest files using the policy name and manifest metadata", async () => {
     const fetchMock = vi.fn(async () => ({
       ok: true,
