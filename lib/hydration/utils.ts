@@ -4,6 +4,7 @@
  * Common utility functions used across the hydration engine
  */
 
+import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
 import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import {
   getAllTemplateCacheKeys,
@@ -66,12 +67,13 @@ export function getLicenseSkipReason(task: HydrationTask, context: ExecutionCont
 export type BaselinePolicyType = CISPolicyType | "AppProtection";
 
 /**
- * Find the OpenIntuneBaseline template of a task.
+ * Find the OpenIntuneBaseline template of a task: by the task's file path when it has one,
+ * otherwise by name (see findBaselineTemplateForTask).
  */
 export function findBaselineTemplate(task: HydrationTask, context: ExecutionContext): BaselinePolicy | undefined {
   const templates = context.cachedBaselineTemplates || getCachedTemplates("baseline");
   if (!Array.isArray(templates)) return undefined;
-  return (templates as BaselinePolicy[]).find((policy) => (policy.name || policy.displayName) === task.itemName);
+  return findBaselineTemplateForTask(templates as BaselinePolicy[], task);
 }
 
 /**

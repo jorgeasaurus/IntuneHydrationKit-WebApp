@@ -279,6 +279,42 @@ describe("executeTasksInBatches", () => {
     );
   });
 
+  it("resolves OpenIntuneBaseline batch templates by selected file path when names collide", async () => {
+    const policyName = "[IHD] Duplicate OIB Policy";
+    const template = (description: string, path: string) => ({
+      name: policyName,
+      displayName: policyName,
+      description,
+      platforms: "windows10",
+      technologies: "mdm",
+      _oibPolicyType: "SettingsCatalog",
+      _oibFilePath: path,
+      settings: [],
+    });
+    mockGetCachedTemplates.mockImplementation((category?: string) =>
+      category === "baseline"
+        ? [template("first", "WINDOWS/SettingsCatalog/a.json"), template("second", "WINDOWS/SettingsCatalog/b.json")]
+        : undefined
+    );
+
+    const task: HydrationTask = {
+      id: "batch-create-oib-path",
+      category: "baseline",
+      operation: "create",
+      itemName: policyName,
+      templatePath: "WINDOWS/SettingsCatalog/b.json",
+      status: "pending",
+    };
+    const client = createBatchClient();
+
+    await executeTasksInBatches([task], createCreateContext(client, { cachedSettingsCatalogPolicies: [] }));
+
+    expect(client.batch).toHaveBeenCalledWith(
+      [expect.objectContaining({ body: expect.objectContaining({ description: expect.stringContaining("second") }) })],
+      "beta"
+    );
+  });
+
   it("replaces OIB organization placeholders in batch Settings Catalog requests", async () => {
     const policyName = "[IHD] OneDrive configuration";
     const tenantId = "12345678-1234-1234-1234-123456789abc";
