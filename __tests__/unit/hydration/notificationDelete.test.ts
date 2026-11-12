@@ -9,9 +9,9 @@ import type { HydrationTask } from "@/types/hydration";
 
 const ENDPOINT = "/deviceManagement/notificationMessageTemplates";
 const V1_REFERENCES =
-  "/deviceManagement/deviceCompliancePolicies?$select=id,displayName&$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)";
+  "/deviceManagement/deviceCompliancePolicies?$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)";
 const V2_REFERENCES =
-  "/deviceManagement/compliancePolicies?$select=id,name&$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)";
+  "/deviceManagement/compliancePolicies?$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)";
 const ENROLLMENT_CONFIGURATIONS = "/deviceManagement/deviceEnrollmentConfigurations";
 const NOTIFICATION_TYPE = "#microsoft.graph.deviceEnrollmentNotificationConfiguration";
 const KIT_NAME = "[IHD] First Alert";

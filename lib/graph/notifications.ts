@@ -170,8 +170,9 @@ export async function getNotificationTemplateReferences(
 
   for (const collection of REFERENCING_COLLECTIONS) {
     const policies = await client.getCollection<Record<string, unknown>>(
-      `${collection.endpoint}?$select=id,${collection.nameProperty}` +
-        `&$expand=${collection.actionsProperty}($expand=scheduledActionConfigurations)`
+      // No $select: some Intune list endpoints leave out an expanded navigation property
+      // that is not in $select, and a missing action list fails every delete (fail closed).
+      `${collection.endpoint}?$expand=${collection.actionsProperty}($expand=scheduledActionConfigurations)`
     );
     for (const policy of policies) {
       const actions = policy[collection.actionsProperty];
