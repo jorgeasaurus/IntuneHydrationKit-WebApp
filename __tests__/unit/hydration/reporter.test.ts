@@ -8,6 +8,7 @@ import {
   summaryMatchesExecution
 } from '@/lib/hydration/reporter'
 import type { HydrationSummary, HydrationTask } from '@/types/hydration'
+import type { PortalLink } from '@/lib/utils/portalLinks'
 
 describe('reporter', () => {
   const mockTasks: HydrationTask[] = [
@@ -552,6 +553,52 @@ describe('reporter', () => {
       expect(Object.fromEntries(headers.map((header, index) => [header, values[index]]))).toMatchObject({ 'Run ID': 'run-123', 'App Version': '2.6.53', 'Baseline Version': '4.0', 'Baseline Source SHA': 'abc123', 'Run Start (UTC)': '2024-01-15 10:00:00', 'Run End (UTC)': '2024-01-15 10:10:00' })
       expect(summaryMatchesExecution(summary, { ...summary, tasks: [] })).toBe(true)
       expect(summaryMatchesExecution(summary, { ...summary, provenance: { ...provenance, runId: 'different' }, tasks: [] })).toBe(false)
+    })
+  })
+
+  describe('portal links', () => {
+    const objectLink = {
+      href: 'https://entra.microsoft.com/#view/Microsoft_AAD_IAM/GroupDetailsMenuBlade/~/Overview/groupId/abc',
+      label: 'Open in Entra admin center',
+      accessibleName: 'Open in Entra admin center: All Windows Devices',
+      target: 'object' as const,
+    }
+    const listLink = {
+      href: 'https://intune.microsoft.com/#view/Microsoft_Intune_DeviceSettings/DevicesMenu/~/assignmentFilters',
+      label: 'Open Assignment filters in Intune',
+      accessibleName: 'Open Assignment filters in Intune (list that contains Filter)',
+      target: 'list' as const,
+    }
+    const links = new Map<string, PortalLink>([[mockTasks[0].id, objectLink], [mockTasks[1].id, listLink]])
+
+    it('adds the created object URL as the last CSV column', () => {
+      const lines = generateCSVReport(mockTasks, 'completedWithIssues', false, mockSummary, links).split('\n')
+      const headers: string[] = JSON.parse(`[${lines[0]}]`)
+      const rows: string[][] = lines.slice(1).map((line) => JSON.parse(`[${line}]`))
+      expect(headers.at(-1)).toBe('Created Object Portal URL')
+      expect(headers.indexOf('Portal URL')).toBe(16)
+      expect(rows[0]).toHaveLength(headers.length)
+      expect(rows[0].at(-1)).toBe(objectLink.href)
+      // A list link does not identify the object, so the column stays empty.
+      expect(rows[1].at(-1)).toBe('')
+      expect(rows[2].at(-1)).toBe('')
+      const empty: string[] = JSON.parse(`[${generateCSVReport([], 'cancelled', false, mockSummary, links).split('\n')[1]}]`)
+      expect(empty).toHaveLength(headers.length)
+    })
+
+    it('adds portal links to the JSON and Markdown task details', () => {
+      const report = JSON.parse(generateJSONReport(mockSummary, mockTasks, 'completedWithIssues', false, links))
+      expect(report.tasks[0].portalLink).toEqual({ url: objectLink.href, target: 'object', label: objectLink.label })
+      expect(report.tasks[1].portalLink).toEqual({ url: listLink.href, target: 'list', label: listLink.label })
+      expect(report.tasks[2]).not.toHaveProperty('portalLink')
+      const markdown = generateMarkdownReport(mockSummary, mockTasks, 'completedWithIssues', false, links)
+      expect(markdown).toContain(`Created object in portal: ${objectLink.href}`)
+      expect(markdown).toContain(`Portal list (Open Assignment filters in Intune): ${listLink.href}`)
+    })
+
+    it('keeps reports unchanged without links', () => {
+      expect(generateCSVReport(mockTasks, 'completedWithIssues', false).split('\n')[1]).toMatch(/,""$/)
+      expect(generateMarkdownReport(mockSummary, mockTasks, 'completedWithIssues', false)).not.toContain('portal:')
     })
   })
 

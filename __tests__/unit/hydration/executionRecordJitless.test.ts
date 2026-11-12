@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 /**
  * Zod's JIT probe calls `new Function("")`. A strict Content-Security-Policy without
  * 'unsafe-eval' reports that call as a violation on every page, so the schemas must
- * run in jitless mode.
+ * run in jitless mode. The mode is set in lib/utils/zod.ts.
  */
 describe("executionRecord zod configuration", () => {
   afterEach(() => {

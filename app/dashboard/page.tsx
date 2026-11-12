@@ -41,6 +41,8 @@ export default function DashboardPage(): React.JSX.Element {
         activityLog={displayRun.activityLog}
         startTime={displayRun.startTime}
         endTime={displayRun.endTime}
+        pausedMs={displayRun.pausedMs}
+        pauseStartedAt={displayRun.pauseStartedAt}
         operationMode={displayRun.operationMode}
         isPreview={displayRun.isPreview}
         tenantName={displayRun.tenantName}

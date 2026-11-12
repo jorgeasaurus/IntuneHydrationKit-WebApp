@@ -29,6 +29,10 @@ interface DashboardRun {
   activityLog: ActivityMessage[];
   startTime: Date | null;
   endTime: Date | null;
+  /** Total time of closed engine pause waits, in milliseconds. */
+  pausedMs: number;
+  /** Start of the open engine pause wait, or null. */
+  pauseStartedAt: Date | null;
 }
 
 function getLiveDashboardRun(execution: ExecutionState, state: WizardState): DashboardRun {
@@ -45,7 +49,13 @@ function getLiveDashboardRun(execution: ExecutionState, state: WizardState): Das
     activityLog: execution.activityLog,
     startTime: execution.startTime,
     endTime: execution.endTime,
+    pausedMs: execution.pausedMs,
+    pauseStartedAt: execution.pauseStartedAt,
   };
+}
+
+function getRestoredDashboardRun(record: ExecutionRecord): DashboardRun {
+  return { ...record, pausedMs: record.pausedMs ?? 0, pauseStartedAt: null };
 }
 
 function hasDifferentOwner(
@@ -76,6 +86,7 @@ export function useDashboardRun() {
     isCompleted,
     startTime,
     endTime,
+    pausedMs,
     summary,
     outcome,
     fatalError,
@@ -128,6 +139,7 @@ export function useDashboardRun() {
       activityLog,
       startTime,
       endTime,
+      pausedMs,
     };
     if (outcome === "failed") {
       if (!fatalError) return;
@@ -146,9 +158,9 @@ export function useDashboardRun() {
       summary,
       fatalError: null,
     });
-  }, [activityLog, endTime, fatalError, isCompleted, outcome, startTime, configuration, summary, tasks]);
+  }, [activityLog, endTime, fatalError, isCompleted, outcome, pausedMs, startTime, configuration, summary, tasks]);
 
-  const displayRun = restoredRecord ?? getLiveDashboardRun(execution, state);
+  const displayRun = restoredRecord ? getRestoredDashboardRun(restoredRecord) : getLiveDashboardRun(execution, state);
   const displayCompleted = Boolean(restoredRecord) || isCompleted;
   const selectedObjectCount = restoredRecord
     ? restoredRecord.selectedObjectCount
@@ -172,6 +184,7 @@ export function useDashboardRun() {
       activityLog: displayRun.activityLog,
       startTime: displayRun.startTime,
       endTime: displayRun.endTime,
+      pausedMs: displayRun.pausedMs,
       operationMode: displayRun.operationMode,
       tenantId: displayRun.tenantId,
       outcome: displayRun.outcome,

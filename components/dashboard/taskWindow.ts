@@ -1,3 +1,5 @@
+import type { HydrationTask } from "@/types/hydration";
+
 /** Lists longer than this render through the windowed list. */
 export const VIRTUALIZE_THRESHOLD = 50;
 
@@ -56,4 +58,14 @@ export function getRowWindow(
     start: Math.max(0, first - overscan),
     end: Math.min(rowCount, last + 1 + overscan),
   };
+}
+
+/** Slot height (row plus gap) of a windowed row without a detail message. */
+export const TASK_ROW_HEIGHT = 76;
+/** Slot height (row plus gap) of a windowed row with a two-line detail message. */
+export const TASK_ROW_WITH_DETAIL_HEIGHT = 142;
+
+/** Fixed slot height of a windowed task row. The value depends only on task data, so no measurement is necessary. */
+export function getTaskRowHeight(task: HydrationTask): number {
+  return task.error ?? task.warning ? TASK_ROW_WITH_DETAIL_HEIGHT : TASK_ROW_HEIGHT;
 }

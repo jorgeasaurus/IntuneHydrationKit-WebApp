@@ -4,12 +4,14 @@ import {
   Ban,
   Check,
   Circle,
+  ExternalLink,
   Loader2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HydrationTask, TaskStatus } from "@/types/hydration";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
+import type { PortalLink } from "@/lib/utils/portalLinks";
 
 const STATUS_CONFIG: Record<
   TaskStatus,
@@ -66,24 +68,16 @@ function formatDuration(task: HydrationTask): string | null {
   return `${Math.round((task.endTime.getTime() - task.startTime.getTime()) / 1000)}s`;
 }
 
-/** Slot height (row plus gap) of a windowed row without a detail message. */
-export const TASK_ROW_HEIGHT = 76;
-/** Slot height (row plus gap) of a windowed row with a two-line detail message. */
-export const TASK_ROW_WITH_DETAIL_HEIGHT = 142;
-
-/** Fixed slot height of a windowed row. The value depends only on task data, so no measurement is necessary. */
-export function getTaskRowHeight(task: HydrationTask): number {
-  return task.error ?? task.warning ? TASK_ROW_WITH_DETAIL_HEIGHT : TASK_ROW_HEIGHT;
-}
-
 interface TaskRowProps {
   task: HydrationTask;
   /** Clamp the content so the row fits its fixed windowed slot. */
   fixedHeight?: boolean;
+  /** Admin portal link for an object that this task created. */
+  portalLink?: PortalLink;
 }
 
 /** One task card. The caller supplies the list item wrapper. */
-function TaskRowComponent({ task, fixedHeight = false }: TaskRowProps): React.JSX.Element {
+function TaskRowComponent({ task, fixedHeight = false, portalLink }: TaskRowProps): React.JSX.Element {
   const status = STATUS_CONFIG[task.status];
   const duration = formatDuration(task);
   const detail = task.error ?? task.warning;
@@ -133,14 +127,29 @@ function TaskRowComponent({ task, fixedHeight = false }: TaskRowProps): React.JS
             </div>
           </div>
 
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center rounded-full border px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em]",
-              status.badgeClassName
+          <div className="flex shrink-0 items-center gap-1.5">
+            {portalLink && (
+              // An icon-size link keeps the row height fixed for the windowed list.
+              <a
+                href={portalLink.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={portalLink.accessibleName}
+                title={portalLink.label}
+                className="flex size-6 items-center justify-center rounded-md border border-sky-300/25 bg-sky-300/10 text-sky-100 transition-colors hover:border-sky-200/60 hover:bg-sky-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+              >
+                <ExternalLink aria-hidden="true" className="size-3.5" />
+              </a>
             )}
-          >
-            {status.label}
-          </span>
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em]",
+                status.badgeClassName
+              )}
+            >
+              {status.label}
+            </span>
+          </div>
         </div>
 
         {detail && (

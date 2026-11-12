@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/utils/zod";
 import { EXECUTION_RECORD_STORAGE_KEY } from "@/lib/storageKeys";
 import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { summaryMatchesExecution } from "@/lib/hydration/reporter";
@@ -10,11 +10,6 @@ import {
   SKIP_KINDS,
   TASK_CATEGORIES,
 } from "@/types/hydration";
-
-// Zod's JIT feature probe calls `new Function("")`. The production Content-Security-Policy
-// has no 'unsafe-eval', so the probe causes a script-src violation report on every page.
-// Jitless mode must be set before the first schema is built.
-z.config({ jitless: true });
 
 const operationModeSchema = z.enum(OPERATION_MODES);
 const taskCategorySchema = z.enum(TASK_CATEGORIES);
@@ -94,6 +89,7 @@ const summarySchema = z.strictObject({
   startTime: dateSchema,
   endTime: dateSchema,
   duration: z.number().nonnegative(),
+  pausedDuration: z.number().positive().optional(),
   stats: z.strictObject({
     total: z.number().int().nonnegative(),
     created: z.number().int().nonnegative(),
@@ -126,6 +122,8 @@ const recordBase = z.strictObject({
   activityLog: z.array(activityMessageSchema),
   startTime: dateSchema.nullable(),
   endTime: dateSchema,
+  /** Paused time of the run. Records saved before this field was added do not have it. */
+  pausedMs: z.number().nonnegative().optional(),
 });
 
 const reportableRecordSchema = recordBase.extend({
@@ -176,6 +174,16 @@ const executionRecordSchema = z.union([reportableRecordSchema, failedRecordSchem
       path: ["outcome"],
     });
   }
+  if (
+    record.pausedMs &&
+    (record.startTime === null || record.pausedMs > record.endTime.getTime() - record.startTime.getTime())
+  ) {
+    context.addIssue({
+      code: "custom",
+      message: "Paused time is longer than the run.",
+      path: ["pausedMs"],
+    });
+  }
   if (record.summary) {
     const summaryMatches =
       record.startTime !== null &&
@@ -186,6 +194,7 @@ const executionRecordSchema = z.union([reportableRecordSchema, failedRecordSchem
         startTime: record.startTime,
         endTime: record.endTime,
         tasks: record.tasks,
+        pausedMs: record.pausedMs,
       });
     const batchStats = record.summary.batchStats;
     const batchStatsMatch =

@@ -181,6 +181,73 @@ describe('GraphClient retry policy', () => {
     })
   })
 
+  describe('POST action', () => {
+    const FILE = '/deviceAppManagement/mobileApps/app-1/microsoft.graph.win32LobApp/contentVersions/1/files/file-1'
+
+    it.each(['renewUpload', 'commit'])('retries a 5xx on %s and returns the next response, without a create check', async (action) => {
+      let posts = 0
+      let reads = 0
+      server.use(
+        http.post(`${GRAPH_BASE}/beta${FILE}/${action}`, () => {
+          posts++
+          return posts < 3
+            ? HttpResponse.json({ error: { message: 'Internal error' } }, { status: posts === 1 ? 500 : 503 })
+            : new HttpResponse(null, { status: 204 })
+        }),
+        http.get(`${GRAPH_BASE}/beta${FILE}`, () => {
+          reads++
+          return HttpResponse.json({})
+        })
+      )
+      const { client, wait } = createClient()
+
+      await expect(client.postAction(`${FILE}/${action}`, action === 'commit' ? { fileEncryptionInfo: {} } : {})).resolves.toEqual({})
+      expect(posts).toBe(3)
+      expect(reads).toBe(0)
+      expect(wait).toHaveBeenCalledTimes(2)
+    })
+
+    it('retries a network error and stops after MAX_RETRIES', async () => {
+      let posts = 0
+      server.use(
+        http.post(`${GRAPH_BASE}/beta${FILE}/renewUpload`, () => {
+          posts++
+          return HttpResponse.error()
+        })
+      )
+      const { client } = createClient()
+
+      await expect(client.postAction(`${FILE}/renewUpload`, {})).rejects.toThrow()
+      expect(posts).toBe(4)
+    })
+
+    it('does not retry a 400 response', async () => {
+      let posts = 0
+      server.use(
+        http.post(`${GRAPH_BASE}/beta${FILE}/commit`, () => {
+          posts++
+          return HttpResponse.json({ error: { code: 'BadRequest', message: 'Invalid state' } }, { status: 400 })
+        })
+      )
+      const { client } = createClient()
+
+      await expect(client.postAction(`${FILE}/commit`, {})).rejects.toMatchObject({ status: 400 })
+      expect(posts).toBe(1)
+    })
+
+    it('stops when the run is cancelled during a retry wait', async () => {
+      server.use(
+        http.post(`${GRAPH_BASE}/beta${FILE}/commit`, () =>
+          HttpResponse.json({ error: { message: 'Internal error' } }, { status: 500 })
+        )
+      )
+      const client = new GraphClient()
+      client.setExecutionControls({ wait: async () => 'cancelled' })
+
+      await expect(client.postAction(`${FILE}/commit`, {})).rejects.toBeInstanceOf(RunCancelledError)
+    })
+  })
+
   describe('GET', () => {
     it('caps one Retry-After wait', async () => {
       let reads = 0

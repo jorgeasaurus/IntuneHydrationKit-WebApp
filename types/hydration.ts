@@ -144,7 +144,10 @@ export interface HydrationSummary {
   operationMode: OperationMode;
   startTime: Date;
   endTime: Date;
+  /** Active run time in milliseconds: the time from start to end without paused time. */
   duration: number;
+  /** Time in milliseconds that the engine waited while the run was paused. Absent when 0. */
+  pausedDuration?: number;
   stats: {
     total: number;
     created: number;
@@ -191,6 +194,8 @@ export interface TenantConfig {
 export interface AppSettings {
   stopOnFirstError: boolean;
   demoMode: boolean;
+  /** Show a browser notification when a run finishes while the tab is hidden. */
+  notifyOnCompletion: boolean;
 }
 
 /**

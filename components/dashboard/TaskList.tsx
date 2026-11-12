@@ -18,9 +18,12 @@ import { TaskRow } from "@/components/dashboard/TaskRow";
 import { VirtualTaskList } from "@/components/dashboard/VirtualTaskList";
 import { VIRTUALIZE_THRESHOLD } from "@/components/dashboard/taskWindow";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
+import type { PortalLink } from "@/lib/utils/portalLinks";
 
 interface TaskListProps {
   tasks: HydrationTask[];
+  /** Admin portal links for created objects, keyed by task ID. */
+  portalLinks?: ReadonlyMap<string, PortalLink>;
 }
 
 const STATUS_LABELS: Record<TaskStatus, string> = {
@@ -40,7 +43,7 @@ const STATUS_FILTERS: Array<TaskStatus | "all"> = [
   "pending",
 ];
 
-export function TaskList({ tasks }: TaskListProps) {
+export function TaskList({ tasks, portalLinks }: TaskListProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<TaskStatus | "all">("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
@@ -192,6 +195,7 @@ export function TaskList({ tasks }: TaskListProps) {
           <VirtualTaskList
             key={`${statusFilter}|${categoryFilter}|${deferredSearchTerm}`}
             tasks={filteredTasks}
+            portalLinks={portalLinks}
           />
         ) : (
           <div
@@ -203,7 +207,7 @@ export function TaskList({ tasks }: TaskListProps) {
             <ol aria-label="Hydration tasks" className="space-y-2">
               {filteredTasks.map((task) => (
                 <li key={task.id}>
-                  <TaskRow task={task} />
+                  <TaskRow task={task} portalLink={portalLinks?.get(task.id)} />
                 </li>
               ))}
             </ol>

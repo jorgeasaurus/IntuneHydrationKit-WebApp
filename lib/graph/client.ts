@@ -324,6 +324,24 @@ export class GraphClient {
   }
 
   /**
+   * POST request to an action endpoint (for example `.../renewUpload` or `.../commit`).
+   *
+   * Use this only for an action that has the same result when it is sent again. The
+   * request uses the normal retry policy (MAX_RETRIES, Retry-After, cancel and pause),
+   * the same as GET, PATCH and DELETE. It does not do the create verification of post.
+   * Never use it to create an object in a collection.
+   */
+  async postAction<T>(
+    endpoint: string,
+    data: unknown,
+    version: "v1.0" | "beta" = "beta"
+  ): Promise<T> {
+    const url = `${this.baseUrl}/${version}${endpoint}`;
+
+    return this.fetchJson<T>(url, { method: "POST", body: JSON.stringify(data) });
+  }
+
+  /**
    * Look for objects that create requests to a collection made. The objects are matched
    * by the name (name or displayName) in each body, case-insensitive.
    * Waits before each read, because a new object can take time to appear.

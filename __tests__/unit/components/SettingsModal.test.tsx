@@ -8,6 +8,7 @@ import { SettingsProvider } from '@/hooks/useSettings'
 const DEFAULT_SETTINGS = {
   stopOnFirstError: false,
   demoMode: false,
+  notifyOnCompletion: false,
 } as const
 
 describe('SettingsModal', () => {
@@ -68,6 +69,7 @@ describe('SettingsModal', () => {
     expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual({
       stopOnFirstError: true,
       demoMode: false,
+      notifyOnCompletion: false,
     })
   })
 
@@ -86,6 +88,7 @@ describe('SettingsModal', () => {
     expect(JSON.parse(window.localStorage.getItem('app-settings:v1') ?? 'null')).toEqual({
       stopOnFirstError: false,
       demoMode: true,
+      notifyOnCompletion: false,
     })
   })
 
@@ -110,7 +113,7 @@ describe('SettingsModal', () => {
 
   it('persists reset defaults only after save', async () => {
     const user = userEvent.setup()
-    const stored = { stopOnFirstError: true, demoMode: true }
+    const stored = { stopOnFirstError: true, demoMode: true, notifyOnCompletion: false }
 
     window.localStorage.setItem('app-settings:v1', JSON.stringify(stored))
 
@@ -135,7 +138,7 @@ describe('SettingsModal', () => {
 
   it('keeps stored settings when reset is followed by cancel', async () => {
     const user = userEvent.setup()
-    const stored = { stopOnFirstError: true, demoMode: true }
+    const stored = { stopOnFirstError: true, demoMode: true, notifyOnCompletion: false }
 
     window.localStorage.setItem('app-settings:v1', JSON.stringify(stored))
 
