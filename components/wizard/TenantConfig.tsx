@@ -257,7 +257,7 @@ function TenantValidationNotices({
           )}
 
           {prerequisiteStatus === "error" && prerequisiteResult && (
-            <Alert className="border-red-500/30 bg-red-500/10">
+            <Alert role="alert" className="border-red-500/30 bg-red-500/10">
               <XCircle className="size-4 text-red-600 dark:text-red-400" />
               <AlertTitle className="text-red-800 dark:text-red-200">
                 Prerequisite check failed

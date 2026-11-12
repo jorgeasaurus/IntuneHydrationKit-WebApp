@@ -1,19 +1,12 @@
 import { AlertTriangle, Eye, Loader2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { getExecutionOutcomeLabel } from "@/lib/hydration/executionOutcome";
-import type {
-  ExecutionOutcome,
-  HydrationSummary,
-  OperationMode,
-} from "@/types/hydration";
+import type { HydrationSummary, OperationMode } from "@/types/hydration";
 
 interface RunNoticesProps {
   isCompleted: boolean;
   summary: HydrationSummary | null;
-  outcome: ExecutionOutcome | null;
   fatalError: string | null;
-  successTaskCount: number;
   isPreview: boolean;
   operationMode: OperationMode;
   isBuildingQueue: boolean;
@@ -23,9 +16,7 @@ interface RunNoticesProps {
 export function RunNotices({
   isCompleted,
   summary,
-  outcome,
   fatalError,
-  successTaskCount,
   isPreview,
   operationMode,
   isBuildingQueue,
@@ -34,19 +25,13 @@ export function RunNotices({
   return (
     <>
       {isCompleted && !summary && (
-        <Alert className="rounded-2xl border-red-300/35 bg-slate-950/75 text-slate-50 shadow-xl shadow-slate-950/20 backdrop-blur-md [&>svg]:text-red-300">
+        <Alert role="alert" className="rounded-2xl border-red-300/35 bg-slate-950/75 text-slate-50 shadow-xl shadow-slate-950/20 backdrop-blur-md [&>svg]:text-red-300">
           <AlertTriangle className="size-4" />
           <AlertTitle className="text-red-100">Run failed</AlertTitle>
           <AlertDescription className="text-slate-200">
             {fatalError || "The run stopped before a summary was available."}
           </AlertDescription>
         </Alert>
-      )}
-
-      {isCompleted && outcome !== "failed" && (
-        <p role="status" aria-live="polite" className="sr-only">
-          {getExecutionOutcomeLabel(outcome, successTaskCount)}
-        </p>
       )}
 
       {isPreview && !isCompleted && (
