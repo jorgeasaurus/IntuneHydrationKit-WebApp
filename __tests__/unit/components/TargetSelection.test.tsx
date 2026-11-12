@@ -615,6 +615,12 @@ describe('TargetSelection', () => {
       throw new Error('Expected Windows baseline checkbox to be rendered')
     }
 
+    expect(within(baselineRegion).getByRole('checkbox', { name: 'Windows' })).toBe(windowsBaselineCheckbox)
+    expect(windowsBaselineCheckbox).toHaveAttribute('aria-checked', 'mixed')
+    const platformExpandButton = within(baselineRegion).getByRole('button', { name: /^Windows/ })
+    expect(platformExpandButton).toHaveAttribute('aria-expanded', 'true')
+    expect(platformExpandButton).toHaveAttribute('aria-controls', 'platform-panel-WINDOWS')
+
     await user.click(windowsBaselineCheckbox)
     expect(screen.getByLabelText('Windows Security Baseline')).toBeChecked()
     expect(screen.getByLabelText('Windows Defender Baseline')).toBeChecked()
@@ -688,7 +694,21 @@ describe('TargetSelection', () => {
       throw new Error('Expected Windows CIS category checkbox to be rendered')
     }
 
+    const namedCISCheckbox = screen.getByRole('checkbox', { name: 'Windows 11 Benchmarks' })
+    expect(namedCISCheckbox).toBe(windowsCISCategoryCheckbox)
+    expect(namedCISCheckbox).toHaveAttribute('aria-checked', 'mixed')
+    expect(namedCISCheckbox).toHaveAccessibleDescription('1 of 2 policies selected')
+
+    const cisExpandButton = within(cisRegion).getByRole('button', { name: /^Windows 11 Benchmarks/ })
+    expect(cisExpandButton).toHaveAttribute('aria-expanded', 'true')
+    const cisPanelId = cisExpandButton.getAttribute('aria-controls')
+    expect(cisPanelId).toBeTruthy()
+    expect(document.getElementById(cisPanelId ?? '')).toContainElement(
+      screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 1`)
+    )
+
     await user.click(windowsCISCategoryCheckbox)
+    expect(windowsCISCategoryCheckbox).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 1`)).toBeChecked()
     expect(screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 2`)).toBeChecked()
 
