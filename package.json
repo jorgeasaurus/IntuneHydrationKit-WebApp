@@ -7,7 +7,7 @@
     "dev:turbo": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint app components lib hooks types e2e",
     "type-check": "tsc --noEmit",
     "generate-cis-manifest": "node scripts/generate-cis-manifest.js",
     "test": "vitest",
