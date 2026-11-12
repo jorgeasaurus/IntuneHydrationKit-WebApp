@@ -175,11 +175,12 @@ describe("batchExecutor branch coverage", () => {
         displayName: "[IHD] Retry Group",
       }),
     ]);
-    expect(mockSleepWithExecutionControl).toHaveBeenCalledWith(2000, context);
+    // Retry-After (1 second) sets the wait.
+    expect(mockSleepWithExecutionControl).toHaveBeenCalledWith(1000, context);
     expect(onTaskComplete).toHaveBeenCalledWith(task);
   });
 
-  it("fails create tasks when the batch response omits a prepared request", async () => {
+  it("does not resend a create when the batch response omits a prepared request", async () => {
     const task = createTask("missing-response", "groups", "create", "[IHD] Missing Response Group");
     const onTaskError = vi.fn();
 
@@ -191,6 +192,7 @@ describe("batchExecutor branch coverage", () => {
         patch: vi.fn(),
         getCollection: vi.fn(),
         batch: vi.fn().mockResolvedValue({ responses: [] }),
+        findCreatedObjects: vi.fn().mockResolvedValue([undefined]),
       } as unknown as ExecutionContext["client"],
       operationMode: "create",
       isPreview: false,
@@ -205,9 +207,10 @@ describe("batchExecutor branch coverage", () => {
       expect.objectContaining({
         success: false,
         skipped: false,
-        error: "No response received",
+        error: expect.stringMatching(/^No response received \(Outcome unknown/),
       }),
     ]);
+    expect(context.client.batch).toHaveBeenCalledTimes(1);
     expect(task.status).toBe("failed");
     expect(onTaskError).toHaveBeenCalledWith(task, expect.any(Error));
   });
@@ -245,13 +248,13 @@ describe("batchExecutor branch coverage", () => {
             {
               id: "req-0",
               status: 503,
-              headers: {},
+              headers: { "Retry-After": "1" },
               body: { error: { message: "Service unavailable" } },
             },
             {
               id: "req-1",
               status: 503,
-              headers: {},
+              headers: { "Retry-After": "1" },
               body: { error: { message: "Service unavailable" } },
             },
           ],

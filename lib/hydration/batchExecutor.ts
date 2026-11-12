@@ -7,13 +7,23 @@
 import {
   BatchRequest,
   BatchResponse,
+  BatchResult,
   extractBatchError,
   isBatchResponseSuccess,
   isBatchResponseConflict,
+  isBatchResponseOutcomeUnknown,
   isBatchResponseRetryable,
   getRetryAfterFromBatchResponse,
 } from "@/lib/graph/batch";
 import type { ApiVersion } from "@/lib/graph/batch";
+import { FoundObject, OUTCOME_UNKNOWN_NOT_FOUND, OUTCOME_UNKNOWN_UNVERIFIED, addErrorNote } from "@/lib/graph/client";
+import {
+  MAX_RETRIES,
+  getErrorRetryAfterMs,
+  getRetryDelayMs,
+  isOutcomeUnknownError,
+  isRunCancelledError,
+} from "@/lib/utils/retry";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage, TenantCacheKey } from "./types";
@@ -22,7 +32,7 @@ import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
-import { sleep, sleepWithExecutionControl, waitWhilePaused, normalizeName, findByNamePrecedence } from "./utils";
+import { sleepWithExecutionControl, waitWhilePaused, normalizeName, findByNamePrecedence } from "./utils";
 import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   buildCISGroupPolicyConfigurationPayload,
@@ -136,102 +146,6 @@ const CATEGORY_ENDPOINTS: Record<string, string> = {
   v2Compliance: "/deviceManagement/compliancePolicies",
 };
 
-
-/**
- * Verify if a compliance policy was created after a 504 timeout
- * Returns the created policy ID if found, null otherwise
- * Includes a delay before checking to allow async creation to complete
- * and retries verification if not found initially
- */
-async function verifyCompliancePolicyCreated(
-  policyName: string,
-  context: ExecutionContext
-): Promise<string | null> {
-  const VERIFICATION_TIMEOUT = 10000; // 10 second timeout per attempt
-  const INITIAL_DELAY = 3000; // Wait 3 seconds before first check
-  const RETRY_DELAY = 2000; // Wait 2 seconds between retries
-  const MAX_RETRIES = 2; // Try up to 3 times total
-
-  try {
-    console.log(`[BatchExecutor] Verifying compliance policy creation for "${policyName}" after 504 timeout...`);
-
-    // Wait before first verification to allow async creation to complete
-    console.log(`[BatchExecutor] Waiting ${INITIAL_DELAY}ms before verification...`);
-    await sleep(INITIAL_DELAY);
-
-    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-      if (attempt > 0) {
-        console.log(`[BatchExecutor] Retry ${attempt}/${MAX_RETRIES} for "${policyName}"...`);
-        await sleep(RETRY_DELAY);
-      }
-
-      let policies: Array<{ id: string; displayName: string; description?: string }> | null = null;
-      try {
-        // Create a timeout promise
-        const timeoutPromise = new Promise<null>((_, reject) => {
-          setTimeout(() => reject(new Error("Verification timeout")), VERIFICATION_TIMEOUT);
-        });
-
-        // Prefer a targeted $filter query to avoid fetching the entire
-        // collection.  Fall back to a full scan when the name contains
-        // characters that break OData string literals.
-        let fetchPromise: Promise<Array<{ id: string; displayName: string; description?: string }>>;
-        if (/^[^']*$/.test(policyName)) {
-          // No single-quotes — safe for OData string literal
-          const escaped = policyName.replace(/'/g, "''");
-          fetchPromise = context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-            `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${escaped}'&$select=id,displayName,description`
-          ).then(r => r.value);
-        } else {
-          // Contains single-quotes — fall back to full collection scan
-          fetchPromise = context.client.getCollection<{ id: string; displayName: string; description?: string }>(
-            "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
-          );
-        }
-
-        policies = await Promise.race([fetchPromise, timeoutPromise]);
-      } catch (attemptError) {
-        // Timeout or fetch error on this attempt — log and continue to next retry
-        const msg = attemptError instanceof Error ? attemptError.message : String(attemptError);
-        console.warn(`[BatchExecutor] Verification attempt ${attempt + 1} failed for "${policyName}": ${msg}`);
-        continue;
-      }
-
-      if (policies) {
-        let foundPolicy: { id: string; displayName: string; description?: string } | undefined;
-        const normalizedPolicyName = policyName.toLowerCase();
-        for (const policy of policies) {
-          if (policy.displayName?.toLowerCase() === normalizedPolicyName) {
-            foundPolicy = policy;
-            break;
-          }
-        }
-
-        if (foundPolicy) {
-          console.log(`[BatchExecutor] Compliance policy "${policyName}" was created successfully (ID: ${foundPolicy.id}) despite 504 timeout`);
-
-          // Update the cache with the newly created policy
-          if (context.cachedCompliancePolicies) {
-            context.cachedCompliancePolicies.push({
-              id: foundPolicy.id,
-              displayName: foundPolicy.displayName,
-              description: foundPolicy.description,
-            });
-          }
-
-          return foundPolicy.id;
-        }
-      }
-    }
-
-    console.log(`[BatchExecutor] Compliance policy "${policyName}" not found after ${MAX_RETRIES + 1} verification attempts - creation actually failed`);
-    return null;
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`[BatchExecutor] Error verifying compliance policy creation for "${policyName}":`, errorMessage);
-    return null;
-  }
-}
 
 /**
  * Build result type for request body builders
@@ -924,7 +838,6 @@ async function executeBatchGroup(
 
   // Re-chunk remaining tasks dynamically; start with initial sizing
   let remainingTasks = [...preparedTasks];
-  const maxRetries = 3;
 
   if (usesCategoryBatchSize) {
     console.log(`[BatchExecutor] Using reduced batch size ${initialBatchSize} for throttle-sensitive categories`);
@@ -974,152 +887,193 @@ async function executeBatchGroup(
 
     console.log(`[BatchExecutor] Executing batch ${i + 1}/${totalEstimatedBatches} with ${chunk.length} requests`);
 
-    // Submit this chunk, with retry support for individual 429/5xx responses
+    // Submit this chunk. Only requests that Graph proved it did not process are sent again.
     let currentItems = chunk;
     let retryCount = 0;
     let batchThrottleCount = 0;
 
-    while (currentItems.length > 0 && retryCount <= maxRetries) {
-      try {
-        // Preview mode: simulate successful responses without making API calls
-        if (context.isPreview) {
-          for (const { task } of currentItems) {
-            task.status = "success";
-            task.endTime = new Date();
-            results.push({ task, success: true, skipped: false });
-            context.onTaskComplete?.(task);
-          }
-          currentItems = [];
-          continue;
+    while (currentItems.length > 0) {
+      // Preview mode: simulate successful responses without making API calls
+      if (context.isPreview) {
+        for (const { task } of currentItems) {
+          task.status = "success";
+          task.endTime = new Date();
+          results.push({ task, success: true, skipped: false });
+          context.onTaskComplete?.(task);
         }
+        currentItems = [];
+        break;
+      }
 
-        const batchResult = await context.client.batch(
+      let batchResult: BatchResult;
+      try {
+        batchResult = await context.client.batch(
           currentItems.map((t) => t.request),
           version
         );
-
-        // Map responses back to tasks
-        const responseMap = new Map<string, BatchResponse>();
-        for (const response of batchResult.responses) {
-          responseMap.set(response.id, response);
+      } catch (error) {
+        if (isRunCancelledError(error)) {
+          markPreparedTasksCancelled([...currentItems, ...remainingTasks], results, context);
+          remainingTasks = [];
+          currentItems = [];
+          break;
         }
 
-        // Collect retryable items for re-submission
-        const pendingRetry: PreparedBatchTask[] = [];
-        let retryAfterMs = 0;
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const status = (error as { status?: unknown }).status;
 
-        for (const item of currentItems) {
-          const { task, request } = item;
-          const response = responseMap.get(request.id);
-
-          if (!response) {
-            task.status = "failed";
-            task.error = "No response received";
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: false, error: "No response received" });
-            context.onTaskError?.(task, new Error("No response received"));
+        // A 429 or 503 for the outer request means that Graph processed none of the
+        // requests in it, so the whole batch can be sent again.
+        const notProcessed = status === 429 || status === 503;
+        if (notProcessed) {
+          batchThrottleCount += currentItems.length;
+          if (retryCount < MAX_RETRIES) {
+            const delay = getRetryDelayMs(retryCount, getErrorRetryAfterMs(error));
+            retryCount++;
+            console.warn(`[BatchExecutor] Batch ${i + 1} request got ${status}; retry ${retryCount}/${MAX_RETRIES} in ${delay}ms`);
+            emitStatus(
+              context,
+              `Graph throttled the batch request (HTTP ${status}). Sending ${currentItems.length} items again in ${Math.ceil(delay / 1000)}s (attempt ${retryCount}/${MAX_RETRIES})...`,
+              "warning"
+            );
+            if ((await sleepWithExecutionControl(delay, context)) === "cancelled") {
+              markPreparedTasksCancelled([...currentItems, ...remainingTasks], results, context);
+              remainingTasks = [];
+              currentItems = [];
+              break;
+            }
             continue;
           }
-
-          if (isBatchResponseSuccess(response.status)) {
-            const createdId = (response.body as Record<string, unknown>)?.id as string | undefined;
-            task.status = "success";
-            task.endTime = new Date();
-            results.push({ task, success: true, skipped: false, createdId });
-            context.onTaskComplete?.(task);
-
-            // Update caches
-            updateCacheAfterCreate(item, response, context);
-          } else if (isBatchResponseConflict(response.status)) {
-            markTaskSkipped(task, "noOp", "Already exists"); // Set skip reason on task object for UI display
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: true, skipKind: "noOp", error: "Already exists" });
-            context.onTaskComplete?.(task);
-          } else if (response.status === 504 && task.category === "compliance") {
-            // Special handling for compliance policies with 504 timeout
-            const verifiedId = await verifyCompliancePolicyCreated(task.itemName, context);
-
-            if (verifiedId) {
-              task.status = "success";
-              task.endTime = new Date();
-              results.push({ task, success: true, skipped: false, createdId: verifiedId });
-              context.onTaskComplete?.(task);
-            } else {
-              const error = extractBatchError(response);
-              task.status = "failed";
-              task.error = `${error.message} (verified not created)`;
-              task.endTime = new Date();
-              results.push({ task, success: false, skipped: false, error: task.error });
-              context.onTaskError?.(task, new Error(task.error));
-            }
-          } else if (isBatchResponseRetryable(response.status) && retryCount < maxRetries) {
-            // 429 or 5xx -- queue for retry instead of marking failed
-            const headerDelay = getRetryAfterFromBatchResponse(response.headers) || 0;
-            retryAfterMs = Math.max(retryAfterMs, headerDelay);
-            pendingRetry.push(item);
-            if (response.status === 429) {
-              batchThrottleCount++;
-            }
-            console.log(`[BatchExecutor] Response ${response.status} for "${task.itemName}" -- queued for retry`);
-          } else {
-            const error = extractBatchError(response);
-            if (shouldLogConditionalAccessCreateFailure(item, response, error)) {
-              logConditionalAccessCreateFailureDiagnostics(item, response, error, version);
-            }
-            const privatePreviewFeatureName = getPrivatePreviewFeatureName(error);
-            if (privatePreviewFeatureName) {
-              const skipReason = getPrivatePreviewSkipReason(privatePreviewFeatureName);
-              markTaskSkipped(task, "blocked", skipReason);
-              task.endTime = new Date();
-              results.push({ task, success: false, skipped: true, skipKind: "blocked", error: skipReason });
-              context.onTaskComplete?.(task);
-              continue;
-            }
-            task.status = "failed";
-            task.error = error.message;
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: false, error: error.message });
-            context.onTaskError?.(task, new Error(error.message));
-            // Count throttle failures that exhausted retries
-            if (response.status === 429 || isThrottleErrorMessage(error.message)) {
-              batchThrottleCount++;
-            }
-          }
         }
 
-        if (pendingRetry.length > 0) {
-          retryCount++;
-          const backoff = Math.pow(2, retryCount) * 1000;
-          const delay = Math.max(retryAfterMs, backoff);
-          console.log(`[BatchExecutor] ${pendingRetry.length} responses need retry (attempt ${retryCount}/${maxRetries}), waiting ${delay}ms`);
-          emitStatus(context, `Retrying ${pendingRetry.length} throttled requests (attempt ${retryCount}/${maxRetries})...`, "warning");
-          const waitResult = await sleepWithExecutionControl(delay, context);
-          if (waitResult === "cancelled") {
-            console.log(`[BatchExecutor] Execution cancelled during retry backoff`);
-            markPreparedTasksCancelled([...pendingRetry, ...remainingTasks], results, context);
-            currentItems = [];
-            break;
-          }
-          currentItems = pendingRetry;
-        } else {
-          // All items handled, exit the retry loop
-          currentItems = [];
-        }
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[BatchExecutor] Batch ${i + 1} request failed; not retrying create batch:`, errorMessage);
+        console.error(`[BatchExecutor] Batch ${i + 1} request failed:`, errorMessage);
         logConditionalAccessBatchRequestFailureDiagnostics(currentItems, errorMessage, version);
 
-        // Entire batch HTTP call failed before per-request responses were available.
-        // Re-submitting POST batches can create duplicates if Graph processed the
-        // original request before the transport error surfaced.
-        for (const { task } of currentItems) {
-          task.status = "failed";
-          task.error = errorMessage;
-          task.endTime = new Date();
-          results.push({ task, success: false, skipped: false, error: errorMessage });
-          context.onTaskError?.(task, error instanceof Error ? error : new Error(errorMessage));
+        if (!notProcessed && isOutcomeUnknownError(error)) {
+          // The outcome is unknown (network error, timeout, 5xx). Graph can have created
+          // some objects, so read the tenant instead of sending the creates again.
+          const outcome = await resolveUnknownCreateOutcomes(
+            currentItems.map((item) => ({ item, error })),
+            context,
+            version,
+            results
+          );
+          if (outcome === "cancelled") {
+            markPreparedTasksCancelled(remainingTasks, results, context);
+            remainingTasks = [];
+          }
+        } else {
+          // Graph rejected the request, or throttling continued after the retries.
+          const message = notProcessed
+            ? `${errorMessage} (Graph did not accept the batch request after ${MAX_RETRIES} retries. The items were not created.)`
+            : errorMessage;
+          for (const item of currentItems) {
+            failPreparedTask(item, message, results, context);
+          }
         }
+        currentItems = [];
+        break;
+      }
+
+      // Map responses back to tasks
+      const responseMap = new Map<string, BatchResponse>();
+      for (const response of batchResult.responses) {
+        responseMap.set(response.id, response);
+      }
+
+      const pendingRetry: PreparedBatchTask[] = [];
+      const unknownOutcomes: UnknownCreateOutcome[] = [];
+      let retryAfterMs: number | undefined;
+
+      for (const item of currentItems) {
+        const { task, request } = item;
+        const response = responseMap.get(request.id);
+
+        if (!response) {
+          unknownOutcomes.push({ item, error: new Error("No response received") });
+          continue;
+        }
+
+        if (isBatchResponseSuccess(response.status)) {
+          const createdId = (response.body as Record<string, unknown>)?.id as string | undefined;
+          task.status = "success";
+          task.endTime = new Date();
+          results.push({ task, success: true, skipped: false, createdId });
+          context.onTaskComplete?.(task);
+
+          // Update caches
+          updateCacheAfterCreate(item, response, context);
+        } else if (isBatchResponseConflict(response.status)) {
+          markTaskSkipped(task, "noOp", "Already exists"); // Set skip reason on task object for UI display
+          task.endTime = new Date();
+          results.push({ task, success: false, skipped: true, skipKind: "noOp", error: "Already exists" });
+          context.onTaskComplete?.(task);
+        } else if (isBatchResponseRetryable(response) && retryCount < MAX_RETRIES) {
+          // 429, or 503 with Retry-After: Graph did not process the request
+          const headerDelay = getRetryAfterFromBatchResponse(response.headers);
+          if (headerDelay !== undefined) {
+            retryAfterMs = Math.max(retryAfterMs ?? 0, headerDelay);
+          }
+          pendingRetry.push(item);
+          if (response.status === 429) {
+            batchThrottleCount++;
+          }
+          console.log(`[BatchExecutor] Response ${response.status} for "${task.itemName}" -- queued for retry`);
+        } else if (isBatchResponseOutcomeUnknown(response)) {
+          // Other 5xx: Graph can have created the object. Read the tenant before any resend.
+          const error = extractBatchError(response);
+          if (shouldLogConditionalAccessCreateFailure(item, response, error)) {
+            logConditionalAccessCreateFailureDiagnostics(item, response, error, version);
+          }
+          unknownOutcomes.push({ item, error: new Error(error.message) });
+        } else {
+          const error = extractBatchError(response);
+          if (shouldLogConditionalAccessCreateFailure(item, response, error)) {
+            logConditionalAccessCreateFailureDiagnostics(item, response, error, version);
+          }
+          const privatePreviewFeatureName = getPrivatePreviewFeatureName(error);
+          if (privatePreviewFeatureName) {
+            const skipReason = getPrivatePreviewSkipReason(privatePreviewFeatureName);
+            markTaskSkipped(task, "blocked", skipReason);
+            task.endTime = new Date();
+            results.push({ task, success: false, skipped: true, skipKind: "blocked", error: skipReason });
+            context.onTaskComplete?.(task);
+            continue;
+          }
+          failPreparedTask(item, error.message, results, context);
+          // Count throttle failures that exhausted retries
+          if (response.status === 429 || isThrottleErrorMessage(error.message)) {
+            batchThrottleCount++;
+          }
+        }
+      }
+
+      if (unknownOutcomes.length > 0) {
+        const outcome = await resolveUnknownCreateOutcomes(unknownOutcomes, context, version, results);
+        if (outcome === "cancelled") {
+          markPreparedTasksCancelled([...pendingRetry, ...remainingTasks], results, context);
+          remainingTasks = [];
+          currentItems = [];
+          break;
+        }
+      }
+
+      if (pendingRetry.length > 0) {
+        const delay = getRetryDelayMs(retryCount, retryAfterMs);
+        retryCount++;
+        console.log(`[BatchExecutor] ${pendingRetry.length} responses need retry (attempt ${retryCount}/${MAX_RETRIES}), waiting ${delay}ms`);
+        emitStatus(context, `Retrying ${pendingRetry.length} throttled requests (attempt ${retryCount}/${MAX_RETRIES})...`, "warning");
+        const waitResult = await sleepWithExecutionControl(delay, context);
+        if (waitResult === "cancelled") {
+          console.log(`[BatchExecutor] Execution cancelled during retry backoff`);
+          markPreparedTasksCancelled([...pendingRetry, ...remainingTasks], results, context);
+          remainingTasks = [];
+          currentItems = [];
+          break;
+        }
+        currentItems = pendingRetry;
+      } else {
+        // All items handled, exit the retry loop
         currentItems = [];
       }
     }
@@ -1127,19 +1081,6 @@ async function executeBatchGroup(
     if (context.shouldCancel?.()) {
       markPreparedTasksCancelled(remainingTasks, results, context);
       break;
-    }
-
-    // If we exhausted retries but still have items (shouldn't happen, but safety net)
-    if (currentItems.length > 0) {
-      for (const { task } of currentItems) {
-        if (task.status !== "failed" && task.status !== "success" && task.status !== "skipped") {
-          task.status = "failed";
-          task.error = "Max retries exhausted";
-          task.endTime = new Date();
-          results.push({ task, success: false, skipped: false, error: "Max retries exhausted" });
-          context.onTaskError?.(task, new Error("Max retries exhausted"));
-        }
-      }
     }
 
     // Adaptive throttle: adjust delay and batch size based on 429 counts
@@ -1189,6 +1130,78 @@ async function executeBatchGroup(
   }
 
   return results;
+}
+
+function failPreparedTask(
+  { task }: PreparedBatchTask,
+  message: string,
+  results: ExecutionResult[],
+  context: ExecutionContext
+): void {
+  task.status = "failed";
+  task.error = message;
+  task.endTime = new Date();
+  results.push({ task, success: false, skipped: false, error: message });
+  context.onTaskError?.(task, new Error(message));
+}
+
+/** A create request whose outcome is not known, with the error that it got. */
+interface UnknownCreateOutcome {
+  item: PreparedBatchTask;
+  error: unknown;
+}
+
+/**
+ * Find out which creates with an unknown outcome made an object. The tenant collection
+ * of each endpoint is read once, and objects are matched by the name in the request body.
+ * A found object is a success with its ID. A create that is not found, or that cannot be
+ * verified, fails with an "Outcome unknown" message. Nothing is sent again, so this
+ * never makes a second copy of an object.
+ */
+async function resolveUnknownCreateOutcomes(
+  entries: UnknownCreateOutcome[],
+  context: ExecutionContext,
+  version: ApiVersion,
+  results: ExecutionResult[]
+): Promise<"completed" | "cancelled"> {
+  const byEndpoint = new Map<string, UnknownCreateOutcome[]>();
+  for (const entry of entries) {
+    const group = byEndpoint.get(entry.item.request.url) ?? [];
+    group.push(entry);
+    byEndpoint.set(entry.item.request.url, group);
+  }
+
+  const groups = [...byEndpoint.entries()];
+  for (let index = 0; index < groups.length; index++) {
+    const [endpoint, group] = groups[index];
+    emitStatus(context, `Checking the tenant for ${group.length} items with an unknown create result...`, "warning", "create");
+    let found: Array<FoundObject | undefined> | undefined;
+    try {
+      found = await context.client.findCreatedObjects(endpoint, group.map(({ item }) => item.request.body), version);
+    } catch (readError) {
+      if (isRunCancelledError(readError)) {
+        markPreparedTasksCancelled(groups.slice(index).flatMap(([, rest]) => rest.map(({ item }) => item)), results, context);
+        return "cancelled";
+      }
+      console.warn(`[BatchExecutor] Could not read ${endpoint} to verify creates:`, readError);
+    }
+
+    group.forEach(({ item, error }, entryIndex) => {
+      const object = found?.[entryIndex];
+      if (object) {
+        console.log(`[BatchExecutor] "${item.task.itemName}" was created despite the error (ID: ${object.id})`);
+        item.task.status = "success";
+        item.task.endTime = new Date();
+        results.push({ task: item.task, success: true, skipped: false, createdId: object.id });
+        context.onTaskComplete?.(item.task);
+        updateCacheAfterCreate(item, { id: item.request.id, status: 201, body: object }, context);
+        return;
+      }
+      const note = found ? OUTCOME_UNKNOWN_NOT_FOUND : OUTCOME_UNKNOWN_UNVERIFIED;
+      failPreparedTask(item, addErrorNote(error, note).message, results, context);
+    });
+  }
+  return "completed";
 }
 
 /**

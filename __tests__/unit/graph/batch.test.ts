@@ -4,6 +4,7 @@ import {
   extractBatchError,
   getRetryAfterFromBatchResponse,
   isBatchResponseConflict,
+  isBatchResponseOutcomeUnknown,
   isBatchResponseRetryable,
   isBatchResponseSuccess,
 } from "@/lib/graph/batch";
@@ -14,10 +15,20 @@ describe("batch graph utilities", () => {
     expect(isBatchResponseSuccess(299)).toBe(true);
     expect(isBatchResponseSuccess(300)).toBe(false);
 
-    expect(isBatchResponseRetryable(429)).toBe(true);
-    expect(isBatchResponseRetryable(500)).toBe(true);
-    expect(isBatchResponseRetryable(599)).toBe(true);
-    expect(isBatchResponseRetryable(400)).toBe(false);
+    // Only responses that prove "not processed" can be sent again.
+    expect(isBatchResponseRetryable({ status: 429 })).toBe(true);
+    expect(isBatchResponseRetryable({ status: 503, headers: { "Retry-After": "2" } })).toBe(true);
+    expect(isBatchResponseRetryable({ status: 503 })).toBe(false);
+    expect(isBatchResponseRetryable({ status: 500 })).toBe(false);
+    expect(isBatchResponseRetryable({ status: 504 })).toBe(false);
+    expect(isBatchResponseRetryable({ status: 400 })).toBe(false);
+
+    expect(isBatchResponseOutcomeUnknown({ status: 500 })).toBe(true);
+    expect(isBatchResponseOutcomeUnknown({ status: 503 })).toBe(true);
+    expect(isBatchResponseOutcomeUnknown({ status: 599 })).toBe(true);
+    expect(isBatchResponseOutcomeUnknown({ status: 503, headers: { "retry-after": "2" } })).toBe(false);
+    expect(isBatchResponseOutcomeUnknown({ status: 429 })).toBe(false);
+    expect(isBatchResponseOutcomeUnknown({ status: 400 })).toBe(false);
 
     expect(isBatchResponseConflict(409)).toBe(true);
     expect(isBatchResponseConflict(404)).toBe(false);
@@ -99,6 +110,11 @@ describe("batch graph utilities", () => {
     expect(getRetryAfterFromBatchResponse({ "Retry-After": "5" })).toBe(5000);
     expect(getRetryAfterFromBatchResponse({ "retry-after": "7" })).toBe(7000);
     expect(getRetryAfterFromBatchResponse({ "Retry-After": "soon" })).toBeUndefined();
+    expect(getRetryAfterFromBatchResponse({ "RETRY-AFTER": "600" })).toBe(60000);
+    const inTenSeconds = new Date(Date.now() + 10000).toUTCString();
+    const fromDate = getRetryAfterFromBatchResponse({ "Retry-After": inTenSeconds });
+    expect(fromDate).toBeGreaterThan(8000);
+    expect(fromDate).toBeLessThanOrEqual(10000);
     expect(getRetryAfterFromBatchResponse()).toBeUndefined();
   });
 
