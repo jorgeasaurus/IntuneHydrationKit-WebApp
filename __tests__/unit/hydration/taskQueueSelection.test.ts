@@ -156,21 +156,31 @@ describe("taskQueue selection handling across runs", () => {
       expect(mockFetchFilters).toHaveBeenCalledTimes(2);
     });
 
-    it.each(["create", "delete"] as const)(
-      "reports a selected template that failed to load in %s mode instead of dropping it",
-      async (operationMode) => {
-        mockFetchFilters.mockImplementationOnce(failFilterB);
+    it("reports a selected template that failed to load in create mode instead of dropping it", async () => {
+      mockFetchFilters.mockImplementationOnce(failFilterB);
 
-        await expect(
-          buildTaskQueueAsync(["filters"], operationMode, {
-            categorySelections: { filters: { selectedItems: ["Filter A", "Filter B"] } },
-          }),
-        ).rejects.toThrow(
-          /Could not load 1 Device Filters template file\(s\): Filters\/filter-b\.json\. Selected templates not loaded: Filter B\./,
-        );
-        expect(getCachedTemplates("filters")).toBeNull();
-      },
-    );
+      await expect(
+        buildTaskQueueAsync(["filters"], "create", {
+          categorySelections: { filters: { selectedItems: ["Filter A", "Filter B"] } },
+        }),
+      ).rejects.toThrow(
+        /Could not load 1 Device Filters template file\(s\): Filters\/filter-b\.json\. Selected templates not loaded: Filter B\./,
+      );
+      expect(getCachedTemplates("filters")).toBeNull();
+    });
+
+    it("queues a delete selection by name when a template file failed to load", async () => {
+      mockFetchFilters.mockImplementationOnce(failFilterB);
+
+      // Delete selections are tenant object names; they can include objects with no template.
+      const tasks = await buildTaskQueueAsync(["filters"], "delete", {
+        categorySelections: { filters: { selectedItems: ["Filter A", "Filter B", "Tenant-only filter"] } },
+      });
+
+      expect(tasks.map((task) => task.itemName)).toEqual(["Filter A", "Filter B", "Tenant-only filter"]);
+      // The incomplete list is not reused by a later run.
+      expect(getCachedTemplates("filters", { completeOnly: true })).toBeNull();
+    });
 
     it("reports a failed load when every template of the category is queued", async () => {
       mockFetchFilters.mockImplementationOnce(failFilterB);
