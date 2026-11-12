@@ -97,7 +97,7 @@ describe('ResultsSummary', () => {
 
     const previewTitle = screen.getByText('Preview Mode')
     const previewDescription = screen.getByText(/Review the simulated outcomes below/i)
-    const previewAlert = previewTitle.closest('[role="alert"]')
+    const previewAlert = previewTitle.closest('[role="note"]')
     expect(previewAlert).toHaveClass('glass-panel', 'rounded-2xl', 'text-slate-50')
     expect(previewAlert).not.toHaveClass('bg-slate-950/95')
     expect(previewTitle).toHaveClass('text-white')

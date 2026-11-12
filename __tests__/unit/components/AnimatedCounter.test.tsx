@@ -1,10 +1,12 @@
 import React from 'react'
-import { describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen } from '@testing-library/react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 
 let isInView = true
+let prefersReducedMotion: boolean | null = false
+const inViewOptions: unknown[] = []
 
 vi.mock('framer-motion', async () => {
   const React = await import('react')
@@ -27,7 +29,11 @@ vi.mock('framer-motion', async () => {
   }
 
   return {
-    useInView: () => isInView,
+    useInView: (_ref: unknown, options: unknown) => {
+      inViewOptions.push(options)
+      return isInView
+    },
+    useReducedMotion: () => prefersReducedMotion,
     useMotionValue: (initial: number) => createMotionValue(initial),
     useSpring: (motionValue: ReturnType<typeof createMotionValue>) => ({
       on: (_event: string, listener: (value: number) => void) => {
@@ -48,6 +54,12 @@ vi.mock('framer-motion', async () => {
 })
 
 describe('AnimatedCounter', () => {
+  beforeEach(() => {
+    isInView = true
+    prefersReducedMotion = false
+    inViewOptions.length = 0
+  })
+
   it('renders the formatted target value once it is in view', () => {
     isInView = true
 
@@ -64,5 +76,32 @@ describe('AnimatedCounter', () => {
     const counter = screen.getByText('2,500')
     expect(counter).toBeInTheDocument()
     expect(counter).toHaveClass('metric')
+  })
+
+  it('insets the in-view root only vertically so edge counters still start', () => {
+    render(<AnimatedCounter value={10} />)
+
+    expect(inViewOptions.at(-1)).toEqual({
+      once: true,
+      margin: '-100px 0px -100px 0px',
+    })
+  })
+
+  it('shows the final value at once when the user prefers reduced motion', () => {
+    isInView = false
+    prefersReducedMotion = true
+
+    render(<AnimatedCounter value={798} />)
+
+    expect(screen.getByText('798')).toBeInTheDocument()
+  })
+
+  it('shows zero at once for downward counters when the user prefers reduced motion', () => {
+    isInView = false
+    prefersReducedMotion = true
+
+    render(<AnimatedCounter value={2500} direction="down" />)
+
+    expect(screen.getByText('0')).toBeInTheDocument()
   })
 })

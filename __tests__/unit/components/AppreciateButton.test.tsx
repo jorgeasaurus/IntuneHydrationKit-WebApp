@@ -23,4 +23,16 @@ describe("AppreciateButton", () => {
       strategy: "afterInteractive",
     });
   });
+
+  it("does not load the third-party script when the page is framed", () => {
+    scriptProps.mockClear();
+    const top = vi.spyOn(window, "top", "get").mockReturnValue({} as Window);
+    try {
+      const { container } = render(<AppreciateButton />);
+      expect(container.querySelector("appreciate-button")).toBeInTheDocument();
+      expect(scriptProps).not.toHaveBeenCalled();
+    } finally {
+      top.mockRestore();
+    }
+  });
 });

@@ -338,6 +338,7 @@ export function OperationModeSelection(): React.JSX.Element {
 
         {mode === "delete" && !isPreview && (
           <Alert
+            role="alert"
             variant="destructive"
             className="border-red-400/70 bg-slate-950/90 text-slate-100 shadow-xl shadow-slate-950/20 backdrop-blur-md [&>svg]:text-red-300"
           >

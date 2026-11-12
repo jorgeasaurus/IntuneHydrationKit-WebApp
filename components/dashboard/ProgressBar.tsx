@@ -86,7 +86,15 @@ export function ProgressBar({ tasks, title, description }: ProgressBarProps) {
             <span className="font-medium">Overall Progress</span>
             <span className="text-muted-foreground">{percentage}%</span>
           </div>
-          <div className="h-3 overflow-hidden rounded-full bg-muted">
+          <div
+            role="progressbar"
+            aria-label="Overall progress"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={percentage}
+            aria-valuetext={`${percentage}% (${completed} of ${total} tasks complete)`}
+            className="h-3 overflow-hidden rounded-full bg-muted"
+          >
             <div
               className={`h-full transition-all duration-500 ease-out ${
                 isComplete
@@ -141,7 +149,15 @@ export function ProgressBar({ tasks, title, description }: ProgressBarProps) {
                     )}
                   </span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  role="progressbar"
+                  aria-label={`${cat.displayName} progress`}
+                  aria-valuemin={0}
+                  aria-valuemax={cat.total}
+                  aria-valuenow={cat.completed}
+                  aria-valuetext={`${cat.completed} of ${cat.total} complete${cat.failed > 0 ? `, ${cat.failed} failed` : ""}`}
+                  className="h-1.5 overflow-hidden rounded-full bg-muted"
+                >
                   <div
                     className={`h-full transition-all duration-300 ${
                       cat.progress === 100 && cat.failed === 0

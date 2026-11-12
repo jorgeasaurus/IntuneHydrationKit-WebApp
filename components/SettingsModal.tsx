@@ -22,7 +22,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
-  const { settings, updateSettings, resetSettings } = useSettings();
+  const { settings, updateSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState(settings);
 
   const handleSave = () => {
@@ -30,8 +30,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     onOpenChange(false);
   };
 
+  // Reset changes the draft only. Save persists it, Cancel discards it.
   const handleReset = () => {
-    resetSettings();
     setLocalSettings(DEFAULT_APP_SETTINGS);
   };
 
