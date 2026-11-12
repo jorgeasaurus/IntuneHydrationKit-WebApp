@@ -8,6 +8,7 @@ import { IntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { Win32AppTemplate } from "@/templates/win32Apps";
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { utf8ToBase64 } from "@/lib/utils/base64";
+import { isAuthSessionError, isRunCancelledError } from "@/lib/utils/retry";
 
 export interface Win32LobApp {
   "@odata.type"?: string;
@@ -168,7 +169,8 @@ async function uploadWithRenewal(
         throw error;
       }
 
-      await client.post(`${contentFileEndpoint}/renewUpload`, {}, "beta");
+      // A repeated renewUpload only asks Intune for a new signed URL again, so it is safe to retry.
+      await client.postAction(`${contentFileEndpoint}/renewUpload`, {}, "beta");
       const renewedTarget = await waitForUploadState(
         client,
         contentFileEndpoint,
@@ -179,6 +181,42 @@ async function uploadWithRenewal(
       }
       currentUploadUri = renewedTarget.azureStorageUri;
     }
+  }
+}
+
+/** Upload states that show that Intune accepted a commit request for the file. */
+const COMMIT_ACCEPTED_STATES = new Set(["commitFilePending", "commitFileSuccess"]);
+
+/**
+ * Commit the uploaded content file. The commit is retried with the normal retry policy.
+ * When the commit still fails, for example because a retry arrived after Intune accepted
+ * an earlier attempt whose response was lost, the file is read again. When its upload
+ * state shows an accepted commit, the commit is treated as done. Otherwise the error
+ * of the commit is thrown.
+ */
+async function commitContentFile(
+  client: GraphClient,
+  contentFileEndpoint: string,
+  fileEncryptionInfo: unknown
+): Promise<void> {
+  try {
+    await client.postAction(`${contentFileEndpoint}/commit`, { fileEncryptionInfo }, "beta");
+  } catch (error) {
+    if (isRunCancelledError(error) || isAuthSessionError(error)) throw error;
+    const uploadState = await client
+      .get<ContentFile>(contentFileEndpoint, "beta")
+      .then((file) => file.uploadState)
+      .catch((readError: unknown) => {
+        if (isRunCancelledError(readError)) throw readError;
+        return undefined;
+      });
+    if (uploadState && COMMIT_ACCEPTED_STATES.has(uploadState)) {
+      console.warn(
+        `[Win32] Commit request failed, but the file upload state is ${uploadState} - treating the commit as accepted`
+      );
+      return;
+    }
+    throw error;
   }
 }
 
@@ -228,11 +266,7 @@ export async function createWin32AppFromPackage(
       uploadTarget.azureStorageUri,
       packageFile.encryptedContent
     );
-    await client.post(
-      `${contentFileEndpoint}/commit`,
-      { fileEncryptionInfo: packageFile.encryptionInfo },
-      "beta"
-    );
+    await commitContentFile(client, contentFileEndpoint, packageFile.encryptionInfo);
     await waitForUploadState(client, contentFileEndpoint, "commitFileSuccess");
     await client.patch(
       `${APPS_ENDPOINT}/${app.id}`,

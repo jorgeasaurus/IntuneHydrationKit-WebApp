@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { TaskRow, getTaskRowHeight } from "@/components/dashboard/TaskRow";
-import { buildRowOffsets, getRowWindow } from "@/components/dashboard/taskWindow";
+import { TaskRow } from "@/components/dashboard/TaskRow";
+import { buildRowOffsets, getRowWindow, getTaskRowHeight } from "@/components/dashboard/taskWindow";
 import type { HydrationTask } from "@/types/hydration";
+import type { PortalLink } from "@/lib/utils/portalLinks";
 
 /** Viewport height before measurement, equal to the container max height. */
 const FALLBACK_VIEWPORT_HEIGHT = 600;
@@ -14,7 +15,13 @@ const FALLBACK_VIEWPORT_HEIGHT = 600;
  * sums without DOM measurement. List items carry aria-setsize and
  * aria-posinset so screen readers report the full list size.
  */
-export function VirtualTaskList({ tasks }: { tasks: HydrationTask[] }): React.JSX.Element {
+export function VirtualTaskList({
+  tasks,
+  portalLinks,
+}: {
+  tasks: HydrationTask[];
+  portalLinks?: ReadonlyMap<string, PortalLink>;
+}): React.JSX.Element {
   const scrollRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<number | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -61,7 +68,7 @@ export function VirtualTaskList({ tasks }: { tasks: HydrationTask[] }): React.JS
         className="absolute inset-x-0 pb-2"
         style={{ top: offsets[index], height: offsets[index + 1] - offsets[index] }}
       >
-        <TaskRow task={task} fixedHeight />
+        <TaskRow task={task} fixedHeight portalLink={portalLinks?.get(task.id)} />
       </li>,
     );
   }

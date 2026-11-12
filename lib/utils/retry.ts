@@ -149,7 +149,8 @@ function isRunControlError(error: unknown): boolean {
 }
 
 /**
- * Retry rule for requests that can be sent again without a side effect (GET, PATCH, DELETE).
+ * Retry rule for requests that can be sent again without a side effect (GET, PATCH, DELETE,
+ * and action POSTs sent with GraphClient.postAction).
  * Retryable: 429, 5xx, transient 400 errors from the Microsoft backend (not ResourceNotFound),
  * and network errors.
  */

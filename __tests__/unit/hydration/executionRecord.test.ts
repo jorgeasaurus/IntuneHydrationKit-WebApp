@@ -5,6 +5,7 @@ import {
   writeExecutionRecord,
   type ExecutionRecord,
 } from "@/lib/hydration/executionRecord";
+import { EXECUTION_RECORD_STORAGE_KEY } from "@/lib/storageKeys";
 
 function createRecord(): ExecutionRecord {
   const startTime = new Date("2026-08-17T01:00:00.000Z");
@@ -80,6 +81,38 @@ describe("execution record storage", () => {
     expect(readExecutionRecord(sessionStorage)).toEqual(record);
     record.isPreview = true;
     expect(() => writeExecutionRecord(sessionStorage, record)).toThrow();
+  });
+
+  it("stores the paused time and restores it with the active duration", () => {
+    const record = createRecord();
+    if (!record.summary) throw new Error("Expected a reportable record.");
+    record.pausedMs = 1500;
+    record.summary.duration = 500;
+    record.summary.pausedDuration = 1500;
+    writeExecutionRecord(sessionStorage, record);
+    expect(readExecutionRecord(sessionStorage)).toEqual(record);
+  });
+
+  it("loads an older record that has no paused time", () => {
+    const olderRecord = createRecord();
+    expect(olderRecord).not.toHaveProperty("pausedMs");
+    sessionStorage.setItem(EXECUTION_RECORD_STORAGE_KEY, JSON.stringify(olderRecord));
+    const record = readExecutionRecord(sessionStorage);
+    expect(record?.summary?.duration).toBe(2000);
+    expect(record?.pausedMs).toBeUndefined();
+  });
+
+  it("rejects paused time that does not match the summary or is longer than the run", () => {
+    const mismatch = createRecord();
+    mismatch.pausedMs = 1500;
+    expect(() => writeExecutionRecord(sessionStorage, mismatch)).toThrow();
+
+    const tooLong = createRecord();
+    if (!tooLong.summary) throw new Error("Expected a reportable record.");
+    tooLong.pausedMs = 3000;
+    tooLong.summary.duration = 0;
+    tooLong.summary.pausedDuration = 3000;
+    expect(() => writeExecutionRecord(sessionStorage, tooLong)).toThrow();
   });
 
   it("accepts equivalent category summaries with a different key order", () => {

@@ -177,18 +177,31 @@ export function sleep(ms: number): Promise<void> {
 export interface ExecutionControlAccessors {
   shouldPause?: () => boolean;
   shouldCancel?: () => boolean;
+  /**
+   * Called with true when the engine starts to wait because the run is paused, and with
+   * false when that wait ends. Only real waits are reported, so a pause that the run
+   * never reached (for example, during the last task) is not recorded.
+   */
+  onPauseWait?: (waiting: boolean) => void;
 }
 
 export async function waitWhilePaused(
   controls: ExecutionControlAccessors,
   pollMs = 250
 ): Promise<"resumed" | "cancelled"> {
-  while (controls.shouldPause?.()) {
-    if (controls.shouldCancel?.()) {
-      return "cancelled";
-    }
+  if (controls.shouldPause?.() && !controls.shouldCancel?.()) {
+    controls.onPauseWait?.(true);
+    try {
+      while (controls.shouldPause?.()) {
+        if (controls.shouldCancel?.()) {
+          return "cancelled";
+        }
 
-    await sleep(pollMs);
+        await sleep(pollMs);
+      }
+    } finally {
+      controls.onPauseWait?.(false);
+    }
   }
 
   if (controls.shouldCancel?.()) {
