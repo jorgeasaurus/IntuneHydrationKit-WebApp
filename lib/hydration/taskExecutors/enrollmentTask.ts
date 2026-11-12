@@ -5,10 +5,10 @@
 
 import { HydrationTask } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult } from "../types";
+import { executeDeleteTask } from "../deleteResolver";
 import {
   createEnrollmentProfile,
   enrollmentProfileExists,
-  deleteEnrollmentProfileByName,
   getEnrollmentProfileType,
   getEnrollmentProfileName,
   EnrollmentProfile,
@@ -30,6 +30,11 @@ export async function executeEnrollmentTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   const template = findEnrollmentTemplate(task.itemName);
@@ -81,22 +86,6 @@ export async function executeEnrollmentTask(
     }
 
     return { task, success: true, skipped: false, createdId: created.id };
-  }
-
-  if (mode === "delete") {
-    if (!(await enrollmentProfileExists(client, template))) {
-      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-    }
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-    try {
-      await deleteEnrollmentProfileByName(client, profileName, profileType);
-      return { task, success: true, skipped: false };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
-    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

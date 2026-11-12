@@ -6,31 +6,56 @@ import {
   initializeMsal,
   msalInstance,
 } from "@/lib/auth/msalConfig";
-import { signOut } from "@/lib/auth/authUtils";
-import { useEffect, useState } from "react";
+import { consumeInactivitySignOutNotice, signOutForInactivity } from "@/lib/auth/authUtils";
+import { AuthUnavailableContext } from "@/components/auth/AuthAvailability";
+import {
+  getExecutionState,
+  subscribeExecutionState,
+  type ExecutionState,
+} from "@/lib/hydration/executionStateStore";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 interface MsalProviderProps {
   children: React.ReactNode;
 }
 
 /** Sign out after 1 hour of inactivity (per security spec) */
-const SESSION_TIMEOUT_MS = 60 * 60 * 1000;
+export const SESSION_TIMEOUT_MS = 60 * 60 * 1000;
 const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll"] as const;
+/** Phases in which a run does work. A paused run does no work, so the idle timer applies again. */
+const WORKING_RUN_PHASES: ReadonlySet<ExecutionState["phase"]> = new Set([
+  "building",
+  "running",
+  "cancelling",
+]);
+
+function getExecutionPhase(): ExecutionState["phase"] {
+  return getExecutionState().phase;
+}
+
+function getServerExecutionPhase(): ExecutionState["phase"] {
+  return "idle";
+}
 
 /**
  * Signs the user out after a period of inactivity.
- * Rendered inside the MSAL context so it can observe the signed-in state.
+ * A run that is building, running, or cancelling counts as activity: the timer stops while the
+ * run works and starts again from zero when the run pauses or ends. A paused run does no work,
+ * so it does not keep the session alive.
  */
 function SessionTimeoutHandler() {
   const { accounts } = useMsal();
   const isSignedIn = accounts.length > 0;
+  const phase = useSyncExternalStore(subscribeExecutionState, getExecutionPhase, getServerExecutionPhase);
+  const isRunWorking = WORKING_RUN_PHASES.has(phase);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    // The effect re-runs when the run stops working, so the timer starts from that moment.
+    if (!isSignedIn || isRunWorking) return;
 
     const handleTimeout = () => {
       console.warn("[Auth] Session timed out after 1 hour of inactivity. Signing out.");
-      signOut().catch((error) =>
+      signOutForInactivity().catch((error) =>
         console.error("[Auth] Sign-out after inactivity failed:", error)
       );
     };
@@ -50,65 +75,92 @@ function SessionTimeoutHandler() {
       window.clearTimeout(timeoutId);
       ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, resetTimer));
     };
-  }, [isSignedIn]);
+  }, [isSignedIn, isRunWorking]);
 
   return null;
 }
 
-/**
- * MSAL authentication provider wrapper
- * Wraps the application with MSAL authentication context
- * Ensures MSAL is properly initialized before rendering children
- */
-export function MsalProvider({ children }: MsalProviderProps) {
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [initError, setInitError] = useState<Error | null>(null);
+/** Tells the user that the app signed them out after inactivity. */
+function InactivitySignOutNotice() {
+  const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const configurationError = getMsalConfigurationError();
+    // Read in an effect: the notice is in sessionStorage, which the server cannot read.
+    if (consumeInactivitySignOutNotice()) setVisible(true);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-4 bottom-4 z-[60] mx-auto flex max-w-md items-start gap-3 rounded-lg border border-amber-500/40 bg-background/95 p-4 shadow-lg backdrop-blur"
+    >
+      <div className="flex-1 space-y-1">
+        <p className="text-sm font-semibold">Signed out due to inactivity</p>
+        <p className="text-sm text-muted-foreground">
+          No activity occurred for 1 hour, so the app signed you out. Sign in again to continue.
+        </p>
+      </div>
+      <button
+        type="button"
+        onClick={() => setVisible(false)}
+        className="rounded-md px-2 py-1 text-sm font-medium hover:bg-muted"
+        aria-label="Dismiss sign-out notice"
+      >
+        Dismiss
+      </button>
+    </div>
+  );
+}
+
+/** Shows why sign-in is not available. The page content stays visible. */
+function AuthUnavailableNotice({ message }: { message: string }) {
+  return (
+    <div
+      role="alert"
+      className="fixed inset-x-4 bottom-4 z-[60] mx-auto max-w-md space-y-1 rounded-lg border border-red-500/40 bg-background/95 p-4 shadow-lg backdrop-blur"
+    >
+      <p className="text-sm font-semibold">Authentication unavailable</p>
+      <p className="text-sm text-muted-foreground">{message}</p>
+    </div>
+  );
+}
+
+/**
+ * MSAL authentication provider wrapper.
+ * Children render on the server and before MSAL initialization completes. msal-react reports
+ * `inProgress: startup` until initialization ends, and auth-dependent UI (for example
+ * ProtectedRoute) waits for that. msal-react stays in `startup` if initialization fails, so the
+ * failure reason is shared through AuthUnavailableContext. signIn waits for initialization
+ * before it opens a popup.
+ */
+export function MsalProvider({ children }: MsalProviderProps) {
+  const configurationError = getMsalConfigurationError();
+  const [initError, setInitError] = useState<string | null>(null);
+
+  useEffect(() => {
     if (configurationError) {
-      const error = new Error(configurationError);
-      console.error("[MSAL] Failed to initialize:", error);
-      setInitError(error);
-      setIsInitialized(true);
+      console.error("[MSAL] Failed to initialize:", new Error(configurationError));
       return;
     }
 
-    initializeMsal()
-      .then(() => {
-        setIsInitialized(true);
-      })
-      .catch((error) => {
-        console.error("[MSAL] Failed to initialize:", error);
-        // Surface the failure instead of rendering the app on a broken MSAL instance
-        setInitError(error instanceof Error ? error : new Error(String(error)));
-        setIsInitialized(true);
-      });
-  }, []);
+    initializeMsal().catch((error) => {
+      console.error("[MSAL] Failed to initialize:", error);
+      setInitError(error instanceof Error ? error.message : String(error));
+    });
+  }, [configurationError]);
 
-  // Show nothing while MSAL is initializing
-  // This prevents authentication operations from being called before MSAL is ready
-  if (!isInitialized) {
-    return null;
-  }
-
-  if (initError) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-6">
-        <div className="max-w-md space-y-2 rounded-lg border border-red-500/40 bg-red-500/10 p-6 text-center">
-          <h2 className="text-lg font-semibold">Authentication unavailable</h2>
-          <p className="text-sm text-muted-foreground">
-            {initError.message}
-          </p>
-        </div>
-      </div>
-    );
-  }
+  const authError = configurationError ?? initError;
 
   return (
     <BaseMsalProvider instance={msalInstance}>
-      <SessionTimeoutHandler />
-      {children}
+      <AuthUnavailableContext.Provider value={authError}>
+        <SessionTimeoutHandler />
+        <InactivitySignOutNotice />
+        {children}
+        {authError ? <AuthUnavailableNotice message={authError} /> : null}
+      </AuthUnavailableContext.Provider>
     </BaseMsalProvider>
   );
 }

@@ -259,13 +259,15 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     (sum, t) => sum + getSelectedCount(t.id),
     0
   );
+  // A category that is still loading has no final selection yet. Continue stays disabled until
+  // every selected category has loaded and has at least one selected item.
   const isValid = selectionState.targets.length > 0 &&
     selectionState.targets.every(t => {
-      if (t === "cisBaseline") return selectionState.selectedCISPolicies.size > 0 || data.cisLoading;
-      return (selectionState.selectedItems[t]?.size || 0) > 0 || data.loadingCategories.has(t);
+      if (t === "cisBaseline") return !data.cisLoading && selectionState.selectedCISPolicies.size > 0;
+      return !data.loadingCategories.has(t) && (selectionState.selectedItems[t]?.size || 0) > 0;
     });
 
-  const handleContinue = useTargetSelectionPersistence({
+  const persistSelection = useTargetSelectionPersistence({
     targets: selectionState.targets,
     selectedItems: selectionState.selectedItems,
     selectedCISPolicies: selectionState.selectedCISPolicies,
@@ -276,6 +278,9 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     setCategorySelections: wizard.setCategorySelections,
     nextStep: wizard.nextStep,
   });
+  const handleContinue = () => {
+    if (isValid) persistSelection();
+  };
 
   return {
     search: {

@@ -27,35 +27,6 @@ function addEnrollmentHydrationMarker(description: string | undefined | null): s
 }
 
 /**
- * Shared delete logic: verify hydration marker, check for assignments, then delete.
- */
-async function deleteEnrollmentEntity(
-  client: GraphClient,
-  basePath: string,
-  entityId: string,
-  entityLabel: string
-): Promise<void> {
-  const entity = await client.get<{ displayName: string; description?: string }>(
-    `${basePath}/${entityId}`
-  );
-
-  if (!hasHydrationMarker(entity.description)) {
-    throw new Error(
-      `Cannot delete ${entityLabel} "${entity.displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  const assignments = await client.getCollection(`${basePath}/${entityId}/assignments`);
-  if (assignments.length > 0) {
-    throw new Error(
-      `Cannot delete ${entityLabel} "${entity.displayName}": Has ${assignments.length} assignment(s). Remove all assignments before deleting.`
-    );
-  }
-
-  await client.delete(`${basePath}/${entityId}`);
-}
-
-/**
  * Autopilot Deployment Profile interface
  */
 export interface AutopilotDeploymentProfile {
@@ -189,24 +160,6 @@ async function createAutopilotProfile(
   );
 }
 
-async function deleteAutopilotProfile(
-  client: GraphClient,
-  profileId: string
-): Promise<void> {
-  await deleteEnrollmentEntity(client, AUTOPILOT_PATH, profileId, "profile");
-}
-
-async function deleteAutopilotProfileByName(
-  client: GraphClient,
-  displayName: string
-): Promise<void> {
-  const profile = await getAutopilotProfileByName(client, displayName);
-  if (!profile?.id) {
-    throw new Error(`Autopilot profile "${displayName}" not found`);
-  }
-  await deleteAutopilotProfile(client, profile.id);
-}
-
 async function getAllEnrollmentConfigurations(
   client: GraphClient
 ): Promise<EnrollmentStatusPageConfiguration[]> {
@@ -246,24 +199,6 @@ async function createESPConfiguration(
   return client.post<EnrollmentStatusPageConfiguration>(ESP_PATH, configBody);
 }
 
-async function deleteESPConfiguration(
-  client: GraphClient,
-  configId: string
-): Promise<void> {
-  await deleteEnrollmentEntity(client, ESP_PATH, configId, "ESP configuration");
-}
-
-async function deleteESPConfigurationByName(
-  client: GraphClient,
-  displayName: string
-): Promise<void> {
-  const config = await getESPConfigurationByName(client, displayName);
-  if (!config?.id) {
-    throw new Error(`ESP configuration "${displayName}" not found`);
-  }
-  await deleteESPConfiguration(client, config.id);
-}
-
 export function getEnrollmentProfileType(
   profile: EnrollmentProfile
 ): "autopilot" | "esp" | "devicePreparation" {
@@ -298,31 +233,6 @@ async function createDevicePreparationProfile(
   payload.description = addEnrollmentHydrationMarker(payload.description);
 
   return client.post<DevicePreparationProfile>(CONFIG_POLICIES_PATH, payload);
-}
-
-async function deleteDevicePreparationByName(
-  client: GraphClient,
-  name: string
-): Promise<void> {
-  const match = await findDevicePreparationPolicyByName(client, name);
-  if (!match?.id) {
-    throw new Error(`Device Preparation policy "${name}" not found`);
-  }
-
-  if (!hasHydrationMarker(match.description) && !hasHydrationMarker(match.name)) {
-    throw new Error(
-      `Cannot delete Device Preparation policy "${match.name}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  const assignments = await client.getCollection(`${CONFIG_POLICIES_PATH}/${match.id}/assignments`);
-  if (assignments.length > 0) {
-    throw new Error(
-      `Cannot delete Device Preparation policy "${match.name}": Has ${assignments.length} assignment(s). Remove all assignments before deleting.`
-    );
-  }
-
-  await client.delete(`${CONFIG_POLICIES_PATH}/${match.id}`);
 }
 
 async function findDevicePreparationPolicyByName(
@@ -384,17 +294,112 @@ export async function enrollmentProfileExists(
   }
 }
 
-export async function deleteEnrollmentProfileByName(
+/**
+ * Tenant enrollment object that matches a delete task, with its endpoints.
+ */
+export interface EnrollmentDeleteCandidate {
+  id: string;
+  name: string;
+  description?: string;
+  label: string;
+  basePath: string;
+}
+
+/** Enrollment object type, as getEnrollmentProfileType returns it. */
+export type EnrollmentProfileType = ReturnType<typeof getEnrollmentProfileType>;
+
+async function findAutopilotForDelete(client: GraphClient, normalizedName: string): Promise<EnrollmentDeleteCandidate | null> {
+  const autopilot = (await getAllAutopilotProfiles(client)).find(
+    (profile) => profile.id && normalizeEnrollmentDisplayName(profile.displayName) === normalizedName
+  );
+  if (!autopilot?.id) return null;
+  return {
+    id: autopilot.id,
+    name: autopilot.displayName,
+    description: autopilot.description,
+    label: "Autopilot profile",
+    basePath: AUTOPILOT_PATH,
+  };
+}
+
+async function findEspForDelete(client: GraphClient, normalizedName: string): Promise<EnrollmentDeleteCandidate | null> {
+  const esp = (await getAllEnrollmentConfigurations(client)).find(
+    (config) => config.id && normalizeEnrollmentDisplayName(config.displayName) === normalizedName
+  );
+  if (!esp?.id) return null;
+  return {
+    id: esp.id,
+    name: esp.displayName,
+    description: esp.description,
+    label: "Enrollment Status Page",
+    basePath: ESP_PATH,
+  };
+}
+
+async function findDevicePreparationForDelete(
   client: GraphClient,
-  displayName: string,
-  profileType: "autopilot" | "esp" | "devicePreparation"
-): Promise<void> {
-  switch (profileType) {
-    case "esp":
-      return deleteESPConfigurationByName(client, displayName);
-    case "devicePreparation":
-      return deleteDevicePreparationByName(client, displayName);
-    case "autopilot":
-      return deleteAutopilotProfileByName(client, displayName);
+  normalizedName: string
+): Promise<EnrollmentDeleteCandidate | null> {
+  // Device Preparation policies are Settings Catalog policies, so only policies with
+  // the "enrollment" technology can match.
+  const devicePreparation = (
+    await client.getCollection<DevicePreparationPolicySummary & { technologies?: string }>(
+      `${CONFIG_POLICIES_PATH}?$select=id,name,description,technologies`
+    )
+  ).find(
+    (policy) =>
+      policy.technologies?.toLowerCase().includes("enrollment") &&
+      normalizeEnrollmentDisplayName(policy.name) === normalizedName
+  );
+  if (!devicePreparation?.id) return null;
+  return {
+    id: devicePreparation.id,
+    name: devicePreparation.name,
+    description: devicePreparation.description,
+    label: "Device Preparation policy",
+    basePath: CONFIG_POLICIES_PATH,
+  };
+}
+
+const ENROLLMENT_DELETE_FINDERS: Record<
+  EnrollmentProfileType,
+  (client: GraphClient, normalizedName: string) => Promise<EnrollmentDeleteCandidate | null>
+> = {
+  autopilot: findAutopilotForDelete,
+  esp: findEspForDelete,
+  devicePreparation: findDevicePreparationForDelete,
+};
+
+/**
+ * Find the enrollment object (Autopilot profile, ESP or Device Preparation policy)
+ * that a delete task names. Read errors are not caught, so the caller does not
+ * delete an object when it cannot read the tenant.
+ *
+ * With a profile type (from the task's template), only that collection is searched,
+ * so an object of another type with the same name cannot be selected. Without one,
+ * all three collections are searched and a name that matches in more than one of
+ * them is an error: the caller must not guess which object to delete.
+ */
+export async function findEnrollmentProfileForDelete(
+  client: GraphClient,
+  name: string,
+  profileType?: EnrollmentProfileType
+): Promise<EnrollmentDeleteCandidate | null> {
+  const normalizedName = normalizeEnrollmentDisplayName(name);
+
+  if (profileType) {
+    return ENROLLMENT_DELETE_FINDERS[profileType](client, normalizedName);
   }
+
+  const matches: EnrollmentDeleteCandidate[] = [];
+  for (const find of Object.values(ENROLLMENT_DELETE_FINDERS)) {
+    const match = await find(client, normalizedName);
+    if (match) matches.push(match);
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `"${name}" matches more than one enrollment object (${matches.map((match) => match.label).join(", ")})`
+    );
+  }
+  return matches[0] ?? null;
 }

@@ -10,7 +10,8 @@ import {
   HYDRATION_MARKER,
   HYDRATION_MARKER_LEGACY,
   IMPORT_PREFIX,
-  hasHydrationMarker,
+  hasConditionalAccessHydrationMarker,
+  normalizeConditionalAccessPolicyName,
 } from "@/lib/utils/hydrationMarker";
 
 export const CONDITIONAL_ACCESS_POLICIES_ENDPOINT =
@@ -123,62 +124,6 @@ export function buildConditionalAccessCreatePlan(
   };
 }
 
-/**
- * Get all conditional access policies in the tenant
- */
-async function getAllConditionalAccessPolicies(
-  client: GraphClient
-): Promise<ConditionalAccessPolicy[]> {
-  return client.getCollection<ConditionalAccessPolicy>(CONDITIONAL_ACCESS_POLICIES_ENDPOINT);
-}
-
-/**
- * Get a conditional access policy by ID
- */
-async function getConditionalAccessPolicyById(
-  client: GraphClient,
-  policyId: string
-): Promise<ConditionalAccessPolicy> {
-  return client.get<ConditionalAccessPolicy>(
-    `/identity/conditionalAccess/policies/${policyId}`
-  );
-}
-
-const CONDITIONAL_ACCESS_MARKER_SUFFIXES = [
-  " [intune hydration kit]",
-  ` [${HYDRATION_MARKER.toLowerCase()}]`,
-  ` [${HYDRATION_MARKER_LEGACY.toLowerCase()}]`,
-];
-
-function hasConditionalAccessHydrationMarker(displayName: string): boolean {
-  const normalizedDisplayName = displayName.trim().toLowerCase();
-
-  return (
-    hasHydrationMarker(displayName) ||
-    CONDITIONAL_ACCESS_MARKER_SUFFIXES.some((suffix) =>
-      normalizedDisplayName.endsWith(suffix)
-    )
-  );
-}
-
-function normalizeConditionalAccessPolicyName(displayName: string): string {
-  let normalized = displayName.trim().toLowerCase();
-  const importPrefix = IMPORT_PREFIX.toLowerCase();
-
-  if (normalized.startsWith(importPrefix)) {
-    normalized = normalized.slice(importPrefix.length);
-  }
-
-  const markerSuffix = CONDITIONAL_ACCESS_MARKER_SUFFIXES.find((suffix) =>
-    normalized.endsWith(suffix)
-  );
-  if (markerSuffix) {
-    normalized = normalized.slice(0, -markerSuffix.length);
-  }
-
-  return normalized.trim();
-}
-
 function getConditionalAccessNamePriority(
   policyName: string,
   requestedName: string
@@ -195,45 +140,38 @@ function getConditionalAccessNamePriority(
 }
 
 /**
- * Get a conditional access policy by display name
+ * Find the kit-created Conditional Access policy that matches a display name.
+ * Only policies with the hydration marker in the display name can match, so a
+ * policy with the same base name that an administrator created is never selected.
  */
-async function getConditionalAccessPolicyByName(
-  client: GraphClient,
+export function findHydrationConditionalAccessPolicy<T extends { id?: string; displayName?: string }>(
+  policies: T[],
   displayName: string
-): Promise<ConditionalAccessPolicy | null> {
-  const policies = await getAllConditionalAccessPolicies(client);
+): T | null {
   const normalizedName = normalizeConditionalAccessPolicyName(displayName);
 
   const matches = policies.filter(
     (policy) =>
+      policy.displayName !== undefined &&
       hasConditionalAccessHydrationMarker(policy.displayName) &&
       normalizeConditionalAccessPolicyName(policy.displayName) === normalizedName
   );
 
   matches.sort((left, right) => {
+    const leftName = left.displayName ?? "";
+    const rightName = right.displayName ?? "";
     const priorityDifference =
-      getConditionalAccessNamePriority(left.displayName, displayName) -
-      getConditionalAccessNamePriority(right.displayName, displayName);
+      getConditionalAccessNamePriority(leftName, displayName) -
+      getConditionalAccessNamePriority(rightName, displayName);
     if (priorityDifference !== 0) return priorityDifference;
 
-    const nameDifference = left.displayName.localeCompare(right.displayName);
+    const nameDifference = leftName.localeCompare(rightName);
     if (nameDifference !== 0) return nameDifference;
 
     return (left.id ?? "").localeCompare(right.id ?? "");
   });
 
   return matches[0] ?? null;
-}
-
-/**
- * Check if a conditional access policy exists by display name (case-insensitive)
- */
-export async function conditionalAccessPolicyExists(
-  client: GraphClient,
-  displayName: string
-): Promise<boolean> {
-  const policy = await getConditionalAccessPolicyByName(client, displayName);
-  return policy !== null;
 }
 
 /**
@@ -254,46 +192,27 @@ export async function createConditionalAccessPolicy(
 }
 
 /**
- * Delete a conditional access policy by ID
- * Only deletes if:
- * 1. The policy was created by Intune Hydration Kit
- * 2. The policy is in DISABLED state
+ * Read a Conditional Access policy again immediately before delete and get the
+ * reason why it must not be deleted. The prefetched list can be old: an
+ * administrator can enable a policy while the run is in progress.
+ * Returns null when the policy has the hydration marker and is disabled.
+ * Throws when the policy cannot be read, so the caller does not delete it.
  */
-async function deleteConditionalAccessPolicy(
+export async function getConditionalAccessDeleteBlockReason(
   client: GraphClient,
   policyId: string
-): Promise<void> {
-  // First, verify the policy has the hydration marker and is disabled
-  const policy = await getConditionalAccessPolicyById(client, policyId);
+): Promise<string | null> {
+  const policy = await client.get<ConditionalAccessPolicy>(
+    `${CONDITIONAL_ACCESS_POLICIES_ENDPOINT}/${policyId}`
+  );
 
   if (!hasConditionalAccessHydrationMarker(policy.displayName)) {
-    throw new Error(
-      `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
-    );
+    return "Not created by Intune Hydration Kit (no marker in the display name)";
   }
 
   if (policy.state !== "disabled") {
-    throw new Error(
-      `Cannot delete policy "${policy.displayName}": Policy must be disabled before deletion. Current state: ${policy.state}`
-    );
+    return `Policy state is "${policy.state}". Disable the policy before you delete it.`;
   }
 
-  await client.delete(`/identity/conditionalAccess/policies/${policyId}`);
-}
-
-/**
- * Delete a conditional access policy by display name
- * Only deletes if the policy was created by Intune Hydration Kit and is disabled
- */
-export async function deleteConditionalAccessPolicyByName(
-  client: GraphClient,
-  displayName: string
-): Promise<void> {
-  const policy = await getConditionalAccessPolicyByName(client, displayName);
-
-  if (!policy || !policy.id) {
-    throw new Error(`Conditional access policy "${displayName}" not found`);
-  }
-
-  await deleteConditionalAccessPolicy(client, policy.id);
+  return null;
 }

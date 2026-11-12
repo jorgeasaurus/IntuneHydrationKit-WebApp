@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { retryWithBackoff } from '@/lib/utils/retry'
+import {
+  MAX_RETRIES,
+  MAX_RETRY_AFTER_MS,
+  RunCancelledError,
+  getRetryDelayMs,
+  isNotProcessedError,
+  isOutcomeUnknownError,
+  parseRetryAfterMs,
+  retryWithBackoff,
+} from '@/lib/utils/retry'
 
 describe('retryWithBackoff', () => {
   beforeEach(() => {
@@ -183,6 +192,11 @@ describe('retryWithBackoff', () => {
   })
 
   describe('backoff delay calculation', () => {
+    // Jitter at its maximum gives the full backoff, so the timings are exact.
+    beforeEach(() => {
+      vi.spyOn(Math, 'random').mockReturnValue(0.999999)
+    })
+
     it('uses exponential backoff with default options', async () => {
       const error500 = Object.assign(new Error('Server error'), { status: 500 })
       const mockFn = vi.fn().mockRejectedValue(error500)
@@ -339,8 +353,9 @@ describe('retryWithBackoff', () => {
 
       await vi.runAllTimersAsync()
 
-      // Default maxRetries is 5, so 6 total calls
-      expect(mockFn).toHaveBeenCalledTimes(6)
+      // Default maxRetries is MAX_RETRIES (3), so 4 total calls
+      expect(MAX_RETRIES).toBe(3)
+      expect(mockFn).toHaveBeenCalledTimes(4)
     })
 
     it('preserves error type on final throw', async () => {
@@ -357,6 +372,96 @@ describe('retryWithBackoff', () => {
         expect(error).toBeInstanceOf(CustomError)
         expect((error as CustomError).code).toBe('CUSTOM_ERROR')
       }
+    })
+  })
+
+  describe('Retry-After and limits', () => {
+    it('parses delta-seconds and HTTP-date values and rejects invalid values', () => {
+      const now = Date.parse('2026-01-01T00:00:00Z')
+      expect(parseRetryAfterMs('7', now)).toBe(7000)
+      expect(parseRetryAfterMs(' 1.5 ', now)).toBe(1500)
+      expect(parseRetryAfterMs('Thu, 01 Jan 2026 00:00:20 GMT', now)).toBe(20000)
+      expect(parseRetryAfterMs('Wed, 31 Dec 2025 23:00:00 GMT', now)).toBe(0)
+      expect(parseRetryAfterMs('soon', now)).toBeUndefined()
+      expect(parseRetryAfterMs(null, now)).toBeUndefined()
+    })
+
+    it('caps one Retry-After wait at MAX_RETRY_AFTER_MS', () => {
+      expect(parseRetryAfterMs('600')).toBe(MAX_RETRY_AFTER_MS)
+      expect(getRetryDelayMs(0, 600_000)).toBe(MAX_RETRY_AFTER_MS)
+    })
+
+    it('adds jitter to exponential backoff (between half and the full backoff)', () => {
+      const random = vi.spyOn(Math, 'random')
+      random.mockReturnValue(0)
+      expect(getRetryDelayMs(2)).toBe(2000)
+      random.mockReturnValue(0.999999)
+      expect(getRetryDelayMs(2)).toBe(4000)
+    })
+
+    it('honours retryAfterMs on a 503 error', async () => {
+      const error503 = Object.assign(new Error('Unavailable'), { status: 503, retryAfterMs: 9000 })
+      const mockFn = vi.fn().mockRejectedValueOnce(error503).mockResolvedValue('ok')
+
+      const resultPromise = retryWithBackoff(mockFn)
+      await vi.advanceTimersByTimeAsync(8999)
+      expect(mockFn).toHaveBeenCalledTimes(1)
+      await vi.advanceTimersByTimeAsync(1)
+      expect(mockFn).toHaveBeenCalledTimes(2)
+      await expect(resultPromise).resolves.toBe('ok')
+    })
+  })
+
+  describe('create (POST) rule', () => {
+    const withStatus = (status: number, extra: Record<string, unknown> = {}) =>
+      Object.assign(new Error(`[${status}]`), { status, ...extra })
+
+    it('treats only 429 and 503 with Retry-After as "not processed"', () => {
+      expect(isNotProcessedError(withStatus(429))).toBe(true)
+      expect(isNotProcessedError(withStatus(503, { retryAfterMs: 1000 }))).toBe(true)
+      expect(isNotProcessedError(withStatus(503))).toBe(false)
+      expect(isNotProcessedError(withStatus(500))).toBe(false)
+      expect(isNotProcessedError(withStatus(504))).toBe(false)
+      expect(isNotProcessedError(new TypeError('Failed to fetch'))).toBe(false)
+    })
+
+    it('treats other 5xx responses and network errors as "outcome unknown"', () => {
+      expect(isOutcomeUnknownError(withStatus(500))).toBe(true)
+      expect(isOutcomeUnknownError(withStatus(503))).toBe(true)
+      expect(isOutcomeUnknownError(withStatus(504))).toBe(true)
+      expect(isOutcomeUnknownError(new TypeError('Failed to fetch'))).toBe(true)
+      expect(isOutcomeUnknownError(withStatus(429))).toBe(false)
+      expect(isOutcomeUnknownError(withStatus(503, { retryAfterMs: 1000 }))).toBe(false)
+      expect(isOutcomeUnknownError(withStatus(400))).toBe(false)
+      expect(isOutcomeUnknownError(new RunCancelledError())).toBe(false)
+    })
+
+    it('does not retry a create on a 504 when the "not processed" rule is used', async () => {
+      const mockFn = vi.fn().mockRejectedValue(withStatus(504))
+      await expect(retryWithBackoff(mockFn, { isRetryable: isNotProcessedError })).rejects.toThrow('[504]')
+      expect(mockFn).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('run controls', () => {
+    it('throws RunCancelledError when the run is cancelled during a wait', async () => {
+      const mockFn = vi.fn().mockRejectedValue(Object.assign(new Error('Busy'), { status: 429, retryAfterMs: 60000 }))
+      const wait = vi.fn().mockResolvedValue('cancelled')
+
+      await expect(retryWithBackoff(mockFn, { wait })).rejects.toBeInstanceOf(RunCancelledError)
+      expect(mockFn).toHaveBeenCalledTimes(1)
+      expect(wait).toHaveBeenCalledWith(60000)
+    })
+
+    it('does not retry cancel or sign-in errors', async () => {
+      const authError = Object.assign(new Error('Session expired'), { name: 'InteractionRequiredError' })
+      const cancelFn = vi.fn().mockRejectedValue(new RunCancelledError())
+      const authFn = vi.fn().mockRejectedValue(authError)
+
+      await expect(retryWithBackoff(cancelFn)).rejects.toBeInstanceOf(RunCancelledError)
+      await expect(retryWithBackoff(authFn)).rejects.toBe(authError)
+      expect(cancelFn).toHaveBeenCalledTimes(1)
+      expect(authFn).toHaveBeenCalledTimes(1)
     })
   })
 })

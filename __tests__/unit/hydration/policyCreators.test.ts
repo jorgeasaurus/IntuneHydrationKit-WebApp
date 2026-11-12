@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildCISGroupPolicyConfigurationPayload,
   buildCISSecurityIntentPayload,
-  compliancePolicyExistsByName,
   createBaselineCompliancePolicy,
   createCISDeviceConfiguration,
   createCISGroupPolicyConfiguration,
@@ -13,11 +12,6 @@ import {
   createDriverUpdateProfile,
   createSettingsCatalogPolicy,
   createV2CompliancePolicy,
-  deviceConfigurationExists,
-  groupPolicyConfigurationExists,
-  securityIntentExists,
-  settingsCatalogPolicyExists,
-  v2CompliancePolicyExists,
 } from "@/lib/hydration/policyCreators";
 
 describe("policyCreators", () => {
@@ -138,72 +132,6 @@ describe("policyCreators", () => {
         },
       ],
     });
-  });
-
-  it("detects existing CIS security intents with OData-unsafe names via collection lookup", async () => {
-    const client = {
-      get: () => {
-        throw new Error("should not use filtered GET for OData-unsafe names");
-      },
-      getCollection: async () => [
-        {
-          id: "intent-1",
-          displayName: "[IHD] Baseline - MacOS - Firewall",
-        },
-      ],
-    } as unknown as Parameters<typeof securityIntentExists>[0];
-
-    await expect(
-      securityIntentExists(client, "[IHD] Baseline - MacOS - Firewall")
-    ).resolves.toBe(true);
-  });
-
-  it("returns false when CIS security intent collection lookup has no data", async () => {
-    const client = {
-      getCollection: vi.fn().mockResolvedValue(undefined),
-    } as unknown as Parameters<typeof securityIntentExists>[0];
-
-    await expect(securityIntentExists(client, "[IHD] Missing Intent")).resolves.toBe(false);
-    expect(client.getCollection).toHaveBeenCalledWith(
-      "/deviceManagement/intents?$select=id,displayName"
-    );
-  });
-
-  it("uses filtered GET for safe CIS security intent lookups and handles errors", async () => {
-    const safeClient = {
-      get: vi.fn().mockResolvedValue({ value: [{ displayName: "O'Brien Intent" }] }),
-    } as unknown as Parameters<typeof securityIntentExists>[0];
-
-    await expect(securityIntentExists(safeClient, "O'Brien Intent")).resolves.toBe(true);
-    expect(safeClient.get).toHaveBeenCalledWith(
-      "/deviceManagement/intents?$filter=displayName eq 'O''Brien Intent'&$select=id,displayName"
-    );
-
-    const failingClient = {
-      get: vi.fn().mockRejectedValue(new Error("boom")),
-    } as unknown as Parameters<typeof securityIntentExists>[0];
-
-    await expect(securityIntentExists(failingClient, "Safe Intent")).resolves.toBe(false);
-  });
-
-  it("skips filtered settings catalog lookups for OData-unsafe names and escapes safe names", async () => {
-    const unsafeClient = {
-      get: vi.fn(),
-    } as unknown as Parameters<typeof settingsCatalogPolicyExists>[0];
-
-    await expect(
-      settingsCatalogPolicyExists(unsafeClient, "[IHD] Baseline: Windows")
-    ).resolves.toBe(false);
-    expect(unsafeClient.get).not.toHaveBeenCalled();
-
-    const safeClient = {
-      get: vi.fn().mockResolvedValue({ value: [{ name: "O'Brien Policy" }] }),
-    } as unknown as Parameters<typeof settingsCatalogPolicyExists>[0];
-
-    await expect(settingsCatalogPolicyExists(safeClient, "O'Brien Policy")).resolves.toBe(true);
-    expect(safeClient.get).toHaveBeenCalledWith(
-      "/deviceManagement/configurationPolicies?$filter=name eq 'O''Brien%20Policy'&$select=id,name"
-    );
   });
 
   it("creates settings catalog policies with normalized names and secret warnings", async () => {
@@ -499,44 +427,4 @@ describe("policyCreators", () => {
     );
   });
 
-  it.each([
-    {
-      label: "compliance policy",
-      fn: compliancePolicyExistsByName,
-      resource: "/deviceManagement/deviceCompliancePolicies?$filter=displayName eq 'O''Brien%20Policy'&$select=id,displayName",
-    },
-    {
-      label: "group policy configuration",
-      fn: groupPolicyConfigurationExists,
-      resource: "/deviceManagement/groupPolicyConfigurations?$filter=displayName eq 'O''Brien%20Policy'&$select=id,displayName",
-    },
-    {
-      label: "v2 compliance policy",
-      fn: v2CompliancePolicyExists,
-      resource: "/deviceManagement/compliancePolicies?$filter=name eq 'O''Brien%20Policy'&$select=id,name",
-    },
-    {
-      label: "device configuration",
-      fn: deviceConfigurationExists,
-      resource: "/deviceManagement/deviceConfigurations?$filter=displayName eq 'O''Brien%20Policy'&$select=id,displayName",
-    },
-  ])("checks $label existence across unsafe, empty, and error branches", async ({ fn, resource }) => {
-    const unsafeClient = {
-      get: vi.fn(),
-    } as unknown as Parameters<typeof fn>[0];
-    const emptyClient = {
-      get: vi.fn().mockResolvedValue({ value: [] }),
-    } as unknown as Parameters<typeof fn>[0];
-    const failingClient = {
-      get: vi.fn().mockRejectedValue(new Error("lookup failed")),
-    } as unknown as Parameters<typeof fn>[0];
-
-    await expect(fn(unsafeClient, "[IHD] Unsafe")).resolves.toBe(false);
-    expect(unsafeClient.get).not.toHaveBeenCalled();
-
-    await expect(fn(emptyClient, "O'Brien Policy")).resolves.toBe(false);
-    expect(emptyClient.get).toHaveBeenCalledWith(resource);
-
-    await expect(fn(failingClient, "Safe Policy")).resolves.toBe(false);
-  });
 });

@@ -4,6 +4,169 @@
  * Common utility functions used across the hydration engine
  */
 
+import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
+import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
+import {
+  getAllTemplateCacheKeys,
+  getCachedTemplates,
+  type BaselinePolicy,
+  type CISBaselinePolicy,
+} from "@/lib/templates/loader";
+import type { HydrationTask } from "@/types/hydration";
+import type { CISPolicyType, ExecutionContext, TenantCacheKey } from "./types";
+
+export const LICENSE_SKIP_REASONS = {
+  conditionalAccess: "No Entra ID Premium (P1) license",
+  premiumP2: "Requires Premium P2 license",
+  driverUpdate: "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)",
+} as const;
+
+/**
+ * Whether a task creates a driver update profile. The template's policy type decides,
+ * the same value that routes the create. The name is used when no template is found.
+ */
+function isDriverUpdateTask(task: HydrationTask, context: ExecutionContext): boolean {
+  if (task.category === "baseline") {
+    const template = findBaselineTemplate(task, context);
+    if (template) return getOIBPolicyType(template) === "DriverUpdateProfiles";
+  }
+  const name = task.itemName.toLowerCase();
+  return name.includes("wufb drivers") || name.includes("driver update");
+}
+
+/**
+ * License check before a create is dispatched, used by the batch and the sequential path.
+ * Returns the skip reason when the tenant does not have the license that the object needs.
+ * Delete is not checked, so existing kit objects can be removed after a license change.
+ */
+export function getLicenseSkipReason(task: HydrationTask, context: ExecutionContext): string | undefined {
+  if (task.operation !== "create") return undefined;
+
+  if (task.category === "conditionalAccess") {
+    if (context.hasConditionalAccessLicense === false) return LICENSE_SKIP_REASONS.conditionalAccess;
+    if (context.hasPremiumP2License === false) {
+      const templates = getCachedTemplates("conditionalAccess");
+      const template = Array.isArray(templates)
+        ? (templates as Array<{ displayName?: string; conditions?: Record<string, unknown> }>).find(
+            (policy) => policy.displayName === task.itemName
+          )
+        : undefined;
+      if (template && policyRequiresPremiumP2(template)) return LICENSE_SKIP_REASONS.premiumP2;
+    }
+  }
+
+  if (context.hasWindowsDriverUpdateLicense === false && isDriverUpdateTask(task, context)) {
+    return LICENSE_SKIP_REASONS.driverUpdate;
+  }
+  return undefined;
+}
+
+/**
+ * Policy type of a baseline template: a CIS policy type, or App Protection.
+ */
+export type BaselinePolicyType = CISPolicyType | "AppProtection";
+
+/**
+ * Find the OpenIntuneBaseline template of a task: by the task's file path when it has one,
+ * otherwise by name (see findBaselineTemplateForTask).
+ */
+export function findBaselineTemplate(task: HydrationTask, context: ExecutionContext): BaselinePolicy | undefined {
+  const templates = context.cachedBaselineTemplates || getCachedTemplates("baseline");
+  if (!Array.isArray(templates)) return undefined;
+  return findBaselineTemplateForTask(templates as BaselinePolicy[], task);
+}
+
+/**
+ * Find the CIS baseline template of a task. CIS templates are cached under keys like
+ * "cisBaseline-cis-windows-11,cis-browser", so every CIS cache key is searched.
+ */
+export function findCISBaselineTemplate(task: HydrationTask): CISBaselinePolicy | undefined {
+  const lookupKey = task.templatePath || task.itemName;
+  const cacheKeys = getAllTemplateCacheKeys().filter((key) => key.startsWith("intune-hydration-templates-cisBaseline"));
+  for (const key of cacheKeys) {
+    const cached = getCachedTemplates(key.replace("intune-hydration-templates-", ""));
+    if (!Array.isArray(cached)) continue;
+    const template = (cached as CISBaselinePolicy[]).find(
+      (policy) => policy._cisFilePath === lookupKey || (policy.name || policy.displayName) === lookupKey
+    );
+    if (template) return template;
+  }
+  return undefined;
+}
+
+/**
+ * Policy type of an OpenIntuneBaseline template, from the manifest folder (_oibPolicyType).
+ * Returns undefined when the folder is not known.
+ */
+export function getOIBPolicyType(template: { _oibPolicyType?: unknown }): BaselinePolicyType | undefined {
+  switch (template._oibPolicyType) {
+    case "AppProtection":
+      return "AppProtection";
+    case "SettingsCatalog":
+      return "SettingsCatalog";
+    case "DeviceConfiguration":
+    case "UpdatePolicies": // WUfB rings use the deviceConfigurations endpoint
+      return "DeviceConfiguration";
+    case "DriverUpdateProfiles":
+      return "DriverUpdateProfiles";
+    case "V2Compliance":
+      return "V2Compliance";
+    case "CompliancePolicies": // The baseline executor creates these as deviceCompliancePolicies
+      return "V1Compliance";
+    default:
+      return undefined;
+  }
+}
+
+/**
+ * Display labels for the prefetched tenant caches.
+ */
+export const TENANT_CACHE_LABELS: Record<TenantCacheKey, string> = {
+  cachedIntuneGroups: "groups",
+  cachedFilters: "device filters",
+  cachedAppProtectionPolicies: "App Protection policies",
+  cachedConditionalAccessPolicies: "Conditional Access policies",
+  cachedCompliancePolicies: "Compliance policies",
+  cachedV2CompliancePolicies: "V2 Compliance policies",
+  cachedSettingsCatalogPolicies: "Settings Catalog policies",
+  cachedDeviceConfigurations: "Device Configurations",
+  cachedDriverUpdateProfiles: "Driver Update profiles",
+  cachedGroupPolicyConfigurations: "Administrative Templates",
+  cachedSecurityIntents: "Endpoint Security profiles",
+};
+
+/**
+ * Get a prefetched tenant cache for a create existence check.
+ * Throws when the cache was not loaded, so the caller does not create an object
+ * without a duplicate check.
+ */
+export function requireTenantCache<K extends TenantCacheKey>(
+  context: ExecutionContext,
+  key: K
+): NonNullable<ExecutionContext[K]> {
+  const cache = context[key];
+  if (cache) {
+    return cache as NonNullable<ExecutionContext[K]>;
+  }
+  const reason = context.prefetchErrors?.[key];
+  throw new Error(
+    `Could not read the existing ${TENANT_CACHE_LABELS[key]} from the tenant${reason ? ` (${reason})` : ""}. ` +
+      "The task did not run, to prevent a duplicate object."
+  );
+}
+
+/**
+ * Find an existing tenant object by name: exact (case-insensitive) match first,
+ * then a punctuation-tolerant match. Partial matches are not used.
+ */
+export function findExistingByName<T>(
+  items: T[],
+  name: string,
+  getName: (item: T) => string | undefined
+): T | undefined {
+  return findByNamePrecedence(items, name, normalizeName(name), getName, false);
+}
+
 /**
  * Sleep utility for delays between tasks
  */
@@ -65,15 +228,6 @@ export async function sleepWithExecutionControl(
   }
 
   return "completed";
-}
-
-/**
- * Escape special characters in OData filter strings
- * Single quotes must be doubled in OData $filter expressions
- */
-export function escapeODataString(value: string): string {
-  // Escape single quotes for OData string literals
-  return value.replace(/'/g, "''");
 }
 
 /**

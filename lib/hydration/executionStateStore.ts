@@ -119,6 +119,14 @@ export function pauseExecution(runId: number): boolean {
   return true;
 }
 
+/**
+ * Pause the active run. The engine uses this when the sign-in session is lost, so the
+ * user can resume the run with the Resume control.
+ */
+export function pauseActiveExecution(): boolean {
+  return executionControl.activeRunId !== null && pauseExecution(executionControl.activeRunId);
+}
+
 export function resumeExecution(runId: number): boolean {
   if (executionControl.activeRunId !== runId || !executionControl.paused || executionControl.cancelRequested) {
     return false;

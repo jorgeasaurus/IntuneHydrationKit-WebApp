@@ -6,7 +6,9 @@
 import { HydrationTask } from "@/types/hydration";
 import { DeviceGroup } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
-import { createGroup, deleteGroupByName } from "@/lib/graph/groups";
+import { executeDeleteTask } from "../deleteResolver";
+import { requireTenantCache } from "../utils";
+import { createGroup } from "@/lib/graph/groups";
 import { getCachedTemplates, GroupTemplate } from "@/lib/templates/loader";
 
 /**
@@ -16,6 +18,11 @@ export async function executeGroupTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   // Templates are loaded from the bundled JSON files before execution.
@@ -34,7 +41,7 @@ export async function executeGroupTask(
     // Check if group already exists using pre-fetched cache (match with or without [IHD] prefix)
     const targetName = template!.displayName.toLowerCase();
     const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
-    const existingGroup = context.cachedIntuneGroups?.find((g) => {
+    const existingGroup = requireTenantCache(context, "cachedIntuneGroups").find((g) => {
       const n = g.displayName.toLowerCase();
       const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
       return n === targetName || ns === targetNameStripped;
@@ -99,34 +106,6 @@ export async function executeGroupTask(
       skipped: false,
       createdId: created.id,
     };
-  } else if (mode === "delete") {
-    // Check if group exists using pre-fetched cache (match with or without [IHD] prefix)
-    const targetName = template!.displayName.toLowerCase();
-    const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
-    const existingGroup = context.cachedIntuneGroups?.find((g) => {
-      const n = g.displayName.toLowerCase();
-      const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
-      return n === targetName || ns === targetNameStripped;
-    });
-
-    if (!existingGroup) {
-      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    // Delete the group
-    try {
-      await deleteGroupByName(client, template.displayName);
-      return { task, success: true, skipped: false };
-    } catch (error) {
-      // Group not found or not created by hydration kit - skip
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
-    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

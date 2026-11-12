@@ -6,8 +6,9 @@
 import { HydrationTask } from "@/types/hydration";
 import { DeviceFilter } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
+import { executeDeleteTask } from "../deleteResolver";
+import { requireTenantCache } from "../utils";
 import { createFilter } from "@/lib/graph/filters";
-import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { getCachedTemplates, FilterTemplate } from "@/lib/templates/loader";
 
 /**
@@ -17,6 +18,11 @@ export async function executeFilterTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   // Templates are loaded from the bundled JSON files before execution.
@@ -33,7 +39,7 @@ export async function executeFilterTask(
     }
 
     // Check if filter already exists using pre-fetched cache
-    const existingFilter = context.cachedFilters?.find(
+    const existingFilter = requireTenantCache(context, "cachedFilters").find(
       (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
     );
 
@@ -78,39 +84,6 @@ export async function executeFilterTask(
       skipped: false,
       createdId: created.id,
     };
-  } else if (mode === "delete") {
-    const targetName = template?.displayName ?? task.itemName;
-
-    // Check if filter exists in tenant using pre-fetched cache
-    const existingFilter = context.cachedFilters?.find(
-      (f) => f.displayName.toLowerCase() === targetName.toLowerCase()
-    );
-
-    if (!existingFilter) {
-      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-    }
-
-    // Check if it was created by the hydration kit
-    if (!hasHydrationMarker(existingFilter.description)) {
-      return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    await client.delete(`/deviceManagement/assignmentFilters/${existingFilter.id}`);
-
-    // Remove from cache
-    if (context.cachedFilters) {
-      const index = context.cachedFilters.findIndex((f) => f.id === existingFilter.id);
-      if (index !== -1) {
-        context.cachedFilters.splice(index, 1);
-      }
-    }
-
-    return { task, success: true, skipped: false };
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

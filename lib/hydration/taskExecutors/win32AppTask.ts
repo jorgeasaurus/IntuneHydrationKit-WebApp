@@ -12,6 +12,8 @@ import { getWin32AppTemplateByName } from "@/templates/win32Apps";
 import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { bytesToBase64 } from "@/lib/utils/base64";
+import { DELETE_REASONS, deleteResolutionResult, readAssignmentCount } from "../deleteResolver";
+import { isRunCancelledError } from "@/lib/utils/retry";
 
 const DELETE_VISIBILITY_RETRY_DELAYS_MS = [2000, 4000, 8000] as const;
 const RECENT_WIN32_APPS_STORAGE_KEY = "intune-hydration-recent-win32-apps";
@@ -269,16 +271,42 @@ export async function executeWin32AppTask(
   }
 
   if (existingApps.length === 0) {
-    return {
+    return deleteResolutionResult(
       task,
-      success: true,
-      skipped: true,
-      skipKind: deleteCandidates?.hasNameMatch ? "blocked" : "noOp",
-      error: deleteCandidates?.hasNameMatch
-        ? "Matching app is not owned by Intune Hydration Kit"
-        : "Not found in tenant",
-    };
+      deleteCandidates?.hasNameMatch
+        ? { action: "skip", skipKind: "blocked", reason: "Matching app is not owned by Intune Hydration Kit" }
+        : { action: "skip", skipKind: "noOp", reason: DELETE_REASONS.notFound },
+      context.isPreview
+    );
   }
+
+  // Do not delete any app when one of them is assigned or its assignments cannot be read.
+  let assignmentCounts: number[];
+  try {
+    assignmentCounts = await Promise.all(
+      existingApps.map((existingApp) =>
+        readAssignmentCount(context, `/deviceAppManagement/mobileApps/${existingApp.id}/assignments`)
+      )
+    );
+  } catch (error) {
+    // A cancelled run is not a failed safety check. The engine marks the task cancelled.
+    if (isRunCancelledError(error)) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    return deleteResolutionResult(
+      task,
+      { action: "fail", reason: `Safety checks did not complete, so the app was not deleted: ${message}` },
+      context.isPreview
+    );
+  }
+  const assignmentCount = assignmentCounts.reduce((total, count) => total + count, 0);
+  if (assignmentCount > 0) {
+    return deleteResolutionResult(
+      task,
+      { action: "skip", skipKind: "blocked", reason: DELETE_REASONS.assigned(assignmentCount) },
+      context.isPreview
+    );
+  }
+
   if (context.isPreview) {
     return { task, success: true, skipped: false };
   }

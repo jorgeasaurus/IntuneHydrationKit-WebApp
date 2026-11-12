@@ -6,19 +6,19 @@
 
 import { HydrationTask } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult } from "../types";
-import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { executeDeleteTask } from "../deleteResolver";
 import {
   createSettingsCatalogPolicy,
   createDeviceConfigurationPolicy,
   createDriverUpdateProfile,
-  compliancePolicyExistsByName,
   createBaselineCompliancePolicy,
 } from "../policyCreators";
-import { escapeODataString, hasODataUnsafeChars } from "../utils";
+import { requireTenantCache } from "../utils";
 import { findBaselineMatch, recordBaselineMatch } from "../baselineEvidence";
 import { resolveOIBOrganizationId } from "../templatePlaceholders";
-import { createAppProtectionPolicy, deleteAppProtectionPolicy } from "@/lib/graph/appProtection";
+import { createAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy, AppProtectionTemplate } from "@/lib/templates/loader";
+import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
 
 /**
  * Execute a baseline task (create or delete)
@@ -28,6 +28,11 @@ export async function executeBaselineTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   // Get template from cache
@@ -35,9 +40,7 @@ export async function executeBaselineTask(
   let template: BaselinePolicy | undefined;
 
   if (cachedBaseline && Array.isArray(cachedBaseline)) {
-    template = (cachedBaseline as BaselinePolicy[]).find(
-      (b) => b.displayName === task.itemName || b.name === task.itemName
-    );
+    template = findBaselineTemplateForTask(cachedBaseline as BaselinePolicy[], task);
   }
 
   if (!template) {
@@ -58,18 +61,7 @@ export async function executeBaselineTask(
       // Route based on policy type
       if (policyType === "CompliancePolicies") {
         // Compliance policies go to deviceCompliancePolicies endpoint
-        let compliancePolicies = context.cachedCompliancePolicies;
-
-        if (
-          (!compliancePolicies || compliancePolicies.length === 0) &&
-          hasODataUnsafeChars(policyName)
-        ) {
-          compliancePolicies = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
-            "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
-          );
-          context.cachedCompliancePolicies = compliancePolicies;
-        }
-
+        const compliancePolicies = requireTenantCache(context, "cachedCompliancePolicies");
         const existingCompliancePolicy = findBaselineMatch("CompliancePolicies", policyName, compliancePolicies);
 
         if (existingCompliancePolicy) {
@@ -78,29 +70,18 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
 
-        const exists = await compliancePolicyExistsByName(client, policyName);
-        if (exists) {
-          task.drift = { status: "notChecked", differences: [], reason: "An existing policy was found, but its identity was not returned by the lookup." };
-          console.log(`[Baseline Task] Compliance policy already exists, skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
-        }
         if (isPreview) {
           return { task, success: true, skipped: false };
         }
         const created = await createBaselineCompliancePolicy(client, template as Record<string, unknown>);
-        if (context.cachedCompliancePolicies && created.id) {
-          context.cachedCompliancePolicies.push({
-            id: created.id,
-            displayName: policyName,
-            description: "",
-          });
-        }
+        compliancePolicies.push({ id: created.id, displayName: policyName, description: "" });
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else if (policyType === "AppProtection") {
         // App Protection policies - use existing app protection handler
         const platform = template["@odata.type"] === "#microsoft.graph.iosManagedAppProtection" ? "iOS" : "android";
-        const platformPolicies = context.cachedAppProtectionPolicies?.filter((policy) => {
+        const appProtectionPolicies = requireTenantCache(context, "cachedAppProtectionPolicies");
+        const platformPolicies = appProtectionPolicies.filter((policy) => {
           if (policy._platform) return policy._platform === platform;
           const expectedType = platform === "iOS" ? "#microsoft.graph.iosManagedAppProtection" : "#microsoft.graph.androidManagedAppProtection";
           return policy["@odata.type"] === expectedType;
@@ -115,15 +96,12 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: false };
         }
         const created = await createAppProtectionPolicy(client, template as AppProtectionTemplate);
+        appProtectionPolicies.push(created);
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
         // DeviceConfiguration and UpdatePolicies use deviceConfigurations endpoint
-        const policies = context.cachedDeviceConfigurations?.length
-          ? context.cachedDeviceConfigurations
-          : await client.getCollection<{ id: string; displayName: string }>(
-          "/deviceManagement/deviceConfigurations?$select=id,displayName"
-        );
+        const policies = requireTenantCache(context, "cachedDeviceConfigurations");
         const existingPolicy = findBaselineMatch("DeviceConfiguration", policyName, policies);
         if (existingPolicy) {
           await recordBaselineMatch(task, template, existingPolicy, "DeviceConfiguration", client);
@@ -134,15 +112,11 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: false };
         }
         const created = await createDeviceConfigurationPolicy(client, template as Record<string, unknown>);
+        policies.push({ id: created.id, displayName: policyName, description: "" });
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else if (policyType === "DriverUpdateProfiles") {
-        // DriverUpdateProfiles endpoint doesn't support $filter, fetch all and filter client-side
-        const policies = context.cachedDriverUpdateProfiles?.length
-          ? context.cachedDriverUpdateProfiles
-          : await client.getCollection<{ id: string; displayName: string }>(
-          "/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName"
-        );
+        const policies = requireTenantCache(context, "cachedDriverUpdateProfiles");
         const existingProfile = findBaselineMatch("DriverUpdateProfiles", policyName, policies);
         if (existingProfile) {
           await recordBaselineMatch(task, template, existingProfile, "DriverUpdateProfiles", client);
@@ -153,13 +127,13 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: false };
         }
         const created = await createDriverUpdateProfile(client, template as Record<string, unknown>);
+        policies.push({ id: created.id, displayName: policyName, description: "" });
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else {
         // SettingsCatalog (default) - use configurationPolicies endpoint
-        // Use cache-based existence check for consistency with batch executor
-        // The $filter API is unreliable for this endpoint
-        const existingSettingsPolicy = findBaselineMatch("SettingsCatalog", policyName, context.cachedSettingsCatalogPolicies);
+        const settingsCatalogPolicies = requireTenantCache(context, "cachedSettingsCatalogPolicies");
+        const existingSettingsPolicy = findBaselineMatch("SettingsCatalog", policyName, settingsCatalogPolicies);
 
         if (existingSettingsPolicy) {
           await recordBaselineMatch(task, template, existingSettingsPolicy, "SettingsCatalog", client);
@@ -174,13 +148,7 @@ export async function executeBaselineTask(
         const created = await createSettingsCatalogPolicy(client, template as Record<string, unknown>);
 
         // Add to cache to prevent duplicate creation
-        if (context.cachedSettingsCatalogPolicies && created.id) {
-          context.cachedSettingsCatalogPolicies.push({
-            id: created.id,
-            name: policyName,
-            description: ""
-          });
-        }
+        settingsCatalogPolicies.push({ id: created.id, name: policyName, description: "" });
 
         return { task, success: true, skipped: false, createdId: created.id, warning: created.warning };
       }
@@ -190,251 +158,6 @@ export async function executeBaselineTask(
       return { task, success: false, skipped: false, error: errorMessage };
     }
 
-  } else if (mode === "delete") {
-    try {
-      if (policyType === "CompliancePolicies") {
-        // Find compliance policy by name first (to get ID)
-        if (hasODataUnsafeChars(policyName)) {
-          console.log(`[Baseline Task] Cannot query compliance for "${policyName}" (OData-unsafe chars) - skipping`);
-          return { task, success: true, skipped: true, skipKind: "blocked", error: "Cannot query by name (special characters)" };
-        }
-        const escapedPolicyName = escapeODataString(policyName);
-        const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
-          `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedPolicyName)}'&$select=id,displayName`
-        );
-        if (!response.value || response.value.length === 0) {
-          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-        }
-        const policyId = response.value[0].id;
-
-        // Fetch full policy by ID to get description
-        const fullPolicy = await client.get<{ id: string; displayName: string; description?: string }>(
-          `/deviceManagement/deviceCompliancePolicies/${policyId}?$select=id,displayName,description`
-        );
-        if (!hasHydrationMarker(fullPolicy.description)) {
-          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-        }
-
-        if (isPreview) {
-          return { task, success: true, skipped: false };
-        }
-
-        await client.delete(`/deviceManagement/deviceCompliancePolicies/${policyId}`);
-        console.log(`[Baseline Task] Deleted compliance policy: "${policyName}"`);
-        return { task, success: true, skipped: false };
-
-      } else if (policyType === "AppProtection") {
-        // Find app protection policy in cache (includes platform info)
-        const cachedPolicy = context.cachedAppProtectionPolicies?.find(
-          (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
-        );
-        if (!cachedPolicy || !cachedPolicy.id) {
-          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-        }
-
-        if (isPreview) {
-          return { task, success: true, skipped: false };
-        }
-
-        // Determine platform from the cached policy's _platform property
-        const platform = cachedPolicy._platform as "iOS" | "android" || "android";
-
-        // Fetch full policy to check the marker (deleteAppProtectionPolicy does this internally)
-        try {
-          await deleteAppProtectionPolicy(client, cachedPolicy.id, platform);
-          console.log(`[Baseline Task] Deleted app protection policy: "${policyName}"`);
-          return { task, success: true, skipped: false };
-        } catch (deleteError) {
-          const errMsg = deleteError instanceof Error ? deleteError.message : String(deleteError);
-          if (errMsg.includes("Not created by Intune Hydration Kit")) {
-            return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-          }
-          throw deleteError;
-        }
-
-      } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
-        // DeviceConfiguration and UpdatePolicies use /deviceManagement/deviceConfigurations endpoint
-        if (hasODataUnsafeChars(policyName)) {
-          console.log(`[Baseline Task] Cannot query device config for "${policyName}" (OData-unsafe chars) - skipping`);
-          return { task, success: true, skipped: true, skipKind: "blocked", error: "Cannot query by name (special characters)" };
-        }
-        const escapedPolicyNameDel = escapeODataString(policyName);
-        const response = await client.get<{ value: Array<{ id: string; displayName: string }> }>(
-          `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedPolicyNameDel)}'&$select=id,displayName`
-        );
-        if (!response.value || response.value.length === 0) {
-          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-        }
-        const policyId = response.value[0].id;
-
-        // Fetch full policy by ID to get description
-        const fullPolicy = await client.get<{ id: string; displayName: string; description?: string }>(
-          `/deviceManagement/deviceConfigurations/${policyId}?$select=id,displayName,description`
-        );
-        if (!hasHydrationMarker(fullPolicy.description)) {
-          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-        }
-
-        if (isPreview) {
-          return { task, success: true, skipped: false };
-        }
-
-        await client.delete(`/deviceManagement/deviceConfigurations/${policyId}`);
-        console.log(`[Baseline Task] Deleted device configuration policy: "${policyName}"`);
-        return { task, success: true, skipped: false };
-
-      } else if (policyType === "DriverUpdateProfiles") {
-        // Use pre-fetched cache for Driver Update Profiles
-        let profiles = context.cachedDriverUpdateProfiles;
-
-        if (!profiles || profiles.length === 0) {
-          console.log(`[Baseline Task] No cached Driver Update Profiles - fetching now...`);
-          const response = await client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-            `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description`
-          );
-          profiles = response.value || [];
-          context.cachedDriverUpdateProfiles = profiles;
-        }
-
-        const matchingProfile = profiles.find(
-          (p) => p.displayName.toLowerCase() === policyName.toLowerCase()
-        );
-        if (!matchingProfile) {
-          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-        }
-
-        console.log(`[Baseline Task] Found Driver Update Profile: "${matchingProfile.displayName}" (ID: ${matchingProfile.id})`);
-
-        // Check hydration marker
-        if (!hasHydrationMarker(matchingProfile.description)) {
-          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-        }
-
-        if (isPreview) {
-          return { task, success: true, skipped: false };
-        }
-
-        await client.delete(`/deviceManagement/windowsDriverUpdateProfiles/${matchingProfile.id}`);
-        console.log(`[Baseline Task] Deleted driver update profile: "${policyName}"`);
-        return { task, success: true, skipped: false };
-
-      } else {
-        // Settings Catalog (default) - use pre-fetched cache to avoid repeated API calls
-        const allPolicies = context.cachedSettingsCatalogPolicies || [];
-
-        if (allPolicies.length === 0) {
-          console.log(`[Baseline Task] No cached Settings Catalog policies - fetching now...`);
-          const fetched = await client.getCollection<{ id: string; name: string; description?: string }>(
-            `/deviceManagement/configurationPolicies?$select=id,name,description`
-          );
-          context.cachedSettingsCatalogPolicies = fetched;
-        }
-
-        // Find matching policy by name (case-insensitive)
-        const matchingPolicy = (context.cachedSettingsCatalogPolicies || []).find(
-          (p) => p.name?.toLowerCase() === policyName.toLowerCase()
-        );
-
-        // If not found in Settings Catalog, try V2 Compliance
-        if (!matchingPolicy) {
-          const v2Policy = (context.cachedV2CompliancePolicies || []).find(
-            (p) => p.name?.toLowerCase() === policyName.toLowerCase()
-          );
-
-          if (v2Policy) {
-            console.log(`[Baseline Task] Found V2 Compliance policy: "${v2Policy.name}" (ID: ${v2Policy.id})`);
-
-            if (!hasHydrationMarker(v2Policy.description)) {
-              return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-            }
-
-            if (isPreview) {
-              return { task, success: true, skipped: false };
-            }
-
-            await client.delete(`/deviceManagement/compliancePolicies/${v2Policy.id}`);
-            console.log(`[Baseline Task] Deleted V2 Compliance policy: "${policyName}"`);
-
-            // Remove from cache
-            if (context.cachedV2CompliancePolicies) {
-              context.cachedV2CompliancePolicies = context.cachedV2CompliancePolicies.filter(
-                (p) => p.id !== v2Policy.id
-              );
-            }
-            return { task, success: true, skipped: false };
-          }
-
-          return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-        }
-
-        console.log(`[Baseline Task] Found Settings Catalog policy: "${matchingPolicy.name}" (ID: ${matchingPolicy.id})`);
-
-        // Check hydration marker
-        if (!hasHydrationMarker(matchingPolicy.description)) {
-          return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-        }
-
-        // Check if the policy has any assignments - skip deletion if assigned
-        try {
-          const assignmentsResponse = await client.get<{ value: Array<{ id: string }> }>(
-            `/deviceManagement/configurationPolicies/${matchingPolicy.id}/assignments`
-          );
-          const assignmentCount = assignmentsResponse.value?.length ?? 0;
-          if (assignmentCount > 0) {
-            console.log(`[Baseline Task] Skipping deletion of "${policyName}" - has ${assignmentCount} active assignment(s)`);
-            return { task, success: true, skipped: true, skipKind: "blocked", error: `Policy has ${assignmentCount} active assignment(s)` };
-          }
-        } catch {
-          console.log(`[Baseline Task] Could not check assignments for "${policyName}", will try delete directly`);
-        }
-
-        if (isPreview) {
-          return { task, success: true, skipped: false };
-        }
-
-        try {
-          await client.delete(`/deviceManagement/configurationPolicies/${matchingPolicy.id}`);
-          console.log(`[Baseline Task] Deleted settings catalog policy: "${policyName}"`);
-          // Remove from cache after successful delete
-          if (context.cachedSettingsCatalogPolicies) {
-            context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
-              (p) => p.id !== matchingPolicy.id
-            );
-          }
-          return { task, success: true, skipped: false };
-        } catch (deleteError) {
-          // Delete returned an error, but policy might still be deleted (Intune backend quirk)
-          console.log(`[Baseline Task] Delete returned error for "${policyName}", verifying if policy was actually deleted...`);
-
-          try {
-            await client.get(`/deviceManagement/configurationPolicies/${matchingPolicy.id}?$select=id`);
-            // If we get here, the policy still exists
-            console.error(`[Baseline Task] Policy "${policyName}" still exists - delete truly failed`);
-            throw deleteError;
-          } catch (verifyError) {
-            const verifyErrorMsg = verifyError instanceof Error ? verifyError.message : String(verifyError);
-            if (verifyErrorMsg.includes("404") || verifyErrorMsg.toLowerCase().includes("not found")) {
-              console.log(`[Baseline Task] Policy "${policyName}" confirmed deleted (verified via 404)`);
-              if (context.cachedSettingsCatalogPolicies) {
-                context.cachedSettingsCatalogPolicies = context.cachedSettingsCatalogPolicies.filter(
-                  (p) => p.id !== matchingPolicy.id
-                );
-              }
-              return { task, success: true, skipped: false };
-            }
-            throw deleteError;
-          }
-        }
-      }
-    } catch (error) {
-      let errorMessage = error instanceof Error ? error.message : String(error);
-      console.error(`[Baseline Task] Delete failed for "${policyName}":`, errorMessage);
-
-      if (errorMessage.includes("[400]") || errorMessage.includes("An error has occurred")) {
-        errorMessage = `Microsoft Intune backend error - some Settings Catalog policies cannot be deleted via Graph API. Delete manually in Intune portal.`;
-      }
-      return { task, success: false, skipped: false, error: errorMessage };
-    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

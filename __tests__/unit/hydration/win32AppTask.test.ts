@@ -38,7 +38,10 @@ const task: HydrationTask = {
 };
 
 const createContext = (isPreview = false): ExecutionContext => ({
-  client: { delete: vi.fn(), get: vi.fn().mockResolvedValue({}) } as unknown as ExecutionContext["client"],
+  client: {
+    delete: vi.fn(),
+    get: vi.fn(async (url: string) => (url.endsWith("/assignments") ? { value: [] } : {})),
+  } as unknown as ExecutionContext["client"],
   operationMode: "create",
   isPreview,
   stopOnFirstError: false,
@@ -123,12 +126,16 @@ describe("executeWin32AppTask", () => {
     );
     expect(result).toMatchObject({ success: true, skipped: false, createdId });
 
-    vi.mocked(context.client.get).mockResolvedValue({
-      id: createdId,
-      displayName: template.displayName,
-      description: "Imported by Intune Hydration Kit",
-      notes: "Imported from WinGet",
-    });
+    vi.mocked(context.client.get).mockImplementation(async (url: string) =>
+      url.endsWith("/assignments")
+        ? { value: [] }
+        : {
+            id: createdId,
+            displayName: template.displayName,
+            description: "Imported by Intune Hydration Kit",
+            notes: "Imported from WinGet",
+          }
+    );
     await expect(executeWin32AppTask(
       { ...appTask, operation: "delete" },
       context
@@ -241,8 +248,9 @@ describe("executeWin32AppTask", () => {
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).resolves.toMatchObject({
-      success: true,
+      success: false,
       skipped: true,
+      skipKind: "blocked",
       error: "Matching app is not owned by Intune Hydration Kit",
     });
   });
@@ -258,8 +266,9 @@ describe("executeWin32AppTask", () => {
     await vi.runAllTimersAsync();
 
     await expect(resultPromise).resolves.toMatchObject({
-      success: true,
+      success: false,
       skipped: true,
+      skipKind: "noOp",
       error: "Not found in tenant",
     });
   });
@@ -280,9 +289,10 @@ describe("executeWin32AppTask", () => {
       },
     ]);
     const context = createContext();
-    vi.mocked(context.client.get).mockRejectedValue(
-      Object.assign(new Error("Resource not found"), { status: 404 })
-    );
+    vi.mocked(context.client.get).mockImplementation(async (url: string) => {
+      if (url.endsWith("/assignments")) return { value: [] };
+      throw Object.assign(new Error("Resource not found"), { status: 404 });
+    });
 
     await expect(executeWin32AppTask(
       { ...task, operation: "delete" },
@@ -324,7 +334,8 @@ describe("executeWin32AppTask", () => {
     const result = await resultPromise;
 
     expect(mockGetWin32LobApps).toHaveBeenCalledTimes(1);
-    expect(context.client.get).toHaveBeenCalledTimes(2);
+    // Two reads of the recent app, then one assignment read
+    expect(context.client.get).toHaveBeenCalledTimes(3);
     expect(context.client.delete).toHaveBeenCalledWith(
       "/deviceAppManagement/mobileApps/newly-visible-app",
       "beta"
@@ -356,7 +367,9 @@ describe("executeWin32AppTask", () => {
     };
     mockGetWin32LobApps.mockResolvedValue([legacyListRecord]);
     const context = createContext();
-    vi.mocked(context.client.get).mockResolvedValue(legacyDetails);
+    vi.mocked(context.client.get).mockImplementation(async (url: string) =>
+      url.endsWith("/assignments") ? { value: [] } : legacyDetails
+    );
 
     const result = await executeWin32AppTask(
       { ...task, operation: "delete" },

@@ -510,6 +510,8 @@ describe('TargetSelection', () => {
 
     await user.click(screen.getByLabelText('Entra Groups'))
     expect(await screen.findByText('Loading entra groups...')).toBeInTheDocument()
+    // Continue must stay disabled while the item list loads, so an empty selection cannot be saved.
+    expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
 
     dynamicGroupsDeferred.resolve([])
 
@@ -540,6 +542,7 @@ describe('TargetSelection', () => {
 
     expect(await screen.findByText('Loading baseline policies…')).toBeInTheDocument()
     expect(await screen.findByText('Loading CIS policies…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
 
     await act(async () => {
       baselineDeferred.resolve(createOIBManifest())

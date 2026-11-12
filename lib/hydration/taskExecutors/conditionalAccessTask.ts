@@ -6,14 +6,10 @@
 import { HydrationTask } from "@/types/hydration";
 import { ConditionalAccessPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
-import {
-  createConditionalAccessPolicy,
-  deleteConditionalAccessPolicyByName,
-  conditionalAccessPolicyExists,
-} from "@/lib/graph/conditionalAccess";
-import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
+import { executeDeleteTask } from "../deleteResolver";
+import { createConditionalAccessPolicy, findHydrationConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
-import { normalizeName } from "../utils";
+import { normalizeName, requireTenantCache } from "../utils";
 
 function findCachedConditionalAccessPolicy(
   displayName: string,
@@ -24,7 +20,7 @@ function findCachedConditionalAccessPolicy(
   const fullMarkerLowerName = `${lowerName} [imported by intune hydration kit]`;
   const normalizedDisplayName = normalizeName(displayName);
 
-  return policies?.find((policy) => {
+  const match = policies?.find((policy) => {
     const policyLower = policy.displayName?.toLowerCase();
     return (
       policyLower === lowerName ||
@@ -33,6 +29,10 @@ function findCachedConditionalAccessPolicy(
       normalizeName(policy.displayName) === normalizedDisplayName
     );
   });
+  if (match) return match;
+  // A kit policy can carry the other marker format, for example
+  // "Require MFA [Imported by Intune Hydration Kit]" for the template "[IHD] Require MFA".
+  return (policies && findHydrationConditionalAccessPolicy(policies, displayName)) ?? undefined;
 }
 
 /**
@@ -42,6 +42,11 @@ export async function executeConditionalAccessTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   // Templates are loaded from the bundled JSON files before execution.
@@ -56,54 +61,13 @@ export async function executeConditionalAccessTask(
       return { task, success: false, skipped: false, error: "Template not found" };
     }
 
-    // Check if tenant has Entra ID Premium P1 license (required for ALL CA policies)
-    if (context.hasConditionalAccessLicense === false) {
-      console.log(
-        `[Conditional Access] Skipped: ${template.displayName} - no Entra ID Premium (P1) license`
-      );
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "blocked",
-        error: "No Entra ID Premium (P1) license",
-      };
-    }
-
-    // Check if policy requires Premium P2 and tenant doesn't have it (PowerShell parity)
-    if (
-      context.hasPremiumP2License === false &&
-      policyRequiresPremiumP2(template as ConditionalAccessPolicy)
-    ) {
-      console.log(
-        `[Conditional Access] Skipped: ${template.displayName} - requires Azure AD Premium P2 license (uses risk-based conditions)`
-      );
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "blocked",
-        error: "Requires Premium P2 license",
-      };
-    }
-
+    // The Premium P1/P2 license checks run before dispatch (getLicenseSkipReason in utils.ts).
     const existingPolicy = findCachedConditionalAccessPolicy(
       template.displayName,
-      context.cachedConditionalAccessPolicies
+      requireTenantCache(context, "cachedConditionalAccessPolicies")
     );
 
     if (existingPolicy) {
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "noOp",
-        error: "Already exists",
-      };
-    }
-
-    const exists = await conditionalAccessPolicyExists(client, template.displayName);
-    if (exists) {
       return {
         task,
         success: true,
@@ -134,41 +98,16 @@ export async function executeConditionalAccessTask(
 
     // Create the policy (will be forced to disabled state)
     const created = await createConditionalAccessPolicy(client, fullCATemplate);
+    requireTenantCache(context, "cachedConditionalAccessPolicies").push({
+      id: created.id ?? "",
+      displayName: template.displayName,
+    });
     return {
       task,
       success: true,
       skipped: false,
       createdId: created.id,
     };
-  } else if (mode === "delete") {
-    const targetName = template?.displayName ?? task.itemName;
-    const existingPolicy = findCachedConditionalAccessPolicy(
-      targetName,
-      context.cachedConditionalAccessPolicies
-    );
-
-    if (!existingPolicy) {
-      // If no cache, check via API
-      const exists = await conditionalAccessPolicyExists(client, targetName);
-      if (!exists) {
-        return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-      }
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    // Delete the policy (must be disabled first)
-    try {
-      await deleteConditionalAccessPolicyByName(client, targetName);
-      return { task, success: true, skipped: false };
-    } catch (error) {
-      // Policy not found or not created by hydration kit - skip
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
-    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

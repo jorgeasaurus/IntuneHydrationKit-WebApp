@@ -6,10 +6,9 @@
 import { HydrationTask } from "@/types/hydration";
 import { AppProtectionPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
-import {
-  createAppProtectionPolicy,
-  deleteAppProtectionPolicy,
-} from "@/lib/graph/appProtection";
+import { executeDeleteTask } from "../deleteResolver";
+import { requireTenantCache } from "../utils";
+import { createAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, AppProtectionTemplate } from "@/lib/templates/loader";
 
 function stripImportPrefix(name: string): string {
@@ -36,6 +35,11 @@ export async function executeAppProtectionTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
   const requestedName = task.itemName;
 
@@ -59,7 +63,7 @@ export async function executeAppProtectionTask(
     }
 
     // Check if policy already exists using cached policies
-    const existingPolicy = context.cachedAppProtectionPolicies?.find(
+    const existingPolicy = requireTenantCache(context, "cachedAppProtectionPolicies").find(
       (p) => p.displayName.toLowerCase() === template!.displayName.toLowerCase()
     );
 
@@ -92,64 +96,6 @@ export async function executeAppProtectionTask(
       skipped: false,
       createdId: created.id,
     };
-  } else if (mode === "delete") {
-    const policy = context.cachedAppProtectionPolicies?.find((p) =>
-      namesMatch(p.displayName, template?.displayName ?? requestedName)
-    );
-
-    if (!policy || !policy.id) {
-      // Policy doesn't exist, skip deletion
-      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    // Tenant prefetch adds _platform because Graph list responses do not reliably include @odata.type.
-    let platform: "iOS" | "android" | undefined = policy._platform;
-
-    if (!platform) {
-      const odataType = policy["@odata.type"];
-      if (odataType === "#microsoft.graph.iosManagedAppProtection") {
-        platform = "iOS";
-      } else if (odataType === "#microsoft.graph.androidManagedAppProtection") {
-        platform = "android";
-      }
-    }
-
-    if (!platform) {
-      // Fallback: check template's @odata.type if policy doesn't have it
-      const templateOdataType = template?.["@odata.type"];
-      if (templateOdataType === "#microsoft.graph.iosManagedAppProtection") {
-        platform = "iOS";
-      } else if (templateOdataType === "#microsoft.graph.androidManagedAppProtection") {
-        platform = "android";
-      }
-    }
-
-    if (!platform) {
-      throw new Error(`Unable to determine platform for policy "${policy.displayName}"`);
-    }
-
-    // Delete the policy
-    const result = await deleteAppProtectionPolicy(client, policy.id, platform);
-
-    // Check if skipped due to active assignments
-    if (result.skipped) {
-      return { task, success: true, skipped: true, skipKind: "blocked", error: result.reason };
-    }
-
-    // Remove the deleted policy from the cache
-    if (context.cachedAppProtectionPolicies) {
-      const index = context.cachedAppProtectionPolicies.findIndex((p) => p.id === policy.id);
-      if (index !== -1) {
-        context.cachedAppProtectionPolicies.splice(index, 1);
-      }
-    }
-
-    return { task, success: true, skipped: false };
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };
