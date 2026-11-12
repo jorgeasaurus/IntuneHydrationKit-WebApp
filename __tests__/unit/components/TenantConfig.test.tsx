@@ -122,7 +122,7 @@ describe('TenantConfig', () => {
     const validationTrace = screen.getByRole('list', { name: 'Tenant validation trace' })
     expect(within(validationTrace).getAllByRole('listitem')).toHaveLength(4)
     expect(within(validationTrace).getByText('Risk-based CA supported')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveClass('bg-emerald-500/18', 'text-emerald-50')
+    expect(screen.getByRole('note')).toHaveClass('bg-emerald-500/18', 'text-emerald-50')
     expect(screen.getByText(/Validation passed/i)).toHaveClass('text-emerald-100')
     expect(screen.getByText(/Last checked at .* UTC/)).toBeInTheDocument()
     await waitFor(() => {
