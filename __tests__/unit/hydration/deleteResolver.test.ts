@@ -153,6 +153,19 @@ describe("resolveDeleteTarget", () => {
     expect(context.client.delete).not.toHaveBeenCalled();
   });
 
+  it("resolves an App Protection policy when another cached policy has no platform", async () => {
+    const context = createContext({
+      cachedAppProtectionPolicies: [
+        { id: "unknown", displayName: "Someone else's policy", description: "Manual" },
+        { id: "app-id", displayName: "[IHD] App policy", description: MARKER, _platform: "iOS" },
+      ],
+    } as Partial<ExecutionContext>);
+
+    const resolution = await resolveDeleteTarget(createTask("appProtection", "[IHD] App policy"), context);
+
+    expect(resolution).toMatchObject({ action: "delete", target: { id: "app-id" } });
+  });
+
   it("resolves two tasks with the same item name to different objects", async () => {
     const context = createContext({
       cachedSettingsCatalogPolicies: [

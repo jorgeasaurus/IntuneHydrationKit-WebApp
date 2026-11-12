@@ -325,7 +325,17 @@ function findInCaches(task: HydrationTask, context: ExecutionContext, sources: D
     const objectUrl = (item: CachedObject) => `${source.basePath(item)}/${item.id}`;
     // Skip objects that another task of this run resolved to. A task keeps its own
     // claim, so resolving the same task again gives the same object.
-    const unclaimed = items.filter((item) => !item.id || !isClaimedByOtherTask(context, objectUrl(item), task.id));
+    // basePath can throw for an object it cannot place (an App Protection policy of an
+    // unknown platform). Such an object cannot be claimed, so it stays a candidate and
+    // only fails the task that actually matches it.
+    const unclaimed = items.filter((item) => {
+      if (!item.id) return true;
+      try {
+        return !isClaimedByOtherTask(context, objectUrl(item), task.id);
+      } catch {
+        return true;
+      }
+    });
     const match = findDeleteMatch(unclaimed, task.itemName, source.getName);
     if (!match?.id) continue;
 
