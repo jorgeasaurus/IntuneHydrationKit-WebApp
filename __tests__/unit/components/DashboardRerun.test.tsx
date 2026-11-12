@@ -166,6 +166,61 @@ describe('Dashboard: continue from an earlier run', () => {
     expect(push).toHaveBeenCalledWith('/wizard')
   })
 
+  it('keeps an interrupted run when the account changes, shows no details, and restores it for the original account', async () => {
+    writeExecutionRecord(sessionStorage, checkpoint())
+    const view = renderPage()
+    await act(async () => undefined)
+    expect(screen.getByRole('heading', { name: 'This run was interrupted' })).toBeInTheDocument()
+
+    getActiveAccount.mockReturnValue({ tenantId: 'other-tenant', homeAccountId: 'home-id' })
+    view.rerender(
+      <SettingsProvider>
+        <DashboardPage />
+      </SettingsProvider>
+    )
+    await act(async () => undefined)
+
+    expect(screen.getByRole('heading', { name: 'An interrupted run cannot be resumed' })).toBeInTheDocument()
+    expect(screen.queryByText('Contoso')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /resume/i })).not.toBeInTheDocument()
+    expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).not.toBeNull()
+    expect(push).not.toHaveBeenCalledWith('/wizard')
+
+    getActiveAccount.mockReturnValue({ tenantId: 'tenant-id', homeAccountId: 'home-id' })
+    view.rerender(
+      <SettingsProvider>
+        <DashboardPage />
+      </SettingsProvider>
+    )
+    await act(async () => undefined)
+    expect(screen.getByRole('button', { name: 'Resume 2 unfinished tasks' })).toBeEnabled()
+  })
+
+  it('still clears a completed run when the account changes', async () => {
+    const tasks = [task('1', 'failed')]
+    writeExecutionRecord(sessionStorage, {
+      ...configuration,
+      tasks,
+      activityLog: [],
+      startTime,
+      endTime,
+      outcome: 'failed',
+      summary: null,
+      fatalError: 'Stopped'
+    })
+    const view = renderPage()
+    await act(async () => undefined)
+    getActiveAccount.mockReturnValue({ tenantId: 'other-tenant', homeAccountId: 'home-id' })
+    view.rerender(
+      <SettingsProvider>
+        <DashboardPage />
+      </SettingsProvider>
+    )
+    await act(async () => undefined)
+    expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).toBeNull()
+    expect(push).toHaveBeenCalledWith('/wizard')
+  })
+
   it('retries the failed tasks of a completed run after confirmation', async () => {
     const tasks = [task('1', 'success'), task('2', 'failed'), task('3', 'skipped')]
     useHydrationExecutionMock.mockReturnValue(

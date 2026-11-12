@@ -219,12 +219,22 @@ export function useDashboardRun() {
 
   useEffect(() => {
     if (!ownerMismatch) return;
-    clearHydrationSession(sessionStorage);
     reset();
     setRestoredRecord(null);
+    // The same rule as on page load: an interrupted run of another account stays saved, with no
+    // details shown, so that account can resume it. The page offers only to discard it.
+    // Sign-out still clears everything (clearHydrationSession in the sign-out flow).
+    const saved = readExecutionRecord(sessionStorage);
+    if (saved && isExecutionCheckpoint(saved) && activeHomeAccountId && activeTenantId) {
+      const action = getSavedRecordAction(saved, { homeAccountId: activeHomeAccountId, tenantId: activeTenantId }, false);
+      setHasForeignInterruptedRun(action === "foreignInterrupted");
+      if (action === "restore") setRestoredRecord(saved);
+      return;
+    }
+    clearHydrationSession(sessionStorage);
     // oxlint-disable-next-line react-doctor/nextjs-no-client-side-redirect -- account ownership is client authentication state
     router.push("/wizard");
-  }, [ownerMismatch, reset, router]);
+  }, [activeHomeAccountId, activeTenantId, ownerMismatch, reset, router]);
 
   function handleDownloadLog(): void {
     const log = {
