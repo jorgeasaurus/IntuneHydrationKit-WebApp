@@ -257,6 +257,7 @@ describe('TenantConfig', () => {
     render(<TenantConfigHarness />)
 
     expect(await screen.findByText('Prerequisite check failed')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Prerequisite check failed')
     expect(screen.getByText('Graph connectivity failed')).toBeInTheDocument()
 
     await waitFor(() => {

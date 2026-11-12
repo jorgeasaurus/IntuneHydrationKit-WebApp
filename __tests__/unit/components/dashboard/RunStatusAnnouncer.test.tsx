@@ -1,3 +1,4 @@
+import { StrictMode } from 'react'
 import { act, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -96,6 +97,22 @@ describe('RunStatusAnnouncer', () => {
       vi.advanceTimersByTime(4000)
     })
     expect(region).toHaveTextContent('Failed: Group 2. 3 of 20 tasks complete.')
+  })
+
+  it('announces progress under React Strict Mode', () => {
+    const tree = (tasks: HydrationTask[]) => (
+      <StrictMode>
+        <RunStatusAnnouncer tasks={tasks} isCompleted={false} outcome={null} announceOutcome />
+      </StrictMode>
+    )
+    const { rerender } = render(tree(makeTasks(20)))
+    const region = screen.getByRole('status')
+
+    rerender(tree(completeFirst(20, 1, { 1: 'failed' })))
+    act(() => {
+      vi.advanceTimersByTime(5000)
+    })
+    expect(region).toHaveTextContent('Failed: Group 1. 2 of 20 tasks complete.')
   })
 
   it('inserts the outcome after the region is mounted empty', () => {

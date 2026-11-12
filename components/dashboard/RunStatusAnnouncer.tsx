@@ -73,7 +73,12 @@ export function RunStatusAnnouncer({
 
   useEffect(
     () => () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        // Reset the handle: Strict Mode runs this cleanup and then the effects again,
+        // and a stale handle would stop any new timer from being scheduled.
+        timerRef.current = null;
+      }
     },
     [],
   );
