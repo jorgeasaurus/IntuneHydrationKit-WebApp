@@ -3,10 +3,13 @@ import { RUN_HISTORY_STORAGE_KEY } from '@/lib/storageKeys'
 import {
   addRunHistoryEntry,
   clearRunHistory,
+  clearRunHistoryEntries,
   createRunHistoryEntry,
   deleteRunHistoryEntry,
   MAX_RUN_HISTORY_CHARS,
   MAX_RUN_HISTORY_ENTRIES,
+  markPendingRunHistoryId,
+  readPendingRunHistoryId,
   readRunHistory,
 } from '@/lib/history/runHistory'
 import { generateCSVReport, generateJSONReport, generateMarkdownReport } from '@/lib/hydration/reporter'
@@ -249,5 +252,17 @@ describe('run history', () => {
 
     clearRunHistory(sessionStorage)
     expect(sessionStorage.getItem(RUN_HISTORY_STORAGE_KEY)).toBeNull()
+  })
+
+  it('keeps the mark of a run not stored yet on "Clear all", and removes it on sign-out', () => {
+    addRunHistoryEntry(sessionStorage, buildEntry(OWNER_A, 1, minutes(1)))
+    markPendingRunHistoryId(sessionStorage, 'refused-run')
+
+    clearRunHistoryEntries(sessionStorage)
+    expect(readRunHistory(sessionStorage, OWNER_A)).toEqual([])
+    expect(readPendingRunHistoryId(sessionStorage)).toBe('refused-run')
+
+    clearRunHistory(sessionStorage)
+    expect(readPendingRunHistoryId(sessionStorage)).toBeNull()
   })
 })

@@ -350,10 +350,23 @@ export function deleteRunHistoryEntry(storage: Storage | null, owner: RunOwner, 
   return writeEntries(storage, readRunHistory(storage, owner).filter((entry) => entry.id !== id));
 }
 
-/** Remove the whole history. Sign-out calls this. */
-export function clearRunHistory(storage: Storage | null): void {
+/**
+ * Remove the stored runs, as "Clear all" on the history page does. The mark of a run that
+ * history could not store stays: that run is not in the list, and the space that this frees
+ * lets a restored dashboard store it.
+ */
+export function clearRunHistoryEntries(storage: Storage | null): void {
   try {
     storage?.removeItem(RUN_HISTORY_STORAGE_KEY);
+  } catch {
+    // Storage that the browser blocks holds no history.
+  }
+}
+
+/** Remove the whole history and the mark of a run not stored yet. Sign-out calls this. */
+export function clearRunHistory(storage: Storage | null): void {
+  clearRunHistoryEntries(storage);
+  try {
     storage?.removeItem(RUN_HISTORY_PENDING_STORAGE_KEY);
   } catch {
     // Storage that the browser blocks holds no history.

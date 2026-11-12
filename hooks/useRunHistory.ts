@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { subscribeSignOut } from "@/lib/auth/sessionEvents";
 import {
-  clearRunHistory,
+  clearRunHistoryEntries,
   deleteRunHistoryEntry,
   getRunHistoryStorage,
   readRunHistory,
@@ -40,7 +40,7 @@ export function useRunHistory() {
       return result.ok;
     },
     clear: (): void => {
-      clearRunHistory(storage);
+      clearRunHistoryEntries(storage);
       setVersion((value) => value + 1);
     },
   };
