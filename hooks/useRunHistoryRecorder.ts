@@ -16,10 +16,23 @@ type RecorderInput = Pick<
 > & { isCompleted: boolean };
 
 /**
- * Runs that this page session already added. The execution state outlives the dashboard
- * page, so without this a return to /dashboard would add a run again after the user deleted it.
+ * Runs that need no further write in this page session: runs that history accepted, and runs
+ * that are larger than the history cap (the cap does not change, so a retry cannot work).
+ * The execution state outlives the dashboard page, so without this a return to /dashboard
+ * would add a run again after the user deleted it.
  */
-const recordedRunIds = new Set<string>();
+const settledRunIds = new Set<string>();
+/**
+ * Runs that history could not accept because storage was blocked or full. A later dashboard
+ * visit tries again, but the warning shows once per run.
+ */
+const warnedRunIds = new Set<string>();
+
+/** Test-only: forget the runs of this page session. */
+export function resetRunHistoryRecorderForTests(): void {
+  settledRunIds.clear();
+  warnedRunIds.clear();
+}
 
 const FAILURE_MESSAGES: Record<Extract<RunHistoryWriteResult, { ok: false }>["reason"], string> = {
   unavailable: "Run history is not available because this browser blocks session storage.",
@@ -52,9 +65,15 @@ export function useRunHistoryRecorder({
       endTime,
       pausedMs,
     });
-    if (recordedRunIds.has(entry.id)) return;
-    recordedRunIds.add(entry.id);
+    if (settledRunIds.has(entry.id)) return;
     const result = addRunHistoryEntry(getRunHistoryStorage(), entry);
-    if (!result.ok) toast.warning(FAILURE_MESSAGES[result.reason]);
+    if (result.ok || result.reason === "tooLarge") settledRunIds.add(entry.id);
+    if (result.ok) {
+      warnedRunIds.delete(entry.id);
+      return;
+    }
+    if (warnedRunIds.has(entry.id)) return;
+    warnedRunIds.add(entry.id);
+    toast.warning(FAILURE_MESSAGES[result.reason]);
   }, [configuration, endTime, fatalError, isCompleted, outcome, pausedMs, startTime, summary, tasks]);
 }
