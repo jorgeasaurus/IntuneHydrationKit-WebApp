@@ -9,6 +9,7 @@ import { ExecutionContext, ExecutionResult } from "../types";
 import { executeDeleteTask } from "../deleteResolver";
 import { requireTenantCache } from "../utils";
 import { buildGroupCreateBody, findExistingGroup } from "../existingObjects";
+import { updateExistingObject } from "../updateResolver";
 import { createGroup } from "@/lib/graph/groups";
 import { getCachedTemplates, GroupTemplate } from "@/lib/templates/loader";
 
@@ -43,6 +44,7 @@ export async function executeGroupTask(
     const existingGroup = findExistingGroup(requireTenantCache(context, "cachedIntuneGroups"), template.displayName);
 
     if (existingGroup) {
+      if (context.updateExisting) return updateExistingObject(task, context);
       return {
         task,
         success: true,

@@ -33,6 +33,7 @@ import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
 import { findExistingFilter, findExistingGroup } from "./existingObjects";
+import { getExistingSkipReason } from "./updateResolver";
 import {
   sleepWithExecutionControl,
   waitWhilePaused,
@@ -506,6 +507,8 @@ async function prepareTaskForBatch(
   switch (task.category) {
     case "groups": {
       const result = buildGroupRequestBody(task, context);
+      // An existing group goes to the sequential executor, which runs the update checks.
+      if (result.type === "skip" && context.updateExisting) return { type: "sequential" };
       if (result.type === "skip") return { type: "skip", reason: result.reason, skipKind: "noOp" };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
@@ -516,6 +519,8 @@ async function prepareTaskForBatch(
 
     case "filters": {
       const result = buildFilterRequestBody(task, context);
+      // An existing filter goes to the sequential executor, which runs the update checks.
+      if (result.type === "skip" && context.updateExisting) return { type: "sequential" };
       if (result.type === "skip") return { type: "skip", reason: result.reason, skipKind: "noOp" };
       if (result.type === "error") return { type: "sequential" };
       body = result.body;
@@ -678,7 +683,8 @@ export async function executeTasksInBatches(
 
   // Immediately add skipped tasks to results
   const skipTime = new Date();
-  for (const { task, reason, skipKind } of skippedTasks) {
+  for (const { task, reason: skipReason, skipKind } of skippedTasks) {
+    const reason = getExistingSkipReason(task, skipReason, context) ?? skipReason;
     // Update task status and error reason before notifying
     markTaskSkipped(task, skipKind, reason); // Set skip reason on task object for UI display
     task.startTime = skipTime;

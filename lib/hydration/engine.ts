@@ -42,6 +42,7 @@ import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
 import { markTaskSkipped } from "./taskTransitions";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
+import { getExistingSkipReason } from "./updateResolver";
 
 const TASK_DELAY_MS = 2000;
 
@@ -316,6 +317,7 @@ async function executeTask(
 
     // Update task with result
     if (result.skipped) {
+      result.error = getExistingSkipReason(task, result.error, context);
       markTaskSkipped(task, result.skipKind, result.error);
     } else {
       task.status = result.success ? "success" : "failed";

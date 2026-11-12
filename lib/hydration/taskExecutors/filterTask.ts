@@ -9,6 +9,7 @@ import { ExecutionContext, ExecutionResult } from "../types";
 import { executeDeleteTask } from "../deleteResolver";
 import { requireTenantCache } from "../utils";
 import { buildFilterCreateBody, findExistingFilter } from "../existingObjects";
+import { updateExistingObject } from "../updateResolver";
 import { createFilter } from "@/lib/graph/filters";
 import { getCachedTemplates, FilterTemplate } from "@/lib/templates/loader";
 
@@ -43,6 +44,7 @@ export async function executeFilterTask(
     const existingFilter = findExistingFilter(requireTenantCache(context, "cachedFilters"), template.displayName);
 
     if (existingFilter) {
+      if (context.updateExisting) return updateExistingObject(task, context);
       return {
         task,
         success: true,

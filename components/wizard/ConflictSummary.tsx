@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Dispatch, type SetStateAction } from "react";
+import { UpdateExistingChoice } from "@/components/wizard/UpdateExistingChoice";
+import { getConflictCheckScope, getCurrentReport, type ExistingObjectsState } from "@/lib/hydration/updateChoice";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { ComparisonBadge, ComparisonDetails, MarkerBadge } from "@/components/drift/ComparisonDetails";
@@ -180,25 +182,42 @@ export function ConflictSummary(props: ConflictSummaryProps): React.JSX.Element 
   return <ConflictSummarySession key={scope} {...props} />;
 }
 
-/** The existing-objects check of the review step. Shown for create runs only. */
-export function CreateConflictReview({
+/**
+ * The existing-objects check and the conflict choice of the review step. Create runs only.
+ * A new check result clears an earlier update confirmation, so the user confirms the current count.
+ * A result is kept with its scope, so a result for another tenant or selection does not apply.
+ */
+export function ExistingObjectsReview({
   state,
-  onReportChange,
+  value,
+  onChange,
 }: {
   state: WizardState;
-  onReportChange?: (report: ConflictReport | null) => void;
+  value: ExistingObjectsState;
+  onChange: Dispatch<SetStateAction<ExistingObjectsState>>;
 }): React.JSX.Element | null {
   if (state.operationMode !== "create" || state.selectedTargets.length === 0) return null;
+  const scope = getConflictCheckScope(state);
   return (
-    <ConflictSummary
-      tenantConfig={state.tenantConfig}
-      selection={{
-        selectedTargets: state.selectedTargets,
-        selectedCISCategories: state.selectedCISCategories,
-        baselineSelection: state.baselineSelection,
-        categorySelections: state.categorySelections,
-      }}
-      onReportChange={onReportChange}
-    />
+    <>
+      <ConflictSummary
+        tenantConfig={state.tenantConfig}
+        selection={{
+          selectedTargets: state.selectedTargets,
+          selectedCISCategories: state.selectedCISCategories,
+          baselineSelection: state.baselineSelection,
+          categorySelections: state.categorySelections,
+        }}
+        onReportChange={(report) =>
+          onChange((current) => ({ report, reportScope: scope, choice: { ...current.choice, confirmedCount: null } }))
+        }
+      />
+      <UpdateExistingChoice
+        choice={value.choice}
+        onChoiceChange={(choice) => onChange((current) => ({ ...current, choice }))}
+        report={getCurrentReport(state, value)}
+        isPreview={state.isPreview}
+      />
+    </>
   );
 }

@@ -75,6 +75,18 @@ export interface TaskDriftEvidence {
   reason?: string;
 }
 
+/**
+ * Update of an existing kit object in a create run with "Update existing kit objects".
+ * A task with this evidence and status "success" updated the object (applied: true), or
+ * would update it in preview (applied: false).
+ */
+export interface TaskUpdateEvidence {
+  objectId: string;
+  applied: boolean;
+  /** Readable per-setting differences that the update changes. */
+  differences: string[];
+}
+
 export interface RunProvenance {
   runId: string;
   appVersion: string;
@@ -90,6 +102,7 @@ interface HydrationTaskBase {
   templatePath?: string;
   match?: TaskMatchEvidence;
   drift?: TaskDriftEvidence;
+  update?: TaskUpdateEvidence;
   error?: string;
   warning?: string;
   startTime?: Date;
@@ -151,6 +164,8 @@ export interface HydrationSummary {
   stats: {
     total: number;
     created: number;
+    /** Existing kit objects updated (or would update in preview). Absent when 0. */
+    updated?: number;
     deleted: number;
     skipped: number;
     failed: number;
@@ -262,5 +277,10 @@ export interface WizardState {
   categorySelections?: CategorySelections;
   baselineSelection?: BaselineSelection; // Keep for backwards compatibility
   confirmed: boolean;
+  /**
+   * Create runs only: update existing kit objects that differ from the template.
+   * Set by the review step when the run starts, never by a saved selection.
+   */
+  updateExisting?: boolean;
   prerequisiteResult?: PrerequisiteCheckResult;
 }
