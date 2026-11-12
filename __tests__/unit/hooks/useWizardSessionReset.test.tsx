@@ -5,7 +5,7 @@ import { WizardProvider, useWizardState } from "@/hooks/useWizardState";
 import { notifySignOut } from "@/lib/auth/sessionEvents";
 
 const msal = vi.hoisted(() => ({
-  accounts: [] as Array<{ homeAccountId: string }>,
+  accounts: [] as Array<{ homeAccountId: string; tenantId: string }>,
 }));
 
 vi.mock("@azure/msal-react", () => ({
@@ -34,7 +34,7 @@ function confirmRun(result: ReturnType<typeof renderWizard>["result"]) {
 
 describe("WizardProvider session reset", () => {
   beforeEach(() => {
-    msal.accounts = [{ homeAccountId: "account-a" }];
+    msal.accounts = [{ homeAccountId: "account-a", tenantId: "tenant-1" }];
   });
 
   it("clears the confirmed wizard when the app signs out", () => {
@@ -62,17 +62,36 @@ describe("WizardProvider session reset", () => {
     const { result, rerender } = renderWizard();
     confirmRun(result);
 
-    msal.accounts = [{ homeAccountId: "account-b" }];
+    msal.accounts = [{ homeAccountId: "account-b", tenantId: "tenant-1" }];
     rerender();
 
     expect(result.current.state.confirmed).toBe(false);
+  });
+
+  it("clears the confirmed wizard when the same account switches tenant", () => {
+    // A guest's tenant profiles share one homeAccountId.
+    const { result, rerender } = renderWizard();
+    confirmRun(result);
+    act(() => {
+      result.current.setTenantConfig({
+        tenantId: "tenant-1",
+        homeAccountId: "account-a",
+        cloudEnvironment: "global",
+      });
+    });
+
+    msal.accounts = [{ homeAccountId: "account-a", tenantId: "tenant-2" }];
+    rerender();
+
+    expect(result.current.state.confirmed).toBe(false);
+    expect(result.current.state.tenantConfig).toBeUndefined();
   });
 
   it("keeps wizard state while the same account stays signed in", () => {
     const { result, rerender } = renderWizard();
     confirmRun(result);
 
-    msal.accounts = [{ homeAccountId: "account-a" }];
+    msal.accounts = [{ homeAccountId: "account-a", tenantId: "tenant-1" }];
     rerender();
 
     expect(result.current.state.confirmed).toBe(true);
@@ -83,7 +102,7 @@ describe("WizardProvider session reset", () => {
     const { result, rerender } = renderWizard();
     confirmRun(result);
 
-    msal.accounts = [{ homeAccountId: "account-a" }];
+    msal.accounts = [{ homeAccountId: "account-a", tenantId: "tenant-1" }];
     rerender();
 
     expect(result.current.state.confirmed).toBe(true);

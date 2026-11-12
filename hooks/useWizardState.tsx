@@ -34,12 +34,15 @@ const initialState: WizardState = {
 };
 
 /**
- * Clear wizard state, including the run confirmation, when the session ends or the account changes.
+ * Clear wizard state, including the run confirmation, when the session ends or the account or
+ * tenant changes.
  * Without this, a confirmed wizard from the previous session can start a live run on /dashboard.
  */
 function useResetOnSessionChange(reset: () => void): void {
   const { instance, accounts } = useMsal();
-  const accountKey = (instance.getActiveAccount() ?? accounts[0])?.homeAccountId ?? null;
+  const account = instance.getActiveAccount() ?? accounts[0];
+  // Guest tenant profiles share one homeAccountId, so the tenant is part of the key.
+  const accountKey = account ? `${account.homeAccountId}|${account.tenantId}` : null;
   const previousAccountKey = useRef(accountKey);
 
   useEffect(() => subscribeSignOut(reset), [reset]);

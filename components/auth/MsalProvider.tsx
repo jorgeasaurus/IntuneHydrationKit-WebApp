@@ -7,6 +7,7 @@ import {
   msalInstance,
 } from "@/lib/auth/msalConfig";
 import { consumeInactivitySignOutNotice, signOutForInactivity } from "@/lib/auth/authUtils";
+import { AuthUnavailableContext } from "@/components/auth/AuthAvailability";
 import {
   getExecutionState,
   subscribeExecutionState,
@@ -21,10 +22,10 @@ interface MsalProviderProps {
 /** Sign out after 1 hour of inactivity (per security spec) */
 export const SESSION_TIMEOUT_MS = 60 * 60 * 1000;
 const ACTIVITY_EVENTS = ["mousemove", "keydown", "click", "scroll"] as const;
-const ACTIVE_RUN_PHASES: ReadonlySet<ExecutionState["phase"]> = new Set([
+/** Phases in which a run does work. A paused run does no work, so the idle timer applies again. */
+const WORKING_RUN_PHASES: ReadonlySet<ExecutionState["phase"]> = new Set([
   "building",
   "running",
-  "paused",
   "cancelling",
 ]);
 
@@ -38,17 +39,19 @@ function getServerExecutionPhase(): ExecutionState["phase"] {
 
 /**
  * Signs the user out after a period of inactivity.
- * A run that is building, running, paused, or cancelling counts as activity: the timer stops
- * while the run is active and starts again from zero when the run ends.
+ * A run that is building, running, or cancelling counts as activity: the timer stops while the
+ * run works and starts again from zero when the run pauses or ends. A paused run does no work,
+ * so it does not keep the session alive.
  */
 function SessionTimeoutHandler() {
   const { accounts } = useMsal();
   const isSignedIn = accounts.length > 0;
   const phase = useSyncExternalStore(subscribeExecutionState, getExecutionPhase, getServerExecutionPhase);
-  const isRunActive = ACTIVE_RUN_PHASES.has(phase);
+  const isRunWorking = WORKING_RUN_PHASES.has(phase);
 
   useEffect(() => {
-    if (!isSignedIn || isRunActive) return;
+    // The effect re-runs when the run stops working, so the timer starts from that moment.
+    if (!isSignedIn || isRunWorking) return;
 
     const handleTimeout = () => {
       console.warn("[Auth] Session timed out after 1 hour of inactivity. Signing out.");
@@ -72,7 +75,7 @@ function SessionTimeoutHandler() {
       window.clearTimeout(timeoutId);
       ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, resetTimer));
     };
-  }, [isSignedIn, isRunActive]);
+  }, [isSignedIn, isRunWorking]);
 
   return null;
 }
@@ -128,7 +131,9 @@ function AuthUnavailableNotice({ message }: { message: string }) {
  * MSAL authentication provider wrapper.
  * Children render on the server and before MSAL initialization completes. msal-react reports
  * `inProgress: startup` until initialization ends, and auth-dependent UI (for example
- * ProtectedRoute) waits for that. signIn waits for initialization before it opens a popup.
+ * ProtectedRoute) waits for that. msal-react stays in `startup` if initialization fails, so the
+ * failure reason is shared through AuthUnavailableContext. signIn waits for initialization
+ * before it opens a popup.
  */
 export function MsalProvider({ children }: MsalProviderProps) {
   const configurationError = getMsalConfigurationError();
@@ -150,10 +155,12 @@ export function MsalProvider({ children }: MsalProviderProps) {
 
   return (
     <BaseMsalProvider instance={msalInstance}>
-      <SessionTimeoutHandler />
-      <InactivitySignOutNotice />
-      {children}
-      {authError ? <AuthUnavailableNotice message={authError} /> : null}
+      <AuthUnavailableContext.Provider value={authError}>
+        <SessionTimeoutHandler />
+        <InactivitySignOutNotice />
+        {children}
+        {authError ? <AuthUnavailableNotice message={authError} /> : null}
+      </AuthUnavailableContext.Provider>
     </BaseMsalProvider>
   );
 }

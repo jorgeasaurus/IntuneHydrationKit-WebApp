@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { render, screen, waitFor } from '@testing-library/react'
 import { ProtectedRoute, SIGN_IN_REQUIRED_PATH } from '@/components/auth/ProtectedRoute'
+import { AuthUnavailableContext } from '@/components/auth/AuthAvailability'
 
 const replace = vi.fn()
 const isAuthenticated = vi.fn()
@@ -65,4 +66,27 @@ describe('ProtectedRoute', () => {
     expect(screen.getByText('Secret content')).toBeInTheDocument()
     expect(replace).not.toHaveBeenCalled()
   })
+
+  it.each([true, false])(
+    'shows a full-page error with a home link when MSAL is unavailable (authenticated: %s)',
+    (authenticated) => {
+      // msal-react stays in startup after an initialization failure.
+      isAuthenticated.mockReturnValue(authenticated)
+      inProgress.mockReturnValue('startup')
+
+      render(
+        <AuthUnavailableContext.Provider value="MSAL initialization failed">
+          <ProtectedRoute>
+            <span>Secret content</span>
+          </ProtectedRoute>
+        </AuthUnavailableContext.Provider>
+      )
+
+      expect(screen.getByRole('alert')).toHaveTextContent('Sign-in is unavailable')
+      expect(screen.getByRole('alert')).toHaveTextContent('MSAL initialization failed')
+      expect(screen.getByRole('link', { name: 'Back to home page' })).toHaveAttribute('href', '/')
+      expect(screen.queryByText('Secret content')).not.toBeInTheDocument()
+      expect(replace).not.toHaveBeenCalled()
+    }
+  )
 })

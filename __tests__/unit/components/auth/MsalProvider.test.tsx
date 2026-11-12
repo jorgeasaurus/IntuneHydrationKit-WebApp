@@ -3,12 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { renderToString } from 'react-dom/server'
 import { MsalProvider, SESSION_TIMEOUT_MS } from '@/components/auth/MsalProvider'
+import { useAuthUnavailableError } from '@/components/auth/AuthAvailability'
 import {
   beginExecution,
   cancelExecution,
   finishExecution,
   forceResetExecutionSessionForTests,
   pauseExecution,
+  resumeExecution,
 } from '@/lib/hydration/executionStateStore'
 
 const mocks = vi.hoisted(() => ({
@@ -120,6 +122,32 @@ describe('MsalProvider', () => {
     consoleError.mockRestore()
   })
 
+  it.each([
+    ['an initialization failure', () => mocks.initializeMsal.mockRejectedValue(new Error('boom')), 'boom'],
+    [
+      'a missing configuration',
+      () => mocks.getMsalConfigurationError.mockReturnValue('Not configured.'),
+      'Not configured.',
+    ],
+  ])('shares %s with auth-dependent components', async (_case, arrange, expected) => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    arrange()
+    function Consumer() {
+      return <span data-testid="auth-error">{useAuthUnavailableError() ?? 'none'}</span>
+    }
+
+    render(
+      <MsalProvider>
+        <Consumer />
+      </MsalProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId('auth-error')).toHaveTextContent(expected)
+    })
+    consoleError.mockRestore()
+  })
+
   it('shows a dismissible notice after an inactivity sign-out', () => {
     mocks.consumeInactivitySignOutNotice.mockReturnValue(true)
 
@@ -201,18 +229,12 @@ describe('SessionTimeoutHandler', () => {
     expect(mocks.signOutForInactivity).not.toHaveBeenCalled()
   })
 
-  it('does not sign out while a run is running, paused, or cancelling', () => {
+  it('does not sign out while a run is building, running, or cancelling', () => {
     renderProvider()
     let runId: number | null = null
 
     act(() => {
       runId = beginExecution(runConfiguration)
-    })
-    act(() => {
-      vi.advanceTimersByTime(SESSION_TIMEOUT_MS * 2)
-    })
-    act(() => {
-      pauseExecution(runId!)
     })
     act(() => {
       vi.advanceTimersByTime(SESSION_TIMEOUT_MS * 2)
@@ -225,6 +247,48 @@ describe('SessionTimeoutHandler', () => {
     })
 
     expect(mocks.signOutForInactivity).not.toHaveBeenCalled()
+  })
+
+  it('signs out a full inactivity period after a run pauses, and stops the timer on resume', () => {
+    renderProvider()
+    let runId: number | null = null
+
+    act(() => {
+      vi.advanceTimersByTime(SESSION_TIMEOUT_MS - 1000)
+      runId = beginExecution(runConfiguration)
+    })
+    act(() => {
+      vi.advanceTimersByTime(SESSION_TIMEOUT_MS * 2)
+    })
+    // Pausing restarts the timer from zero; stale activity time does not sign out at once.
+    act(() => {
+      pauseExecution(runId!)
+    })
+    act(() => {
+      vi.advanceTimersByTime(SESSION_TIMEOUT_MS - 1000)
+    })
+    expect(mocks.signOutForInactivity).not.toHaveBeenCalled()
+
+    // Resuming suspends the timer again.
+    act(() => {
+      resumeExecution(runId!)
+    })
+    act(() => {
+      vi.advanceTimersByTime(SESSION_TIMEOUT_MS * 2)
+    })
+    expect(mocks.signOutForInactivity).not.toHaveBeenCalled()
+
+    act(() => {
+      pauseExecution(runId!)
+    })
+    act(() => {
+      vi.advanceTimersByTime(SESSION_TIMEOUT_MS - 1)
+    })
+    expect(mocks.signOutForInactivity).not.toHaveBeenCalled()
+    act(() => {
+      vi.advanceTimersByTime(1)
+    })
+    expect(mocks.signOutForInactivity).toHaveBeenCalledTimes(1)
   })
 
   it('starts a full inactivity period when the run ends', () => {
