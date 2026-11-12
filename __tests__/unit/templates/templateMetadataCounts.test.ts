@@ -27,6 +27,7 @@ describe("TEMPLATE_METADATA counts", () => {
     ["appProtection", "IntuneTemplates/AppProtection"],
     ["enrollment", "IntuneTemplates/Enrollment"],
     ["conditionalAccess", "IntuneTemplates/ConditionalAccess"],
+    ["notification", "IntuneTemplates/Notifications"],
   ] as const)("matches the %s template files", (category, directory) => {
     expect(TEMPLATE_METADATA[category].count).toBe(countJsonFiles(directory));
   });

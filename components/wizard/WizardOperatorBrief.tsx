@@ -1,13 +1,9 @@
 import { SensitiveData } from "@/components/SensitiveData";
-import type { WizardState } from "@/types/hydration";
+import type { CloudEnvironment, WizardState } from "@/types/hydration";
 
-const CLOUD_ENVIRONMENT_LABELS = {
+const CLOUD_ENVIRONMENT_LABELS: Record<CloudEnvironment, string> = {
   global: "Global",
-  usgov: "GCC High",
-  usgovdod: "DoD",
-  germany: "Germany",
-  china: "21Vianet",
-} as const;
+};
 
 export function WizardOperatorBrief({
   state,

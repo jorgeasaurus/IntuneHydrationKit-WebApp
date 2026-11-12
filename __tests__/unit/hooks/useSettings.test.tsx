@@ -45,6 +45,20 @@ describe("useSettings", () => {
     expect(result.current.settings).toEqual(DEFAULT_SETTINGS);
   });
 
+  it("ignores a stored legacy cloud environment setting", () => {
+    window.localStorage.setItem(
+      "app-settings:v1",
+      JSON.stringify({
+        stopOnFirstError: true,
+        defaultCloudEnvironment: "usgov",
+      })
+    );
+
+    const { result } = renderHook(() => useSettings(), { wrapper });
+
+    expect(result.current.settings).toEqual({ ...DEFAULT_SETTINGS, stopOnFirstError: true });
+  });
+
   it("loads stored settings synchronously and discards retired theme settings", () => {
     window.localStorage.setItem(
       "app-settings:v1",

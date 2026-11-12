@@ -204,15 +204,12 @@ describe("POST /api/win32-upload", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("accepts signed Azure Blob URLs for sovereign clouds", async () => {
-    const sovereignUploadUrl = "https://tenant.blob.core.usgovcloudapi.net/package?sig=value";
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(createGraphTargetResponse({
-        azureStorageUri: sovereignUploadUrl,
-        sizeEncrypted: 1,
-      }))
-      .mockResolvedValueOnce(new Response(null, { status: 201 }))
-      .mockResolvedValueOnce(new Response(null, { status: 201 }));
+  it.each([
+    "https://tenant.blob.core.usgovcloudapi.net/package?sig=value",
+    "https://tenant.blob.core.chinacloudapi.cn/package?sig=value",
+    "https://tenant.blob.core.cloudapi.de/package?sig=value",
+  ])("rejects sovereign cloud upload URL %s without issuing a request", async (sovereignUploadUrl) => {
+    const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
 
     const response = await POST(createUploadRequest(new Uint8Array([1]), {
@@ -220,8 +217,8 @@ describe("POST /api/win32-upload", () => {
       "x-intune-upload-url": sovereignUploadUrl,
     }));
 
-    expect(response.status).toBe(204);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(response.status).toBe(400);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("uploads packages larger than one block in Azure blocks", async () => {
