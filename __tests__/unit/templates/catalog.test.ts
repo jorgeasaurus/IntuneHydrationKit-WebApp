@@ -28,7 +28,7 @@ vi.mock('@/lib/templates/loader', () => ({
     {
       displayName: '[IHD] Windows Corporate Devices',
       description: 'Windows corporate filter. Imported by Intune Hydration Kit',
-      platform: 'Windows',
+      platform: 'windows10AndLater',
       rule: '(device.deviceOwnership -eq "Company")',
     },
   ]),
@@ -173,7 +173,12 @@ describe('template catalog', () => {
       (item) =>
         item.sourcePath === 'BYOD/AppProtection/Android - Baseline - BYOD - App Protection.json'
     )
-    expect(byodItem?.platform).toBe('BYOD (Bring Your Own Device)')
+    expect(byodItem?.platform).toBe('Android')
+    expect(byodItem?.subcategory).toBe('BYOD (Bring Your Own Device)')
+    expect(baselineItem?.subcategory).toBe('Windows')
+
+    const filterItem = catalog.items.find((item) => item.category === 'filters')
+    expect(filterItem?.platform).toBe('Windows')
 
     const cisItem = catalog.items.find((item) => item.category === 'cisBaseline')
     expect(cisItem?.subcategory).toBe('Windows 11 - Intune Benchmarks')

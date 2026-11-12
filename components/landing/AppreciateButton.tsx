@@ -1,10 +1,26 @@
 "use client";
 
-import { createElement } from "react";
+import { createElement, useSyncExternalStore } from "react";
 import Script from "next/script";
 
-/** Render the configured appreciation widget on the landing page. */
+const subscribeToNothing = () => () => {};
+
+/**
+ * Render the configured appreciation widget on the landing page.
+ *
+ * The third-party script loads only when this page is the top-level document.
+ * MSAL's silent token renewal loads the landing page (the redirect URI) in a
+ * hidden same-origin iframe, and that iframe shares sessionStorage, where MSAL
+ * keeps tokens, with the wizard and dashboard. No third-party code runs there.
+ */
 export function AppreciateButton() {
+  // False on the server and during hydration, then the real value in the browser.
+  const isTopLevel = useSyncExternalStore(
+    subscribeToNothing,
+    () => window.self === window.top,
+    () => false,
+  );
+
   return (
     <div className="flex items-center justify-center gap-3 text-sm text-white">
       <span>Find this useful?</span>
@@ -13,10 +29,12 @@ export function AppreciateButton() {
         "data-label": "Appreciate Intune Hydration Kit",
         class: "appreciate-widget",
       })}
-      <Script
-        src="https://appreciate-button.com/widget.js"
-        strategy="afterInteractive"
-      />
+      {isTopLevel && (
+        <Script
+          src="https://appreciate-button.com/widget.js"
+          strategy="afterInteractive"
+        />
+      )}
     </div>
   );
 }

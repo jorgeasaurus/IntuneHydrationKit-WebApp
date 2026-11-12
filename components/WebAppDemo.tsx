@@ -3,7 +3,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
+import {
+  AnimatePresence,
+  LazyMotion,
+  domAnimation,
+  m,
+  useReducedMotion,
+} from "framer-motion";
 import {
   CheckCircle2,
   Play,
@@ -13,39 +19,61 @@ import {
   Filter,
   Loader2,
 } from "lucide-react";
+import { LANDING_TEMPLATE_COUNTS } from "@/components/landing/landingContent";
 
 type Phase = "configure" | "deploying" | "complete";
 
 const CATEGORIES = [
-  { id: "groups", label: "Dynamic Groups", icon: Users, count: 47 },
-  { id: "filters", label: "Device Filters", icon: Filter, count: 29 },
-  { id: "compliance", label: "Compliance Policies", icon: Shield, count: 16 },
-  { id: "baseline", label: "Security Baselines", icon: FileCheck, count: 795 },
+  { id: "groups", label: "Entra Groups", icon: Users, count: LANDING_TEMPLATE_COUNTS.groups },
+  { id: "filters", label: "Device Filters", icon: Filter, count: LANDING_TEMPLATE_COUNTS.filters },
+  {
+    id: "compliance",
+    label: "Compliance Policies",
+    icon: Shield,
+    count: LANDING_TEMPLATE_COUNTS.compliance,
+  },
+  {
+    id: "baseline",
+    label: "Security Baselines",
+    icon: FileCheck,
+    count: LANDING_TEMPLATE_COUNTS.baseline + LANDING_TEMPLATE_COUNTS.cisBaseline,
+  },
 ];
 
 const DEPLOYMENT_TASKS = [
-  "Creating Dynamic Groups...",
+  "Creating Entra Groups...",
   "Deploying Device Filters...",
   "Configuring Compliance Policies...",
   "Applying Security Baselines...",
   "Setting up Conditional Access...",
 ];
 
+const DEMO_TOTAL = CATEGORIES.reduce((total, category) => total + category.count, 0);
+const DEMO_SKIPPED = 39;
+
 const FINAL_STATS = {
-  total: 927,
-  created: 888,
-  skipped: 39,
+  total: DEMO_TOTAL,
+  created: DEMO_TOTAL - DEMO_SKIPPED,
+  skipped: DEMO_SKIPPED,
   failed: 0,
 };
 
 export function WebAppDemo() {
-  const [phase, setPhase] = useState<Phase>("configure");
+  // When the user prefers reduced motion, show the finished run as a still
+  // frame and do not start the looping demo timers.
+  const prefersReducedMotion = useReducedMotion() ?? false;
+  const [animatedPhase, setPhase] = useState<Phase>("configure");
+  const phase: Phase = prefersReducedMotion ? "complete" : animatedPhase;
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [currentTask, setCurrentTask] = useState(0);
 
   // Animation cycle
   useEffect(() => {
+    if (prefersReducedMotion) {
+      return;
+    }
+
     let timeout: NodeJS.Timeout;
 
     if (phase === "configure") {
@@ -85,7 +113,7 @@ export function WebAppDemo() {
     }
 
     return () => clearTimeout(timeout);
-  }, [phase]);
+  }, [phase, prefersReducedMotion]);
 
   useEffect(() => {
     if (phase === "deploying" && progress === 100) {

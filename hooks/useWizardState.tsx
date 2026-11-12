@@ -1,6 +1,8 @@
 "use client";
 
-import { createContext, useCallback, useContext, useMemo, useState, ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from "react";
+import { useMsal } from "@azure/msal-react";
+import { subscribeSignOut } from "@/lib/auth/sessionEvents";
 import { WizardState, OperationMode, TaskCategory, TenantConfig, CISCategoryId, BaselineSelection, CategorySelections } from "@/types/hydration";
 import { PrerequisiteCheckResult } from "@/types/prerequisites";
 
@@ -30,6 +32,27 @@ const initialState: WizardState = {
   selectedCISCategories: [],
   confirmed: false,
 };
+
+/**
+ * Clear wizard state, including the run confirmation, when the session ends or the account or
+ * tenant changes.
+ * Without this, a confirmed wizard from the previous session can start a live run on /dashboard.
+ */
+function useResetOnSessionChange(reset: () => void): void {
+  const { instance, accounts } = useMsal();
+  const account = instance.getActiveAccount() ?? accounts[0];
+  // Guest tenant profiles share one homeAccountId, so the tenant is part of the key.
+  const accountKey = account ? `${account.homeAccountId}|${account.tenantId}` : null;
+  const previousAccountKey = useRef(accountKey);
+
+  useEffect(() => subscribeSignOut(reset), [reset]);
+
+  useEffect(() => {
+    const previous = previousAccountKey.current;
+    previousAccountKey.current = accountKey;
+    if (previous !== null && previous !== accountKey) reset();
+  }, [accountKey, reset]);
+}
 
 export function WizardProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<WizardState>(initialState);
@@ -77,6 +100,8 @@ export function WizardProvider({ children }: { children: ReactNode }) {
   const resetWizard = useCallback(() => {
     setState(initialState);
   }, []);
+
+  useResetOnSessionChange(resetWizard);
 
   const nextStep = useCallback(() => {
     setState((prev) => ({ ...prev, currentStep: Math.min(prev.currentStep + 1, 4) }));

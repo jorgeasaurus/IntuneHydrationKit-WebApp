@@ -6,6 +6,7 @@ import {
   forceResetExecutionSessionForTests,
   getExecutionState,
 } from "@/lib/hydration/executionStateStore";
+import { markLeavingForSignOut } from "@/lib/auth/sessionEvents";
 
 const replace = vi.fn();
 const getActiveAccount = vi.fn();
@@ -57,6 +58,12 @@ describe("ExecutionRouteGuard", () => {
     expect(
       fireEvent(window, new Event("beforeunload", { cancelable: true })),
     ).toBe(false);
+
+    // After an inactivity sign-out the app reloads itself; the prompt must not block it.
+    markLeavingForSignOut();
+    expect(
+      fireEvent(window, new Event("beforeunload", { cancelable: true })),
+    ).toBe(true);
   });
 
   it("keeps the dashboard visible during an active run", () => {
