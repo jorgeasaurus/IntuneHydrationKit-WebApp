@@ -119,10 +119,13 @@ function SettingsSection({ summary }: { summary: TemplateSettingsSummary | null 
           <dl className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-black/20">
             {summary.rows.map((row) => (
               <div
-                key={`${row.label}=${row.value}`}
+                key={row.key}
                 className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr),minmax(0,1fr)] sm:gap-4"
               >
                 <dt className="min-w-0 break-all font-mono text-xs leading-5 text-muted-foreground">
+                  {row.entry ? (
+                    <span className="block text-foreground/80">In {row.entry}</span>
+                  ) : null}
                   {row.label}
                 </dt>
                 <dd className="min-w-0 break-words text-sm font-medium text-foreground">

@@ -1,13 +1,18 @@
 /**
  * Builds a readable list of the settings that a template payload configures.
- * Settings Catalog payloads list each setting definition and its value. Other
- * payloads list their configured properties, with nested objects shown as dotted
- * paths.
+ * Settings Catalog payloads list each setting definition and its value. Settings
+ * inside a collection entry (for example, one firewall rule) keep the entry they
+ * belong to. Other payloads list their configured properties, with nested
+ * objects shown as dotted paths.
  */
 
 export interface TemplateSettingRow {
+  /** Unique identity of the row: the entry path, the label, and the value. */
+  key: string;
   label: string;
   value: string;
+  /** The collection entry that contains the setting, for example "..._{firewallrulename} #2". */
+  entry?: string;
 }
 
 export interface TemplateSettingsSummary {
@@ -17,8 +22,8 @@ export interface TemplateSettingsSummary {
 
 const MAX_PROPERTY_DEPTH = 4;
 
-/** Keys that are metadata, identity, or shown elsewhere on the page. */
-const IGNORED_KEYS = new Set([
+/** Top-level keys that are metadata, identity of the payload, or shown elsewhere on the page. */
+const IGNORED_TOP_LEVEL_KEYS = new Set([
   "id",
   "displayName",
   "name",
@@ -39,13 +44,19 @@ const IGNORED_KEYS = new Set([
   "uninstallScriptContent",
 ]);
 
-function isIgnoredKey(key: string): boolean {
+/** Graph annotations and actions are metadata at every level. */
+function isAnnotationKey(key: string): boolean {
+  return key.includes("@odata.") || key.startsWith("#");
+}
+
+/**
+ * Only the payload's own metadata is ignored. Nested keys such as
+ * `grantControls.authenticationStrength.id` are configuration references and stay.
+ */
+function isIgnoredKey(key: string, depth: number): boolean {
   return (
-    IGNORED_KEYS.has(key) ||
-    key.startsWith("@odata.") ||
-    key.includes("@odata.") ||
-    key.startsWith("#") ||
-    key.startsWith("_")
+    isAnnotationKey(key) ||
+    (depth === 0 && (IGNORED_TOP_LEVEL_KEYS.has(key) || key.startsWith("_")))
   );
 }
 
@@ -79,11 +90,20 @@ function asRecords(value: unknown): Record<string, unknown>[] {
     : [];
 }
 
-function collectChildren(values: Record<string, unknown>[]): SettingInstance[] {
-  return values.flatMap((value) => asRecords(value.children));
+function entryLabel(definitionId: string, index: number, count: number): string | null {
+  return count > 1 ? `${definitionId} #${index + 1}` : null;
 }
 
-function flattenSettingInstance(instance: SettingInstance, rows: TemplateSettingRow[]): void {
+function joinEntry(parent: string | undefined, segment: string | null): string | undefined {
+  if (!segment) return parent;
+  return parent ? `${parent} › ${segment}` : segment;
+}
+
+function flattenSettingInstance(
+  instance: SettingInstance,
+  entry: string | undefined,
+  rows: TemplateSettingRow[]
+): void {
   const definitionId =
     typeof instance.settingDefinitionId === "string" ? instance.settingDefinitionId : "";
   const choice = asRecord(instance.choiceSettingValue);
@@ -91,10 +111,7 @@ function flattenSettingInstance(instance: SettingInstance, rows: TemplateSetting
   const simpleCollection = asRecords(instance.simpleSettingCollectionValue);
   const choiceCollection = asRecords(instance.choiceSettingCollectionValue);
   const groupValue = asRecord(instance.groupSettingValue);
-  const groupValues = [
-    ...asRecords(instance.groupSettingCollectionValue),
-    ...(groupValue ? [groupValue] : []),
-  ];
+  const groupCollection = asRecords(instance.groupSettingCollectionValue);
 
   let value: string | null = null;
   if (choice) {
@@ -104,36 +121,47 @@ function flattenSettingInstance(instance: SettingInstance, rows: TemplateSetting
     value = formatScalar(simple.value);
   } else if (simpleCollection.length > 0) {
     value = simpleCollection
-      .map((entry) => formatScalar(entry.value))
+      .map((item) => formatScalar(item.value))
       .filter(Boolean)
       .join(", ");
   } else if (choiceCollection.length > 0) {
     value = choiceCollection
-      .map((entry) => formatScalar(entry.value))
-      .filter((entry): entry is string => Boolean(entry))
-      .map((entry) => stripDefinitionPrefix(entry, definitionId))
+      .map((item) => formatScalar(item.value))
+      .filter((item): item is string => Boolean(item))
+      .map((item) => stripDefinitionPrefix(item, definitionId))
       .join(", ");
   }
 
   if (definitionId && value) {
-    rows.push({ label: definitionId, value });
+    rows.push({
+      key: `${entry ?? ""}|${definitionId}=${value}`,
+      label: definitionId,
+      value,
+      ...(entry ? { entry } : {}),
+    });
   }
 
-  const children = [
-    ...(choice ? asRecords(choice.children) : []),
-    ...collectChildren(choiceCollection),
-    ...collectChildren(groupValues),
-  ];
-  children.forEach((child) => flattenSettingInstance(child, rows));
+  const visitChildren = (children: unknown, childEntry: string | undefined) =>
+    asRecords(children).forEach((child) => flattenSettingInstance(child, childEntry, rows));
+
+  if (choice) visitChildren(choice.children, entry);
+  if (groupValue) visitChildren(groupValue.children, entry);
+  [choiceCollection, groupCollection].forEach((collection) =>
+    collection.forEach((item, index) =>
+      visitChildren(
+        item.children,
+        joinEntry(entry, entryLabel(definitionId, index, collection.length))
+      )
+    )
+  );
 }
 
-/** Removes rows that repeat the same label and value, so each row has a unique key. */
+/** Removes rows that repeat the same setting and value inside the same collection entry. */
 function uniqueRows(rows: TemplateSettingRow[]): TemplateSettingRow[] {
   const seen = new Set<string>();
   return rows.filter((row) => {
-    const key = `${row.label}=${row.value}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    if (seen.has(row.key)) return false;
+    seen.add(row.key);
     return true;
   });
 }
@@ -143,7 +171,7 @@ function summarizeSettingsCatalog(settings: unknown[]): TemplateSettingRow[] {
   asRecords(settings).forEach((setting) => {
     const instance = asRecord(setting.settingInstance);
     if (instance) {
-      flattenSettingInstance(instance, rows);
+      flattenSettingInstance(instance, undefined, rows);
     }
   });
   return uniqueRows(rows);
@@ -156,14 +184,14 @@ function summarizeProperties(
   rows: TemplateSettingRow[]
 ): void {
   Object.entries(record).forEach(([key, value]) => {
-    if (isIgnoredKey(key) || value === null || value === undefined) {
+    if (isIgnoredKey(key, depth) || value === null || value === undefined) {
       return;
     }
 
     const label = prefix ? `${prefix}.${key}` : key;
     const scalar = formatScalar(value);
     if (scalar !== null) {
-      rows.push({ label, value: scalar });
+      rows.push({ key: label, label, value: scalar });
       return;
     }
 
@@ -174,6 +202,7 @@ function summarizeProperties(
 
       const scalars = value.map(formatScalar);
       rows.push({
+        key: label,
         label,
         value: scalars.every((entry) => entry !== null)
           ? scalars.join(", ")
