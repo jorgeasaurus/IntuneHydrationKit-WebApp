@@ -815,6 +815,8 @@ export function TemplateCatalogPage() {
                                                 </div>
                                                 <Link
                                                   href={getTemplatePath(item)}
+                                                  // Detail pages embed the full payload. Do not download them for every visible row.
+                                                  prefetch={false}
                                                   aria-label={`Details for ${item.displayName}`}
                                                   className="mb-4 inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-border/70 bg-background/70 px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none sm:mb-0 sm:self-center"
                                                 >
