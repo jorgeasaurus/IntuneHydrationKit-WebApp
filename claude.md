@@ -17,6 +17,7 @@ Build a web-based version of the IntuneHydrationKit PowerShell tool that enables
 - TypeScript, Tailwind CSS, Radix UI components
 - TanStack Query for state management
 - Recharts for visualizations
+- This app does not use TanStack Query or Recharts. It uses React Context and plain components.
 
 ## Core Requirements
 
@@ -25,12 +26,9 @@ Build a web-based version of the IntuneHydrationKit PowerShell tool that enables
 **MSAL React Configuration**:
 - Single-page application (SPA) flow
 - Delegated permissions (no application/daemon auth)
-- Support for multiple cloud environments:
-  - Global (Commercial)
-  - USGov (GCC High)
-  - USGovDoD
-  - Germany
-  - China (21Vianet)
+- Interactive sign-in and token renewal use MSAL popups (`loginPopup`, `acquireTokenPopup`)
+- Global (Commercial) cloud only. The web app has no cloud selector.
+  - Sovereign clouds (USGov GCC High, USGovDoD, China 21Vianet) are supported only by the PowerShell module.
 
 **Required Microsoft Graph Scopes**:
 ```typescript
@@ -51,7 +49,7 @@ const REQUIRED_SCOPES = [
 ```
 
 **Session Management**:
-- Store tenant context (tenantId, tenantName) in session
+- Get tenant context (tenantId, tenantName) from the signed-in account. The user does not type a tenant ID.
 - Implement token refresh logic
 - Handle authentication errors gracefully
 - Support sign-out with session cleanup
@@ -77,14 +75,16 @@ interface LicenseCheck {
 
 ### 3. Configuration Wizard
 
-**Step 1: Tenant Configuration**
-- Input: Tenant ID (GUID format validation)
-- Input: Tenant display name (optional, for UI display)
-- Cloud environment selector (dropdown)
-- "Connect to Tenant" button triggers MSAL login
+The wizard has four steps: Tenant checkpoint, Execution mode, Deployment scope, and Launch review.
 
-**Step 2: Operation Mode Selection**
-- Radio buttons: Create | Delete | Preview (WhatIf)
+**Step 1: Tenant Checkpoint**
+- Sign-in button starts the MSAL popup login
+- Tenant ID and display name come from the signed-in account (no tenant ID input)
+- Cloud environment is shown as fixed text: "Global (Commercial)" (no selector)
+- Run pre-flight validation and show the results
+
+**Step 2: Execution Mode**
+- Choose Preview (WhatIf) or Live, and Create or Delete
 - Warning banner for Delete mode:
   ```
   ⚠️ Delete mode will remove configurations created by this tool.
@@ -92,29 +92,26 @@ interface LicenseCheck {
   Conditional Access policies must be disabled to be deleted.
   ```
 
-**Step 3: Target Selection**
+**Step 3: Deployment Scope**
 - Checkbox group for configuration types:
   - OpenIntuneBaseline policies
+  - CIS baselines (with sub-selection by benchmark family)
   - Compliance templates
   - App protection policies
+  - Win32 apps
   - Notification templates
   - Enrollment profiles
-  - Dynamic groups
+  - Dynamic and static groups
   - Device filters
   - Conditional Access policies
+- Per-item selection inside each category
 - "Select All" / "Deselect All" buttons
 - Display estimated object count for each category
+- The OpenIntuneBaseline and CIS templates are bundled with the app. There is no repository URL, branch selector, or "Download Latest" step.
 
-**Step 4: OpenIntuneBaseline Configuration** (conditional, if selected)
-- GitHub repository URL (default: https://github.com/SkipToTheEndpoint/OpenIntuneBaseline)
-- Branch selector (default: main)
-- "Download Latest" button with progress indicator
-- Display current baseline version after download
-
-**Step 5: Review & Confirm**
+**Step 4: Launch Review**
 - Summary table showing:
   - Tenant name and ID
-  - Cloud environment
   - Operation mode
   - Selected targets with object counts
   - Estimated total objects to create/delete
@@ -139,7 +136,7 @@ interface HydrationTask {
 
 **Execution Flow**:
 1. Create task queue from selected targets
-2. Execute tasks sequentially (no parallel execution to avoid API throttling)
+2. Execute batchable tasks through Graph `$batch` requests (`lib/graph/batch.ts`, `lib/config/batchConfig.ts`): 20 requests per batch (15 for OpenIntuneBaseline and CIS), 1 second between batches. Delete mode sends batchable deletes with limited parallelism (3 concurrent requests, 500 ms between groups). Tasks that cannot be batched run one at a time.
 3. For each task:
    - Check if object already exists (create mode) or needs deletion (delete mode)
    - Apply operation via Microsoft Graph API
@@ -175,8 +172,8 @@ async function createDeviceFilter(filter: DeviceFilter): Promise<void> {
 **Rate Limiting & Retries**:
 - Implement exponential backoff for 429 (Too Many Requests) responses
 - Respect `Retry-After` header
-- Max 3 retry attempts per request
-- 2-second delay between tasks to avoid throttling
+- Bounded retry attempts per request (`lib/utils/retry.ts`)
+- Fixed delays between batches (see Execution Flow) instead of a delay between each task
 
 ### 5. Real-time Progress Dashboard
 
@@ -272,7 +269,7 @@ interface HydrationSummary {
 ```
 
 **Post-execution Actions**:
-- "View in Intune Portal" links for created objects
+- "View matched object" Intune portal links for matched Settings Catalog policies (links for all object types are not yet implemented)
 - "Download Report" button (multi-format)
 - "Start New Hydration" button (resets wizard)
 - Display conditional access reminder: "Remember to review and enable CA policies manually"
@@ -294,14 +291,18 @@ interface HydrationSummary {
 ```
 
 **OpenIntuneBaseline Integration**:
-- Fetch latest baseline JSON from GitHub:
-  ```
-  https://raw.githubusercontent.com/SkipToTheEndpoint/OpenIntuneBaseline/main/Windows/
-  https://raw.githubusercontent.com/SkipToTheEndpoint/OpenIntuneBaseline/main/macOS/
-  ```
-- Parse JSON and inject hydration kit marker into descriptions
-- Display baseline version/commit hash in UI
-- Cache downloaded baselines in browser localStorage
+- The OpenIntuneBaseline templates are bundled in `public/IntuneTemplates/OpenIntuneBaseline`. The app does not download them from GitHub at runtime and does not cache them in localStorage.
+- `.github/workflows/sync-oib-templates.yml` runs `scripts/sync-oib-templates.js` every week (and on demand). When upstream changes, it opens a pull request against `dev` with the new templates and a version increment.
+- Inject the hydration kit marker into descriptions at execution time
+- Display the bundled baseline version in the UI
+
+**CIS Baselines**:
+- The CIS templates are bundled in `public/CISIntuneBaselines` with a `manifest.json`.
+- Regenerate the manifest with `npm run generate-cis-manifest`. The sync workflow does not update CIS templates.
+
+**Win32 Apps**:
+- Win32 app definitions are in `templates/win32Apps.ts`. The `.intunewin` packages are bundled in `public/win32-apps`.
+- The browser cannot write to the Intune Azure Storage upload URL because that storage does not send CORS headers. The `/api/win32-upload` server route relays the encrypted package to the signed Azure Blob URL.
 
 ### 8. Differential & Drift Detection
 
@@ -317,17 +318,16 @@ interface HydrationSummary {
   
   Options:
   ( ) Skip conflicting items
-  ( ) Update existing items (overwrites settings)
   ( ) Cancel operation
   ```
+- As built, create mode always skips conflicting items. The "Update existing items" option is not yet implemented.
+- The Launch review step shows an OpenIntuneBaseline change review (new, existing, and older-version policies by name).
 
 **Drift Detection** (informational):
 - Compare existing objects created by this tool against current templates
-- Display drift report showing:
-  - Objects created by tool that no longer match templates
-  - Settings that have been manually modified
-  - Missing objects that were previously created
-- "Reconcile Drift" button to update to latest templates
+- As built, the results view shows drift evidence (differences) for existing objects that the run skipped
+- A drift report for settings that were manually modified, and for missing objects that were previously created, is not yet implemented
+- The "Reconcile Drift" button is not yet implemented
 
 ### 9. UI/UX Specifications
 
@@ -340,7 +340,7 @@ interface HydrationSummary {
 **Design System**:
 - Use shadcn/ui components (same as reference project)
 - Tailwind CSS for styling
-- Dark mode support
+- Fixed glass theme over an animated wallpaper (three.js + Vanta). There is no light/dark toggle.
 - Responsive design (desktop-first, mobile-friendly)
 
 **Color Coding**:
@@ -357,7 +357,7 @@ interface HydrationSummary {
 - Color contrast ratio ≥ 4.5:1
 
 **Performance**:
-- Lazy load templates (don't load all 127 templates upfront)
+- Lazy load templates per category (don't load the full catalog upfront)
 - Virtualize long task lists (>50 items)
 - Debounce search inputs
 - Optimize re-renders with React.memo and useMemo
@@ -367,26 +367,20 @@ interface HydrationSummary {
 **Persistent Settings** (localStorage):
 ```typescript
 interface AppSettings {
-  defaultCloudEnvironment: string;
-  defaultBaselineRepo: string;
-  defaultBaselineBranch: string;
   stopOnFirstError: boolean;
-  enableVerboseLogging: boolean;
-  autoDownloadReports: boolean;
-  theme: 'light' | 'dark' | 'system';
+  demoMode: boolean;
 }
 ```
 
 **Settings UI**:
-- Modal dialog accessible from sidebar
-- Form with validation
-- "Reset to Defaults" button
-- Immediate save (no "Apply" button needed)
+- Modal dialog accessible from navigation
+- "Save Changes" and "Cancel" buttons (changes apply only on save)
 
 ### 11. Security Considerations
 
 **Data Handling**:
-- Never store access tokens in localStorage (use MSAL in-memory cache only)
+- Never store access tokens in localStorage. MSAL keeps its token cache in sessionStorage (`cacheLocation: "sessionStorage"` in `lib/auth/msalConfig.ts`), so tokens are cleared when the browser tab closes.
+- Send the Graph token to this app's own server only for `/api/win32-upload`, which uses it to confirm the upload target with Graph
 - Never log sensitive data (tokens, secrets)
 - All Graph API calls over HTTPS
 - Sanitize user inputs to prevent XSS
@@ -397,15 +391,11 @@ interface AppSettings {
 - Session timeout after 1 hour of inactivity
 
 **Content Security Policy**:
-```typescript
-// next.config.js
-const securityHeaders = [
-  {
-    key: 'Content-Security-Policy',
-    value: "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; connect-src 'self' https://graph.microsoft.com https://login.microsoftonline.com;"
-  }
-];
-```
+- `next.config.ts` builds the policy and sets it with `headers()`.
+- `/wizard` and `/dashboard` (the routes that use Graph tokens) get a stricter policy that does not allow the third-party appreciation widget origin. Other routes allow it. A CSP applies to the loaded document, so a client-side navigation from `/` keeps the landing policy.
+- `'unsafe-eval'` is allowed only for the development server. Scripts keep `'unsafe-inline'` because statically generated pages contain inline Next.js bootstrap scripts.
+- `frame-src` allows the MSAL authority for hidden-iframe token renewal. `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, and `frame-ancestors 'none'` are set.
+- The app also sends `Strict-Transport-Security`, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
 
 ## Technical Stack
 
@@ -418,7 +408,7 @@ const securityHeaders = [
 - PublicClientApplication configuration
 - MsalProvider wrapper for app
 - useMsal hook for auth state
-- useMsalAuthentication for protected routes
+- useIsAuthenticated in `ProtectedRoute` for protected routes
 
 **State Management**:
 - React Context for app-level state (wizard progress, settings)
@@ -427,71 +417,55 @@ const securityHeaders = [
 **UI Libraries**:
 - shadcn/ui (Radix UI primitives + Tailwind)
 - Lucide React (icons)
-- Recharts (progress visualization)
 - Sonner (toast notifications)
+- Framer Motion (animation)
+- three.js + Vanta (animated wallpaper)
+- Progress bars are plain components. Recharts is not used.
 
 **Utilities**:
-- date-fns (date formatting)
+- `lib/utils/dateFormat.ts` (date formatting; date-fns is not used)
 - zod (schema validation)
 - clsx + tailwind-merge (className utilities)
 
 ## Project Structure
 
+The source folders are at the repository root (there is no `src/` folder). Main files:
+
 ```
-src/
 ├── app/
 │   ├── layout.tsx                 # Root layout with providers
 │   ├── page.tsx                   # Landing page
-│   ├── wizard/
-│   │   └── page.tsx              # Multi-step wizard
-│   └── dashboard/
-│       └── page.tsx              # Live execution, results, and reports
+│   ├── templates/page.tsx         # Template catalog
+│   ├── wizard/                    # Four-step wizard (layout sets noindex)
+│   ├── dashboard/                 # Live execution, results, and reports (layout sets noindex)
+│   ├── api/win32-upload/route.ts  # Server relay for Win32 package upload to Azure Blob
+│   ├── robots.ts, sitemap.ts, manifest.ts
 ├── components/
-│   ├── auth/
-│   │   ├── MsalProvider.tsx
-│   │   └── ProtectedRoute.tsx
-│   ├── wizard/
-│   │   ├── TenantConfig.tsx
-│   │   ├── OperationMode.tsx
-│   │   ├── TargetSelection.tsx
-│   │   └── ReviewConfirm.tsx
-│   ├── dashboard/
-│   │   ├── ProgressBar.tsx
-│   │   ├── TaskList.tsx
-│   │   └── ExecutionControls.tsx
+│   ├── auth/                      # MsalProvider.tsx, ProtectedRoute.tsx
+│   ├── wizard/                    # TenantConfig, OperationMode, TargetSelection*, ReviewConfirm, BaselineChangeReview, ...
+│   ├── dashboard/                 # DashboardRunView, ProgressBar, TaskList, TaskRow, ExecutionControls, ResultsSummary, ReportComparison, ...
+│   ├── landing/                   # HomeLanding, AppreciateButton
+│   ├── templates/                 # TemplateCatalogPage
+│   ├── SettingsModal.tsx, Navigation.tsx, DynamicWallpaper.tsx, ...
 │   └── ui/                        # shadcn components
 ├── lib/
-│   ├── auth/
-│   │   ├── msalConfig.ts         # MSAL configuration
-│   │   └── authUtils.ts
-│   ├── graph/
-│   │   ├── client.ts             # Graph API client
-│   │   ├── groups.ts             # Group operations
-│   │   ├── compliance.ts         # Compliance operations
-│   │   ├── filters.ts            # Filter operations
-│   │   └── conditionalAccess.ts
-│   ├── hydration/
-│   │   ├── engine.ts             # Task execution engine
-│   │   ├── validator.ts          # Pre-flight checks
-│   │   └── reporter.ts           # Report generation
-│   └── utils/
-│       ├── retry.ts              # Exponential backoff
-│       └── format.ts
-├── templates/
-│   ├── compliance.ts
-│   ├── groups.ts
-│   ├── filters.ts
-│   ├── conditionalAccess.ts
-│   ├── appProtection.ts
-│   └── enrollment.ts
-├── types/
-│   ├── graph.ts                  # Graph API types
-│   ├── hydration.ts              # App-specific types
-│   └── templates.ts
-└── hooks/
-    ├── useHydration.ts
-    ├── useGraphQuery.ts
-    └── useWizardState.ts
+│   ├── auth/                      # msalConfig.ts, authUtils.ts
+│   ├── config/batchConfig.ts      # Graph $batch sizes and delays
+│   ├── graph/                     # client.ts, batch.ts, endpoints.ts, prerequisites.ts, and one module per object type
+│   ├── hydration/                 # engine.ts, batchExecutor.ts, taskQueue.ts, reporter.ts, taskExecutors/, ...
+│   ├── templates/                 # loader.ts, catalog.ts
+│   ├── win32/intuneWinPackage.ts  # .intunewin parsing
+│   └── utils/                     # retry.ts, dateFormat.ts, hydrationMarker.ts, base64.ts
+├── templates/                     # TypeScript manifests: groupManifest.ts, filterManifest.ts, win32Apps.ts
+├── types/                         # graph.ts, hydration.ts, prerequisites.ts
+├── hooks/                         # useWizardState, useHydrationExecution, useDashboardRun, useSettings
+├── public/
+│   ├── IntuneTemplates/           # JSON policy templates, including OpenIntuneBaseline/
+│   ├── CISIntuneBaselines/        # CIS benchmark templates and manifest.json
+│   └── win32-apps/                # Bundled .intunewin packages
+├── scripts/                       # sync-oib-templates.js, generate-*-manifest.js
+├── __tests__/                     # Vitest unit tests
+└── e2e/                           # Playwright tests
 ```
 
 ## Implementation Phases
@@ -515,10 +489,10 @@ src/
 - Create real-time progress dashboard
 - Implement results view with report generation
 - Add settings modal
-- Implement dark mode
+- Implement the fixed glass theme (no dark-mode toggle)
 
 ### Phase 4: Advanced Features (Week 5)
-- OpenIntuneBaseline GitHub integration
+- OpenIntuneBaseline templates bundled and synced by a GitHub workflow
 - Conflict detection and drift analysis
 - Export functionality (MD, JSON, CSV)
 - Comprehensive error logging
@@ -540,7 +514,7 @@ src/
 
 **Integration Tests**:
 - MSAL authentication flow (mocked)
-- Graph API calls (mocked with MSW)
+- Graph API calls (mocked `fetch` with Vitest; MSW is not used)
 - Wizard state transitions
 - Task execution engine
 
@@ -574,6 +548,7 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 ```
 
 **Hosting Options**:
+- The host must run the Node.js `/api/win32-upload` route. A static-only export is not sufficient.
 - Vercel (recommended, easy Next.js deployment)
 - Azure Static Web Apps (integrates with Entra ID)
 - Netlify
@@ -597,7 +572,7 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 - Security considerations
 - License (proprietary commercial EULA)
 
-**In-app Help**:
+**In-app Help** (not yet implemented; see "Not Yet Implemented"):
 - Tooltip on each wizard step
 - "What is this?" buttons with detailed explanations
 - Link to Microsoft Graph API documentation
@@ -611,7 +586,7 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 ## Success Criteria
 
 **Functional**:
-- Successfully creates all 127 Intune objects in test tenant
+- Successfully creates all catalog objects in test tenant (the template catalog lists 990 items)
 - Delete mode safely removes only kit-created objects
 - Preview mode shows accurate diff without mutations
 - Handles Graph API throttling gracefully
@@ -630,6 +605,15 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 - Progress is visible and accurate
 - No unexpected behavior or data loss
 - Consistent with Intune admin center UX patterns
+
+## Not Yet Implemented
+
+These items are still wanted but are not in the app as built:
+
+- Conflict option "Update existing items (overwrites settings)". Create mode always skips existing objects.
+- "Reconcile Drift" button, and a full drift report (manually modified settings, missing objects that were previously created).
+- "View in Intune Portal" links for all created object types. Only matched Settings Catalog policies have portal links.
+- In-app help: tooltip on each wizard step, "What is this?" buttons, links to Microsoft Graph documentation, and an FAQ section.
 
 ## Open Questions / Decisions
 
@@ -654,13 +638,13 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 - **Mitigation**: Require explicit confirmation for delete mode, show list of objects to be deleted, only delete kit-created objects
 
 **Risk**: Graph API throttling breaks execution
-- **Mitigation**: Implement exponential backoff, respect Retry-After headers, sequential execution (no parallelism)
+- **Mitigation**: Implement exponential backoff, respect Retry-After headers, Graph `$batch` with fixed batch sizes and delays, and limited delete parallelism (3 concurrent requests)
 
 **Risk**: User lacks required permissions
 - **Mitigation**: Pre-flight permission check, clear error messages, link to permission documentation
 
 **Risk**: OpenIntuneBaseline repo changes structure
-- **Mitigation**: Pin to specific commit hash by default, allow user override, handle parse errors gracefully
+- **Mitigation**: Bundle the templates in the app. The sync workflow opens a reviewed pull request for each upstream change. Handle parse errors gracefully.
 
 **Risk**: Browser compatibility issues
 - **Mitigation**: Use polyfills for modern APIs, test on all major browsers, provide browser support matrix in docs
@@ -669,8 +653,8 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 
 - First contentful paint: < 1.5s
 - Time to interactive: < 3s
-- Task execution rate: 1 task per 2-3 seconds (avg)
-- Total hydration time (127 objects): < 10 minutes
+- Task execution rate: set by Graph `$batch` size and batch delay (see Execution Flow)
+- Total hydration time (full catalog, about 990 objects): < 10 minutes
 - Report generation: < 2 seconds
 - Memory usage: < 100MB (excluding browser baseline)
 
