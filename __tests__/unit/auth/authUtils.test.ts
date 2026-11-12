@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
     getAuthorityUrl: vi.fn(),
     initializeMsal: vi.fn(),
     notifySignOut: vi.fn(),
+    markLeavingForSignOut: vi.fn(),
     resetExecutionSession: vi.fn(),
     InteractionRequiredAuthError: class extends Error {},
     BrowserAuthError: class extends Error {},
@@ -61,6 +62,7 @@ vi.mock("@/lib/auth/msalConfig", () => ({
 
 vi.mock("@/lib/auth/sessionEvents", () => ({
   notifySignOut: mocks.notifySignOut,
+  markLeavingForSignOut: mocks.markLeavingForSignOut,
 }));
 
 vi.mock("@/lib/hydration/executionStateStore", () => ({
@@ -281,6 +283,7 @@ describe("authUtils", () => {
       await signOutForInactivity();
 
       expect(mocks.msalInstance.clearCache).toHaveBeenCalledWith();
+      expect(mocks.markLeavingForSignOut).toHaveBeenCalled();
       expect(mocks.msalInstance.logoutPopup).not.toHaveBeenCalled();
       expect(window.sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).toBeNull();
       expect(mocks.notifySignOut).toHaveBeenCalled();

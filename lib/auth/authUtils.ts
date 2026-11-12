@@ -1,6 +1,6 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
 import { msalInstance, loginRequest, getAuthorityUrl, initializeMsal } from "./msalConfig";
-import { notifySignOut } from "./sessionEvents";
+import { markLeavingForSignOut, notifySignOut } from "./sessionEvents";
 import { clearHydrationSession } from "@/lib/hydration/executionRecord";
 import { resetExecutionSession } from "@/lib/hydration/executionStateStore";
 
@@ -154,6 +154,8 @@ const INACTIVITY_SIGN_OUT_NOTICE_KEY = "auth-inactivity-sign-out:v1";
  * The page then reloads at the home page so that no in-memory state remains.
  */
 export async function signOutForInactivity(): Promise<void> {
+  // A paused run keeps the "Leave site?" guard on. Lift it before the tokens are removed.
+  markLeavingForSignOut();
   try {
     await msalInstance.clearCache();
   } finally {

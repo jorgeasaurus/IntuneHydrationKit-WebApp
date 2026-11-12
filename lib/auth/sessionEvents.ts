@@ -16,3 +16,19 @@ export function subscribeSignOut(listener: () => void): () => void {
 export function notifySignOut(): void {
   signOutListeners.forEach((listener) => listener());
 }
+
+let leavingForSignOut = false;
+
+/**
+ * Mark that the app is about to reload because it signed the user out. The page then
+ * must not show a "Leave site?" prompt: the tokens are already gone, so staying on the
+ * page would leave a signed-out dashboard.
+ */
+export function markLeavingForSignOut(): void {
+  leavingForSignOut = true;
+}
+
+/** True once the app started a reload for a sign-out. */
+export function isLeavingForSignOut(): boolean {
+  return leavingForSignOut;
+}
