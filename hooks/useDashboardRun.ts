@@ -98,7 +98,7 @@ export function useDashboardRun() {
     startExecution,
     reset,
   } = execution;
-  useRunHistoryRecorder(execution);
+  useRunHistoryRecorder(execution, restoredRecord);
 
   useEffect(() => {
     if (!activeHomeAccountId || !activeTenantId) return;

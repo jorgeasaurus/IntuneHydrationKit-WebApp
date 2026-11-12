@@ -9,7 +9,7 @@
  * remove the entries of any other owner.
  */
 import { z } from "@/lib/utils/zod";
-import { RUN_HISTORY_STORAGE_KEY } from "@/lib/storageKeys";
+import { RUN_HISTORY_PENDING_STORAGE_KEY, RUN_HISTORY_STORAGE_KEY } from "@/lib/storageKeys";
 import type { ExecutionRunConfiguration } from "@/lib/hydration/executionStateStore";
 import { isUpdateTask } from "@/lib/hydration/reporter";
 import {
@@ -354,7 +354,38 @@ export function deleteRunHistoryEntry(storage: Storage | null, owner: RunOwner, 
 export function clearRunHistory(storage: Storage | null): void {
   try {
     storage?.removeItem(RUN_HISTORY_STORAGE_KEY);
+    storage?.removeItem(RUN_HISTORY_PENDING_STORAGE_KEY);
   } catch {
     // Storage that the browser blocks holds no history.
+  }
+}
+
+/** Run ID that history could not store yet, or null. */
+export function readPendingRunHistoryId(storage: Storage | null): string | null {
+  try {
+    return storage?.getItem(RUN_HISTORY_PENDING_STORAGE_KEY) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remember a run that history could not store, so that a restored dashboard tries again.
+ * A run that history stored is never marked, so a run that the user deleted from history
+ * does not come back. Only the latest refused run is kept, as only the latest run restores.
+ */
+export function markPendingRunHistoryId(storage: Storage | null, id: string): void {
+  try {
+    storage?.setItem(RUN_HISTORY_PENDING_STORAGE_KEY, id);
+  } catch {
+    // Storage that is blocked or full cannot keep the mark. The run is then not retried.
+  }
+}
+
+export function clearPendingRunHistoryId(storage: Storage | null): void {
+  try {
+    storage?.removeItem(RUN_HISTORY_PENDING_STORAGE_KEY);
+  } catch {
+    // Nothing to clear in blocked storage.
   }
 }

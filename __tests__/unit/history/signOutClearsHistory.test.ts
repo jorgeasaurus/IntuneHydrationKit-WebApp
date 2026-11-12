@@ -17,15 +17,16 @@ vi.mock('@/lib/auth/msalConfig', () => ({
 }))
 
 import { signOut, signOutForInactivity } from '@/lib/auth/authUtils'
-import { addRunHistoryEntry } from '@/lib/history/runHistory'
+import { addRunHistoryEntry, markPendingRunHistoryId } from '@/lib/history/runHistory'
 import { addProfile, writeProfiles } from '@/lib/profiles/scopeProfiles'
-import { RUN_HISTORY_STORAGE_KEY, SCOPE_PROFILES_STORAGE_KEY } from '@/lib/storageKeys'
+import { RUN_HISTORY_PENDING_STORAGE_KEY, RUN_HISTORY_STORAGE_KEY, SCOPE_PROFILES_STORAGE_KEY } from '@/lib/storageKeys'
 import { buildEntry } from '../../helpers/runHistoryFixtures'
 
 const account = { homeAccountId: 'home-a.tenant-a', tenantId: 'aaaaaaaa-0000-0000-0000-000000000001' }
 
 function seed(): void {
   addRunHistoryEntry(sessionStorage, buildEntry())
+  markPendingRunHistoryId(sessionStorage, `${account.tenantId}:2026-11-01T10:00:00.000Z`)
   writeProfiles(localStorage, addProfile([], 'Keep me', { targets: ['groups'], items: { groups: ['All Windows Devices'] } }))
 }
 
@@ -52,6 +53,7 @@ describe('sign-out and run history', () => {
     await signOut()
 
     expect(sessionStorage.getItem(RUN_HISTORY_STORAGE_KEY)).toBeNull()
+    expect(sessionStorage.getItem(RUN_HISTORY_PENDING_STORAGE_KEY)).toBeNull()
     expect(localStorage.getItem(SCOPE_PROFILES_STORAGE_KEY)).toContain('Keep me')
   })
 
@@ -67,6 +69,7 @@ describe('sign-out and run history', () => {
     seed()
     await signOutForInactivity()
     expect(sessionStorage.getItem(RUN_HISTORY_STORAGE_KEY)).toBeNull()
+    expect(sessionStorage.getItem(RUN_HISTORY_PENDING_STORAGE_KEY)).toBeNull()
     expect(localStorage.getItem(SCOPE_PROFILES_STORAGE_KEY)).toContain('Keep me')
   })
 })
