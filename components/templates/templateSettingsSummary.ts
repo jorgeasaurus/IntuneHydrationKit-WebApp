@@ -127,6 +127,17 @@ function flattenSettingInstance(instance: SettingInstance, rows: TemplateSetting
   children.forEach((child) => flattenSettingInstance(child, rows));
 }
 
+/** Removes rows that repeat the same label and value, so each row has a unique key. */
+function uniqueRows(rows: TemplateSettingRow[]): TemplateSettingRow[] {
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    const key = `${row.label}=${row.value}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function summarizeSettingsCatalog(settings: unknown[]): TemplateSettingRow[] {
   const rows: TemplateSettingRow[] = [];
   asRecords(settings).forEach((setting) => {
@@ -135,7 +146,7 @@ function summarizeSettingsCatalog(settings: unknown[]): TemplateSettingRow[] {
       flattenSettingInstance(instance, rows);
     }
   });
-  return rows;
+  return uniqueRows(rows);
 }
 
 function summarizeProperties(

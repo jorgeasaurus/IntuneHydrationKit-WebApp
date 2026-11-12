@@ -9,6 +9,7 @@ import {
 import {
   getPayloadODataType,
   summarizeTemplateSettings,
+  type TemplateSettingsSummary,
 } from "@/components/templates/templateSettingsSummary";
 import {
   getTemplateFilePath,
@@ -63,11 +64,144 @@ function showSubcategory(item: TemplateDocumentationItem): boolean {
   );
 }
 
+function DetailsSection({ item, odataType }: { item: TemplateDocumentationItem; odataType?: string }) {
+  const filePath = getTemplateFilePath(item);
+
+  return (
+    <section aria-labelledby="template-details-heading" className="space-y-4">
+      <h2 id="template-details-heading" className="text-xl font-bold text-foreground">
+        Template details
+      </h2>
+      <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <DetailField label="Category">{item.categoryLabel}</DetailField>
+        <DetailField label="Platform">{item.platform ?? "General"}</DetailField>
+        <DetailField label="Policy type">{item.itemType}</DetailField>
+        <DetailField label="Source">{getTemplateSourceLabel(item)}</DetailField>
+        {showSubcategory(item) ? (
+          <DetailField label="Subcategory">{item.subcategory}</DetailField>
+        ) : null}
+        {odataType ? (
+          <DetailField label="OData type">
+            <span className="font-mono text-xs break-all">{odataType}</span>
+          </DetailField>
+        ) : null}
+      </dl>
+      <dl>
+        <DetailField label="File path">
+          {filePath ? (
+            <span className="font-mono text-xs break-all">{filePath}</span>
+          ) : (
+            "Bundled with the web app"
+          )}
+        </DetailField>
+      </dl>
+    </section>
+  );
+}
+
+function describeSummary(summary: TemplateSettingsSummary): string {
+  const count = summary.rows.length;
+  const formatted = count.toLocaleString("en-US");
+  return summary.kind === "settingsCatalog"
+    ? `${formatted} configured setting${count === 1 ? "" : "s"}, listed by setting definition ID.`
+    : `${formatted} configured propert${count === 1 ? "y" : "ies"}. Nested values use dotted paths.`;
+}
+
+function SettingsSection({ summary }: { summary: TemplateSettingsSummary | null }) {
+  return (
+    <section aria-labelledby="template-settings-heading" className="space-y-4">
+      <h2 id="template-settings-heading" className="text-xl font-bold text-foreground">
+        What this template configures
+      </h2>
+      {summary ? (
+        <>
+          <p className="text-sm leading-6 text-muted-foreground">{describeSummary(summary)}</p>
+          <dl className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-black/20">
+            {summary.rows.map((row) => (
+              <div
+                key={`${row.label}=${row.value}`}
+                className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr),minmax(0,1fr)] sm:gap-4"
+              >
+                <dt className="min-w-0 break-all font-mono text-xs leading-5 text-muted-foreground">
+                  {row.label}
+                </dt>
+                <dd className="min-w-0 break-words text-sm font-medium text-foreground">
+                  {row.value}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      ) : (
+        <p className="text-sm leading-6 text-muted-foreground">
+          No summary is available for this template shape. The JSON below shows every value.
+        </p>
+      )}
+    </section>
+  );
+}
+
+function ScriptsSection({ scripts }: { scripts: ReturnType<typeof getWin32Scripts> }) {
+  return (
+    <section aria-labelledby="template-scripts-heading" className="space-y-4">
+      <h2 id="template-scripts-heading" className="text-xl font-bold text-foreground">
+        Wrapper scripts
+      </h2>
+      {scripts.map((script) => (
+        <PowerShellScriptPanel
+          key={script.key}
+          id={`template-script-${script.key}`}
+          title={script.title}
+          content={script.content}
+          headingLevel="h3"
+        />
+      ))}
+    </section>
+  );
+}
+
+function JsonSection({ json }: { json: string | null }) {
+  return (
+    <section aria-labelledby="template-json-heading" className="space-y-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h2 id="template-json-heading" className="text-xl font-bold text-foreground">
+          Import-ready JSON
+        </h2>
+        {json ? (
+          <CopyElementTextButton
+            targetId={JSON_ELEMENT_ID}
+            label="Copy JSON"
+            successMessage="Template JSON copied to clipboard."
+          />
+        ) : null}
+      </div>
+      {json ? (
+        <div className="overflow-hidden rounded-2xl border border-border/70 bg-[#050816]">
+          <div className="flex items-center gap-2 border-b border-white/10 px-4 py-2 text-xs font-mono uppercase tracking-[0.24em] text-slate-300">
+            <FileCode2 className="size-3.5" aria-hidden="true" />
+            Payload
+          </div>
+          <pre
+            tabIndex={0}
+            aria-labelledby="template-json-heading"
+            className="max-h-[640px] overflow-auto p-4 text-xs leading-6 text-slate-100 selection:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          >
+            <code id={JSON_ELEMENT_ID} className="font-mono">
+              {json}
+            </code>
+          </pre>
+        </div>
+      ) : (
+        <p className="text-sm leading-6 text-muted-foreground">
+          The payload for this template could not load.
+        </p>
+      )}
+    </section>
+  );
+}
+
 /** Server-rendered detail page for one catalog template. */
 export function TemplateDetailPage({ item, payload }: TemplateDetailPageProps) {
-  const filePath = getTemplateFilePath(item);
-  const odataType = getPayloadODataType(payload);
-  const summary = summarizeTemplateSettings(payload);
   const scripts = getWin32Scripts(payload);
   const json = payload === null || payload === undefined ? null : JSON.stringify(payload, null, 2);
 
@@ -102,121 +236,10 @@ export function TemplateDetailPage({ item, payload }: TemplateDetailPageProps) {
                 </div>
               </header>
 
-              <section aria-labelledby="template-details-heading" className="space-y-4">
-                <h2 id="template-details-heading" className="text-xl font-bold text-foreground">
-                  Template details
-                </h2>
-                <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                  <DetailField label="Category">{item.categoryLabel}</DetailField>
-                  <DetailField label="Platform">{item.platform ?? "General"}</DetailField>
-                  <DetailField label="Policy type">{item.itemType}</DetailField>
-                  <DetailField label="Source">{getTemplateSourceLabel(item)}</DetailField>
-                  {showSubcategory(item) ? (
-                    <DetailField label="Subcategory">{item.subcategory}</DetailField>
-                  ) : null}
-                  {odataType ? (
-                    <DetailField label="OData type">
-                      <span className="font-mono text-xs break-all">{odataType}</span>
-                    </DetailField>
-                  ) : null}
-                </dl>
-                <dl>
-                  <DetailField label="File path">
-                    {filePath ? (
-                      <span className="font-mono text-xs break-all">{filePath}</span>
-                    ) : (
-                      "Bundled with the web app"
-                    )}
-                  </DetailField>
-                </dl>
-              </section>
-
-              <section aria-labelledby="template-settings-heading" className="space-y-4">
-                <h2 id="template-settings-heading" className="text-xl font-bold text-foreground">
-                  What this template configures
-                </h2>
-                {summary ? (
-                  <>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {summary.kind === "settingsCatalog"
-                        ? `${summary.rows.length.toLocaleString("en-US")} configured setting${summary.rows.length === 1 ? "" : "s"}, listed by setting definition ID.`
-                        : `${summary.rows.length.toLocaleString("en-US")} configured propert${summary.rows.length === 1 ? "y" : "ies"}. Nested values use dotted paths.`}
-                    </p>
-                    <dl className="divide-y divide-border/60 overflow-hidden rounded-2xl border border-border/60 bg-black/20">
-                      {summary.rows.map((row, index) => (
-                        <div
-                          key={`${row.label}-${index}`}
-                          className="grid gap-1 px-4 py-3 sm:grid-cols-[minmax(0,1fr),minmax(0,1fr)] sm:gap-4"
-                        >
-                          <dt className="min-w-0 break-all font-mono text-xs leading-5 text-muted-foreground">
-                            {row.label}
-                          </dt>
-                          <dd className="min-w-0 break-words text-sm font-medium text-foreground">
-                            {row.value}
-                          </dd>
-                        </div>
-                      ))}
-                    </dl>
-                  </>
-                ) : (
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    No summary is available for this template shape. The JSON below shows every value.
-                  </p>
-                )}
-              </section>
-
-              {scripts.length > 0 ? (
-                <section aria-labelledby="template-scripts-heading" className="space-y-4">
-                  <h2 id="template-scripts-heading" className="text-xl font-bold text-foreground">
-                    Wrapper scripts
-                  </h2>
-                  {scripts.map((script) => (
-                    <PowerShellScriptPanel
-                      key={script.key}
-                      id={`template-script-${script.key}`}
-                      title={script.title}
-                      content={script.content}
-                      headingLevel="h3"
-                    />
-                  ))}
-                </section>
-              ) : null}
-
-              <section aria-labelledby="template-json-heading" className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 id="template-json-heading" className="text-xl font-bold text-foreground">
-                    Import-ready JSON
-                  </h2>
-                  {json ? (
-                    <CopyElementTextButton
-                      targetId={JSON_ELEMENT_ID}
-                      label="Copy JSON"
-                      successMessage="Template JSON copied to clipboard."
-                    />
-                  ) : null}
-                </div>
-                {json ? (
-                  <div className="overflow-hidden rounded-2xl border border-border/70 bg-[#050816]">
-                    <div className="flex items-center gap-2 border-b border-white/10 px-4 py-2 text-xs font-mono uppercase tracking-[0.24em] text-slate-300">
-                      <FileCode2 className="size-3.5" aria-hidden="true" />
-                      Payload
-                    </div>
-                    <pre
-                      tabIndex={0}
-                      aria-labelledby="template-json-heading"
-                      className="max-h-[640px] overflow-auto p-4 text-xs leading-6 text-slate-100 selection:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                    >
-                      <code id={JSON_ELEMENT_ID} className="font-mono">
-                        {json}
-                      </code>
-                    </pre>
-                  </div>
-                ) : (
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    The payload for this template could not load.
-                  </p>
-                )}
-              </section>
+              <DetailsSection item={item} odataType={getPayloadODataType(payload)} />
+              <SettingsSection summary={summarizeTemplateSettings(payload)} />
+              {scripts.length > 0 ? <ScriptsSection scripts={scripts} /> : null}
+              <JsonSection json={json} />
             </article>
           </div>
         </main>
