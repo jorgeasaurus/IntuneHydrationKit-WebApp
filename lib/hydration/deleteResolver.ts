@@ -7,9 +7,11 @@
  *
  * Safety rules (every rule fails closed: if a check cannot complete, the object is not deleted):
  * - The object must carry the hydration marker in its description. Conditional Access
- *   policies have no description, so their marker is in the display name.
+ *   policies and notification templates have no description, so their marker is in the
+ *   display name.
  * - A Conditional Access policy is read again and must be in the "disabled" state.
- * - An object with assignments is not deleted.
+ * - An object with assignments is not deleted. A notification template that a compliance
+ *   policy uses is not deleted.
  * - Preview mode runs the same checks with GET requests only.
  */
 
@@ -26,8 +28,13 @@ import {
   getEnrollmentProfileName,
   getEnrollmentProfileType,
 } from "@/lib/graph/enrollment";
+import {
+  NOTIFICATION_TEMPLATES_ENDPOINT,
+  getNotificationTemplateReferences,
+  type NotificationTemplate,
+} from "@/lib/graph/notifications";
 import { getCachedTemplates } from "@/lib/templates/loader";
-import { IMPORT_PREFIX, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { IMPORT_PREFIX, hasHydrationMarker, hasNotificationTemplateMarker } from "@/lib/utils/hydrationMarker";
 import { isRunCancelledError } from "@/lib/utils/retry";
 import { HydrationTask } from "@/types/hydration";
 import { detectCISPolicyType } from "./policyDetection";
@@ -67,6 +74,8 @@ export interface DeleteChecks {
   assignments?: number | "notApplicable";
   /** Conditional Access state verdict after the policy is read again. */
   state?: "disabled" | "notDisabled";
+  /** Number of objects that use the object (notification templates used by compliance policies). */
+  references?: number;
 }
 
 export type DeleteResolution =
@@ -79,6 +88,11 @@ export const DELETE_REASONS = {
   noMarker: "Not created by Intune Hydration Kit (no marker in the description)",
   assigned: (count: number) =>
     `Policy has ${count} active assignment(s). Remove the assignments before you delete it.`,
+  noNotificationMarker:
+    "Not created by Intune Hydration Kit (the display name is not an [IHD] name from the kit notification templates)",
+  notificationInUse: (policies: string[]) =>
+    `Notification template is used by ${policies.length} compliance policy action(s): ${policies.join(", ")}. ` +
+    "Remove it from the noncompliance actions before you delete it.",
 } as const;
 
 type CachedObject = {
@@ -97,8 +111,18 @@ interface DeleteSource {
   /** DELETE base path for the matched object. Throws when it cannot be determined. */
   basePath: (item: CachedObject) => string;
   apiVersion: ApiVersion;
-  /** False only for object types that are assignment targets themselves (groups, filters). */
+  /** False for object types without assignments (groups, filters, notification templates). */
   hasAssignments: boolean;
+  /** Marker check for an object type without a description. Default: marker in the description. */
+  hasMarker?: (item: CachedObject) => boolean;
+  /** Skip reason when hasMarker is false. Default: DELETE_REASONS.noMarker. */
+  noMarkerReason?: string;
+  /**
+   * Read the objects that use the object, for an object type that is used by reference
+   * instead of by assignment. Returns a block reason, or undefined when nothing uses it.
+   * Throws when the check cannot complete, so the object is not deleted.
+   */
+  getInUseReason?: (context: ExecutionContext, target: DeleteTarget) => Promise<{ count: number; reason: string } | undefined>;
 }
 
 const byName = (item: CachedObject) => item.name;
@@ -118,6 +142,18 @@ function appProtectionBasePath(item: CachedObject): string {
     throw new Error(`Cannot determine the platform of App Protection policy "${item.displayName}"`);
   }
   return APP_PROTECTION_PLATFORM_ENDPOINTS[platform];
+}
+
+/**
+ * Display names of the kit notification templates. Throws when the templates are not
+ * loaded, because the marker check needs them.
+ */
+function getKitNotificationTemplateNames(): string[] {
+  const templates = getCachedTemplates("notification");
+  if (!Array.isArray(templates)) {
+    throw new Error("The notification templates are not loaded, so the marker cannot be checked");
+  }
+  return (templates as NotificationTemplate[]).map((template) => template.displayName);
 }
 
 const SOURCES = {
@@ -201,6 +237,22 @@ const SOURCES = {
     apiVersion: "beta",
     hasAssignments: true,
   },
+  notificationTemplate: {
+    label: "notification template",
+    cacheKey: "cachedNotificationTemplates",
+    getName: byDisplayName,
+    basePath: fixedPath(NOTIFICATION_TEMPLATES_ENDPOINT),
+    apiVersion: "beta",
+    hasAssignments: false,
+    hasMarker: (item) => hasNotificationTemplateMarker(item.displayName, getKitNotificationTemplateNames()),
+    noMarkerReason: DELETE_REASONS.noNotificationMarker,
+    getInUseReason: async (context, target) => {
+      const policies = await getNotificationTemplateReferences(context.client, target.id);
+      return policies.length > 0
+        ? { count: policies.length, reason: DELETE_REASONS.notificationInUse(policies) }
+        : undefined;
+    },
+  },
 } satisfies Record<string, DeleteSource>;
 
 /**
@@ -212,6 +264,7 @@ const CATEGORY_SOURCES: Partial<Record<HydrationTask["category"], DeleteSource[]
   filters: [SOURCES.filter],
   compliance: [SOURCES.v2Compliance, SOURCES.v1Compliance],
   appProtection: [SOURCES.appProtection],
+  notification: [SOURCES.notificationTemplate],
   baseline: [
     SOURCES.settingsCatalog,
     SOURCES.v2Compliance,
@@ -288,7 +341,14 @@ function findDeleteMatch<T>(items: T[], name: string, getName: (item: T) => stri
 
 interface FoundObject {
   target: DeleteTarget;
-  description?: string;
+  /** The matched object as the prefetch or list read gave it. */
+  object: CachedObject;
+  /** The cache source of the object. Undefined for objects that are not prefetched. */
+  source?: DeleteSource;
+}
+
+function carriesMarker(found: FoundObject, object: CachedObject): boolean {
+  return found.source?.hasMarker ? found.source.hasMarker(object) : hasHydrationMarker(object.description);
 }
 
 /**
@@ -342,7 +402,8 @@ function findInCaches(task: HydrationTask, context: ExecutionContext, sources: D
     const url = objectUrl(match);
     claimTarget(context, url, task.id);
     return {
-      description: match.description,
+      object: match,
+      source,
       target: {
         id: match.id,
         name: source.getName(match) ?? task.itemName,
@@ -381,9 +442,9 @@ export async function readAssignmentCount(context: ExecutionContext, assignments
 async function readCurrentObject(
   context: ExecutionContext,
   target: DeleteTarget
-): Promise<{ description?: string } | null> {
+): Promise<CachedObject | null> {
   try {
-    return await context.client.get<{ description?: string }>(target.url, target.apiVersion);
+    return await context.client.get<CachedObject>(target.url, target.apiVersion);
   } catch (error) {
     const { status, message } = (error ?? {}) as { status?: number; message?: string };
     if (status === 404 || /\[404\]|ResourceNotFound/i.test(message ?? "")) return null;
@@ -440,7 +501,7 @@ async function findEnrollmentObject(task: HydrationTask, context: ExecutionConte
   if (!candidate) return null;
   const url = `${candidate.basePath}/${candidate.id}`;
   return {
-    description: candidate.description,
+    object: { description: candidate.description },
     target: {
       id: candidate.id,
       name: candidate.name,
@@ -473,19 +534,37 @@ async function resolve(task: HydrationTask, context: ExecutionContext): Promise<
   }
 
   const { target } = found;
-  if (!hasHydrationMarker(found.description)) {
-    return { action: "skip", skipKind: "blocked", reason: DELETE_REASONS.noMarker, target, checks: { marker: "missing" } };
+  const noMarkerReason = found.source?.noMarkerReason ?? DELETE_REASONS.noMarker;
+  if (!carriesMarker(found, found.object)) {
+    return { action: "skip", skipKind: "blocked", reason: noMarkerReason, target, checks: { marker: "missing" } };
   }
 
-  // The description above can come from the prefetch at the start of the run. Read the
+  // The marker above can come from the prefetch at the start of the run. Read the
   // object again, so a marker that was removed since then (during a pause, for example)
   // blocks the delete. A read error stops the delete (the caller reports a failure).
   const current = await readCurrentObject(context, target);
   if (current === null) {
     return { action: "skip", skipKind: "noOp", reason: DELETE_REASONS.notFound };
   }
-  if (!hasHydrationMarker(current.description)) {
-    return { action: "skip", skipKind: "blocked", reason: DELETE_REASONS.noMarker, target, checks: { marker: "missing" } };
+  if (!carriesMarker(found, current)) {
+    return { action: "skip", skipKind: "blocked", reason: noMarkerReason, target, checks: { marker: "missing" } };
+  }
+
+  // An object type that is used by reference: read the users now, just before the delete.
+  if (found.source?.getInUseReason) {
+    const inUse = await found.source.getInUseReason(context, target);
+    if (inUse) {
+      return {
+        action: "skip",
+        skipKind: "blocked",
+        reason: inUse.reason,
+        target,
+        checks: { marker: "present", assignments: "notApplicable", references: inUse.count },
+      };
+    }
+    if (target.assignmentsUrl === null) {
+      return { action: "delete", target, checks: { marker: "present", assignments: "notApplicable", references: 0 } };
+    }
   }
 
   if (target.assignmentsUrl === null) {
