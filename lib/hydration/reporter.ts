@@ -195,7 +195,8 @@ function getJSONPortalLink(link: PortalLink | undefined) {
   return link ? { url: link.href, target: link.target, label: link.label } : undefined;
 }
 
-function escapeCSVField(value: string | number): string {
+/** Quote a CSV field and neutralize spreadsheet formula prefixes. */
+export function escapeCSVField(value: string | number): string {
   let text = String(value);
   if (/^\s*[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '\"\"')}"`;

@@ -48,7 +48,7 @@ const TASK_DELAY_MS = 2000;
 /**
  * Tenant caches to prefetch, with the task categories that need each cache.
  */
-const TENANT_CACHE_PREFETCHES: Array<{
+export const TENANT_CACHE_PREFETCHES: Array<{
   key: TenantCacheKey;
   categories: TaskCategory[];
   load: (client: GraphClient) => Promise<unknown[]>;

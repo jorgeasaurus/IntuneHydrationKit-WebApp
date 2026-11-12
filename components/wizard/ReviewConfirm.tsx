@@ -11,6 +11,7 @@ import { getExecutionState, resetExecutionSession, subscribeExecutionState } fro
 import { SensitiveData } from "@/components/SensitiveData";
 import { BaselineChangeReview } from "@/components/wizard/BaselineChangeReview";
 import { ExecutionApprovalCard } from "@/components/wizard/ExecutionApprovalCard";
+import { CreateConflictReview } from "@/components/wizard/ConflictSummary";
 import { TEMPLATE_METADATA } from "@/templates";
 import { getEstimatedTaskCount, getEstimatedCategoryCount } from "@/lib/hydration/engine";
 import { AlertTriangle, CheckCircle2, Eye, ShieldAlert, Sparkles } from "lucide-react";
@@ -141,6 +142,7 @@ export function ReviewConfirm(): React.JSX.Element {
         {state.selectedTargets.includes("baseline") && state.operationMode === "create" && (
           <BaselineChangeReview tenantConfig={state.tenantConfig} selection={state.categorySelections?.baseline ?? state.baselineSelection} />
         )}
+        <CreateConflictReview state={state} />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
             <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Operation</p>

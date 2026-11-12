@@ -32,6 +32,7 @@ import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
+import { findExistingFilter, findExistingGroup } from "./existingObjects";
 import {
   sleepWithExecutionControl,
   waitWhilePaused,
@@ -188,13 +189,7 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
   // Without a loaded cache, the sequential executor fails the task with the prefetch error.
   if (!context.cachedIntuneGroups) return { type: "error", reason: "Group cache is not loaded" };
   console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups.length} cached groups`);
-  const templateName = template!.displayName.toLowerCase();
-  const templateNameStripped = templateName.startsWith("[ihd] ") ? templateName.slice(6) : templateName;
-  const existingGroup = context.cachedIntuneGroups.find((g) => {
-    const cachedName = g.displayName.toLowerCase();
-    const cachedNameStripped = cachedName.startsWith("[ihd] ") ? cachedName.slice(6) : cachedName;
-    return cachedName === templateName || cachedNameStripped === templateNameStripped;
-  });
+  const existingGroup = findExistingGroup(context.cachedIntuneGroups, template.displayName);
   if (existingGroup) {
     console.log(`[BatchExecutor:groups] ✗ Group already exists: "${task.itemName}"`);
     return { type: "skip", reason: "Group already exists" };
@@ -265,9 +260,7 @@ function buildFilterRequestBody(task: HydrationTask, context: ExecutionContext):
   // Check if already exists in cache.
   // Without a loaded cache, the sequential executor fails the task with the prefetch error.
   if (!context.cachedFilters) return { type: "error", reason: "Filter cache is not loaded" };
-  const existingFilter = context.cachedFilters.find(
-    (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
-  );
+  const existingFilter = findExistingFilter(context.cachedFilters, template.displayName);
   if (existingFilter) return { type: "skip", reason: "Filter already exists" };
 
   // Build full filter template
