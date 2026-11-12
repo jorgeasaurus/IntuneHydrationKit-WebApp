@@ -16,7 +16,7 @@ import { getEstimatedTaskCount } from "@/lib/hydration/engine";
 import type { CloudEnvironment, ExecutionOutcome, HydrationSummary, HydrationTask, OperationMode, WizardState } from "@/types/hydration";
 import { getExecutionState, type ExecutionState } from "@/lib/hydration/executionStateStore";
 import { prepareRestoredRecord, startRunCheckpoints } from "@/lib/hydration/runCheckpoint";
-import { getRunLockState, watchRunLock, type RunLockState } from "@/lib/hydration/runLock";
+import { claimRunLock, watchRunLock, type RunLockState } from "@/lib/hydration/runLock";
 import { downloadReport, generateJSONReport, generateReportFilename } from "@/lib/hydration/reporter";
 import { getCreatedObjectLinks } from "@/lib/utils/portalLinks";
 import {
@@ -299,25 +299,37 @@ export function useDashboardRun() {
   });
 
   /**
-   * Start a new run that continues from the displayed run. The other-tab check runs again at
-   * confirm time, so a run that started in another tab after the last check is refused.
+   * Start a new run that continues from the displayed run. At confirm time this tab claims the
+   * run lock of the tenant. The claim is atomic, so when two tabs confirm at the same time only
+   * one of them starts, and a run that started in another tab after the last check is refused.
    */
   async function startRerunAfterChecks(kind: RerunKind): Promise<void> {
     if (!rerunSource || rerunDisabledReason) return;
     if (kind === "resume" && !isInterrupted) return;
     if (kind === "live" && !rerunSource.isPreview) return;
     const source = rerunSource;
-    const currentLockState = await getRunLockState(source.tenantId);
-    setLockCheck({ tenantId: source.tenantId, state: currentLockState });
+    const claim = await claimRunLock(source.tenantId);
+    const release = claim.state === "claimed" ? claim.release : undefined;
+    const currentLockState: RunLockState = claim.state === "claimed" ? "free" : claim.state;
+    if (claim.state !== "claimed") setLockCheck({ tenantId: source.tenantId, state: currentLockState });
     if (getRunLockBlockReason(kind, currentLockState)) return;
     const currentPhase = getExecutionState().phase;
-    if (currentPhase !== "idle" && currentPhase !== "completed") return;
-    const plan = createRerunPlan(kind, source);
+    if (currentPhase !== "idle" && currentPhase !== "completed") {
+      release?.();
+      return;
+    }
+    let plan: ReturnType<typeof createRerunPlan>;
+    try {
+      plan = createRerunPlan(kind, source);
+    } catch (error) {
+      release?.();
+      throw error;
+    }
     // The wizard must not start its own run after the displayed record is removed.
     hasStartedRef.current = true;
     setRestoredRecord(null);
     setRunStartMessage(`${RUN_START_MESSAGES[kind]} ${plan.configuration.selectedObjectCount} items in scope.`);
-    startRerun(plan).catch(() => {
+    startRerun(plan, release).catch(() => {
       // The execution hook records and displays the actionable error.
     });
   }

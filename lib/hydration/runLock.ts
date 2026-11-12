@@ -40,6 +40,37 @@ export function holdRunLock(tenantId: string): () => void {
   return () => release();
 }
 
+/** Result of a claim: the run may start ("claimed"), another tab runs ("held"), or the browser cannot tell. */
+export type RunLockClaim = { state: "claimed"; release: () => void } | { state: "held" } | { state: "unknown" };
+
+/**
+ * Claim the run lock of a tenant for a run that continues a saved run (retry, resume, run for real).
+ * The claim is exclusive and atomic: when two tabs with a copy of the same checkpoint confirm
+ * at the same time, the browser grants the lock to one of them and the other gets "held".
+ * A wizard run in another tab (a shared holder) also gives "held".
+ * The caller must call `release` when the run ends, or when it does not start.
+ */
+export function claimRunLock(tenantId: string): Promise<RunLockClaim> {
+  const locks = getLockManager();
+  if (!locks) return Promise.resolve({ state: "unknown" });
+  return new Promise<RunLockClaim>((resolve) => {
+    locks
+      .request(getLockName(tenantId), { mode: "exclusive", ifAvailable: true }, (lock) => {
+        if (!lock) {
+          resolve({ state: "held" });
+          return undefined;
+        }
+        return new Promise<void>((release) => {
+          resolve({ state: "claimed", release });
+        });
+      })
+      .catch((error: unknown) => {
+        console.warn("[Run lock] Could not claim the run lock:", error);
+        resolve({ state: "unknown" });
+      });
+  });
+}
+
 /**
  * Whether a run for the tenant is active in a tab. Call it only when this tab has no active
  * run, so a held lock belongs to another tab.

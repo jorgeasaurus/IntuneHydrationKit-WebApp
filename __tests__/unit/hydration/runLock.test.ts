@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { installFakeLocks, runLockName } from "@/__tests__/helpers/fakeLocks";
-import { getRunLockState, holdRunLock } from "@/lib/hydration/runLock";
+import { claimRunLock, getRunLockState, holdRunLock } from "@/lib/hydration/runLock";
 import {
   CHECKING_OTHER_TABS_REASON,
   OTHER_TAB_RUN_REASON,
@@ -31,6 +31,36 @@ describe("run lock", () => {
     release();
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(await getRunLockState("tenant-1")).toBe("free");
+  });
+
+  it("grants a claim to one of two tabs that confirm at the same time", async () => {
+    const fake = installFakeLocks();
+    uninstall = fake.uninstall;
+
+    const [first, second] = await Promise.all([claimRunLock("tenant-1"), claimRunLock("Tenant-1")]);
+    expect([first.state, second.state].sort()).toEqual(["claimed", "held"]);
+    expect(await getRunLockState("tenant-1")).toBe("held");
+
+    const claimed = first.state === "claimed" ? first : second;
+    if (claimed.state !== "claimed") throw new Error("no claim was granted");
+    claimed.release();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(await getRunLockState("tenant-1")).toBe("free");
+    expect((await claimRunLock("tenant-1")).state).toBe("claimed");
+  });
+
+  it("refuses a claim while a run in another tab holds the lock", async () => {
+    const fake = installFakeLocks();
+    uninstall = fake.uninstall;
+    const release = holdRunLock("tenant-1");
+    await Promise.resolve();
+
+    expect((await claimRunLock("tenant-1")).state).toBe("held");
+    release();
+  });
+
+  it("cannot claim when the browser has no Web Locks API", async () => {
+    expect((await claimRunLock("tenant-1")).state).toBe("unknown");
   });
 
   it("reports unknown when the browser has no Web Locks API", async () => {

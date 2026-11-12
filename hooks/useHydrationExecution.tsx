@@ -77,16 +77,18 @@ export function useHydrationExecution() {
   const runExecution = useCallback(async (
     configuration: ExecutionRunConfiguration,
     buildQueue: QueueBuilder,
-    options: { updateExisting?: boolean } = {},
+    options: { updateExisting?: boolean; claimedRunLockRelease?: () => void } = {},
   ) => {
     const { operationMode } = configuration;
     const runId = beginExecution(configuration);
     if (runId === null) {
       console.log("[Execution Hook] Execution already in progress, ignoring duplicate call");
+      options.claimedRunLockRelease?.();
       return;
     }
     // Other tabs (for example a duplicated tab) see this lock and do not continue this run.
-    const releaseRunLock = holdRunLock(configuration.tenantId);
+    // A run that continues a saved run arrives with the exclusive lock it claimed at confirm time.
+    const releaseRunLock = options.claimedRunLockRelease ?? holdRunLock(configuration.tenantId);
     const startTime = new Date();
     const provenance = createRunProvenance();
     const batchConfig = getBatchConfig();
@@ -346,7 +348,7 @@ export function useHydrationExecution() {
    * It uses the same engine path as a wizard run.
    */
   const startRerun = useCallback(
-    async (plan: RerunPlan) => {
+    async (plan: RerunPlan, claimedRunLockRelease?: () => void) => {
       const { configuration } = plan;
       const scope = configuration.scope;
       await runExecution(configuration, ({ shouldCancel, onProgress }) => {
@@ -361,7 +363,7 @@ export function useHydrationExecution() {
           });
         }
         return buildRerunTaskQueue(plan.sourceTasks, configuration.operationMode, { shouldCancel, onProgress });
-      });
+      }, { claimedRunLockRelease });
     },
     [runExecution],
   );
