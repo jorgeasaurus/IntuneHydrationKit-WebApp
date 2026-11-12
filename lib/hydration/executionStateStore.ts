@@ -152,6 +152,15 @@ export function getPausedMsAt(at: Date): number {
  * Record the start (true) or end (false) of a real engine wait while the run is paused.
  * This does not change the phase: "paused" is published when the user pauses the run.
  * Parallel waits are counted, so the interval is open while at least one wait is open.
+ *
+ * Known limit: when work runs in parallel (for example the Promise.all of
+ * executeDeletesInParallel, or parallel reads in a task), one request can start a paused
+ * retry wait while another request of the same group is still in flight. The interval
+ * then opens before all work has stopped. The other request does not start new work
+ * during the pause: when its response arrives, it either completes or also waits. So the
+ * error is at most the remaining time of the requests already in flight (usually below a
+ * few seconds per pause). Exact accounting would need request tracking in the Graph
+ * client and at every parallel call site, which is not worth that complexity.
  */
 export function recordPauseWait(runId: number, waiting: boolean): void {
   if (executionControl.activeRunId !== runId) return;
