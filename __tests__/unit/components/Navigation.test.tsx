@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Navigation } from '@/components/Navigation'
 import {
   beginExecution,
@@ -175,5 +175,24 @@ describe('Navigation', () => {
     await waitFor(() => {
       expect(push).toHaveBeenCalledWith('/#faq')
     })
+  })
+  it('leaves modified clicks on menu links to the browser', async () => {
+    const user = userEvent.setup()
+    useIsAuthenticated.mockReturnValue(false)
+    usePathname.mockReturnValue('/templates')
+    push.mockClear()
+
+    render(<Navigation />)
+    await user.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+    const menu = await screen.findByRole('dialog', { name: 'Menu' })
+    const link = within(menu).getByRole('link', { name: 'FAQs' })
+
+    for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { shiftKey: true }]) {
+      // fireEvent returns false when a handler called preventDefault.
+      expect(fireEvent.click(link, modifier)).toBe(true)
+    }
+
+    expect(screen.getByRole('dialog', { name: 'Menu' })).toBeInTheDocument()
+    expect(push).not.toHaveBeenCalled()
   })
 })

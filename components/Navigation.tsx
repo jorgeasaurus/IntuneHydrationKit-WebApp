@@ -135,6 +135,17 @@ export function Navigation() {
                             <Link
                               href={link.href}
                               onClick={(event) => {
+                                // Leave Ctrl/Cmd/Shift/Alt-clicks and non-primary buttons to
+                                // the browser, so they open a new tab or window as usual.
+                                if (
+                                  event.button !== 0 ||
+                                  event.metaKey ||
+                                  event.ctrlKey ||
+                                  event.shiftKey ||
+                                  event.altKey
+                                ) {
+                                  return;
+                                }
                                 event.preventDefault();
                                 pendingMenuHref.current = link.href;
                                 setIsMenuOpen(false);
