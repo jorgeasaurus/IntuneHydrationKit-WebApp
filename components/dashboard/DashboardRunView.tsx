@@ -6,6 +6,7 @@ import { AppNavigation } from "@/components/AppNavigation";
 import { SensitiveData } from "@/components/SensitiveData";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ActivityLog } from "@/components/dashboard/ActivityLog";
+import { CompletionNotificationToggle } from "@/components/dashboard/CompletionNotificationToggle";
 import { ExecutionControls } from "@/components/dashboard/ExecutionControls";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 import { ResultsSummary } from "@/components/dashboard/ResultsSummary";
@@ -16,6 +17,9 @@ import { TaskList } from "@/components/dashboard/TaskList";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useCreatedObjectLinks } from "@/hooks/useCreatedObjectLinks";
+import { useRunCompletionNotification } from "@/hooks/useRunCompletionNotification";
+import { useRunWakeLock } from "@/hooks/useRunWakeLock";
+import { useSettings } from "@/hooks/useSettings";
 import type { PortalLink } from "@/lib/utils/portalLinks";
 import type { ActivityMessage } from "@/lib/hydration/types";
 import type { ExecutionState } from "@/lib/hydration/executionStateStore";
@@ -101,6 +105,9 @@ export function DashboardRunView({
   ).length;
   const controlsStartTime = startTime ?? (isCompleted ? endTime : null);
   const portalLinks = useCreatedObjectLinks(tasks, isPreview);
+  const { settings } = useSettings();
+  useRunWakeLock();
+  useRunCompletionNotification(settings.notifyOnCompletion);
 
   return (
     <div className="relative z-10 min-h-screen">
@@ -167,6 +174,8 @@ export function DashboardRunView({
             onDownloadLog={onDownloadLog}
           />
         )}
+
+        {!isCompleted && <CompletionNotificationToggle />}
 
         <ActivityLog messages={activityLog} />
 

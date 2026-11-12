@@ -191,6 +191,8 @@ export interface TenantConfig {
 export interface AppSettings {
   stopOnFirstError: boolean;
   demoMode: boolean;
+  /** Show a browser notification when a run finishes while the tab is hidden. */
+  notifyOnCompletion: boolean;
 }
 
 /**

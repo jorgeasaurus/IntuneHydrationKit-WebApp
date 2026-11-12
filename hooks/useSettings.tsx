@@ -19,6 +19,9 @@ function normalizeSettings(candidate: unknown): AppSettings {
     demoMode: typeof parsed.demoMode === "boolean"
       ? parsed.demoMode
       : DEFAULT_APP_SETTINGS.demoMode,
+    notifyOnCompletion: typeof parsed.notifyOnCompletion === "boolean"
+      ? parsed.notifyOnCompletion
+      : DEFAULT_APP_SETTINGS.notifyOnCompletion,
   };
 }
 
