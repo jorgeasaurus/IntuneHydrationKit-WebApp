@@ -370,7 +370,7 @@ describe("executeTasksInBatches", () => {
     );
   });
 
-  it("does not retry an entire create batch when the batch request itself fails", async () => {
+  it("does not send a create batch again when the batch request fails with an unknown outcome", async () => {
     const policyName = "[IHD] Require password change for high-risk users";
 
     mockConditionalAccessTemplate({
@@ -380,7 +380,7 @@ describe("executeTasksInBatches", () => {
       grantControls: { operator: "OR", builtInControls: ["mfa"] },
     });
     const task = createConditionalAccessTask("batch-create-http-failure", policyName);
-    const batchError = new Error("[503] Service unavailable");
+    const batchError = new TypeError("Failed to fetch");
     const client = createBatchClient({ batchError });
     const context = createCreateContext(client);
 
@@ -392,7 +392,7 @@ describe("executeTasksInBatches", () => {
     expect(results[0]).toMatchObject({
       success: false,
       skipped: false,
-      error: "[503] Service unavailable",
+      error: expect.stringMatching(/^Failed to fetch \(Outcome unknown/),
     });
   });
 

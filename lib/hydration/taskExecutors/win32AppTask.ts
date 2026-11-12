@@ -13,6 +13,7 @@ import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { bytesToBase64 } from "@/lib/utils/base64";
 import { DELETE_REASONS, deleteResolutionResult, readAssignmentCount } from "../deleteResolver";
+import { isRunCancelledError } from "@/lib/utils/retry";
 
 const DELETE_VISIBILITY_RETRY_DELAYS_MS = [2000, 4000, 8000] as const;
 const RECENT_WIN32_APPS_STORAGE_KEY = "intune-hydration-recent-win32-apps";
@@ -288,6 +289,8 @@ export async function executeWin32AppTask(
       )
     );
   } catch (error) {
+    // A cancelled run is not a failed safety check. The engine marks the task cancelled.
+    if (isRunCancelledError(error)) throw error;
     const message = error instanceof Error ? error.message : String(error);
     return deleteResolutionResult(
       task,

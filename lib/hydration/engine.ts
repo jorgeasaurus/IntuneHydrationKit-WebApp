@@ -28,8 +28,10 @@ import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
-import { sleep, sleepWithExecutionControl, waitWhilePaused, TENANT_CACHE_LABELS } from "./utils";
+import { getLicenseSkipReason, sleep, sleepWithExecutionControl, waitWhilePaused, TENANT_CACHE_LABELS } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage, TenantCacheKey } from "./types";
+import { pauseActiveExecution } from "./executionStateStore";
+import { RUN_CANCELLED_MESSAGE, isRunCancelledError } from "@/lib/utils/retry";
 import { executeGroupTask } from "./taskExecutors/groupTask";
 import { executeFilterTask } from "./taskExecutors/filterTask";
 import { executeComplianceTask } from "./taskExecutors/complianceTask";
@@ -126,6 +128,78 @@ function markTaskCancelled(
   results.push({ task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled by user" });
 }
 
+/** Status message when the sign-in session is lost during a run. */
+export const SESSION_EXPIRED_MESSAGE = "Session expired — click Resume to sign in again and continue.";
+
+/**
+ * Pause the run after the sign-in session was lost, and wait for the user.
+ * The in-flight tasks go back to "pending" and are not marked failed. Resume is a user
+ * click, so the sign-in popup is allowed then. Each lost session needs a new Resume,
+ * so a run that cannot get a token does not loop.
+ */
+async function pauseForSignIn(
+  error: Error,
+  tasks: HydrationTask[],
+  context: ExecutionContext
+): Promise<"retry" | "stop" | "cancelled"> {
+  if (context.shouldCancel?.()) return "cancelled";
+
+  pauseActiveExecution();
+  if (!context.shouldPause?.()) {
+    // The run cannot pause (no pause control), so the request fails as before.
+    console.warn("[Execute Tasks] Sign-in session lost and the run cannot pause:", error.message);
+    return "stop";
+  }
+
+  const inFlight = tasks.filter((task) => task.status === "running");
+  for (const task of inFlight) {
+    task.status = "pending";
+    context.onTaskStart?.(task);
+  }
+  console.warn("[Execute Tasks] Sign-in session lost - run paused:", error.message);
+  emitStatus(context, SESSION_EXPIRED_MESSAGE, "warning", "control");
+
+  if ((await waitWhilePaused(context)) === "cancelled") return "cancelled";
+
+  for (const task of inFlight) {
+    if (task.status !== "pending") continue;
+    task.status = "running";
+    context.onTaskStart?.(task);
+  }
+  emitStatus(context, "Resumed. Signing in again and sending the request...", "info", "control");
+  return "retry";
+}
+
+/**
+ * Attach the run controls to the Graph client: retry waits that act on cancel and
+ * pause, and the sign-in recovery. Returns the function that removes them.
+ */
+function attachRunControls(tasks: HydrationTask[], context: ExecutionContext): () => void {
+  const { client } = context;
+  // Test doubles of the client do not always have the method.
+  if (typeof client.setExecutionControls !== "function") return () => undefined;
+
+  // Parallel requests that lose the session at the same time share one pause.
+  let recovery: Promise<"retry" | "stop" | "cancelled"> | null = null;
+  client.setExecutionControls({
+    wait: (ms) => sleepWithExecutionControl(ms, context),
+    onAuthSessionLost: (error) => {
+      recovery ??= pauseForSignIn(error, tasks, context).finally(() => {
+        recovery = null;
+      });
+      return recovery;
+    },
+  });
+  return () => client.setExecutionControls(undefined);
+}
+
+function cancelledResult(task: HydrationTask, context: ExecutionContext): ExecutionResult {
+  task.endTime = new Date();
+  markTaskSkipped(task, "cancelled", RUN_CANCELLED_MESSAGE);
+  context.onTaskComplete?.(task);
+  return { task, success: false, skipped: true, skipKind: "cancelled", error: RUN_CANCELLED_MESSAGE };
+}
+
 function cancelRemainingTasks(
   tasks: HydrationTask[],
   startIndex: number,
@@ -183,18 +257,11 @@ async function executeTask(
   try {
     let result: ExecutionResult;
 
-    // Check for Windows Driver Update license requirement
-    const isDriverUpdateProfile = task.itemName.toLowerCase().includes("wufb drivers") ||
-      task.itemName.toLowerCase().includes("driver update");
-
-    // Create only: a delete task goes to the delete resolver on both delete paths,
-    // so that existing kit objects can be removed after a license change.
-    if (task.operation === "create" && isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
-      markTaskSkipped(
-        task,
-        "blocked",
-        "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)"
-      );
+    // The same license check as the batch path. Create only: a delete task goes to the
+    // delete resolver, so that existing kit objects can be removed after a license change.
+    const licenseSkipReason = getLicenseSkipReason(task, context);
+    if (licenseSkipReason) {
+      markTaskSkipped(task, "blocked", licenseSkipReason);
       task.endTime = new Date();
       context.onTaskComplete?.(task);
       return {
@@ -242,6 +309,11 @@ async function executeTask(
         };
     }
 
+    // An executor that catches errors returns the cancel error as a failure.
+    if (!result.success && !result.skipped && result.error === RUN_CANCELLED_MESSAGE && context.shouldCancel?.()) {
+      return cancelledResult(task, context);
+    }
+
     // Update task with result
     if (result.skipped) {
       markTaskSkipped(task, result.skipKind, result.error);
@@ -260,6 +332,9 @@ async function executeTask(
 
     return result;
   } catch (error) {
+    if (isRunCancelledError(error)) {
+      return cancelledResult(task, context);
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     task.status = "failed";
     task.error = errorMessage;
@@ -327,6 +402,18 @@ export async function executeTasks(
   tasks: HydrationTask[],
   context: ExecutionContext
 ): Promise<ExecutionResult[]> {
+  const detachRunControls = attachRunControls(tasks, context);
+  try {
+    return await runTasks(tasks, context);
+  } finally {
+    detachRunControls();
+  }
+}
+
+async function runTasks(
+  tasks: HydrationTask[],
+  context: ExecutionContext
+): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
   const stopForExecutionControl = async (): Promise<boolean> => {
     if ((await waitWhilePaused(context)) !== "cancelled") return false;
@@ -364,6 +451,7 @@ export async function executeTasks(
       (context as Record<TenantCacheKey, unknown[] | undefined>)[prefetch.key] = items;
       emitStatus(context, `Found ${items.length} existing ${label}`, "success", "prefetch");
     } catch (error) {
+      if (isRunCancelledError(error) && (await stopForExecutionControl())) return results;
       const reason = error instanceof Error ? error.message : String(error);
       context.prefetchErrors = { ...context.prefetchErrors, [prefetch.key]: reason };
       emitStatus(

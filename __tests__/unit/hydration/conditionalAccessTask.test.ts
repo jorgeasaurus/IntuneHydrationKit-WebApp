@@ -6,23 +6,18 @@ import type { HydrationTask } from "@/types/hydration";
 const {
   mockGetCachedTemplates,
   mockCreateConditionalAccessPolicy,
-  mockPolicyRequiresPremiumP2,
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockCreateConditionalAccessPolicy: vi.fn(),
-  mockPolicyRequiresPremiumP2: vi.fn(),
 }));
 
 vi.mock("@/lib/templates/loader", () => ({
   getCachedTemplates: mockGetCachedTemplates,
 }));
 
-vi.mock("@/lib/graph/conditionalAccess", () => ({
+vi.mock("@/lib/graph/conditionalAccess", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/graph/conditionalAccess")>()),
   createConditionalAccessPolicy: mockCreateConditionalAccessPolicy,
-}));
-
-vi.mock("@/lib/graph/conditionalAccessP2", () => ({
-  policyRequiresPremiumP2: mockPolicyRequiresPremiumP2,
 }));
 
 import { executeConditionalAccessTask } from "@/lib/hydration/taskExecutors/conditionalAccessTask";
@@ -51,7 +46,6 @@ describe("executeConditionalAccessTask", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCachedTemplates.mockReturnValue(undefined);
-    mockPolicyRequiresPremiumP2.mockReturnValue(false);
   });
 
   it("returns a failure when the conditional access template cannot be resolved", async () => {
@@ -69,61 +63,7 @@ describe("executeConditionalAccessTask", () => {
     });
   });
 
-  it("skips create when the tenant lacks a Premium P1 license", async () => {
-    const policyName = "[IHD] Require MFA";
-
-    mockGetCachedTemplates.mockReturnValue([
-      {
-        displayName: policyName,
-        state: "disabled",
-        conditions: {},
-        grantControls: { operator: "OR", builtInControls: ["mfa"] },
-      },
-    ]);
-
-    const result = await executeConditionalAccessTask(createTask(policyName), {
-      client: createClient(),
-      operationMode: "create",
-      isPreview: false,
-      stopOnFirstError: false,
-      hasConditionalAccessLicense: false,
-    });
-
-    expect(result).toMatchObject({
-      success: true,
-      skipped: true,
-      error: "No Entra ID Premium (P1) license",
-    });
-  });
-
-  it("skips create when the policy requires Premium P2 but the tenant does not have it", async () => {
-    const policyName = "[IHD] High Risk Users";
-
-    mockGetCachedTemplates.mockReturnValue([
-      {
-        displayName: policyName,
-        state: "disabled",
-        conditions: { userRiskLevels: ["high"] },
-        grantControls: { operator: "OR", builtInControls: ["mfa"] },
-      },
-    ]);
-    mockPolicyRequiresPremiumP2.mockReturnValue(true);
-
-    const result = await executeConditionalAccessTask(createTask(policyName), {
-      client: createClient(),
-      operationMode: "create",
-      isPreview: false,
-      stopOnFirstError: false,
-      hasConditionalAccessLicense: true,
-      hasPremiumP2License: false,
-    });
-
-    expect(result).toMatchObject({
-      success: true,
-      skipped: true,
-      error: "Requires Premium P2 license",
-    });
-  });
+  // The Premium P1/P2 license skips run before dispatch; see licenseGating.test.ts.
 
   it("creates policies from simplified templates by expanding them to the Graph payload shape", async () => {
     const policyName = "[IHD] Require MFA";
@@ -162,6 +102,24 @@ describe("executeConditionalAccessTask", () => {
         state: "disabled",
       })
     );
+  });
+
+  it("skips create when a kit policy with the other marker format exists", async () => {
+    const policyName = "[IHD] Require MFA";
+    mockGetCachedTemplates.mockReturnValue([
+      { displayName: policyName, state: "disabled", conditions: {}, grantControls: { operator: "OR", builtInControls: ["mfa"] } },
+    ]);
+
+    const result = await executeConditionalAccessTask(createTask(policyName), {
+      client: createClient(),
+      operationMode: "create",
+      isPreview: false,
+      stopOnFirstError: false,
+      cachedConditionalAccessPolicies: [{ id: "old", displayName: "Require MFA [Imported by Intune Hydration Kit]" }],
+    });
+
+    expect(result).toMatchObject({ skipped: true, skipKind: "noOp", error: "Already exists" });
+    expect(mockCreateConditionalAccessPolicy).not.toHaveBeenCalled();
   });
 
   it("skips preview create when a normalized cached policy name already exists", async () => {

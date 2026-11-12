@@ -7,8 +7,7 @@ import { HydrationTask } from "@/types/hydration";
 import { ConditionalAccessPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
 import { executeDeleteTask } from "../deleteResolver";
-import { createConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
-import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
+import { createConditionalAccessPolicy, findHydrationConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
 import { normalizeName, requireTenantCache } from "../utils";
 
@@ -21,7 +20,7 @@ function findCachedConditionalAccessPolicy(
   const fullMarkerLowerName = `${lowerName} [imported by intune hydration kit]`;
   const normalizedDisplayName = normalizeName(displayName);
 
-  return policies?.find((policy) => {
+  const match = policies?.find((policy) => {
     const policyLower = policy.displayName?.toLowerCase();
     return (
       policyLower === lowerName ||
@@ -30,6 +29,10 @@ function findCachedConditionalAccessPolicy(
       normalizeName(policy.displayName) === normalizedDisplayName
     );
   });
+  if (match) return match;
+  // A kit policy can carry the other marker format, for example
+  // "Require MFA [Imported by Intune Hydration Kit]" for the template "[IHD] Require MFA".
+  return (policies && findHydrationConditionalAccessPolicy(policies, displayName)) ?? undefined;
 }
 
 /**
@@ -58,37 +61,7 @@ export async function executeConditionalAccessTask(
       return { task, success: false, skipped: false, error: "Template not found" };
     }
 
-    // Check if tenant has Entra ID Premium P1 license (required for ALL CA policies)
-    if (context.hasConditionalAccessLicense === false) {
-      console.log(
-        `[Conditional Access] Skipped: ${template.displayName} - no Entra ID Premium (P1) license`
-      );
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "blocked",
-        error: "No Entra ID Premium (P1) license",
-      };
-    }
-
-    // Check if policy requires Premium P2 and tenant doesn't have it (PowerShell parity)
-    if (
-      context.hasPremiumP2License === false &&
-      policyRequiresPremiumP2(template as ConditionalAccessPolicy)
-    ) {
-      console.log(
-        `[Conditional Access] Skipped: ${template.displayName} - requires Azure AD Premium P2 license (uses risk-based conditions)`
-      );
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "blocked",
-        error: "Requires Premium P2 license",
-      };
-    }
-
+    // The Premium P1/P2 license checks run before dispatch (getLicenseSkipReason in utils.ts).
     const existingPolicy = findCachedConditionalAccessPolicy(
       template.displayName,
       requireTenantCache(context, "cachedConditionalAccessPolicies")

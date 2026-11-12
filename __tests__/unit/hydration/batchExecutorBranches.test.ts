@@ -52,6 +52,7 @@ import {
   executeDeletesInParallel,
   executeTasksInBatches,
 } from "@/lib/hydration/batchExecutor";
+import { serveCachedObjects } from "../../helpers/tenantObjectReads";
 
 const defaultBatchConfig: BatchConfiguration = {
   defaultBatchSize: 20,
@@ -175,11 +176,12 @@ describe("batchExecutor branch coverage", () => {
         displayName: "[IHD] Retry Group",
       }),
     ]);
-    expect(mockSleepWithExecutionControl).toHaveBeenCalledWith(2000, context);
+    // Retry-After (1 second) sets the wait.
+    expect(mockSleepWithExecutionControl).toHaveBeenCalledWith(1000, context);
     expect(onTaskComplete).toHaveBeenCalledWith(task);
   });
 
-  it("fails create tasks when the batch response omits a prepared request", async () => {
+  it("does not resend a create when the batch response omits a prepared request", async () => {
     const task = createTask("missing-response", "groups", "create", "[IHD] Missing Response Group");
     const onTaskError = vi.fn();
 
@@ -191,6 +193,7 @@ describe("batchExecutor branch coverage", () => {
         patch: vi.fn(),
         getCollection: vi.fn(),
         batch: vi.fn().mockResolvedValue({ responses: [] }),
+        findCreatedObjects: vi.fn().mockResolvedValue([undefined]),
       } as unknown as ExecutionContext["client"],
       operationMode: "create",
       isPreview: false,
@@ -205,9 +208,10 @@ describe("batchExecutor branch coverage", () => {
       expect.objectContaining({
         success: false,
         skipped: false,
-        error: "No response received",
+        error: expect.stringMatching(/^No response received \(Outcome unknown/),
       }),
     ]);
+    expect(context.client.batch).toHaveBeenCalledTimes(1);
     expect(task.status).toBe("failed");
     expect(onTaskError).toHaveBeenCalledWith(task, expect.any(Error));
   });
@@ -245,13 +249,13 @@ describe("batchExecutor branch coverage", () => {
             {
               id: "req-0",
               status: 503,
-              headers: {},
+              headers: { "Retry-After": "1" },
               body: { error: { message: "Service unavailable" } },
             },
             {
               id: "req-1",
               status: 503,
-              headers: {},
+              headers: { "Retry-After": "1" },
               body: { error: { message: "Service unavailable" } },
             },
           ],
@@ -454,7 +458,7 @@ describe("batchExecutor branch coverage", () => {
     ]);
   });
 
-  it("handles mixed fast-delete outcomes including Conditional Access safety skips, retries, and hard failures", async () => {
+  it("handles mixed fast-delete outcomes including Conditional Access safety skips and hard failures", async () => {
     const missingTask = createTask("fast-missing", "groups", "delete", "[IHD] Missing Group");
     const noMarkerTask = createTask("fast-no-marker", "groups", "delete", "[IHD] No Marker Group");
     const assignedTask = createTask("fast-assigned", "baseline", "delete", "[IHD] Assigned Settings Policy");
@@ -559,7 +563,7 @@ describe("batchExecutor branch coverage", () => {
         resourceGoneTask,
         forbiddenTask,
       ],
-      context
+      serveCachedObjects(context)
     );
 
     expect(results).toEqual([
@@ -587,10 +591,12 @@ describe("batchExecutor branch coverage", () => {
         skipped: true,
         error: "Conditional Access deletion must use the sequential safety check",
       }),
+      // The Graph client owns the retries, so the executor sends one DELETE per task.
       expect.objectContaining({
         task: retryTask,
-        success: true,
+        success: false,
         skipped: false,
+        error: "[400] transient backend",
       }),
       expect.objectContaining({
         task: forbiddenTask,
@@ -600,11 +606,13 @@ describe("batchExecutor branch coverage", () => {
       }),
     ]);
     expect(removeCalls).toHaveBeenCalledWith("/groups/retry-group-id", "v1.0");
+    expect(deleteCalls.get("/groups/retry-group-id")).toBe(1);
     expect(context.cachedIntuneGroups).toEqual([
       expect.objectContaining({
         id: "no-marker-group-id",
         displayName: "[IHD] No Marker Group",
       }),
+      expect.objectContaining({ id: "retry-group-id" }),
     ]);
     expect(context.cachedConditionalAccessPolicies).toEqual([
       expect.objectContaining({ id: "ca-gone-id" }),
@@ -615,14 +623,11 @@ describe("batchExecutor branch coverage", () => {
         displayName: "Trusted Filter",
       }),
     ]);
-    expect(mockSleepWithExecutionControl).toHaveBeenCalledWith(500, context);
+    expect(mockSleepWithExecutionControl).not.toHaveBeenCalled();
   });
 
   it("cools down after throttled fast-delete failures and cancels the remaining batch", async () => {
-    mockSleepWithExecutionControl
-      .mockResolvedValueOnce("completed")
-      .mockResolvedValueOnce("completed")
-      .mockResolvedValueOnce("cancelled");
+    mockSleepWithExecutionControl.mockResolvedValueOnce("cancelled");
 
     const throttledTask = createTask("fast-throttle", "groups", "delete", "[IHD] Throttled Group");
     const successOne = createTask("fast-success-1", "groups", "delete", "[IHD] Success Group One");
@@ -695,7 +700,7 @@ describe("batchExecutor branch coverage", () => {
 
     const results = await executeDeletesInParallel(
       [throttledTask, successOne, successTwo, cancelledTask],
-      context
+      serveCachedObjects(context)
     );
 
     expect(results).toEqual([
@@ -722,9 +727,10 @@ describe("batchExecutor branch coverage", () => {
         error: "Cancelled",
       }),
     ]);
-    expect(mockSleepWithExecutionControl).toHaveBeenNthCalledWith(1, 3000, context);
-    expect(mockSleepWithExecutionControl).toHaveBeenNthCalledWith(2, 6000, context);
-    expect(mockSleepWithExecutionControl).toHaveBeenNthCalledWith(3, 5000, context);
+    // One cooldown after the throttled batch; no second retry loop around client.delete.
+    expect(mockSleepWithExecutionControl).toHaveBeenCalledTimes(1);
+    expect(mockSleepWithExecutionControl).toHaveBeenCalledWith(5000, context);
+    expect(clientDelete).toHaveBeenCalledTimes(3);
     expect(clientDelete).not.toHaveBeenCalledWith("/groups/cancelled-group-id", "v1.0");
   });
 });

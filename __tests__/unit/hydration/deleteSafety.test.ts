@@ -33,12 +33,15 @@ import { executeAppProtectionTask } from "@/lib/hydration/taskExecutors/appProte
 import { executeEnrollmentTask } from "@/lib/hydration/taskExecutors/enrollmentTask";
 import { executeWin32AppTask } from "@/lib/hydration/taskExecutors/win32AppTask";
 import { hasConditionalAccessHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { serveCachedObjects } from "../../helpers/tenantObjectReads";
 
 const MARKER = "Imported by Intune Hydration Kit";
 
 type Route = unknown | Error;
 
 /** Fake Graph client: GET responses come from a route table; unknown routes fail. */
+const DEVICE_PREPARATION_LIST = "/deviceManagement/configurationPolicies?$select=id,name,description,technologies";
+
 function createClient(routes: Record<string, Route>) {
   const respond = (url: string): Promise<unknown> => {
     if (!(url in routes)) {
@@ -48,6 +51,7 @@ function createClient(routes: Record<string, Route>) {
     return value instanceof Error ? Promise.reject(value) : Promise.resolve(value);
   };
   return {
+    routes,
     get: vi.fn((url: string) => respond(url)),
     getCollection: vi.fn(async (url: string) => (await respond(url)) as unknown[]),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -61,13 +65,13 @@ function createClient(routes: Record<string, Route>) {
 type FakeClient = ReturnType<typeof createClient>;
 
 function createContext(client: FakeClient, overrides: Partial<ExecutionContext> = {}): ExecutionContext {
-  return {
+  return serveCachedObjects({
     client: client as unknown as ExecutionContext["client"],
     operationMode: "delete",
     isPreview: false,
     stopOnFirstError: false,
     ...overrides,
-  };
+  }, (endpoint) => !(endpoint in client.routes));
 }
 
 function createTask(category: TaskCategory, itemName: string): HydrationTask {
@@ -373,13 +377,33 @@ describe("Errors are failures, safety blocks are skips", () => {
     const name = "[IHD] Windows Autopilot Profile";
     const client = createClient({
       "/deviceManagement/windowsAutopilotDeploymentProfiles": [{ id: "ap-id", displayName: name, description: MARKER }],
+      "/deviceManagement/windowsAutopilotDeploymentProfiles/ap-id": { id: "ap-id", displayName: name, description: MARKER },
       "/deviceManagement/windowsAutopilotDeploymentProfiles/ap-id/assignments": noAssignments,
+      "/deviceManagement/deviceEnrollmentConfigurations": [],
+      [DEVICE_PREPARATION_LIST]: [],
     });
     client.delete.mockRejectedValue(new Error("[403] Forbidden"));
 
     const result = await executeEnrollmentTask(createTask("enrollment", name), createContext(client));
 
     expect(result).toMatchObject({ success: false, skipped: false, error: "[403] Forbidden" });
+  });
+
+  it("fails an enrollment delete when the name matches objects of two types", async () => {
+    const name = "[IHD] Windows Enrollment";
+    const client = createClient({
+      "/deviceManagement/windowsAutopilotDeploymentProfiles": [{ id: "ap-id", displayName: name, description: MARKER }],
+      "/deviceManagement/deviceEnrollmentConfigurations": [
+        { id: "esp-id", displayName: name, description: MARKER, "@odata.type": "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration" },
+      ],
+      [DEVICE_PREPARATION_LIST]: [],
+    });
+
+    const result = await executeEnrollmentTask(createTask("enrollment", name), createContext(client));
+
+    expect(result).toMatchObject({ success: false, skipped: false });
+    expect(result.error).toMatch(/matches more than one enrollment object/);
+    expect(client.delete).not.toHaveBeenCalled();
   });
 
   it("reports a group without the marker as a blocked skip", async () => {
@@ -526,6 +550,7 @@ describe("Preview deletes run the live checks with GET requests only", () => {
       "/deviceManagement/deviceEnrollmentConfigurations": [
         { id: "esp-id", displayName: name, description: "Manual", "@odata.type": "#microsoft.graph.windows10EnrollmentCompletionPageConfiguration" },
       ],
+      [DEVICE_PREPARATION_LIST]: [],
     });
 
     const result = await executeEnrollmentTask(createTask("enrollment", name), createContext(client, { isPreview: true }));
