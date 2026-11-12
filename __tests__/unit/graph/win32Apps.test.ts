@@ -31,14 +31,14 @@ describe("createWin32AppFromPackage", () => {
       .mockResolvedValueOnce({ id: "app-id" })
       .mockResolvedValueOnce({ id: "content-id" })
       .mockResolvedValueOnce({ id: "file-id" });
-    const post = vi.fn().mockResolvedValue({});
+    const postAction = vi.fn().mockResolvedValue({});
     const get = vi
       .fn()
       .mockResolvedValueOnce({ uploadState: "azureStorageUriRequestSuccess", azureStorageUri: "https://upload.example/package" })
       .mockResolvedValueOnce({ uploadState: "commitFileSuccess" });
     const patch = vi.fn().mockResolvedValue({});
     const deleteApp = vi.fn().mockResolvedValue(undefined);
-    const client = { postNoRetry, post, get, patch, delete: deleteApp };
+    const client = { postNoRetry, postAction, get, patch, delete: deleteApp };
     const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 201 }));
     vi.stubGlobal("fetch", fetchMock);
 
@@ -119,7 +119,7 @@ describe("createWin32AppFromPackage", () => {
       }),
       "beta"
     );
-    expect(post).toHaveBeenLastCalledWith(
+    expect(postAction).toHaveBeenLastCalledWith(
       expect.stringContaining("/files/file-id/commit"),
       expect.objectContaining({ fileEncryptionInfo: expect.objectContaining({ profileIdentifier: "ProfileVersion1" }) }),
       "beta"
@@ -206,7 +206,7 @@ describe("createWin32AppFromPackage", () => {
       .mockResolvedValueOnce({ id: "app-id" })
       .mockResolvedValueOnce({ id: "content-id" })
       .mockResolvedValueOnce({ id: "file-id" });
-    const post = vi.fn().mockResolvedValue({});
+    const postAction = vi.fn().mockResolvedValue({});
     const get = vi
       .fn()
       .mockResolvedValueOnce({
@@ -220,7 +220,7 @@ describe("createWin32AppFromPackage", () => {
       .mockResolvedValueOnce({ uploadState: "commitFileSuccess" });
     const client = {
       postNoRetry,
-      post,
+      postAction,
       get,
       patch: vi.fn().mockResolvedValue({}),
       delete: vi.fn().mockResolvedValue(undefined),
@@ -258,7 +258,7 @@ describe("createWin32AppFromPackage", () => {
       "detected"
     );
 
-    expect(post).toHaveBeenCalledWith(
+    expect(postAction).toHaveBeenCalledWith(
       expect.stringContaining("/files/file-id/renewUpload"),
       {},
       "beta"
@@ -283,13 +283,13 @@ describe("createWin32AppFromPackage", () => {
       .mockResolvedValueOnce({ id: "app-id" })
       .mockResolvedValueOnce({ id: "content-id" })
       .mockResolvedValueOnce({ id: "file-id" });
-    const post = vi.fn().mockResolvedValue({});
+    const postAction = vi.fn().mockResolvedValue({});
     const get = vi.fn().mockResolvedValueOnce({
       uploadState: "azureStorageUriRequestSuccess",
       azureStorageUri: "https://upload.example/package",
     });
     const deleteApp = vi.fn().mockResolvedValue(undefined);
-    const client = { postNoRetry, post, get, delete: deleteApp };
+    const client = { postNoRetry, postAction, get, delete: deleteApp };
     vi.stubGlobal("fetch", vi.fn().mockResolvedValueOnce(new Response(
       JSON.stringify({ error: "Azure Storage upload failed." }),
       { status: 502, headers: { "Content-Type": "application/json" } }
@@ -316,11 +316,88 @@ describe("createWin32AppFromPackage", () => {
       "detected"
     )).rejects.toThrow("Azure Storage upload failed.");
 
-    expect(post).not.toHaveBeenCalledWith(
+    expect(postAction).not.toHaveBeenCalledWith(
       expect.stringContaining("/renewUpload"),
       expect.anything(),
       expect.anything()
     );
+  });
+
+  function packageFile() {
+    return {
+      encryptedContent: new Blob(["encrypted-content"]),
+      encryptedContentName: "IntunePackage.intunewin",
+      setupFile: "Install-WinGetPackage.ps1",
+      unencryptedContentSize: 42,
+      encryptionInfo: {
+        encryptionKey: "key",
+        macKey: "mac-key",
+        initializationVector: "iv",
+        mac: "mac",
+        profileIdentifier: "ProfileVersion1",
+        fileDigest: "digest",
+        fileDigestAlgorithm: "SHA256",
+      },
+    };
+  }
+
+  function commitClient(commitError: Error, stateAfterCommitError: string | Error) {
+    const postNoRetry = vi
+      .fn()
+      .mockResolvedValueOnce({ id: "app-id" })
+      .mockResolvedValueOnce({ id: "content-id" })
+      .mockResolvedValueOnce({ id: "file-id" });
+    const postAction = vi.fn().mockRejectedValueOnce(commitError);
+    const get = vi
+      .fn()
+      .mockResolvedValueOnce({ uploadState: "azureStorageUriRequestSuccess", azureStorageUri: "https://upload.example/package" });
+    if (stateAfterCommitError instanceof Error) get.mockRejectedValueOnce(stateAfterCommitError);
+    else get.mockResolvedValueOnce({ uploadState: stateAfterCommitError });
+    get.mockResolvedValueOnce({ uploadState: "commitFileSuccess" });
+    const patch = vi.fn().mockResolvedValue({});
+    const deleteApp = vi.fn().mockResolvedValue(undefined);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 201 })));
+    return { postNoRetry, postAction, get, patch, delete: deleteApp };
+  }
+
+  it.each(["commitFilePending", "commitFileSuccess"])(
+    "treats a failed commit as done when the file state is %s (lost response of an earlier attempt)",
+    async (state) => {
+      const alreadyCommitted = Object.assign(new Error("[400] The file is already committed."), { status: 400 });
+      const client = commitClient(alreadyCommitted, state);
+
+      const app = await createWin32AppFromPackage(client as never, SEVEN_ZIP_WIN32_APP, packageFile(), "detected");
+
+      expect(app.id).toBe("app-id");
+      expect(client.postAction).toHaveBeenCalledTimes(1);
+      expect(client.patch).toHaveBeenCalledWith(
+        "/deviceAppManagement/mobileApps/app-id",
+        expect.objectContaining({ committedContentVersion: "content-id" }),
+        "beta"
+      );
+      expect(client.delete).not.toHaveBeenCalled();
+    }
+  );
+
+  it("fails the commit when the file state does not show an accepted commit", async () => {
+    const commitError = Object.assign(new Error("[500] Internal error"), { status: 500 });
+    const client = commitClient(commitError, "azureStorageUriRequestSuccess");
+
+    await expect(
+      createWin32AppFromPackage(client as never, SEVEN_ZIP_WIN32_APP, packageFile(), "detected")
+    ).rejects.toThrow("[500] Internal error");
+    expect(client.patch).not.toHaveBeenCalled();
+    expect(client.delete).toHaveBeenCalledWith("/deviceAppManagement/mobileApps/app-id", "beta");
+  });
+
+  it("fails the commit with the commit error when the file state cannot be read", async () => {
+    const commitError = Object.assign(new Error("[502] Bad gateway"), { status: 502 });
+    const client = commitClient(commitError, new Error("read failed"));
+
+    await expect(
+      createWin32AppFromPackage(client as never, SEVEN_ZIP_WIN32_APP, packageFile(), "detected")
+    ).rejects.toThrow("[502] Bad gateway");
+    expect(client.patch).not.toHaveBeenCalled();
   });
 
   it("removes the uncommitted app when content publishing fails", async () => {
@@ -328,9 +405,9 @@ describe("createWin32AppFromPackage", () => {
       .fn()
       .mockResolvedValueOnce({ id: "app-id" })
       .mockRejectedValueOnce(new Error("content version unavailable"));
-    const post = vi.fn();
+    const postAction = vi.fn();
     const deleteApp = vi.fn().mockResolvedValue(undefined);
-    const client = { postNoRetry, post, delete: deleteApp };
+    const client = { postNoRetry, postAction, delete: deleteApp };
 
     await expect(createWin32AppFromPackage(
       client as never,
