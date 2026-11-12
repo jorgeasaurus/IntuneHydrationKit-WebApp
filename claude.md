@@ -392,7 +392,7 @@ interface AppSettings {
 
 **Content Security Policy**:
 - `next.config.ts` builds the policy and sets it with `headers()`.
-- `/wizard` and `/dashboard` (the routes that use Graph tokens) get a stricter policy that does not allow the third-party appreciation widget origin. Other routes allow it. A CSP applies to the loaded document, so a client-side navigation from `/` keeps the landing policy.
+- All app pages use one policy. No third-party script host is allowed except Vercel Analytics.
 - `'unsafe-eval'` is allowed only for the development server. Scripts keep `'unsafe-inline'` because statically generated pages contain inline Next.js bootstrap scripts.
 - `frame-src` allows the MSAL authority for hidden-iframe token renewal. `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, and `frame-ancestors 'none'` are set.
 - The app also sends `Strict-Transport-Security`, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
@@ -444,7 +444,7 @@ The source folders are at the repository root (there is no `src/` folder). Main 
 │   ├── auth/                      # MsalProvider.tsx, ProtectedRoute.tsx
 │   ├── wizard/                    # TenantConfig, OperationMode, TargetSelection*, ReviewConfirm, BaselineChangeReview, ...
 │   ├── dashboard/                 # DashboardRunView, ProgressBar, TaskList, TaskRow, ExecutionControls, ResultsSummary, ReportComparison, ...
-│   ├── landing/                   # HomeLanding, AppreciateButton
+│   ├── landing/                   # HomeLanding
 │   ├── templates/                 # TemplateCatalogPage
 │   ├── SettingsModal.tsx, Navigation.tsx, DynamicWallpaper.tsx, ...
 │   └── ui/                        # shadcn components
