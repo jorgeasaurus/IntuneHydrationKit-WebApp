@@ -217,6 +217,7 @@ export function useHydrationExecution() {
         operationMode,
         isPreview: state.isPreview,
         stopOnFirstError: settings.stopOnFirstError,
+        updateExisting: operationMode === "create" && state.updateExisting === true,
         hasConditionalAccessLicense: state.prerequisiteResult?.licenses?.hasConditionalAccessLicense ?? true,
         hasPremiumP2License: state.prerequisiteResult?.licenses?.hasPremiumP2License ?? true,
         hasWindowsDriverUpdateLicense: state.prerequisiteResult?.licenses?.hasWindowsDriverUpdateLicense ?? true,

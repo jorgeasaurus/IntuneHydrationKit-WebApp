@@ -24,6 +24,7 @@ import {
   CheckCircle2,
   ChevronRight,
   FileCheck2,
+  GitCompare,
   History,
   Home,
   Layers3,
@@ -165,25 +166,31 @@ function WizardContent() {
         )}
         actions={(
           <>
-            <Button variant="outline" onClick={() => setShowSettings(true)} className="size-9 px-0 sm:w-auto sm:px-3">
-              <Settings2 className="size-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only">Settings</span>
+            <Button variant="outline" onClick={() => setShowSettings(true)} className="size-9 px-0 lg:w-auto lg:px-3">
+              <Settings2 className="size-4 lg:mr-2" />
+              <span className="sr-only lg:not-sr-only">Settings</span>
             </Button>
-            <Button variant="outline" asChild className="size-9 px-0 sm:w-auto sm:px-3">
+            <Button variant="outline" asChild className="size-9 px-0 lg:w-auto lg:px-3">
+              <Link href="/drift">
+                <GitCompare aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Drift Scan</span>
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="size-9 px-0 lg:w-auto lg:px-3">
               <Link href="/history">
-                <History aria-hidden="true" className="size-4 sm:mr-2" />
-                <span className="sr-only sm:not-sr-only">Run history</span>
+                <History aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Run history</span>
               </Link>
             </Button>
-            <Button variant="outline" asChild className="size-9 px-0 sm:w-auto sm:px-3">
+            <Button variant="outline" asChild className="size-9 px-0 lg:w-auto lg:px-3">
               <Link href="/">
-                <Home className="size-4 sm:mr-2" />
-                <span className="sr-only sm:not-sr-only">Home</span>
+                <Home className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Home</span>
               </Link>
             </Button>
-            <Button variant="outline" onClick={handleSignOut} className="size-9 px-0 sm:w-auto sm:px-3">
-              <LogOut className="size-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only">Sign Out</span>
+            <Button variant="outline" onClick={handleSignOut} className="size-9 px-0 lg:w-auto lg:px-3">
+              <LogOut className="size-4 lg:mr-2" />
+              <span className="sr-only lg:not-sr-only">Sign Out</span>
             </Button>
           </>
         )}

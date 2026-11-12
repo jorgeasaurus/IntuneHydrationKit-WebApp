@@ -45,13 +45,14 @@ import { executeNotificationTask } from "./taskExecutors/notificationTask";
 import { markTaskSkipped } from "./taskTransitions";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
+import { getExistingSkipReason } from "./updateResolver";
 
 const TASK_DELAY_MS = 2000;
 
 /**
  * Tenant caches to prefetch, with the task categories that need each cache.
  */
-const TENANT_CACHE_PREFETCHES: Array<{
+export const TENANT_CACHE_PREFETCHES: Array<{
   key: TenantCacheKey;
   categories: TaskCategory[];
   load: (client: GraphClient) => Promise<unknown[]>;
@@ -323,6 +324,7 @@ async function executeTask(
 
     // Update task with result
     if (result.skipped) {
+      result.error = getExistingSkipReason(task, result.error, context);
       markTaskSkipped(task, result.skipKind, result.error);
     } else {
       task.status = result.success ? "success" : "failed";

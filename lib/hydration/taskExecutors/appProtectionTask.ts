@@ -10,23 +10,7 @@ import { executeDeleteTask } from "../deleteResolver";
 import { requireTenantCache } from "../utils";
 import { createAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, AppProtectionTemplate } from "@/lib/templates/loader";
-
-function stripImportPrefix(name: string): string {
-  return name.replace(/^\[ihd\]\s/i, "");
-}
-
-function namesMatch(left: string | undefined, right: string | undefined): boolean {
-  if (!left || !right) {
-    return false;
-  }
-
-  const normalizedLeft = left.toLowerCase();
-  const normalizedRight = right.toLowerCase();
-  return (
-    normalizedLeft === normalizedRight ||
-    stripImportPrefix(normalizedLeft) === stripImportPrefix(normalizedRight)
-  );
-}
+import { findExistingAppProtectionPolicy, namesMatchIgnoringImportPrefix as namesMatch } from "../existingObjects";
 
 /**
  * Execute an app protection policy task (create or delete)
@@ -63,8 +47,9 @@ export async function executeAppProtectionTask(
     }
 
     // Check if policy already exists using cached policies
-    const existingPolicy = requireTenantCache(context, "cachedAppProtectionPolicies").find(
-      (p) => p.displayName.toLowerCase() === template!.displayName.toLowerCase()
+    const existingPolicy = findExistingAppProtectionPolicy(
+      requireTenantCache(context, "cachedAppProtectionPolicies"),
+      template.displayName
     );
 
     if (existingPolicy) {

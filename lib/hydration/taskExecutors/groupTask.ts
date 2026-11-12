@@ -8,6 +8,8 @@ import { DeviceGroup } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
 import { executeDeleteTask } from "../deleteResolver";
 import { requireTenantCache } from "../utils";
+import { buildGroupCreateBody, findExistingGroup } from "../existingObjects";
+import { updateExistingObject } from "../updateResolver";
 import { createGroup } from "@/lib/graph/groups";
 import { getCachedTemplates, GroupTemplate } from "@/lib/templates/loader";
 
@@ -39,15 +41,10 @@ export async function executeGroupTask(
 
   if (mode === "create") {
     // Check if group already exists using pre-fetched cache (match with or without [IHD] prefix)
-    const targetName = template!.displayName.toLowerCase();
-    const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
-    const existingGroup = requireTenantCache(context, "cachedIntuneGroups").find((g) => {
-      const n = g.displayName.toLowerCase();
-      const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
-      return n === targetName || ns === targetNameStripped;
-    });
+    const existingGroup = findExistingGroup(requireTenantCache(context, "cachedIntuneGroups"), template.displayName);
 
     if (existingGroup) {
+      if (context.updateExisting) return updateExistingObject(task, context);
       return {
         task,
         success: true,
@@ -63,35 +60,7 @@ export async function executeGroupTask(
     }
 
     // Convert template to full DeviceGroup format if it's a simple template
-    let fullGroupTemplate: DeviceGroup = template as DeviceGroup;
-    if (!("@odata.type" in template)) {
-      const simpleTemplate = template as GroupTemplate;
-      const isStaticGroup = simpleTemplate.isStaticGroup === true || !simpleTemplate.membershipRule;
-
-      if (isStaticGroup) {
-        fullGroupTemplate = {
-          "@odata.type": "#microsoft.graph.group",
-          displayName: simpleTemplate.displayName,
-          description: simpleTemplate.description,
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
-          securityEnabled: true,
-        };
-      } else {
-        fullGroupTemplate = {
-          "@odata.type": "#microsoft.graph.group",
-          displayName: simpleTemplate.displayName,
-          description: simpleTemplate.description,
-          groupTypes: ["DynamicMembership"],
-          mailEnabled: false,
-          mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
-          securityEnabled: true,
-          membershipRule: simpleTemplate.membershipRule,
-          membershipRuleProcessingState: "On",
-        };
-      }
-    }
+    const fullGroupTemplate = buildGroupCreateBody(template);
 
     const created = await createGroup(client, fullGroupTemplate);
 
