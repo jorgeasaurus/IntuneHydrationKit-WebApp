@@ -20,13 +20,18 @@ const alertVariants = cva(
   }
 );
 
+/**
+ * Static notice panel. The default role is `note`, which screen readers do not
+ * announce on render. Pass `role="alert"` for errors that need an assertive
+ * announcement, or `role="status"` for polite status updates.
+ */
 const Alert = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement> & VariantProps<typeof alertVariants>
->(({ className, variant, ...props }, ref) => (
+>(({ className, variant, role = "note", ...props }, ref) => (
   <div
     ref={ref}
-    role="alert"
+    role={role}
     className={cn(alertVariants({ variant }), className)}
     {...props}
   />

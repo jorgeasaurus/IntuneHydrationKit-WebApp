@@ -41,6 +41,11 @@ interface ContentFile {
 const APPS_ENDPOINT = "/deviceAppManagement/mobileApps";
 const POLL_INTERVAL_MS = 2000;
 const UPLOAD_TIMEOUT_MS = 180000;
+/** Error code that /api/win32-upload returns when Azure rejects the signed upload URL. */
+const AZURE_STORAGE_AUTHORIZATION_FAILED_CODE = "azureStorageAuthorizationFailed";
+
+/** Azure Storage rejected the signed upload URL. Intune can issue a renewed URL. */
+class AzureUploadAuthorizationError extends Error {}
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -131,14 +136,19 @@ async function uploadToAzureStorage(
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/octet-stream",
       "x-intune-content-file-endpoint": contentFileEndpoint,
       "x-intune-upload-url": uploadUri,
     },
     body: content,
   });
   if (!response.ok) {
-    const details = await response.json().catch(() => null) as { error?: string } | null;
-    throw new Error(details?.error || `Azure Storage upload failed: ${response.status} ${response.statusText}`);
+    const details = await response.json().catch(() => null) as { error?: string; code?: string } | null;
+    const message = details?.error || `Azure Storage upload failed: ${response.status} ${response.statusText}`;
+    if (details?.code === AZURE_STORAGE_AUTHORIZATION_FAILED_CODE) {
+      throw new AzureUploadAuthorizationError(message);
+    }
+    throw new Error(message);
   }
 }
 
@@ -154,9 +164,7 @@ async function uploadWithRenewal(
       await uploadToAzureStorage(currentUploadUri, contentFileEndpoint, content);
       return;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const isAuthorizationFailure = /AuthenticationFailed|\b403\b|authori[sz]ed/i.test(message);
-      if (!isAuthorizationFailure || attempt === 3) {
+      if (!(error instanceof AzureUploadAuthorizationError) || attempt === 3) {
         throw error;
       }
 

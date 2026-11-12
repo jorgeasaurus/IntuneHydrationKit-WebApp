@@ -6,12 +6,10 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
+      // Crawlers must be able to fetch /wizard and /dashboard to read their
+      // `noindex` metadata. A robots.txt disallow hides that metadata.
       allow: "/",
-      // App routes are auth-gated, thin, and hold no SEO value.
-      disallow: ["/wizard", "/dashboard"],
     },
     sitemap: `${SITE_URL}/sitemap.xml`,
-    // The `host` directive expects a bare hostname (no scheme).
-    host: new URL(SITE_URL).host,
   };
 }

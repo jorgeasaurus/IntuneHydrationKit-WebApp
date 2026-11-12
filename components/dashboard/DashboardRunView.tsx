@@ -1,12 +1,17 @@
-import { AlertTriangle, RotateCcw } from "lucide-react";
+"use client";
+
+import { useState } from "react";
+import { AlertTriangle, RotateCcw, Settings2 } from "lucide-react";
 import { AppNavigation } from "@/components/AppNavigation";
 import { SensitiveData } from "@/components/SensitiveData";
+import { SettingsModal } from "@/components/SettingsModal";
 import { ActivityLog } from "@/components/dashboard/ActivityLog";
 import { ExecutionControls } from "@/components/dashboard/ExecutionControls";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 import { ResultsSummary } from "@/components/dashboard/ResultsSummary";
 import { RunNotices } from "@/components/dashboard/RunNotices";
 import { RunOverview } from "@/components/dashboard/RunOverview";
+import { RunStatusAnnouncer } from "@/components/dashboard/RunStatusAnnouncer";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -118,12 +123,17 @@ export function DashboardRunView({
           outcome={outcome}
         />
 
+        <RunStatusAnnouncer
+          tasks={tasks}
+          isCompleted={isCompleted}
+          outcome={outcome}
+          announceOutcome={Boolean(summary) && outcome !== "failed"}
+        />
+
         <RunNotices
           isCompleted={isCompleted}
           summary={summary}
-          outcome={outcome}
           fatalError={fatalError}
-          successTaskCount={successTaskCount}
           isPreview={isPreview}
           operationMode={operationMode}
           isBuildingQueue={isBuildingQueue}
@@ -185,7 +195,10 @@ function RunNavigation({
   | "tenantId"
   | "onStartNewHydration"
 > & { isCompleted: boolean }): React.JSX.Element {
+  const [showSettings, setShowSettings] = useState(false);
+
   return (
+    <>
     <AppNavigation
       brandHref={isCompleted ? "/" : null}
       eyebrow={
@@ -204,18 +217,34 @@ function RunNavigation({
         </>
       }
       actions={
-        isCompleted ? (
+        <>
           <Button
             variant="outline"
-            onClick={onStartNewHydration}
-            className="nav-action size-9 px-0 sm:w-auto sm:px-4"
+            onClick={() => setShowSettings(true)}
+            className="nav-action size-9 px-0 sm:w-auto sm:px-3"
           >
-            <RotateCcw className="size-4 sm:mr-2" />
-            <span className="sr-only sm:not-sr-only">Start New Hydration</span>
+            <Settings2 aria-hidden="true" className="size-4 sm:mr-2" />
+            <span className="sr-only sm:not-sr-only">Settings</span>
           </Button>
-        ) : null
+          {isCompleted && (
+            <Button
+              variant="outline"
+              onClick={onStartNewHydration}
+              className="nav-action size-9 px-0 sm:w-auto sm:px-4"
+            >
+              <RotateCcw className="size-4 sm:mr-2" />
+              <span className="sr-only sm:not-sr-only">Start New Hydration</span>
+            </Button>
+          )}
+        </>
       }
     />
+    <SettingsModal
+      key={showSettings ? "settings-open" : "settings-closed"}
+      open={showSettings}
+      onOpenChange={setShowSettings}
+    />
+    </>
   );
 }
 

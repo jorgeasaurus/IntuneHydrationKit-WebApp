@@ -58,8 +58,15 @@ export function ActivityLog({ messages, className }: ActivityLogProps) {
         </CardTitle>
       </CardHeader>
       <CardContent className="pt-0">
+        {/* role="log" gives the stream its semantics. Live speech is off here because
+            the engine writes many messages per task; RunStatusAnnouncer speaks a
+            throttled summary instead. tabIndex lets keyboard users scroll the log. */}
         <div
-          className="h-[200px] overflow-y-auto rounded-md border bg-slate-950/80 p-3"
+          role="log"
+          aria-label="Activity log"
+          aria-live="off"
+          tabIndex={0}
+          className="h-[200px] overflow-y-auto rounded-md border bg-slate-950/80 p-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           ref={scrollRef}
         >
           <div className="space-y-1.5 font-mono text-xs">

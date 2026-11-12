@@ -75,6 +75,7 @@ describe('OperationModeSelection', () => {
 
     const warningTitle = screen.getByText('Delete mode is live')
     const warningDescription = screen.getByText(/Conditional Access policies must be disabled/i)
+    // The warning appears when Delete is selected, so it is announced as an alert.
     const warning = screen.getByRole('alert')
     expect(warningTitle).toHaveClass('text-red-200')
     expect(warningDescription).toHaveClass('text-slate-100/90')

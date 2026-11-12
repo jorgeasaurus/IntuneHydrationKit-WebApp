@@ -2,7 +2,7 @@
 /* oxlint-disable react-doctor/no-giant-component -- wizard shell stays colocated around shared step state; splitting it is a separate UI refactor. */
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useMsal } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
@@ -89,6 +89,9 @@ function WizardContent() {
   const { accounts } = useMsal();
   const router = useRouter();
   const [showSettings, setShowSettings] = useState(false);
+  const stepHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousStepRef = useRef(state.currentStep);
+  const [stepAnnouncement, setStepAnnouncement] = useState("");
 
   const handleSignOut = async () => {
     await signOut();
@@ -101,6 +104,17 @@ function WizardContent() {
     state.selectedTargets,
     state.categorySelections
   );
+
+  // After a step change the control that caused it can unmount. Move focus to
+  // the new step heading and announce the step. The first render does neither.
+  useEffect(() => {
+    if (previousStepRef.current === state.currentStep) return;
+    previousStepRef.current = state.currentStep;
+    stepHeadingRef.current?.focus();
+    setStepAnnouncement(
+      `Step ${state.currentStep} of ${WIZARD_STEPS.length}: ${currentStep.label}`
+    );
+  }, [currentStep.label, state.currentStep]);
 
   const stepStates = useMemo(() => {
     const checks = {
@@ -202,6 +216,7 @@ function WizardContent() {
                     key={step.id}
                     type="button"
                     disabled={!step.accessible}
+                    aria-current={step.current ? "step" : undefined}
                     onClick={() => step.accessible && setCurrentStep(step.id)}
                     className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                       step.current
@@ -266,7 +281,11 @@ function WizardContent() {
                   <p className="text-[11px] font-mono uppercase tracking-[0.3em] text-hydrate">
                     {currentStep.eyebrow}
                   </p>
-                  <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+                  <h2
+                    ref={stepHeadingRef}
+                    tabIndex={-1}
+                    className="mt-3 text-3xl font-bold tracking-tight outline-none sm:text-4xl"
+                  >
                     {currentStep.label}
                   </h2>
                   <p className="mt-3 max-w-2xl text-base leading-relaxed text-muted-foreground">
@@ -301,6 +320,10 @@ function WizardContent() {
           <ActiveWizardStep currentStep={state.currentStep} />
         </section>
       </main>
+
+      <p role="status" aria-live="polite" aria-atomic="true" className="sr-only">
+        {stepAnnouncement}
+      </p>
 
       <SettingsModal
         key={showSettings ? "settings-open" : "settings-closed"}

@@ -133,13 +133,21 @@ describe('DashboardPage', () => {
     useHydrationExecutionMock.mockReturnValue(createExecutionState())
   })
 
+  it('opens settings from the dashboard header', () => {
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
+  })
+
   it('renders the preview notice as a high-contrast glass surface', () => {
     useWizardStateMock.mockReturnValue(createWizardState(true))
 
     renderPage()
 
     const previewTitle = screen.getByText('Preview Mode')
-    const previewNotice = previewTitle.closest('[role="alert"]')
+    const previewNotice = previewTitle.closest('[role="note"]')
 
     expect(previewNotice).toHaveClass('glass-panel', 'rounded-2xl', 'text-slate-50')
     expect(previewNotice).not.toHaveClass('bg-blue-500/10')
@@ -150,8 +158,9 @@ describe('DashboardPage', () => {
   it('renders live delete mode with a filled high-contrast warning banner', () => {
     renderPage()
 
-    const warning = screen.getByRole('alert')
+    const warning = screen.getByRole('note')
 
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByText('Delete Mode Active')).toBeInTheDocument()
     expect(warning).toHaveClass('bg-slate-950/90')
     expect(warning).toHaveClass('text-slate-50')
@@ -252,7 +261,7 @@ describe('DashboardPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Dynamic Groups/ }))
     expect(screen.getByText('All Windows Devices')).toBeInTheDocument()
     expect(screen.getByText('Hydration run completed')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('1 succeeded')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Run finished: 1 succeeded.'))
     await waitFor(() => expect(readExecutionRecord(sessionStorage)?.outcome).toBe('succeeded'))
 
     expect(screen.getByText('Run complete')).toBeInTheDocument()
