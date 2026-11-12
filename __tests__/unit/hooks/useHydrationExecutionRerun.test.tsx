@@ -141,6 +141,42 @@ describe('useHydrationExecution reruns', () => {
     expect(JSON.stringify(configuration)).not.toContain('confirmed')
   })
 
+  it('never carries the wizard "update existing" choice into a retry, resume, or live run', async () => {
+    mockUseWizardState.mockReturnValue({
+      state: {
+        currentStep: 4,
+        confirmed: true,
+        isPreview: false,
+        operationMode: 'create',
+        selectedTargets: ['groups'],
+        selectedCISCategories: [],
+        updateExisting: true,
+        tenantConfig: { tenantId: 'tenant-1', homeAccountId: 'home-1', cloudEnvironment: 'global' }
+      } satisfies WizardState
+    })
+    mockBuildTaskQueueAsync.mockResolvedValue([template('Group A')])
+    const { result } = renderHook(() => useHydrationExecution())
+
+    await act(async () => {
+      await result.current.startExecution()
+    })
+    expect((mockExecuteTasks.mock.calls[0][1] as ExecutionContext).updateExisting).toBe(true)
+    expect(JSON.stringify(getExecutionState().configuration)).not.toContain('updateExisting')
+
+    const scope = { selectedTargets: ['groups' as const], selectedCISCategories: [] }
+    const plans: RerunPlan[] = [
+      { kind: 'retry', configuration: baseConfiguration, sourceTasks: [{ id: 'task-3', category: 'groups', operation: 'create', itemName: 'Group A', status: 'failed' }] },
+      { kind: 'resume', configuration: baseConfiguration, sourceTasks: [template('Group A')] },
+      { kind: 'live', configuration: { ...baseConfiguration, scope }, sourceTasks: [] }
+    ]
+    for (const [index, plan] of plans.entries()) {
+      await act(async () => {
+        await result.current.startRerun(plan)
+      })
+      expect((mockExecuteTasks.mock.calls[index + 1][1] as ExecutionContext).updateExisting).toBe(false)
+    }
+  })
+
   it('does not start a second run while a run is active', async () => {
     let release!: () => void
     mockBuildTaskQueueAsync.mockReturnValue(new Promise((resolve) => (release = () => resolve([template('Group A')]))))

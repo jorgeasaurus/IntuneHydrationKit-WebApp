@@ -47,6 +47,13 @@ const DESCRIPTIONS: Record<RerunKind, string> = {
   live: "A new live run builds the same scope again from the templates and runs every check again. The preview results are not reused.",
 };
 
+/**
+ * The "update existing kit objects" choice of the wizard is never carried into a new run.
+ * To update existing objects, start a new hydration and confirm that choice again.
+ */
+const SKIP_EXISTING_NOTE =
+  "This run does not update existing objects: it skips them. To update existing kit objects, start a new hydration and choose it in the review step.";
+
 function getConfirmLabel(kind: RerunKind, operationMode: OperationMode): string {
   if (kind === "retry") return "Start retry";
   if (kind === "resume") return "Resume run";
@@ -98,7 +105,10 @@ function RerunConfirmBody({
     >
       <DialogHeader>
         <DialogTitle>{TITLES[kind](objectCount)}</DialogTitle>
-        <DialogDescription>{DESCRIPTIONS[kind]}</DialogDescription>
+        <DialogDescription>
+          {DESCRIPTIONS[kind]}
+          {operationMode === "create" && ` ${SKIP_EXISTING_NOTE}`}
+        </DialogDescription>
       </DialogHeader>
 
       <dl className="grid gap-3 rounded-xl border border-border/80 bg-background/60 p-4 text-sm sm:grid-cols-3">

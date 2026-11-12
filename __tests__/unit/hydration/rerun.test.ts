@@ -211,6 +211,22 @@ describe("buildRerunTaskQueue", () => {
     expect(queue[1]).toMatchObject({ itemName: "[IHD] All Windows Devices", status: "pending" });
   });
 
+  it("retries a failed update as a plain task, and does not retry updated or would-update tasks", async () => {
+    const update = { objectId: "obj-1", applied: true, differences: ["membershipRule"] };
+    const earlier: HydrationTask[] = [
+      task("updated", "success", { itemName: "[IHD] All macOS Devices", update }),
+      task("would-update", "success", { itemName: "[IHD] All macOS Devices", update: { ...update, applied: false } }),
+      task("update-failed", "failed", { itemName: "[IHD] All Windows Devices", error: "Update failed: 403", update }),
+    ];
+    const retry = getRetryTasks(earlier);
+    expect(retry.map((item) => item.id)).toEqual(["update-failed"]);
+    const queue = await buildRerunTaskQueue(retry, "create");
+    expect(queue).toEqual([
+      { id: "task-1", category: "groups", operation: "create", itemName: "[IHD] All Windows Devices", status: "pending" },
+    ]);
+    expect(queue[0]).not.toHaveProperty("update");
+  });
+
   it("queues a delete task without a template by name, so the delete resolver checks it", async () => {
     const earlier = [task("a", "failed", { operation: "delete", itemName: "Tenant-only group" })];
     const queue = await buildRerunTaskQueue(earlier, "delete");
