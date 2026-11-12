@@ -167,6 +167,24 @@ describe("batch create resilience", () => {
     });
   });
 
+  it("keeps the per-request retries after the outer request used its own retries", async () => {
+    mockGetBatchConfig.mockReturnValue({ ...config, defaultBatchSize: 1 });
+    const throttled = { id: "req-0", status: 429, headers: { "Retry-After": "1" }, body: { error: { message: "Throttled" } } };
+    const batch = vi
+      .fn()
+      .mockRejectedValueOnce(httpError(429))
+      .mockRejectedValueOnce(httpError(429))
+      .mockRejectedValueOnce(httpError(429))
+      .mockResolvedValueOnce({ responses: [throttled] })
+      .mockResolvedValueOnce({ responses: [created("0", GROUP_NAMES[0])] });
+    const context = createContext({ batch });
+
+    const results = await executeTasksInBatches([task(0)], context);
+
+    expect(batch).toHaveBeenCalledTimes(5);
+    expect(results).toEqual([expect.objectContaining({ success: true })]);
+  });
+
   describe("per-request responses", () => {
     it("does not resend a create after a 504; a found object counts as created", async () => {
       const batch = vi.fn().mockResolvedValue({

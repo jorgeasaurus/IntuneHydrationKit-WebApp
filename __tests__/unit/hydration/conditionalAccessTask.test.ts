@@ -15,7 +15,8 @@ vi.mock("@/lib/templates/loader", () => ({
   getCachedTemplates: mockGetCachedTemplates,
 }));
 
-vi.mock("@/lib/graph/conditionalAccess", () => ({
+vi.mock("@/lib/graph/conditionalAccess", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/graph/conditionalAccess")>()),
   createConditionalAccessPolicy: mockCreateConditionalAccessPolicy,
 }));
 
@@ -101,6 +102,24 @@ describe("executeConditionalAccessTask", () => {
         state: "disabled",
       })
     );
+  });
+
+  it("skips create when a kit policy with the other marker format exists", async () => {
+    const policyName = "[IHD] Require MFA";
+    mockGetCachedTemplates.mockReturnValue([
+      { displayName: policyName, state: "disabled", conditions: {}, grantControls: { operator: "OR", builtInControls: ["mfa"] } },
+    ]);
+
+    const result = await executeConditionalAccessTask(createTask(policyName), {
+      client: createClient(),
+      operationMode: "create",
+      isPreview: false,
+      stopOnFirstError: false,
+      cachedConditionalAccessPolicies: [{ id: "old", displayName: "Require MFA [Imported by Intune Hydration Kit]" }],
+    });
+
+    expect(result).toMatchObject({ skipped: true, skipKind: "noOp", error: "Already exists" });
+    expect(mockCreateConditionalAccessPolicy).not.toHaveBeenCalled();
   });
 
   it("skips preview create when a normalized cached policy name already exists", async () => {

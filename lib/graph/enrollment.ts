@@ -305,45 +305,43 @@ export interface EnrollmentDeleteCandidate {
   basePath: string;
 }
 
-/**
- * Find the enrollment object (Autopilot profile, ESP or Device Preparation policy)
- * that a delete task names. Read errors are not caught, so the caller does not
- * delete an object when it cannot read the tenant.
- * Device Preparation policies are Settings Catalog policies, so only policies with
- * the "enrollment" technology can match.
- */
-export async function findEnrollmentProfileForDelete(
-  client: GraphClient,
-  name: string
-): Promise<EnrollmentDeleteCandidate | null> {
-  const normalizedName = normalizeEnrollmentDisplayName(name);
+/** Enrollment object type, as getEnrollmentProfileType returns it. */
+export type EnrollmentProfileType = ReturnType<typeof getEnrollmentProfileType>;
 
+async function findAutopilotForDelete(client: GraphClient, normalizedName: string): Promise<EnrollmentDeleteCandidate | null> {
   const autopilot = (await getAllAutopilotProfiles(client)).find(
     (profile) => profile.id && normalizeEnrollmentDisplayName(profile.displayName) === normalizedName
   );
-  if (autopilot?.id) {
-    return {
-      id: autopilot.id,
-      name: autopilot.displayName,
-      description: autopilot.description,
-      label: "Autopilot profile",
-      basePath: AUTOPILOT_PATH,
-    };
-  }
+  if (!autopilot?.id) return null;
+  return {
+    id: autopilot.id,
+    name: autopilot.displayName,
+    description: autopilot.description,
+    label: "Autopilot profile",
+    basePath: AUTOPILOT_PATH,
+  };
+}
 
+async function findEspForDelete(client: GraphClient, normalizedName: string): Promise<EnrollmentDeleteCandidate | null> {
   const esp = (await getAllEnrollmentConfigurations(client)).find(
     (config) => config.id && normalizeEnrollmentDisplayName(config.displayName) === normalizedName
   );
-  if (esp?.id) {
-    return {
-      id: esp.id,
-      name: esp.displayName,
-      description: esp.description,
-      label: "Enrollment Status Page",
-      basePath: ESP_PATH,
-    };
-  }
+  if (!esp?.id) return null;
+  return {
+    id: esp.id,
+    name: esp.displayName,
+    description: esp.description,
+    label: "Enrollment Status Page",
+    basePath: ESP_PATH,
+  };
+}
 
+async function findDevicePreparationForDelete(
+  client: GraphClient,
+  normalizedName: string
+): Promise<EnrollmentDeleteCandidate | null> {
+  // Device Preparation policies are Settings Catalog policies, so only policies with
+  // the "enrollment" technology can match.
   const devicePreparation = (
     await client.getCollection<DevicePreparationPolicySummary & { technologies?: string }>(
       `${CONFIG_POLICIES_PATH}?$select=id,name,description,technologies`
@@ -353,15 +351,55 @@ export async function findEnrollmentProfileForDelete(
       policy.technologies?.toLowerCase().includes("enrollment") &&
       normalizeEnrollmentDisplayName(policy.name) === normalizedName
   );
-  if (devicePreparation?.id) {
-    return {
-      id: devicePreparation.id,
-      name: devicePreparation.name,
-      description: devicePreparation.description,
-      label: "Device Preparation policy",
-      basePath: CONFIG_POLICIES_PATH,
-    };
+  if (!devicePreparation?.id) return null;
+  return {
+    id: devicePreparation.id,
+    name: devicePreparation.name,
+    description: devicePreparation.description,
+    label: "Device Preparation policy",
+    basePath: CONFIG_POLICIES_PATH,
+  };
+}
+
+const ENROLLMENT_DELETE_FINDERS: Record<
+  EnrollmentProfileType,
+  (client: GraphClient, normalizedName: string) => Promise<EnrollmentDeleteCandidate | null>
+> = {
+  autopilot: findAutopilotForDelete,
+  esp: findEspForDelete,
+  devicePreparation: findDevicePreparationForDelete,
+};
+
+/**
+ * Find the enrollment object (Autopilot profile, ESP or Device Preparation policy)
+ * that a delete task names. Read errors are not caught, so the caller does not
+ * delete an object when it cannot read the tenant.
+ *
+ * With a profile type (from the task's template), only that collection is searched,
+ * so an object of another type with the same name cannot be selected. Without one,
+ * all three collections are searched and a name that matches in more than one of
+ * them is an error: the caller must not guess which object to delete.
+ */
+export async function findEnrollmentProfileForDelete(
+  client: GraphClient,
+  name: string,
+  profileType?: EnrollmentProfileType
+): Promise<EnrollmentDeleteCandidate | null> {
+  const normalizedName = normalizeEnrollmentDisplayName(name);
+
+  if (profileType) {
+    return ENROLLMENT_DELETE_FINDERS[profileType](client, normalizedName);
   }
 
-  return null;
+  const matches: EnrollmentDeleteCandidate[] = [];
+  for (const find of Object.values(ENROLLMENT_DELETE_FINDERS)) {
+    const match = await find(client, normalizedName);
+    if (match) matches.push(match);
+  }
+  if (matches.length > 1) {
+    throw new Error(
+      `"${name}" matches more than one enrollment object (${matches.map((match) => match.label).join(", ")})`
+    );
+  }
+  return matches[0] ?? null;
 }

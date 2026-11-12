@@ -20,7 +20,13 @@ import {
   findHydrationConditionalAccessPolicy,
   getConditionalAccessDeleteBlockReason,
 } from "@/lib/graph/conditionalAccess";
-import { findEnrollmentProfileForDelete } from "@/lib/graph/enrollment";
+import {
+  EnrollmentProfile,
+  findEnrollmentProfileForDelete,
+  getEnrollmentProfileName,
+  getEnrollmentProfileType,
+} from "@/lib/graph/enrollment";
+import { getCachedTemplates } from "@/lib/templates/loader";
 import { IMPORT_PREFIX, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { isRunCancelledError } from "@/lib/utils/retry";
 import { HydrationTask } from "@/types/hydration";
@@ -393,8 +399,17 @@ async function resolveConditionalAccess(task: HydrationTask, context: ExecutionC
 }
 
 async function findEnrollmentObject(task: HydrationTask, context: ExecutionContext): Promise<FoundObject | null> {
-  // Enrollment objects are not prefetched; read them now.
-  const candidate = await findEnrollmentProfileForDelete(context.client, task.itemName);
+  // Enrollment objects are not prefetched; read them now. The template gives the object
+  // type, so only that collection is searched.
+  const templates = getCachedTemplates("enrollment");
+  const template = Array.isArray(templates)
+    ? (templates as EnrollmentProfile[]).find((profile) => getEnrollmentProfileName(profile) === task.itemName)
+    : undefined;
+  const candidate = await findEnrollmentProfileForDelete(
+    context.client,
+    task.itemName,
+    template && getEnrollmentProfileType(template)
+  );
   if (!candidate) return null;
   const url = `${candidate.basePath}/${candidate.id}`;
   return {

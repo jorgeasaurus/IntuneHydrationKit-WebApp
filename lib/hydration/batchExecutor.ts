@@ -819,6 +819,9 @@ async function executeBatchGroup(
 
     // Submit this chunk. Only requests that Graph proved it did not process are sent again.
     let currentItems = chunk;
+    // The outer $batch request and the requests inside it have separate retry budgets,
+    // so throttling of the outer request does not use up the retries of the inner ones.
+    let outerRetryCount = 0;
     let retryCount = 0;
     let batchThrottleCount = 0;
 
@@ -857,13 +860,13 @@ async function executeBatchGroup(
         const notProcessed = status === 429 || status === 503;
         if (notProcessed) {
           batchThrottleCount += currentItems.length;
-          if (retryCount < MAX_RETRIES) {
-            const delay = getRetryDelayMs(retryCount, getErrorRetryAfterMs(error));
-            retryCount++;
-            console.warn(`[BatchExecutor] Batch ${i + 1} request got ${status}; retry ${retryCount}/${MAX_RETRIES} in ${delay}ms`);
+          if (outerRetryCount < MAX_RETRIES) {
+            const delay = getRetryDelayMs(outerRetryCount, getErrorRetryAfterMs(error));
+            outerRetryCount++;
+            console.warn(`[BatchExecutor] Batch ${i + 1} request got ${status}; retry ${outerRetryCount}/${MAX_RETRIES} in ${delay}ms`);
             emitStatus(
               context,
-              `Graph throttled the batch request (HTTP ${status}). Sending ${currentItems.length} items again in ${Math.ceil(delay / 1000)}s (attempt ${retryCount}/${MAX_RETRIES})...`,
+              `Graph throttled the batch request (HTTP ${status}). Sending ${currentItems.length} items again in ${Math.ceil(delay / 1000)}s (attempt ${outerRetryCount}/${MAX_RETRIES})...`,
               "warning"
             );
             if ((await sleepWithExecutionControl(delay, context)) === "cancelled") {

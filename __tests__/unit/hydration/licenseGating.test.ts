@@ -73,6 +73,20 @@ describe("license gating before dispatch", () => {
     expect(getLicenseSkipReason(createTask("conditionalAccess", RISK_POLICY, "delete"), context)).toBeUndefined();
   });
 
+  it("gates a driver update profile by template type, not by its name", () => {
+    const renamed = "[IHD] Win - OIB - Hardware Servicing - Default";
+    const other = "[IHD] Win - OIB - Driver Update Notes";
+    const context = createContext({
+      cachedBaselineTemplates: [
+        { ...driverTemplate, displayName: renamed },
+        { displayName: other, _oibPolicyType: "SettingsCatalog" } as unknown as BaselinePolicy,
+      ],
+    });
+
+    expect(getLicenseSkipReason(createTask("baseline", renamed), context)).toMatch(/No Windows Driver Update license/);
+    expect(getLicenseSkipReason(createTask("baseline", other), context)).toBeUndefined();
+  });
+
   it("skips a risk-based Conditional Access policy on the batch path without Premium P2", async () => {
     const context = createContext();
     const task = createTask("conditionalAccess", RISK_POLICY);

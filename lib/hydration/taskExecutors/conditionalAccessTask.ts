@@ -7,7 +7,7 @@ import { HydrationTask } from "@/types/hydration";
 import { ConditionalAccessPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
 import { executeDeleteTask } from "../deleteResolver";
-import { createConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
+import { createConditionalAccessPolicy, findHydrationConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
 import { normalizeName, requireTenantCache } from "../utils";
 
@@ -20,7 +20,7 @@ function findCachedConditionalAccessPolicy(
   const fullMarkerLowerName = `${lowerName} [imported by intune hydration kit]`;
   const normalizedDisplayName = normalizeName(displayName);
 
-  return policies?.find((policy) => {
+  const match = policies?.find((policy) => {
     const policyLower = policy.displayName?.toLowerCase();
     return (
       policyLower === lowerName ||
@@ -29,6 +29,10 @@ function findCachedConditionalAccessPolicy(
       normalizeName(policy.displayName) === normalizedDisplayName
     );
   });
+  if (match) return match;
+  // A kit policy can carry the other marker format, for example
+  // "Require MFA [Imported by Intune Hydration Kit]" for the template "[IHD] Require MFA".
+  return (policies && findHydrationConditionalAccessPolicy(policies, displayName)) ?? undefined;
 }
 
 /**

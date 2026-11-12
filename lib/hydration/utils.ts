@@ -20,7 +20,15 @@ export const LICENSE_SKIP_REASONS = {
   driverUpdate: "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)",
 } as const;
 
-function isDriverUpdateTask(task: HydrationTask): boolean {
+/**
+ * Whether a task creates a driver update profile. The template's policy type decides,
+ * the same value that routes the create. The name is used when no template is found.
+ */
+function isDriverUpdateTask(task: HydrationTask, context: ExecutionContext): boolean {
+  if (task.category === "baseline") {
+    const template = findBaselineTemplate(task, context);
+    if (template) return getOIBPolicyType(template) === "DriverUpdateProfiles";
+  }
   const name = task.itemName.toLowerCase();
   return name.includes("wufb drivers") || name.includes("driver update");
 }
@@ -46,7 +54,7 @@ export function getLicenseSkipReason(task: HydrationTask, context: ExecutionCont
     }
   }
 
-  if (context.hasWindowsDriverUpdateLicense === false && isDriverUpdateTask(task)) {
+  if (context.hasWindowsDriverUpdateLicense === false && isDriverUpdateTask(task, context)) {
     return LICENSE_SKIP_REASONS.driverUpdate;
   }
   return undefined;

@@ -205,6 +205,26 @@ describe("lib/graph/enrollment", () => {
     expect(getCollection).toHaveBeenCalledWith("/deviceManagement/configurationPolicies?$select=id,name,description,technologies");
   });
 
+  it("searches only the collection of the given profile type", async () => {
+    const sameName = "[IHD] Windows Enrollment";
+    const getCollection = vi.fn(async (url: string) => {
+      if (url === "/deviceManagement/windowsAutopilotDeploymentProfiles") {
+        return [makeAutopilotProfile({ displayName: sameName })];
+      }
+      if (url === "/deviceManagement/deviceEnrollmentConfigurations") return [makeEspProfile({ displayName: sameName })];
+      return [];
+    });
+    const client = { getCollection } as unknown as GraphClient;
+
+    await expect(findEnrollmentProfileForDelete(client, sameName, "esp")).resolves.toMatchObject({
+      id: "esp-id",
+      basePath: "/deviceManagement/deviceEnrollmentConfigurations",
+    });
+    expect(getCollection).toHaveBeenCalledTimes(1);
+    // Without a type, a name that matches two object types is not resolved.
+    await expect(findEnrollmentProfileForDelete(client, sameName)).rejects.toThrow(/more than one enrollment object/);
+  });
+
   it("does not hide read errors during the delete lookup", async () => {
     const client = {
       getCollection: vi.fn().mockRejectedValue(new Error("[403] Forbidden")),
