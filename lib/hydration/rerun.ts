@@ -10,6 +10,7 @@
 import { isExecutionCheckpoint, type ExecutionRecord } from "@/lib/hydration/executionRecord";
 import type { ExecutionRunConfiguration, ExecutionState } from "@/lib/hydration/executionStateStore";
 import type { RunScope } from "@/lib/hydration/runScope";
+import type { RunLockState } from "@/lib/hydration/runLock";
 import { buildTaskQueueAsync, getEstimatedTaskCount } from "@/lib/hydration/engine";
 import type { ActivityMessage } from "@/lib/hydration/types";
 import type { CloudEnvironment, HydrationTask, OperationMode } from "@/types/hydration";
@@ -113,6 +114,24 @@ export function getSavedRecordAction(
 
 const ACTIVE_RUN_REASON = "A run is active. Wait until it completes before you start another run.";
 
+export const OTHER_TAB_RUN_REASON =
+  "Another browser tab is running a hydration for this tenant. Wait until that run completes, or close that tab, before you continue here.";
+export const CHECKING_OTHER_TABS_REASON = "Checking that no other browser tab is running this run...";
+export const UNKNOWN_OTHER_TABS_REASON =
+  "This browser cannot confirm that no other tab is still running this run, so it cannot be resumed here. Discard it, or start a new hydration.";
+
+/**
+ * Reason why the run lock state blocks a new run, or null.
+ * A run in another tab blocks every kind. An interrupted run is resumed only when it is known
+ * that no other tab runs it (fail closed): a duplicated tab has a copy of its checkpoint.
+ */
+export function getRunLockBlockReason(kind: RerunKind, lockState: RunLockState | null): string | null {
+  if (lockState === "held") return OTHER_TAB_RUN_REASON;
+  if (kind !== "resume") return null;
+  if (lockState === null) return CHECKING_OTHER_TABS_REASON;
+  return lockState === "unknown" ? UNKNOWN_OTHER_TABS_REASON : null;
+}
+
 /**
  * The run that a new run can continue from (the restored record, or the completed live run),
  * and the reason why no new run can start now.
@@ -122,12 +141,16 @@ export function getRerunAvailability({
   liveRun,
   phase,
   active,
+  lockState,
 }: {
   restoredRecord: ExecutionRecord | null;
   liveRun: { configuration: ExecutionRunConfiguration | null; tasks: HydrationTask[] };
   phase: ExecutionState["phase"];
   active: ActiveAccount;
+  /** Run lock state of the source tenant in other tabs, or null before the first check. */
+  lockState: RunLockState | null;
 }): { source: RerunSource | null; disabledReason: string | null; isInterrupted: boolean } {
+  const isInterrupted = Boolean(restoredRecord && isExecutionCheckpoint(restoredRecord));
   const source: RerunSource | null =
     restoredRecord ??
     (phase === "completed" && liveRun.configuration ? { ...liveRun.configuration, tasks: liveRun.tasks } : null);
@@ -136,12 +159,8 @@ export function getRerunAvailability({
     ? null
     : isRunActive
       ? ACTIVE_RUN_REASON
-      : getRerunBlockReason(source, active);
-  return {
-    source,
-    disabledReason,
-    isInterrupted: Boolean(restoredRecord && isExecutionCheckpoint(restoredRecord)),
-  };
+      : (getRerunBlockReason(source, active) ?? getRunLockBlockReason(isInterrupted ? "resume" : "retry", lockState));
+  return { source, disabledReason, isInterrupted };
 }
 
 /** Create the plan of a new run that continues from the earlier run. */

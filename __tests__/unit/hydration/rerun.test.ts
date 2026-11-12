@@ -126,10 +126,11 @@ describe("saved record handling", () => {
       liveRun: { configuration: null, tasks: [] },
       phase: "running",
       active,
+      lockState: "free",
     });
     expect(availability.disabledReason).toMatch(/A run is active/);
     expect(
-      getRerunAvailability({ restoredRecord: null, liveRun: { configuration: null, tasks: [] }, phase: "running", active }).source,
+      getRerunAvailability({ restoredRecord: null, liveRun: { configuration: null, tasks: [] }, phase: "running", active, lockState: "free" }).source,
     ).toBeNull();
   });
 });

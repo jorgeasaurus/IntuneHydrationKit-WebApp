@@ -30,6 +30,8 @@ vi.mock('@/lib/config/batchConfig', () => ({
 import { resetExecutionControlForTests, useHydrationExecution } from '@/hooks/useHydrationExecution'
 import { getExecutionState } from '@/lib/hydration/executionStateStore'
 import { TEMPLATE_UNAVAILABLE_MESSAGE } from '@/lib/hydration/rerun'
+import { getRunLockState } from '@/lib/hydration/runLock'
+import { installFakeLocks } from '@/__tests__/helpers/fakeLocks'
 
 const licenses = { hasConditionalAccessLicense: false, hasPremiumP2License: false, hasWindowsDriverUpdateLicense: true }
 const baseConfiguration = {
@@ -175,6 +177,26 @@ describe('useHydrationExecution reruns', () => {
       })
       expect((mockExecuteTasks.mock.calls[index + 1][1] as ExecutionContext).updateExisting).toBe(false)
     }
+  })
+
+  it('holds the tenant run lock for the life of the run, so other tabs see it', async () => {
+    const locks = installFakeLocks()
+    let lockDuringRun: string | null = null
+    mockBuildTaskQueueAsync.mockResolvedValue([template('Group A')])
+    mockExecuteTasks.mockImplementation(async (tasks: HydrationTask[]) => {
+      lockDuringRun = await getRunLockState('tenant-1')
+      finishTasks(tasks)
+    })
+    const { result } = renderHook(() => useHydrationExecution())
+    await act(async () => {
+      await result.current.startRerun({ kind: 'retry', configuration: baseConfiguration, sourceTasks: [{ id: 'x', category: 'groups', operation: 'create', itemName: 'Group A', status: 'failed' }] })
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(lockDuringRun).toBe('held')
+    expect(await getRunLockState('tenant-1')).toBe('free')
+    locks.uninstall()
   })
 
   it('does not start a second run while a run is active', async () => {

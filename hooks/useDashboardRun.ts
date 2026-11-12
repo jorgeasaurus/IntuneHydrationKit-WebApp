@@ -15,12 +15,14 @@ import {
 import { getEstimatedTaskCount } from "@/lib/hydration/engine";
 import type { CloudEnvironment, ExecutionOutcome, HydrationSummary, HydrationTask, OperationMode, WizardState } from "@/types/hydration";
 import { getExecutionState, type ExecutionState } from "@/lib/hydration/executionStateStore";
-import { startRunCheckpoints } from "@/lib/hydration/runCheckpoint";
+import { prepareRestoredRecord, startRunCheckpoints } from "@/lib/hydration/runCheckpoint";
+import { getRunLockState, watchRunLock, type RunLockState } from "@/lib/hydration/runLock";
 import { downloadReport, generateJSONReport, generateReportFilename } from "@/lib/hydration/reporter";
 import { getCreatedObjectLinks } from "@/lib/utils/portalLinks";
 import {
   createRerunPlan,
   getRerunAvailability,
+  getRunLockBlockReason,
   getSavedRecordAction,
   type RerunKind,
 } from "@/lib/hydration/rerun";
@@ -76,6 +78,9 @@ function getRestoredDashboardRun(record: ExecutionRecord): DashboardRun {
     pauseStartedAt: null,
   };
 }
+
+/** Time between two checks for a run of the displayed tenant in another tab. */
+const RUN_LOCK_POLL_MS = 3000;
 
 const RUN_START_MESSAGES: Record<RerunKind, string> = {
   retry: "Retry run started.",
@@ -138,6 +143,15 @@ export function useDashboardRun() {
     reset,
   } = execution;
 
+  // Liveness of runs for the displayed tenant in other tabs (a duplicated tab copies the checkpoint).
+  const [lockCheck, setLockCheck] = useState<{ tenantId: string; state: RunLockState } | null>(null);
+  const lockTenantId = restoredRecord?.tenantId ?? (isCompleted ? configuration?.tenantId : undefined) ?? null;
+  useEffect(() => {
+    if (!lockTenantId) return;
+    return watchRunLock(lockTenantId, (state) => setLockCheck({ tenantId: lockTenantId, state }), RUN_LOCK_POLL_MS);
+  }, [lockTenantId]);
+  const lockState = lockCheck?.tenantId === lockTenantId ? lockCheck.state : null;
+
   // Save the progress of the active run, so that an interrupted run can be resumed.
   useEffect(() => startRunCheckpoints({ storage: sessionStorage, eventTarget: window }), []);
 
@@ -150,7 +164,7 @@ export function useDashboardRun() {
       getExecutionState().phase !== "idle",
     );
     setHasForeignInterruptedRun(action === "foreignInterrupted");
-    if (action === "restore") setRestoredRecord(record);
+    if (action === "restore" && record) setRestoredRecord(prepareRestoredRecord(record, sessionStorage));
     if (action === "clear") clearHydrationSession(sessionStorage);
     setHasCheckedRecord(true);
   }, [activeHomeAccountId, activeTenantId]);
@@ -228,7 +242,7 @@ export function useDashboardRun() {
     if (saved && isExecutionCheckpoint(saved) && activeHomeAccountId && activeTenantId) {
       const action = getSavedRecordAction(saved, { homeAccountId: activeHomeAccountId, tenantId: activeTenantId }, false);
       setHasForeignInterruptedRun(action === "foreignInterrupted");
-      if (action === "restore") setRestoredRecord(saved);
+      if (action === "restore") setRestoredRecord(prepareRestoredRecord(saved, sessionStorage));
       return;
     }
     clearHydrationSession(sessionStorage);
@@ -281,14 +295,24 @@ export function useDashboardRun() {
     liveRun: { configuration, tasks },
     phase,
     active: { homeAccountId: activeHomeAccountId, tenantId: activeTenantId },
+    lockState,
   });
 
-  /** Start a new run that continues from the displayed run. */
-  function handleRerun(kind: RerunKind): void {
+  /**
+   * Start a new run that continues from the displayed run. The other-tab check runs again at
+   * confirm time, so a run that started in another tab after the last check is refused.
+   */
+  async function startRerunAfterChecks(kind: RerunKind): Promise<void> {
     if (!rerunSource || rerunDisabledReason) return;
     if (kind === "resume" && !isInterrupted) return;
     if (kind === "live" && !rerunSource.isPreview) return;
-    const plan = createRerunPlan(kind, rerunSource);
+    const source = rerunSource;
+    const currentLockState = await getRunLockState(source.tenantId);
+    setLockCheck({ tenantId: source.tenantId, state: currentLockState });
+    if (getRunLockBlockReason(kind, currentLockState)) return;
+    const currentPhase = getExecutionState().phase;
+    if (currentPhase !== "idle" && currentPhase !== "completed") return;
+    const plan = createRerunPlan(kind, source);
     // The wizard must not start its own run after the displayed record is removed.
     hasStartedRef.current = true;
     setRestoredRecord(null);
@@ -296,6 +320,10 @@ export function useDashboardRun() {
     startRerun(plan).catch(() => {
       // The execution hook records and displays the actionable error.
     });
+  }
+
+  function handleRerun(kind: RerunKind): void {
+    void startRerunAfterChecks(kind);
   }
 
   return {

@@ -17,7 +17,9 @@ import {
 import {
   CHECKPOINT_ACTIVITY_LIMIT,
   CHECKPOINT_INTERVAL_MS,
+  completeFinishedCheckpoint,
   createCheckpointRecord,
+  prepareRestoredRecord,
   startRunCheckpoints,
 } from "@/lib/hydration/runCheckpoint";
 import { EXECUTION_RECORD_STORAGE_KEY } from "@/lib/storageKeys";
@@ -283,5 +285,50 @@ describe("execution record compatibility", () => {
 
   it("rejects a checkpoint whose paused time is longer than the saved run", () => {
     expect(() => writeExecutionRecord(sessionStorage, { ...checkpoint(), pausedMs: 5000 })).toThrow();
+  });
+});
+
+describe("finished checkpoints", () => {
+  const start = new Date("2026-08-17T01:00:00.000Z");
+  const saved = new Date("2026-08-17T01:00:09.000Z");
+  const finishedTasks: HydrationTask[] = [
+    { id: "t1", category: "groups", operation: "create", itemName: "A", status: "success", startTime: start, endTime: start },
+    { id: "t2", category: "groups", operation: "create", itemName: "B", status: "failed", error: "403", startTime: start, endTime: start },
+  ];
+  const checkpoint = (tasks: HydrationTask[]) =>
+    ({
+      ...configuration,
+      tasks,
+      activityLog: [],
+      startTime: start,
+      endTime: null,
+      pausedMs: 1000,
+      outcome: null,
+      summary: null,
+      fatalError: null,
+      checkpointAt: saved,
+    }) as Extract<ExecutionRecord, { outcome: null }>;
+
+  beforeEach(() => sessionStorage.clear());
+
+  it("turns a checkpoint whose tasks all finished into a valid terminal record", () => {
+    const terminal = completeFinishedCheckpoint(checkpoint(finishedTasks))!;
+    expect(terminal.outcome).toBe("completedWithIssues");
+    expect(terminal.endTime).toEqual(saved);
+    expect(terminal.summary?.stats).toMatchObject({ total: 2, created: 1, failed: 1 });
+    expect(terminal).not.toHaveProperty("checkpointAt");
+    expect(() => writeExecutionRecord(sessionStorage, terminal)).not.toThrow();
+  });
+
+  it("keeps a checkpoint with unfinished tasks as interrupted", () => {
+    const record = checkpoint([...finishedTasks, { id: "t3", category: "groups", operation: "create", itemName: "C", status: "pending" }]);
+    expect(completeFinishedCheckpoint(record)).toBeNull();
+    expect(prepareRestoredRecord(record, sessionStorage)).toBe(record);
+  });
+
+  it("saves the finished run again, so a refresh shows the results view", () => {
+    const restored = prepareRestoredRecord(checkpoint(finishedTasks), sessionStorage);
+    expect(isExecutionCheckpoint(restored)).toBe(false);
+    expect(isExecutionCheckpoint(readExecutionRecord(sessionStorage)!)).toBe(false);
   });
 });

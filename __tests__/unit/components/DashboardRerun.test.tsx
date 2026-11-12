@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import DashboardPage from '@/app/dashboard/page'
@@ -9,6 +9,7 @@ import { createSummary } from '@/lib/hydration/reporter'
 import type { RerunPlan } from '@/lib/hydration/rerun'
 import type { HydrationSummary, HydrationTask, WizardState } from '@/types/hydration'
 import type { useHydrationExecution } from '@/hooks/useHydrationExecution'
+import { installFakeLocks, runLockName } from '@/__tests__/helpers/fakeLocks'
 
 type ExecutionHookState = ReturnType<typeof useHydrationExecution>
 
@@ -38,6 +39,13 @@ vi.mock('@/lib/auth/authUtils', () => ({ getActiveAccount: () => getActiveAccoun
 
 const startTime = new Date('2026-08-17T01:00:00.000Z')
 const endTime = new Date('2026-08-17T01:00:02.000Z')
+
+/** Let the async run lock checks settle. */
+async function flush(): Promise<void> {
+  await act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
+}
 
 function renderPage() {
   return render(
@@ -116,7 +124,12 @@ function checkpoint(overrides: Partial<ExecutionRecord> = {}): ExecutionRecord {
 }
 
 describe('Dashboard: continue from an earlier run', () => {
+  let locks: ReturnType<typeof installFakeLocks>
+
+  afterEach(() => locks.uninstall())
+
   beforeEach(() => {
+    locks = installFakeLocks()
     vi.clearAllMocks()
     sessionStorage.clear()
     localStorage.clear()
@@ -131,7 +144,7 @@ describe('Dashboard: continue from an earlier run', () => {
   it('shows an interrupted run and resumes only its pending and running tasks', async () => {
     writeExecutionRecord(sessionStorage, checkpoint())
     renderPage()
-    await act(async () => undefined)
+    await flush()
 
     expect(screen.getByRole('heading', { name: 'This run was interrupted' })).toBeInTheDocument()
     expect(push).not.toHaveBeenCalled()
@@ -142,6 +155,7 @@ describe('Dashboard: continue from an earlier run', () => {
     const dialog = screen.getByRole('dialog', { name: 'Resume 2 unfinished tasks' })
     expect(within(dialog).getByRole('button', { name: 'Cancel' })).toHaveFocus()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Resume run' }))
+    await flush()
 
     expect(startRerun).toHaveBeenCalledTimes(1)
     const plan = startRerun.mock.calls[0][0] as RerunPlan
@@ -151,10 +165,78 @@ describe('Dashboard: continue from an earlier run', () => {
     expect(screen.getByTestId('run-start-announcer')).toHaveTextContent('Resumed run started. 2 items in scope.')
   })
 
+  it('refuses to resume while another tab (for example a duplicated tab) still runs the tenant', async () => {
+    locks.held.set(runLockName('tenant-id'), 1)
+    writeExecutionRecord(sessionStorage, checkpoint())
+    renderPage()
+    await flush()
+
+    const resume = screen.getByRole('button', { name: 'Resume 2 unfinished tasks' })
+    expect(resume).toBeDisabled()
+    expect(resume).toHaveAccessibleDescription(/Another browser tab is running a hydration for this tenant/)
+
+    // When the other tab's run ends, Resume becomes available.
+    locks.held.clear()
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 3100))
+    })
+    expect(screen.getByRole('button', { name: 'Resume 2 unfinished tasks' })).toBeEnabled()
+  })
+
+  it('checks the other tabs again at confirm time', async () => {
+    writeExecutionRecord(sessionStorage, checkpoint())
+    renderPage()
+    await flush()
+    fireEvent.click(screen.getByRole('button', { name: 'Resume 2 unfinished tasks' }))
+    const dialog = screen.getByRole('dialog', { name: 'Resume 2 unfinished tasks' })
+
+    locks.held.set(runLockName('tenant-id'), 1)
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Resume run' }))
+    await flush()
+
+    expect(startRerun).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: 'Resume 2 unfinished tasks' })).toBeDisabled()
+    expect(screen.getByText(/Another browser tab is running a hydration/)).toBeInTheDocument()
+  })
+
+  it('does not resume when the browser cannot tell whether another tab runs it', async () => {
+    locks.uninstall()
+    writeExecutionRecord(sessionStorage, checkpoint())
+    renderPage()
+    await flush()
+
+    const resume = screen.getByRole('button', { name: 'Resume 2 unfinished tasks' })
+    expect(resume).toBeDisabled()
+    expect(resume).toHaveAccessibleDescription(/cannot confirm that no other tab/)
+    expect(screen.getByRole('button', { name: 'Discard run' })).toBeEnabled()
+  })
+
+  it('shows a checkpoint whose tasks all finished as a finished run and offers to retry its failures', async () => {
+    writeExecutionRecord(
+      sessionStorage,
+      checkpoint({
+        tasks: [task('1', 'success'), task('2', 'failed'), { ...task('3', 'skipped'), skipKind: 'cancelled' } as HydrationTask]
+      })
+    )
+    renderPage()
+    await flush()
+
+    expect(screen.queryByRole('heading', { name: 'This run was interrupted' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Resume/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retry 1 failed task' }))
+    fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Start retry' }))
+    await flush()
+    const plan = startRerun.mock.calls[0][0] as RerunPlan
+    expect(plan.sourceTasks.map((item) => item.id)).toEqual(['2'])
+    const saved = JSON.parse(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)!)
+    expect(saved.outcome).toBe('cancelled')
+    expect(saved.checkpointAt).toBeUndefined()
+  })
+
   it('does not offer to resume an interrupted run of a different tenant, and offers only to discard', async () => {
     writeExecutionRecord(sessionStorage, checkpoint({ tenantId: 'other-tenant' }))
     renderPage()
-    await act(async () => undefined)
+    await flush()
 
     expect(screen.getByRole('heading', { name: 'An interrupted run cannot be resumed' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /resume/i })).not.toBeInTheDocument()
@@ -169,7 +251,7 @@ describe('Dashboard: continue from an earlier run', () => {
   it('keeps an interrupted run when the account changes, shows no details, and restores it for the original account', async () => {
     writeExecutionRecord(sessionStorage, checkpoint())
     const view = renderPage()
-    await act(async () => undefined)
+    await flush()
     expect(screen.getByRole('heading', { name: 'This run was interrupted' })).toBeInTheDocument()
 
     getActiveAccount.mockReturnValue({ tenantId: 'other-tenant', homeAccountId: 'home-id' })
@@ -178,7 +260,7 @@ describe('Dashboard: continue from an earlier run', () => {
         <DashboardPage />
       </SettingsProvider>
     )
-    await act(async () => undefined)
+    await flush()
 
     expect(screen.getByRole('heading', { name: 'An interrupted run cannot be resumed' })).toBeInTheDocument()
     expect(screen.queryByText('Contoso')).not.toBeInTheDocument()
@@ -192,7 +274,7 @@ describe('Dashboard: continue from an earlier run', () => {
         <DashboardPage />
       </SettingsProvider>
     )
-    await act(async () => undefined)
+    await flush()
     expect(screen.getByRole('button', { name: 'Resume 2 unfinished tasks' })).toBeEnabled()
   })
 
@@ -209,14 +291,14 @@ describe('Dashboard: continue from an earlier run', () => {
       fatalError: 'Stopped'
     })
     const view = renderPage()
-    await act(async () => undefined)
+    await flush()
     getActiveAccount.mockReturnValue({ tenantId: 'other-tenant', homeAccountId: 'home-id' })
     view.rerender(
       <SettingsProvider>
         <DashboardPage />
       </SettingsProvider>
     )
-    await act(async () => undefined)
+    await flush()
     expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).toBeNull()
     expect(push).toHaveBeenCalledWith('/wizard')
   })
@@ -237,7 +319,7 @@ describe('Dashboard: continue from an earlier run', () => {
       })
     )
     renderPage()
-    await act(async () => undefined)
+    await flush()
 
     expect(screen.queryByRole('button', { name: 'Run this for real' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Retry 1 failed task' }))
@@ -245,6 +327,7 @@ describe('Dashboard: continue from an earlier run', () => {
     expect(within(dialog).getByText(/replaces the results on this page/)).toBeInTheDocument()
     expect(within(dialog).getByRole('button', { name: 'Download report (JSON)' })).toBeInTheDocument()
     fireEvent.click(within(dialog).getByRole('button', { name: 'Start retry' }))
+    await flush()
 
     const plan = startRerun.mock.calls[0][0] as RerunPlan
     expect(plan.kind).toBe('retry')
@@ -273,7 +356,7 @@ describe('Dashboard: continue from an earlier run', () => {
       })
     )
     renderPage()
-    await act(async () => undefined)
+    await flush()
 
     fireEvent.click(screen.getByRole('button', { name: 'Run this for real' }))
     let dialog = screen.getByRole('dialog', { name: 'Run this preview for real' })
@@ -309,6 +392,7 @@ describe('Dashboard: continue from an earlier run', () => {
 
     fireEvent.click(within(dialog).getByRole('checkbox', { name: 'I understand this run will modify my Intune tenant' }))
     fireEvent.click(within(dialog).getByRole('button', { name: 'Start deletion' }))
+    await flush()
     const plan = startRerun.mock.calls[0][0] as RerunPlan
     expect(plan.kind).toBe('live')
     expect(plan.configuration).toMatchObject({ isPreview: false, operationMode: 'delete', tenantId: 'tenant-id' })
@@ -326,7 +410,7 @@ describe('Dashboard: continue from an earlier run', () => {
       })
     )
     renderPage()
-    await act(async () => undefined)
+    await flush()
 
     expect(screen.queryByRole('button', { name: /retry/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Run this for real' })).not.toBeInTheDocument()
@@ -346,7 +430,7 @@ describe('Dashboard: continue from an earlier run', () => {
     })
     useHydrationExecutionMock.mockReturnValue(createExecutionState({ phase: 'cancelling', isCancelling: true }))
     renderPage()
-    await act(async () => undefined)
+    await flush()
 
     const retry = screen.getByRole('button', { name: 'Retry 1 failed task' })
     expect(retry).toBeDisabled()

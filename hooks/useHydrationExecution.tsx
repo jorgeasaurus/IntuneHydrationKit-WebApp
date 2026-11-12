@@ -15,6 +15,7 @@ import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { markTaskSkipped } from "@/lib/hydration/taskTransitions";
 import { getWizardRunLicenses, getWizardRunScope } from "@/lib/hydration/runScope";
 import { buildRerunTaskQueue, type RerunPlan } from "@/lib/hydration/rerun";
+import { holdRunLock } from "@/lib/hydration/runLock";
 import {
   beginExecution,
   cancelExecution,
@@ -84,6 +85,8 @@ export function useHydrationExecution() {
       console.log("[Execution Hook] Execution already in progress, ignoring duplicate call");
       return;
     }
+    // Other tabs (for example a duplicated tab) see this lock and do not continue this run.
+    const releaseRunLock = holdRunLock(configuration.tenantId);
     const startTime = new Date();
     const provenance = createRunProvenance();
     const batchConfig = getBatchConfig();
@@ -298,6 +301,7 @@ export function useHydrationExecution() {
       };
       throw error;
     } finally {
+      releaseRunLock();
       if (terminalState) {
         finishExecution(runId, terminalState);
       }

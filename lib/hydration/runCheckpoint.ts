@@ -12,7 +12,15 @@ import {
   subscribeExecutionState,
   type ExecutionState,
 } from "@/lib/hydration/executionStateStore";
-import { writeExecutionRecord, type ExecutionCheckpointRecord } from "@/lib/hydration/executionRecord";
+import {
+  isExecutionCheckpoint,
+  writeExecutionRecord,
+  type ExecutionCheckpointRecord,
+  type ExecutionRecord,
+  type TerminalExecutionRecord,
+} from "@/lib/hydration/executionRecord";
+import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
+import { createSummary } from "@/lib/hydration/reporter";
 
 /** Minimum time between two checkpoint writes. */
 export const CHECKPOINT_INTERVAL_MS = 3000;
@@ -105,4 +113,60 @@ export function startRunCheckpoints({
     eventTarget?.removeEventListener("beforeunload", write);
     if (timer) clearTimeout(timer);
   };
+}
+
+/**
+ * A checkpoint whose tasks all finished (for example a refresh after the last task, or after a
+ * cancel marked the rest skipped) is a finished run, not an interrupted one. This returns its
+ * terminal record, with the last saved time as the end time, or null when tasks did not finish.
+ */
+export function completeFinishedCheckpoint(record: ExecutionCheckpointRecord): TerminalExecutionRecord | null {
+  if (record.startTime === null || record.tasks.length === 0) return null;
+  if (record.tasks.some((task) => task.status === "pending" || task.status === "running")) return null;
+  const { checkpointAt, ...rest } = record;
+  const summary = createSummary(
+    record.tenantId,
+    record.operationMode,
+    record.startTime,
+    checkpointAt,
+    record.tasks,
+    undefined,
+    record.tenantName,
+    undefined,
+    record.pausedMs ?? 0,
+  );
+  return {
+    ...rest,
+    activityLog: [
+      ...record.activityLog,
+      {
+        id: `checkpoint-complete-${checkpointAt.getTime()}`,
+        timestamp: checkpointAt,
+        message: "Every task finished before the page was closed or refreshed. The end time is the last saved time.",
+        type: "info",
+        category: "control",
+      },
+    ],
+    endTime: checkpointAt,
+    outcome: deriveExecutionOutcome(record.tasks),
+    summary,
+    fatalError: null,
+  } as TerminalExecutionRecord;
+}
+
+/**
+ * The saved record to show. A finished checkpoint is saved again as a terminal record, so the
+ * dashboard shows the results view and can offer to retry failed tasks.
+ */
+export function prepareRestoredRecord(record: ExecutionRecord, storage: Storage): ExecutionRecord {
+  if (!isExecutionCheckpoint(record)) return record;
+  const finished = completeFinishedCheckpoint(record);
+  if (!finished) return record;
+  try {
+    writeExecutionRecord(storage, finished);
+    return finished;
+  } catch (error) {
+    console.warn("[Run checkpoint] Could not save the finished run:", error);
+    return record;
+  }
 }
