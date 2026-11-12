@@ -114,6 +114,47 @@ describe("resolveDeleteTarget", () => {
     expect(resolution).toEqual({ action: "skip", skipKind: "noOp", reason: "Not found in tenant" });
   });
 
+  it("resolves two tasks with the same item name to different objects", async () => {
+    const context = createContext({
+      cachedSettingsCatalogPolicies: [
+        { id: "first", name: "[IHD] Policy", description: MARKER },
+        { id: "second", name: "[IHD] Policy", description: MARKER },
+      ],
+    } as Partial<ExecutionContext>);
+    const taskA = { ...createTask("cisBaseline", "[IHD] Policy"), id: "a", templatePath: "A/Policy.json" };
+    const taskB = { ...createTask("cisBaseline", "[IHD] Policy"), id: "b", templatePath: "B/Policy.json" };
+
+    const first = await resolveDeleteTarget(taskA, context);
+    const second = await resolveDeleteTarget(taskB, context);
+    const firstAgain = await resolveDeleteTarget(taskA, context);
+
+    expect(first).toMatchObject({ action: "delete", target: { id: "first" } });
+    expect(second).toMatchObject({ action: "delete", target: { id: "second" } });
+    // A task that is resolved again (after a pause, for example) keeps its object.
+    expect(firstAgain).toMatchObject({ action: "delete", target: { id: "first" } });
+  });
+
+  it("reports the second task as not found when one object matches two tasks", async () => {
+    const context = createContext({
+      cachedAppProtectionPolicies: [
+        { id: "only", displayName: "[IHD] Policy", description: MARKER, "@odata.type": "#microsoft.graph.androidManagedAppProtection" },
+      ],
+      cachedSettingsCatalogPolicies: [],
+      cachedV2CompliancePolicies: [],
+      cachedCompliancePolicies: [],
+      cachedDeviceConfigurations: [],
+      cachedGroupPolicyConfigurations: [],
+      cachedSecurityIntents: [],
+      cachedDriverUpdateProfiles: [],
+    } as Partial<ExecutionContext>);
+
+    const first = await resolveDeleteTarget({ ...createTask("appProtection", "[IHD] Policy"), id: "a" }, context);
+    const second = await resolveDeleteTarget({ ...createTask("baseline", "[IHD] Policy"), id: "b" }, context);
+
+    expect(first).toMatchObject({ action: "delete", target: { id: "only" } });
+    expect(second).toMatchObject({ action: "skip", skipKind: "noOp" });
+  });
+
   it("fails for a category without a delete resolver", async () => {
     const resolution = await resolveDeleteTarget(createTask("notification", "[IHD] Notice"), createContext());
 

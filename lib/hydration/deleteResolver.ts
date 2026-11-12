@@ -242,6 +242,29 @@ interface FoundObject {
   description?: string;
 }
 
+/**
+ * Tenant objects that a task of this run already resolved to, by object URL. Two tasks
+ * can have the same item name (the same template in two categories, or two CIS
+ * templates with one display name). The parallel delete path resolves every task before
+ * it deletes anything, so without this record both tasks would resolve to the same
+ * object and a second object with that name would stay in the tenant.
+ */
+const claimedTargets = new WeakMap<ExecutionContext, Map<string, string>>();
+
+function isClaimedByOtherTask(context: ExecutionContext, url: string, taskId: string): boolean {
+  const owner = claimedTargets.get(context)?.get(url);
+  return owner !== undefined && owner !== taskId;
+}
+
+function claimTarget(context: ExecutionContext, url: string, taskId: string): void {
+  let claims = claimedTargets.get(context);
+  if (!claims) {
+    claims = new Map();
+    claimedTargets.set(context, claims);
+  }
+  claims.set(url, taskId);
+}
+
 function findInCaches(task: HydrationTask, context: ExecutionContext, sources: DeleteSource[]): FoundObject | null {
   const missingCaches: TenantCacheKey[] = [];
   for (const source of sources) {
@@ -250,10 +273,15 @@ function findInCaches(task: HydrationTask, context: ExecutionContext, sources: D
       missingCaches.push(source.cacheKey);
       continue;
     }
-    const match = findDeleteMatch(items, task.itemName, source.getName);
+    const objectUrl = (item: CachedObject) => `${source.basePath(item)}/${item.id}`;
+    // Skip objects that another task of this run resolved to. A task keeps its own
+    // claim, so resolving the same task again gives the same object.
+    const unclaimed = items.filter((item) => !item.id || !isClaimedByOtherTask(context, objectUrl(item), task.id));
+    const match = findDeleteMatch(unclaimed, task.itemName, source.getName);
     if (!match?.id) continue;
 
-    const url = `${source.basePath(match)}/${match.id}`;
+    const url = objectUrl(match);
+    claimTarget(context, url, task.id);
     return {
       description: match.description,
       target: {
