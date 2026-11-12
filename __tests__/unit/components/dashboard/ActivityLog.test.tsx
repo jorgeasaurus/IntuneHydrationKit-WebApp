@@ -71,6 +71,15 @@ describe('ActivityLog', () => {
     expect(screen.getByText('Created dynamic group')).toBeInTheDocument()
   })
 
+  it('exposes the stream as a keyboard-scrollable log without live speech', () => {
+    render(<ActivityLog messages={messages} />)
+
+    const log = screen.getByRole('log', { name: 'Activity log' })
+    expect(log).toHaveAttribute('aria-live', 'off')
+    expect(log).toHaveAttribute('tabindex', '0')
+    expect(within(log).getByText('Failed to create filter')).toBeInTheDocument()
+  })
+
   it('uses readable text, timestamps, and status icons on the dark log surface', () => {
     const { container } = render(<ActivityLog messages={messages} />)
 
