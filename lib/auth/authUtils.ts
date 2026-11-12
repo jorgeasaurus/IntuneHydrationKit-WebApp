@@ -1,6 +1,6 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
-import { msalInstance, loginRequest, getAuthorityUrl } from "./msalConfig";
-import { APP_SETTINGS_STORAGE_KEY } from "@/lib/storageKeys";
+import { msalInstance, loginRequest, getAuthorityUrl, initializeMsal } from "./msalConfig";
+import { notifySignOut } from "./sessionEvents";
 import { clearHydrationSession } from "@/lib/hydration/executionRecord";
 import { resetExecutionSession } from "@/lib/hydration/executionStateStore";
 
@@ -28,8 +28,11 @@ export function assertActiveAccountMatches(
 }
 
 /**
- * Acquire an access token silently
- * Falls back to interactive login if silent acquisition fails (timeout, interaction required)
+ * Acquire an access token silently.
+ * When silent acquisition needs user interaction, try one popup for the active account.
+ * Browsers block popups that do not start from a user gesture, so code that runs without a
+ * gesture (for example the execution engine) gets an InteractionRequiredError. The caller must
+ * stop sending requests and ask the user to sign in again.
  */
 export async function getAccessToken(): Promise<string> {
   const account = getActiveAccount();
@@ -49,17 +52,16 @@ export async function getAccessToken(): Promise<string> {
     return response.accessToken;
   } catch (error) {
     if (error instanceof InteractionRequiredAuthError || error instanceof BrowserAuthError) {
-      // Silent acquisition failed (iframe timeout, expired session, etc.) - try popup
       try {
         const response = await msalInstance.acquireTokenPopup({
           ...loginRequest,
+          account,
+          loginHint: account.username,
           authority,
         });
         return response.accessToken;
-      } catch {
-        throw new AuthSessionExpiredError(
-          "Session expired. Please sign out and sign in again."
-        );
+      } catch (popupError) {
+        throw new InteractionRequiredError(undefined, { cause: popupError });
       }
     }
     throw error;
@@ -73,9 +75,24 @@ export class AuthSessionExpiredError extends Error {
   /** Prevent request retries when the active authentication session is invalid. */
   readonly status = 401;
 
-  constructor(message = "No active account found. Please sign in.") {
-    super(message);
+  constructor(message = "No active account found. Please sign in.", options?: ErrorOptions) {
+    super(message, options);
     this.name = "AuthSessionExpiredError";
+  }
+}
+
+/**
+ * The access token expired and MSAL cannot renew it without user interaction.
+ * Every later request fails the same way, so callers must not continue task by task.
+ * An active run must pause and prompt the user to sign in again.
+ */
+export class InteractionRequiredError extends AuthSessionExpiredError {
+  constructor(
+    message = "Your sign-in session expired. Sign in again to continue.",
+    options?: ErrorOptions
+  ) {
+    super(message, options);
+    this.name = "InteractionRequiredError";
   }
 }
 
@@ -83,6 +100,8 @@ export class AuthSessionExpiredError extends Error {
  * Sign in the user (global/commercial cloud only).
  */
 export async function signIn(): Promise<AccountInfo> {
+  // Public pages render before MSAL finishes startup, so wait for initialization here.
+  await initializeMsal();
   const authority = getAuthorityUrl("common");
 
   const response = await msalInstance.loginPopup({
@@ -98,19 +117,16 @@ export async function signIn(): Promise<AccountInfo> {
 }
 
 /**
- * Clear all app data from sessionStorage (tenant results and template caches)
- * Prevents cross-tenant/cross-user data leakage on shared browsers
+ * Clear all app data from sessionStorage (tenant results and template caches) and
+ * in-memory session state. Prevents cross-tenant/cross-user data leakage on shared browsers.
+ * App settings in localStorage are device preferences without tenant data, so they stay.
  */
 function clearSessionData(): void {
   if (typeof window === "undefined") return;
 
   clearHydrationSession(sessionStorage);
   resetExecutionSession();
-
-  // Clear persisted app settings so the next user on a shared browser starts clean
-  if (typeof localStorage !== "undefined") {
-    localStorage.removeItem(APP_SETTINGS_STORAGE_KEY);
-  }
+  notifySignOut();
 }
 
 /**
@@ -127,6 +143,32 @@ export async function signOut(): Promise<void> {
   } finally {
     clearSessionData();
   }
+}
+
+const INACTIVITY_SIGN_OUT_NOTICE_KEY = "auth-inactivity-sign-out:v1";
+
+/**
+ * Sign out after inactivity, without a user gesture.
+ * A logout popup is blocked in this case, so remove the MSAL tokens and accounts from the
+ * local cache only. The Entra ID server session stays, as with any local sign-out.
+ * The page then reloads at the home page so that no in-memory state remains.
+ */
+export async function signOutForInactivity(): Promise<void> {
+  try {
+    await msalInstance.clearCache();
+  } finally {
+    clearSessionData();
+    sessionStorage.setItem(INACTIVITY_SIGN_OUT_NOTICE_KEY, "1");
+    window.location.replace("/");
+  }
+}
+
+/** Return true once after an inactivity sign-out, so the UI can tell the user. */
+export function consumeInactivitySignOutNotice(): boolean {
+  if (typeof window === "undefined") return false;
+  const signedOut = sessionStorage.getItem(INACTIVITY_SIGN_OUT_NOTICE_KEY) !== null;
+  sessionStorage.removeItem(INACTIVITY_SIGN_OUT_NOTICE_KEY);
+  return signedOut;
 }
 
 /**
