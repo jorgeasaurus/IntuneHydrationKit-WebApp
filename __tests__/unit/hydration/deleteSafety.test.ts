@@ -33,6 +33,7 @@ import { executeAppProtectionTask } from "@/lib/hydration/taskExecutors/appProte
 import { executeEnrollmentTask } from "@/lib/hydration/taskExecutors/enrollmentTask";
 import { executeWin32AppTask } from "@/lib/hydration/taskExecutors/win32AppTask";
 import { hasConditionalAccessHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { serveCachedObjects } from "../../helpers/tenantObjectReads";
 
 const MARKER = "Imported by Intune Hydration Kit";
 
@@ -50,6 +51,7 @@ function createClient(routes: Record<string, Route>) {
     return value instanceof Error ? Promise.reject(value) : Promise.resolve(value);
   };
   return {
+    routes,
     get: vi.fn((url: string) => respond(url)),
     getCollection: vi.fn(async (url: string) => (await respond(url)) as unknown[]),
     delete: vi.fn().mockResolvedValue(undefined),
@@ -63,13 +65,13 @@ function createClient(routes: Record<string, Route>) {
 type FakeClient = ReturnType<typeof createClient>;
 
 function createContext(client: FakeClient, overrides: Partial<ExecutionContext> = {}): ExecutionContext {
-  return {
+  return serveCachedObjects({
     client: client as unknown as ExecutionContext["client"],
     operationMode: "delete",
     isPreview: false,
     stopOnFirstError: false,
     ...overrides,
-  };
+  }, (endpoint) => !(endpoint in client.routes));
 }
 
 function createTask(category: TaskCategory, itemName: string): HydrationTask {
@@ -375,6 +377,7 @@ describe("Errors are failures, safety blocks are skips", () => {
     const name = "[IHD] Windows Autopilot Profile";
     const client = createClient({
       "/deviceManagement/windowsAutopilotDeploymentProfiles": [{ id: "ap-id", displayName: name, description: MARKER }],
+      "/deviceManagement/windowsAutopilotDeploymentProfiles/ap-id": { id: "ap-id", displayName: name, description: MARKER },
       "/deviceManagement/windowsAutopilotDeploymentProfiles/ap-id/assignments": noAssignments,
       "/deviceManagement/deviceEnrollmentConfigurations": [],
       [DEVICE_PREPARATION_LIST]: [],

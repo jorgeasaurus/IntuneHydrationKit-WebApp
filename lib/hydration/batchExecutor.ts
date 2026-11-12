@@ -56,6 +56,7 @@ import {
 import {
   CONDITIONAL_ACCESS_POLICIES_ENDPOINT,
   buildConditionalAccessCreatePlan,
+  findHydrationConditionalAccessPolicy,
 } from "@/lib/graph/conditionalAccess";
 import {
   getPrivatePreviewFeatureName,
@@ -1294,7 +1295,11 @@ async function policyExistsInCache(
             policyLower === `${lowerName} [intune hydration kit]` ||
             policyLower === `${lowerName} [imported by intune hydration kit]`
           );
-        });
+        }) ??
+        // A kit policy can carry the other marker format ("[IHD] X" and "X [Imported by ...]").
+        (context.cachedConditionalAccessPolicies
+          ? (findHydrationConditionalAccessPolicy(context.cachedConditionalAccessPolicies, policyName) ?? undefined)
+          : undefined);
       break;
   }
 

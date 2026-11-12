@@ -5,6 +5,7 @@ import { cacheTemplates, clearCategoryCache, type BaselinePolicy } from "@/lib/t
 import { RunCancelledError } from "@/lib/utils/retry";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask, TaskCategory } from "@/types/hydration";
+import { serveCachedObjects } from "../../helpers/tenantObjectReads";
 
 const MARKER = "Imported by Intune Hydration Kit";
 
@@ -13,7 +14,7 @@ function createTask(category: TaskCategory, itemName: string): HydrationTask {
 }
 
 function createContext(overrides: Partial<ExecutionContext> = {}): ExecutionContext {
-  return {
+  return serveCachedObjects({
     client: {
       get: vi.fn().mockResolvedValue({ value: [] }),
       getCollection: vi.fn(),
@@ -23,7 +24,7 @@ function createContext(overrides: Partial<ExecutionContext> = {}): ExecutionCont
     isPreview: false,
     stopOnFirstError: false,
     ...overrides,
-  };
+  });
 }
 
 describe("resolveDeleteTarget", () => {
@@ -52,8 +53,10 @@ describe("resolveDeleteTarget", () => {
     if (assignments) {
       expect(context.client.get).toHaveBeenCalledWith(`${url}/assignments`);
     } else {
-      expect(context.client.get).not.toHaveBeenCalled();
+      // Only the read of the object itself (the marker is checked on the current object).
+      expect(context.client.get).toHaveBeenCalledTimes(1);
     }
+    expect(context.client.get).toHaveBeenCalledWith(url, apiVersion);
   });
 
   it.each([
@@ -114,6 +117,40 @@ describe("resolveDeleteTarget", () => {
     const resolution = await resolveDeleteTarget(createTask("compliance", "[IHD] Missing"), context);
 
     expect(resolution).toEqual({ action: "skip", skipKind: "noOp", reason: "Not found in tenant" });
+  });
+
+  it("does not delete when the marker was removed after the prefetch", async () => {
+    const context = createContext({
+      cachedFilters: [{ id: "f-id", displayName: "[IHD] Filter", description: MARKER }],
+    } as Partial<ExecutionContext>);
+    context.client.get = vi.fn().mockResolvedValue({ id: "f-id", displayName: "[IHD] Filter", description: "Edited by an admin" });
+
+    const resolution = await resolveDeleteTarget(createTask("filters", "[IHD] Filter"), context);
+
+    expect(resolution).toMatchObject({ action: "skip", skipKind: "blocked", checks: { marker: "missing" } });
+  });
+
+  it("reports not found when the object was deleted after the prefetch", async () => {
+    const context = createContext({
+      cachedFilters: [{ id: "f-id", displayName: "[IHD] Filter", description: MARKER }],
+    } as Partial<ExecutionContext>);
+    context.client.get = vi.fn().mockRejectedValue(Object.assign(new Error("[404] Not found"), { status: 404 }));
+
+    const resolution = await resolveDeleteTarget(createTask("filters", "[IHD] Filter"), context);
+
+    expect(resolution).toMatchObject({ action: "skip", skipKind: "noOp" });
+  });
+
+  it("fails closed when the current object cannot be read", async () => {
+    const context = createContext({
+      cachedFilters: [{ id: "f-id", displayName: "[IHD] Filter", description: MARKER }],
+    } as Partial<ExecutionContext>);
+    context.client.get = vi.fn().mockRejectedValue(Object.assign(new Error("[403] Forbidden"), { status: 403 }));
+
+    const resolution = await resolveDeleteTarget(createTask("filters", "[IHD] Filter"), context);
+
+    expect(resolution).toMatchObject({ action: "fail" });
+    expect(context.client.delete).not.toHaveBeenCalled();
   });
 
   it("resolves two tasks with the same item name to different objects", async () => {

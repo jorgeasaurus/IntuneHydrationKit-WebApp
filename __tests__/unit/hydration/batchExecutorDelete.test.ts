@@ -6,6 +6,7 @@ import {
 } from "@/lib/hydration/batchExecutor";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
+import { serveCachedObjects } from "../../helpers/tenantObjectReads";
 
 describe("executeDeletesInParallel", () => {
   it("keeps Conditional Access batchable for create execution", () => {
@@ -96,7 +97,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -137,7 +138,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -180,7 +181,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -220,7 +221,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
@@ -258,7 +259,7 @@ describe("executeDeletesInParallel", () => {
       }],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toEqual([expect.objectContaining({
       success: false,
@@ -300,7 +301,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -343,7 +344,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });

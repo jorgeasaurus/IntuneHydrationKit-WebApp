@@ -52,6 +52,7 @@ import {
   executeDeletesInParallel,
   executeTasksInBatches,
 } from "@/lib/hydration/batchExecutor";
+import { serveCachedObjects } from "../../helpers/tenantObjectReads";
 
 const defaultBatchConfig: BatchConfiguration = {
   defaultBatchSize: 20,
@@ -562,7 +563,7 @@ describe("batchExecutor branch coverage", () => {
         resourceGoneTask,
         forbiddenTask,
       ],
-      context
+      serveCachedObjects(context)
     );
 
     expect(results).toEqual([
@@ -699,7 +700,7 @@ describe("batchExecutor branch coverage", () => {
 
     const results = await executeDeletesInParallel(
       [throttledTask, successOne, successTwo, cancelledTask],
-      context
+      serveCachedObjects(context)
     );
 
     expect(results).toEqual([

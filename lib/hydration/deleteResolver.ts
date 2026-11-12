@@ -364,6 +364,23 @@ export async function readAssignmentCount(context: ExecutionContext, assignments
   return response.value.length;
 }
 
+/**
+ * Read a resolved object from the tenant by ID. Returns null when the object no longer
+ * exists. Any other read error is thrown, so the caller does not delete the object.
+ */
+async function readCurrentObject(
+  context: ExecutionContext,
+  target: DeleteTarget
+): Promise<{ description?: string } | null> {
+  try {
+    return await context.client.get<{ description?: string }>(target.url, target.apiVersion);
+  } catch (error) {
+    const { status, message } = (error ?? {}) as { status?: number; message?: string };
+    if (status === 404 || /\[404\]|ResourceNotFound/i.test(message ?? "")) return null;
+    throw error;
+  }
+}
+
 async function resolveConditionalAccess(task: HydrationTask, context: ExecutionContext): Promise<DeleteResolution> {
   const policy = findHydrationConditionalAccessPolicy(
     requireTenantCache(context, "cachedConditionalAccessPolicies"),
@@ -447,6 +464,17 @@ async function resolve(task: HydrationTask, context: ExecutionContext): Promise<
 
   const { target } = found;
   if (!hasHydrationMarker(found.description)) {
+    return { action: "skip", skipKind: "blocked", reason: DELETE_REASONS.noMarker, target, checks: { marker: "missing" } };
+  }
+
+  // The description above can come from the prefetch at the start of the run. Read the
+  // object again, so a marker that was removed since then (during a pause, for example)
+  // blocks the delete. A read error stops the delete (the caller reports a failure).
+  const current = await readCurrentObject(context, target);
+  if (current === null) {
+    return { action: "skip", skipKind: "noOp", reason: DELETE_REASONS.notFound };
+  }
+  if (!hasHydrationMarker(current.description)) {
     return { action: "skip", skipKind: "blocked", reason: DELETE_REASONS.noMarker, target, checks: { marker: "missing" } };
   }
 
