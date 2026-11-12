@@ -3,7 +3,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { AnimatePresence, LazyMotion, domAnimation, m } from "framer-motion";
+import {
+  AnimatePresence,
+  LazyMotion,
+  domAnimation,
+  m,
+  useReducedMotion,
+} from "framer-motion";
 import {
   CheckCircle2,
   Play,
@@ -53,13 +59,21 @@ const FINAL_STATS = {
 };
 
 export function WebAppDemo() {
-  const [phase, setPhase] = useState<Phase>("configure");
+  // When the user prefers reduced motion, show the finished run as a still
+  // frame and do not start the looping demo timers.
+  const prefersReducedMotion = useReducedMotion() ?? false;
+  const [animatedPhase, setPhase] = useState<Phase>("configure");
+  const phase: Phase = prefersReducedMotion ? "complete" : animatedPhase;
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [currentTask, setCurrentTask] = useState(0);
 
   // Animation cycle
   useEffect(() => {
+    if (prefersReducedMotion) {
+      return;
+    }
+
     let timeout: NodeJS.Timeout;
 
     if (phase === "configure") {
@@ -99,7 +113,7 @@ export function WebAppDemo() {
     }
 
     return () => clearTimeout(timeout);
-  }, [phase]);
+  }, [phase, prefersReducedMotion]);
 
   useEffect(() => {
     if (phase === "deploying" && progress === 100) {

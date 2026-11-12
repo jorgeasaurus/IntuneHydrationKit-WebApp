@@ -5,6 +5,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WebAppDemo } from '@/components/WebAppDemo'
 import { LANDING_TEMPLATE_COUNTS } from '@/components/landing/landingContent'
 
+let prefersReducedMotion: boolean | null = false
+
 vi.mock('framer-motion', async () => {
   const React = await import('react')
 
@@ -42,11 +44,13 @@ vi.mock('framer-motion', async () => {
     domAnimation: {},
     m: motion,
     motion,
+    useReducedMotion: () => prefersReducedMotion,
   }
 })
 
 describe('demo showcase components', () => {
   beforeEach(() => {
+    prefersReducedMotion = false
     vi.useFakeTimers()
   })
 
@@ -88,4 +92,19 @@ describe('demo showcase components', () => {
     expect(screen.getByText('Select Categories')).toBeInTheDocument()
   })
 
+  it('shows a still completed run and starts no timers when the user prefers reduced motion', () => {
+    prefersReducedMotion = true
+
+    render(<WebAppDemo />)
+
+    expect(screen.getByText('Deployment Complete')).toBeInTheDocument()
+    expect(vi.getTimerCount()).toBe(0)
+
+    act(() => {
+      vi.advanceTimersByTime(20000)
+    })
+
+    expect(screen.getByText('Deployment Complete')).toBeInTheDocument()
+    expect(screen.queryByText('Select Categories')).not.toBeInTheDocument()
+  })
 })

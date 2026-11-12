@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { MotionConfig } from "framer-motion";
 import {
   CheckCircle2,
   ChevronRight,
@@ -641,26 +642,28 @@ export function HomeLanding({
   onContinue,
 }: HomeLandingProps) {
   return (
-    <div className="landing-shell landing-glass-shell relative min-h-screen">
-      <div className="relative z-10">
-        <Navigation />
-        <Hero
-          isAuthenticated={isAuthenticated}
-          onSignInClick={onSignInClick}
-          onContinue={onContinue}
-        />
-        <FeaturesSection />
-        <WorkflowSection />
-        <ConfigurationsSection />
-        <PermissionsSection />
-        <FaqSection />
-        <FinalCta
-          isAuthenticated={isAuthenticated}
-          onSignInClick={onSignInClick}
-          onContinue={onContinue}
-        />
-        <Footer />
+    <MotionConfig reducedMotion="user">
+      <div className="landing-shell landing-glass-shell relative min-h-screen">
+        <div className="relative z-10">
+          <Navigation />
+          <Hero
+            isAuthenticated={isAuthenticated}
+            onSignInClick={onSignInClick}
+            onContinue={onContinue}
+          />
+          <FeaturesSection />
+          <WorkflowSection />
+          <ConfigurationsSection />
+          <PermissionsSection />
+          <FaqSection />
+          <FinalCta
+            isAuthenticated={isAuthenticated}
+            onSignInClick={onSignInClick}
+            onContinue={onContinue}
+          />
+          <Footer />
+        </div>
       </div>
-    </div>
+    </MotionConfig>
   );
 }
