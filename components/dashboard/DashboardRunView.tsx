@@ -15,6 +15,8 @@ import { RunStatusAnnouncer } from "@/components/dashboard/RunStatusAnnouncer";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useCreatedObjectLinks } from "@/hooks/useCreatedObjectLinks";
+import type { PortalLink } from "@/lib/utils/portalLinks";
 import type { ActivityMessage } from "@/lib/hydration/types";
 import type { ExecutionState } from "@/lib/hydration/executionStateStore";
 import type {
@@ -98,6 +100,7 @@ export function DashboardRunView({
     (task) => task.status === "success",
   ).length;
   const controlsStartTime = startTime ?? (isCompleted ? endTime : null);
+  const portalLinks = useCreatedObjectLinks(tasks, isPreview);
 
   return (
     <div className="relative z-10 min-h-screen">
@@ -174,6 +177,7 @@ export function DashboardRunView({
           tasks={tasks}
           isPreview={isPreview}
           operationMode={operationMode}
+          portalLinks={portalLinks}
         />
       </main>
     </div>
@@ -255,10 +259,11 @@ function RunResults({
   tasks,
   isPreview,
   operationMode,
+  portalLinks,
 }: Pick<
   DashboardRunViewProps,
   "summary" | "outcome" | "tasks" | "isPreview" | "operationMode"
-> & { isCompleted: boolean }): React.JSX.Element {
+> & { isCompleted: boolean; portalLinks: ReadonlyMap<string, PortalLink> }): React.JSX.Element {
   return (
     <>
       {isCompleted && summary && outcome && outcome !== "failed" && (
@@ -280,13 +285,14 @@ function RunResults({
             tasks={tasks}
             isPreview={isPreview}
             outcome={outcome}
+            portalLinks={portalLinks}
           />
         </div>
       )}
       {isCompleted && !summary && tasks.length > 0 && (
-        <TaskList tasks={tasks} />
+        <TaskList tasks={tasks} portalLinks={portalLinks} />
       )}
-      {!isCompleted && <TaskList tasks={tasks} />}
+      {!isCompleted && <TaskList tasks={tasks} portalLinks={portalLinks} />}
     </>
   );
 }
