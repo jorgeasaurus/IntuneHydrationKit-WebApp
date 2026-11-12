@@ -47,6 +47,26 @@ export function hasConditionalAccessHydrationMarker(displayName: string | undefi
 }
 
 /**
+ * Check if a notification message template display name carries the hydration marker.
+ * Notification templates have no description field. The PowerShell module creates them
+ * as "[IHD] <template name>" and deletes only names in its own template set, so the
+ * marker is the [IHD] prefix together with a name from the kit's template set.
+ * An unprefixed name is not accepted, because it carries no marker.
+ * @param displayName The display name of the tenant object
+ * @param kitTemplateNames Display names of the kit templates, with the [IHD] prefix
+ */
+export function hasNotificationTemplateMarker(
+  displayName: string | undefined | null,
+  kitTemplateNames: readonly string[]
+): boolean {
+  if (!displayName?.startsWith(IMPORT_PREFIX)) return false;
+  const lowerName = displayName.toLowerCase();
+  return kitTemplateNames.some(
+    (name) => name.startsWith(IMPORT_PREFIX) && name.toLowerCase() === lowerName
+  );
+}
+
+/**
  * Remove the Conditional Access marker prefix and suffix from a display name, for name matching.
  */
 export function normalizeConditionalAccessPolicyName(displayName: string): string {

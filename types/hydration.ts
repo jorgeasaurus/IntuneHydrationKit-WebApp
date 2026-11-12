@@ -248,6 +248,7 @@ export interface CategorySelections {
   appProtection?: CategorySelection;
   win32Apps?: CategorySelection;
   enrollment?: CategorySelection;
+  notification?: CategorySelection;
   baseline?: BaselineSelection;
   cisBaseline?: CategorySelection;
 }

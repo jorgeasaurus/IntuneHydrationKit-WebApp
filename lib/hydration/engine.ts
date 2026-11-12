@@ -25,6 +25,7 @@ import type { GraphClient } from "@/lib/graph/client";
 import { getIntuneGroups } from "@/lib/graph/groups";
 import { getAllFilters } from "@/lib/graph/filters";
 import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
+import { getAllNotificationTemplates } from "@/lib/graph/notifications";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
@@ -39,6 +40,7 @@ import { executeConditionalAccessTask } from "./taskExecutors/conditionalAccessT
 import { executeAppProtectionTask } from "./taskExecutors/appProtectionTask";
 import { executeWin32AppTask } from "./taskExecutors/win32AppTask";
 import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
+import { executeNotificationTask } from "./taskExecutors/notificationTask";
 import { markTaskSkipped } from "./taskTransitions";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
@@ -62,6 +64,7 @@ const TENANT_CACHE_PREFETCHES: Array<{
     categories: ["conditionalAccess"],
     load: (client) => client.getCollection("/identity/conditionalAccess/policies?$select=id,displayName,state"),
   },
+  { key: "cachedNotificationTemplates", categories: ["notification"], load: getAllNotificationTemplates },
   {
     key: "cachedCompliancePolicies",
     categories: ["compliance", "baseline", "cisBaseline"],
@@ -299,6 +302,9 @@ async function executeTask(
         break;
       case "enrollment":
         result = await executeEnrollmentTask(task, context);
+        break;
+      case "notification":
+        result = await executeNotificationTask(task, context);
         break;
       default:
         result = {
