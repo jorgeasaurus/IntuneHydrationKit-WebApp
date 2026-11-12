@@ -10,7 +10,8 @@ import {
   readRunHistory,
 } from '@/lib/history/runHistory'
 import { generateCSVReport, generateJSONReport, generateMarkdownReport } from '@/lib/hydration/reporter'
-import { buildEntry, buildTasks, OWNER_A, OWNER_B } from '../../helpers/runHistoryFixtures'
+import { createSummary } from '@/lib/hydration/reporter'
+import { buildEntry, buildTasks, OWNER_A, OWNER_B, withUpdates } from '../../helpers/runHistoryFixtures'
 
 function minutes(count: number): Date {
   return new Date(Date.UTC(2026, 10, 1, 10, count))
@@ -31,7 +32,7 @@ describe('run history', () => {
     expect(stored.endTime).toEqual(entry.endTime)
     expect(stored.summary?.startTime).toEqual(entry.summary?.startTime)
     expect(stored.tasks[0].startTime).toEqual(entry.tasks[0].startTime)
-    expect(stored.counts).toEqual({ ...entry.summary?.stats, wouldCreate: 0, wouldDelete: 0 })
+    expect(stored.counts).toEqual({ ...entry.summary?.stats, updated: 0, wouldCreate: 0, wouldUpdate: 0, wouldDelete: 0 })
     expect(stored.cloudEnvironment).toBe('global')
     expect(stored.tasks.find((task) => task.status === 'success')?.createdObject?.id).toMatch(/^0f9e8d7c-/)
 
@@ -86,7 +87,7 @@ describe('run history', () => {
       pausedMs: 60_000,
     })
     expect(entry.durationMs).toBe(120_000)
-    expect(entry.counts).toEqual({ total: 5, created: 0, deleted: 3, wouldCreate: 0, wouldDelete: 0, skipped: 1, failed: 1 })
+    expect(entry.counts).toEqual({ total: 5, created: 0, deleted: 3, updated: 0, wouldCreate: 0, wouldUpdate: 0, wouldDelete: 0, skipped: 1, failed: 1 })
     expect(addRunHistoryEntry(sessionStorage, entry).ok).toBe(true)
     expect(readRunHistory(sessionStorage, OWNER_A)[0].fatalError).toBe('Your sign-in session expired.')
   })
@@ -115,9 +116,38 @@ describe('run history', () => {
       endTime: minutes(1),
       pausedMs: 0,
     })
-    const expected = { total: 5, created: 0, deleted: 0, wouldCreate: 3, wouldDelete: 0, skipped: 1, failed: 1 }
+    const expected = { total: 5, created: 0, deleted: 0, updated: 0, wouldCreate: 3, wouldUpdate: 0, wouldDelete: 0, skipped: 1, failed: 1 }
     expect(finished.counts).toEqual(expected)
     expect(failed.counts).toEqual(expected)
+  })
+
+  it('counts updates of existing kit objects and keeps their evidence for the reports', () => {
+    for (const isPreview of [false, true]) {
+      sessionStorage.clear()
+      const tasks = withUpdates(buildTasks(12, minutes(0)), !isPreview)
+      const summary = createSummary(OWNER_A.tenantId, 'create', minutes(0), minutes(5), tasks)
+      expect(summary.stats.updated).toBe(2)
+      addRunHistoryEntry(sessionStorage, createRunHistoryEntry({
+        configuration: { ...OWNER_A, operationMode: 'create', isPreview, selectedObjectCount: 12 },
+        tasks,
+        summary,
+        outcome: 'completedWithIssues',
+        fatalError: null,
+        startTime: minutes(0),
+        endTime: minutes(5),
+        pausedMs: 0,
+      }))
+      const [stored] = readRunHistory(sessionStorage, OWNER_A)
+      const changes = summary.stats.created
+      expect(stored.counts).toMatchObject(isPreview
+        ? { created: 0, updated: 0, wouldCreate: changes, wouldUpdate: 2 }
+        : { created: changes, updated: 2, wouldCreate: 0, wouldUpdate: 0 })
+      expect(stored.summary?.stats.updated).toBe(2)
+      const markdown = generateMarkdownReport(stored.summary!, stored.tasks, 'completedWithIssues', isPreview)
+      expect(markdown).toContain('Updated object: existing-task-2')
+      expect(markdown).toContain('Updated setting: membershipRule')
+      expect(markdown).toContain(`- **${isPreview ? 'Would Update' : 'Updated'}**: 2`)
+    }
   })
 
   it('reads entries with unknown optional task fields', () => {

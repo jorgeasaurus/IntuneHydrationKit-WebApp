@@ -15,18 +15,28 @@ interface RunHistoryListProps {
 }
 
 // The same words as the results summary and the reports: a preview changes nothing.
-const LIVE_COUNT_LABELS = [
+// The update count shows only for a run that updated objects, as in the results summary.
+type CountKey = keyof RunHistoryEntry["counts"];
+const LIVE_COUNT_LABELS: ReadonlyArray<readonly [CountKey, string]> = [
   ["created", "Created"],
+  ["updated", "Updated"],
   ["deleted", "Deleted"],
   ["skipped", "Skipped"],
   ["failed", "Failed"],
-] as const;
-const PREVIEW_COUNT_LABELS = [
+];
+const PREVIEW_COUNT_LABELS: ReadonlyArray<readonly [CountKey, string]> = [
   ["wouldCreate", "Would create"],
+  ["wouldUpdate", "Would update"],
   ["wouldDelete", "Would delete"],
   ["skipped", "Skipped"],
   ["failed", "Failed"],
-] as const;
+];
+
+function getCountLabels(entry: RunHistoryEntry): ReadonlyArray<readonly [CountKey, string]> {
+  const labels = entry.isPreview ? PREVIEW_COUNT_LABELS : LIVE_COUNT_LABELS;
+  const updateKey = entry.isPreview ? "wouldUpdate" : "updated";
+  return entry.counts[updateKey] > 0 ? labels : labels.filter(([key]) => key !== updateKey);
+}
 
 /** Past runs, newest first. */
 export function RunHistoryList({ entries, onOpen, onDelete }: RunHistoryListProps): React.JSX.Element {
@@ -59,8 +69,8 @@ export function RunHistoryList({ entries, onOpen, onDelete }: RunHistoryListProp
                     Duration {formatRunDuration(entry.durationMs)}
                   </span>
                 </p>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-1 pt-2 text-sm sm:grid-cols-4">
-                  {(entry.isPreview ? PREVIEW_COUNT_LABELS : LIVE_COUNT_LABELS).map(([key, label]) => (
+                <dl className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-sm">
+                  {getCountLabels(entry).map(([key, label]) => (
                     <div key={key} className="flex gap-1">
                       <dt className="text-muted-foreground">{label}:</dt>
                       <dd className="font-medium tabular-nums">{entry.counts[key]}</dd>

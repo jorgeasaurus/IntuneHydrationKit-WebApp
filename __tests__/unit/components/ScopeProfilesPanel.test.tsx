@@ -14,6 +14,7 @@ const setSelectedCISCategories = vi.fn()
 const setBaselineSelection = vi.fn()
 const setCategorySelections = vi.fn()
 const setConfirmed = vi.fn()
+const setUpdateExisting = vi.fn()
 const nextStep = vi.fn()
 const previousStep = vi.fn()
 const useWizardStateMock = vi.fn()
@@ -91,6 +92,7 @@ function renderWithState(overrides: Partial<WizardState> = {}) {
     setBaselineSelection,
     setCategorySelections,
     setConfirmed,
+    setUpdateExisting,
     nextStep,
     previousStep,
   })
@@ -109,6 +111,33 @@ describe('ScopeProfilesPanel', () => {
     fetchOIBManifestMock.mockResolvedValue(OIB_MANIFEST)
     fetchCISBaselineManifestMock.mockResolvedValue(null)
     fetchNotificationTemplatesMock.mockResolvedValue([{ displayName: 'First Warning', localizedMessages: [] }])
+  })
+
+  it('never stores or applies the update-existing choice', async () => {
+    const user = userEvent.setup()
+    writeProfiles(localStorage, addProfile([], 'Groups', { targets: ['groups'], items: { groups: ['Windows Devices'] } }))
+    renderWithState({
+      updateExisting: true,
+      selectedTargets: ['groups'],
+      categorySelections: { groups: { selectedItems: ['Windows Devices'] } },
+    })
+
+    await user.click(screen.getByRole('button', { name: 'Save selection as profile' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Save selection as profile' })
+    await user.type(within(dialog).getByLabelText('Profile name'), 'With update choice')
+    await user.click(within(dialog).getByRole('button', { name: 'Save profile' }))
+    expect(localStorage.getItem(SCOPE_PROFILES_STORAGE_KEY)).not.toMatch(/updateExisting|"update"|"mode"|confirmedCount/)
+
+    await user.click(screen.getByRole('button', { name: 'Apply profile Groups' }))
+    expect(await screen.findByText(/Applied profile "Groups"\./)).toBeInTheDocument()
+    expect(setUpdateExisting).not.toHaveBeenCalled()
+    expect(setConfirmed).not.toHaveBeenCalled()
+
+    // A file that carries the choice is not a valid profile export.
+    const exported = JSON.parse(serializeProfilesExport(addProfile([], 'Shared', { targets: ['groups'], items: { groups: ['Windows Devices'] } })))
+    exported.profiles[0].selection.updateExisting = true
+    await user.upload(screen.getByLabelText('Import scope profile file'), jsonFile(JSON.stringify(exported), 'profiles.json'))
+    expect(await screen.findByText(/unknown fields/)).toBeInTheDocument()
   })
 
   it('saves and applies notification templates like any other category', async () => {

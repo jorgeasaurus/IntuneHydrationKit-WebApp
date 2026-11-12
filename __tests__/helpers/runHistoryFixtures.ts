@@ -60,6 +60,19 @@ export function buildTasks(count: number, start = new Date('2026-11-01T10:00:00.
   })
 }
 
+/** Mark successful group tasks as updates of existing kit objects. */
+export function withUpdates(tasks: HydrationTask[], applied: boolean): HydrationTask[] {
+  return tasks.map((task) =>
+    task.status === 'success' && task.category === 'groups'
+      ? {
+          ...task,
+          createdObject: undefined,
+          update: { objectId: `existing-${task.id}`, applied, differences: ['membershipRule: "old" -> "new"'] },
+        }
+      : task,
+  )
+}
+
 export function buildEntry(
   owner = OWNER_A,
   taskCount = 3,

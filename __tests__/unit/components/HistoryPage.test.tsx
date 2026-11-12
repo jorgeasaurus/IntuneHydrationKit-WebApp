@@ -6,7 +6,8 @@ import { SettingsProvider } from '@/hooks/useSettings'
 import { addRunHistoryEntry, clearRunHistory, createRunHistoryEntry } from '@/lib/history/runHistory'
 import { notifySignOut } from '@/lib/auth/sessionEvents'
 import { RUN_HISTORY_STORAGE_KEY } from '@/lib/storageKeys'
-import { buildEntry, buildTasks, OWNER_A, OWNER_B } from '../../helpers/runHistoryFixtures'
+import { createSummary } from '@/lib/hydration/reporter'
+import { buildEntry, buildTasks, OWNER_A, OWNER_B, withUpdates } from '../../helpers/runHistoryFixtures'
 
 const activeAccount = vi.hoisted(() => ({ current: null as null | { homeAccountId: string; tenantId: string } }))
 const downloadReport = vi.hoisted(() => vi.fn())
@@ -135,6 +136,28 @@ describe('HistoryPage', () => {
       expect(within(item).queryByText('Created:')).not.toBeInTheDocument()
       expect(within(item).queryByText('Deleted:')).not.toBeInTheDocument()
     }
+  })
+
+  it('shows the update count only for a run that updated objects', () => {
+    const start = new Date('2026-11-01T10:00:00.000Z')
+    const end = new Date('2026-11-01T10:05:00.000Z')
+    const tasks = withUpdates(buildTasks(12, start), true)
+    addRunHistoryEntry(sessionStorage, createRunHistoryEntry({
+      configuration: { ...OWNER_A, operationMode: 'create', isPreview: false, selectedObjectCount: 12 },
+      tasks,
+      summary: createSummary(OWNER_A.tenantId, 'create', start, end, tasks),
+      outcome: 'completedWithIssues',
+      fatalError: null,
+      startTime: start,
+      endTime: end,
+      pausedMs: 0,
+    }))
+    addRunHistoryEntry(sessionStorage, buildEntry(OWNER_A, 4, new Date('2026-11-01T09:00:00.000Z')))
+    renderPage()
+
+    const [withUpdate, withoutUpdate] = within(screen.getByRole('list', { name: 'Past runs' })).getAllByRole('listitem')
+    expect(within(withUpdate).getByText('Updated:').nextElementSibling).toHaveTextContent('2')
+    expect(within(withoutUpdate).queryByText('Updated:')).not.toBeInTheDocument()
   })
 
   it('shows a failed run without reports', async () => {

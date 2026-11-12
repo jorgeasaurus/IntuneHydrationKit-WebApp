@@ -25,8 +25,8 @@ export function RunHistoryDetail({
   );
   const counts = entry.counts;
   const changeCounts = entry.isPreview
-    ? `${counts.wouldCreate} would create, ${counts.wouldDelete} would delete`
-    : `${counts.created} created, ${counts.deleted} deleted`;
+    ? `${counts.wouldCreate} would create, ${counts.wouldUpdate} would update, ${counts.wouldDelete} would delete`
+    : `${counts.created} created, ${counts.updated} updated, ${counts.deleted} deleted`;
 
   return (
     <div className="space-y-5">

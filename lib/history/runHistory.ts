@@ -11,6 +11,7 @@
 import { z } from "@/lib/utils/zod";
 import { RUN_HISTORY_STORAGE_KEY } from "@/lib/storageKeys";
 import type { ExecutionRunConfiguration } from "@/lib/hydration/executionStateStore";
+import { isUpdateTask } from "@/lib/hydration/reporter";
 import {
   CLOUD_ENVIRONMENTS,
   EXECUTION_OUTCOMES,
@@ -40,14 +41,17 @@ export interface RunOwner {
 }
 
 /**
- * Task counts. A preview changes nothing, so its successful tasks count as wouldCreate or
- * wouldDelete and created and deleted stay 0, as in the reports.
+ * Task counts. A preview changes nothing, so its successful tasks count as wouldCreate,
+ * wouldUpdate, or wouldDelete and created, updated, and deleted stay 0, as in the reports.
+ * An update of an existing kit object counts as updated, not created.
  */
 export interface RunHistoryCounts {
   total: number;
   created: number;
+  updated: number;
   deleted: number;
   wouldCreate: number;
+  wouldUpdate: number;
   wouldDelete: number;
   skipped: number;
   failed: number;
@@ -82,9 +86,14 @@ const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
   .transform((value) => new Date(value));
 const countSchema = z.number().int().nonnegative();
 const summaryStatsSchema = z.object({
-  total: countSchema, created: countSchema, deleted: countSchema, skipped: countSchema, failed: countSchema,
+  total: countSchema, created: countSchema, updated: countSchema.optional(), deleted: countSchema,
+  skipped: countSchema, failed: countSchema,
 });
-const countsSchema = summaryStatsSchema.extend({ wouldCreate: countSchema, wouldDelete: countSchema });
+const countsSchema = z.object({
+  total: countSchema, created: countSchema, updated: countSchema, deleted: countSchema,
+  wouldCreate: countSchema, wouldUpdate: countSchema, wouldDelete: countSchema,
+  skipped: countSchema, failed: countSchema,
+});
 const issueSchema = z.object({ task: z.string(), message: z.string(), timestamp: isoDate });
 
 // The task and summary schemas strip fields that they do not know, so a new optional
@@ -101,6 +110,7 @@ const taskBase = {
   drift: z.object({
     status: z.enum(["matches", "different", "notChecked"]), differences: z.array(z.string()), reason: z.string().optional(),
   }).optional(),
+  update: z.object({ objectId: z.string().min(1), applied: z.boolean(), differences: z.array(z.string()) }).optional(),
   createdObject: z.object({ id: z.string().min(1), policyType: z.string().optional() }).optional(),
   error: z.string().optional(),
   warning: z.string().optional(),
@@ -180,6 +190,9 @@ function compactTask(task: HydrationTask): HydrationTask {
     templatePath: task.templatePath,
     match: task.match,
     drift: task.drift,
+    update: task.update
+      ? { objectId: task.update.objectId, applied: task.update.applied, differences: task.update.differences }
+      : undefined,
     createdObject: task.createdObject
       ? { id: task.createdObject.id, policyType: task.createdObject.policyType }
       : undefined,
@@ -193,15 +206,17 @@ function compactTask(task: HydrationTask): HydrationTask {
 
 /** Count the tasks the same way for every outcome, with preview successes as "would" counts. */
 function countTasks(tasks: HydrationTask[], isPreview: boolean): RunHistoryCounts {
-  const successes = (operation: HydrationTask["operation"]) =>
-    tasks.filter((task) => task.status === "success" && task.operation === operation).length;
-  const created = successes("create");
-  const deleted = successes("delete");
+  const successes = tasks.filter((task) => task.status === "success");
+  const updated = successes.filter(isUpdateTask).length;
+  const created = successes.filter((task) => task.operation === "create").length - updated;
+  const deleted = successes.filter((task) => task.operation === "delete").length;
   return {
     total: tasks.length,
     created: isPreview ? 0 : created,
+    updated: isPreview ? 0 : updated,
     deleted: isPreview ? 0 : deleted,
     wouldCreate: isPreview ? created : 0,
+    wouldUpdate: isPreview ? updated : 0,
     wouldDelete: isPreview ? deleted : 0,
     skipped: tasks.filter((task) => task.status === "skipped").length,
     failed: tasks.filter((task) => task.status === "failed").length,
