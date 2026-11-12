@@ -75,7 +75,9 @@ const COMMON_SECURITY_HEADERS = [
 // A CSP applies to the document that the browser loaded. After a client-side
 // navigation from "/" to "/wizard", the landing policy stays in effect, so this
 // split protects only documents that load these routes directly.
-const TOKEN_ROUTE_SOURCES = ["/wizard", "/wizard/:path*", "/dashboard", "/dashboard/:path*"];
+const TOKEN_ROUTE_SOURCES = [
+  "/wizard", "/wizard/:path*", "/dashboard", "/dashboard/:path*", "/history", "/history/:path*",
+];
 
 // The MSAL redirect URI is the site origin (lib/auth/msalConfig.ts), so the
 // silent renewal iframe lands on "/". Only this path may be framed, and only by

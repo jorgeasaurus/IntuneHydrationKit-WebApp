@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import type { TaskCategory } from "@/types/hydration";
 import {
   fetchOIBManifest,
@@ -160,24 +160,27 @@ export function useTargetSelectionData() {
     }
   }, [baselineManifest]);
 
-  const ensureCISManifest = useCallback(async (): Promise<CISBaselineManifest | null> => {
+  // A caller that asks while the manifest loads gets the same request, not null.
+  const cisRequest = useRef<Promise<CISBaselineManifest | null> | null>(null);
+  const ensureCISManifest = useCallback((): Promise<CISBaselineManifest | null> => {
     if (cisManifest) {
-      return cisManifest;
+      return Promise.resolve(cisManifest);
     }
 
-    if (cisLoading) {
-      return null;
+    if (!cisRequest.current) {
+      setCISLoading(true);
+      cisRequest.current = fetchCISBaselineManifest()
+        .then((manifest) => {
+          setCISManifest(manifest);
+          return manifest;
+        })
+        .finally(() => {
+          cisRequest.current = null;
+          setCISLoading(false);
+        });
     }
-
-    setCISLoading(true);
-    try {
-      const manifest = await fetchCISBaselineManifest();
-      setCISManifest(manifest);
-      return manifest;
-    } finally {
-      setCISLoading(false);
-    }
-  }, [cisLoading, cisManifest]);
+    return cisRequest.current;
+  }, [cisManifest]);
 
   const ensureAllCategoryItems = useCallback(async (
     categories: TaskCategory[]

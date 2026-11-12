@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, GitCompare, RotateCcw, Settings2 } from "lucide-react";
+import { AlertTriangle, GitCompare, History, RotateCcw, Settings2 } from "lucide-react";
 import { AppNavigation } from "@/components/AppNavigation";
 import { SensitiveData } from "@/components/SensitiveData";
 import { SettingsModal } from "@/components/SettingsModal";
@@ -247,27 +247,35 @@ function RunNavigation({
           <Button
             variant="outline"
             onClick={() => setShowSettings(true)}
-            className="nav-action size-9 px-0 sm:w-auto sm:px-3"
+            className="nav-action size-9 px-0 lg:w-auto lg:px-3"
           >
-            <Settings2 aria-hidden="true" className="size-4 sm:mr-2" />
-            <span className="sr-only sm:not-sr-only">Settings</span>
+            <Settings2 aria-hidden="true" className="size-4 lg:mr-2" />
+            <span className="sr-only lg:not-sr-only">Settings</span>
           </Button>
           {isCompleted && (
-            <Button variant="outline" asChild className="nav-action size-9 px-0 sm:w-auto sm:px-3">
+            <>
+            <Button variant="outline" asChild className="nav-action size-9 px-0 lg:w-auto lg:px-3">
               <Link href="/drift">
-                <GitCompare aria-hidden="true" className="size-4 sm:mr-2" />
-                <span className="sr-only sm:not-sr-only">Drift Scan</span>
+                <GitCompare aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Drift Scan</span>
               </Link>
             </Button>
+            <Button variant="outline" asChild className="nav-action size-9 px-0 lg:w-auto lg:px-3">
+              <Link href="/history">
+                <History aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Run history</span>
+              </Link>
+            </Button>
+            </>
           )}
           {isCompleted && (
             <Button
               variant="outline"
               onClick={onStartNewHydration}
-              className="nav-action size-9 px-0 sm:w-auto sm:px-4"
+              className="nav-action size-9 px-0 lg:w-auto lg:px-4"
             >
-              <RotateCcw className="size-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only">Start New Hydration</span>
+              <RotateCcw className="size-4 lg:mr-2" />
+              <span className="sr-only lg:not-sr-only">Start New Hydration</span>
             </Button>
           )}
         </>
