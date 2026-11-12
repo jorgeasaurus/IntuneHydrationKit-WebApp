@@ -93,9 +93,48 @@ describe('HistoryPage', () => {
     expect(downloadReport.mock.calls[0][0]).toContain('# Intune Hydration Report')
     expect(downloadReport.mock.calls[0][0]).toContain(OWNER_A.tenantId)
     expect(JSON.parse(downloadReport.mock.calls[1][0]).tasks).toHaveLength(4)
+    // Created-object portal links come back from history, as on the dashboard.
+    expect(downloadReport.mock.calls[0][0]).toMatch(/- (Created object in portal|Portal list \(.*\)): https:\/\//)
+    expect(JSON.parse(downloadReport.mock.calls[1][0]).tasks.some((task: { portalLink?: unknown }) => task.portalLink)).toBe(true)
 
     await user.click(screen.getByRole('button', { name: 'Back to run history' }))
     expect(screen.getByRole('list', { name: 'Past runs' })).toBeInTheDocument()
+  })
+
+  it('labels preview counts as would-change counts for every outcome', () => {
+    const preview = { ...OWNER_A, operationMode: 'create' as const, isPreview: true, selectedObjectCount: 5 }
+    const live = buildEntry(OWNER_A, 5, new Date('2026-11-01T11:00:00.000Z'))
+    addRunHistoryEntry(sessionStorage, createRunHistoryEntry({
+      configuration: preview,
+      tasks: live.tasks,
+      summary: live.summary,
+      outcome: live.outcome,
+      fatalError: null,
+      startTime: live.startTime,
+      endTime: live.endTime,
+      pausedMs: 0,
+    }))
+    addRunHistoryEntry(sessionStorage, createRunHistoryEntry({
+      configuration: preview,
+      tasks: buildTasks(5),
+      summary: null,
+      outcome: 'failed',
+      fatalError: 'Your sign-in session expired.',
+      startTime: new Date('2026-11-01T12:00:00.000Z'),
+      endTime: new Date('2026-11-01T12:01:00.000Z'),
+      pausedMs: 0,
+    }))
+    renderPage()
+
+    const items = within(screen.getByRole('list', { name: 'Past runs' })).getAllByRole('listitem')
+    expect(items).toHaveLength(2)
+    for (const item of items) {
+      expect(within(item).getByText('Preview (create)')).toBeInTheDocument()
+      expect(within(item).getByText('Would create:').nextElementSibling).toHaveTextContent('3')
+      expect(within(item).getByText('Would delete:')).toBeInTheDocument()
+      expect(within(item).queryByText('Created:')).not.toBeInTheDocument()
+      expect(within(item).queryByText('Deleted:')).not.toBeInTheDocument()
+    }
   })
 
   it('shows a failed run without reports', async () => {

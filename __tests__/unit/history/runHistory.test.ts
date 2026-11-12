@@ -31,7 +31,9 @@ describe('run history', () => {
     expect(stored.endTime).toEqual(entry.endTime)
     expect(stored.summary?.startTime).toEqual(entry.summary?.startTime)
     expect(stored.tasks[0].startTime).toEqual(entry.tasks[0].startTime)
-    expect(stored.counts).toEqual(entry.summary?.stats)
+    expect(stored.counts).toEqual({ ...entry.summary?.stats, wouldCreate: 0, wouldDelete: 0 })
+    expect(stored.cloudEnvironment).toBe('global')
+    expect(stored.tasks.find((task) => task.status === 'success')?.createdObject?.id).toMatch(/^0f9e8d7c-/)
 
     const outcome = stored.outcome === 'failed' ? 'cancelled' : stored.outcome
     const original = generateJSONReport(entry.summary!, entry.tasks, outcome, false)
@@ -84,9 +86,49 @@ describe('run history', () => {
       pausedMs: 60_000,
     })
     expect(entry.durationMs).toBe(120_000)
-    expect(entry.counts).toEqual({ total: 5, created: 0, deleted: 3, skipped: 1, failed: 1 })
+    expect(entry.counts).toEqual({ total: 5, created: 0, deleted: 3, wouldCreate: 0, wouldDelete: 0, skipped: 1, failed: 1 })
     expect(addRunHistoryEntry(sessionStorage, entry).ok).toBe(true)
     expect(readRunHistory(sessionStorage, OWNER_A)[0].fatalError).toBe('Your sign-in session expired.')
+  })
+
+  it('counts preview successes as would-change counts for every outcome', () => {
+    const tasks = buildTasks(5)
+    const preview = { ...OWNER_A, operationMode: 'create' as const, isPreview: true, selectedObjectCount: 5 }
+    const completed = buildEntry(OWNER_A, 5)
+    const finished = createRunHistoryEntry({
+      configuration: preview,
+      tasks: completed.tasks,
+      summary: completed.summary,
+      outcome: completed.outcome,
+      fatalError: null,
+      startTime: completed.startTime,
+      endTime: completed.endTime,
+      pausedMs: 0,
+    })
+    const failed = createRunHistoryEntry({
+      configuration: preview,
+      tasks,
+      summary: null,
+      outcome: 'failed',
+      fatalError: 'Your sign-in session expired.',
+      startTime: minutes(0),
+      endTime: minutes(1),
+      pausedMs: 0,
+    })
+    const expected = { total: 5, created: 0, deleted: 0, wouldCreate: 3, wouldDelete: 0, skipped: 1, failed: 1 }
+    expect(finished.counts).toEqual(expected)
+    expect(failed.counts).toEqual(expected)
+  })
+
+  it('reads entries with unknown optional task fields', () => {
+    addRunHistoryEntry(sessionStorage, buildEntry(OWNER_A, 2))
+    const raw = JSON.parse(sessionStorage.getItem(RUN_HISTORY_STORAGE_KEY) ?? '{}')
+    raw.entries[0].tasks[0].futureEvidence = { anything: true }
+    raw.entries[0].tasks[0].createdObject = { id: 'object-1', policyType: 'SettingsCatalog', futureField: 1 }
+    sessionStorage.setItem(RUN_HISTORY_STORAGE_KEY, JSON.stringify(raw))
+    const [stored] = readRunHistory(sessionStorage, OWNER_A)
+    expect(stored.tasks[0]).not.toHaveProperty('futureEvidence')
+    expect(stored.tasks[0].createdObject).toEqual({ id: 'object-1', policyType: 'SettingsCatalog' })
   })
 
   it('shows only the active account and tenant, and removes other owners', () => {
@@ -115,7 +157,7 @@ describe('run history', () => {
   it('fits a realistic 990-task run and drops the oldest runs at the size cap', () => {
     const large = buildEntry(OWNER_A, 990, minutes(0))
     const size = JSON.stringify(large).length
-    // Measured: about 458,000 characters (450 per task) for 990 tasks with full evidence, so 3 such runs fit.
+    // Measured: about 515,000 characters (520 per task) for 990 tasks with full evidence and created-object IDs, so 3 such runs fit.
     expect(size).toBeLessThan(MAX_RUN_HISTORY_CHARS / 2)
 
     for (let index = 0; index < 4; index += 1) {

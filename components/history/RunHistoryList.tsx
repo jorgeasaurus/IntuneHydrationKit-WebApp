@@ -14,9 +14,16 @@ interface RunHistoryListProps {
   onDelete: (entry: RunHistoryEntry) => void;
 }
 
-const COUNT_LABELS = [
+// The same words as the results summary and the reports: a preview changes nothing.
+const LIVE_COUNT_LABELS = [
   ["created", "Created"],
   ["deleted", "Deleted"],
+  ["skipped", "Skipped"],
+  ["failed", "Failed"],
+] as const;
+const PREVIEW_COUNT_LABELS = [
+  ["wouldCreate", "Would create"],
+  ["wouldDelete", "Would delete"],
   ["skipped", "Skipped"],
   ["failed", "Failed"],
 ] as const;
@@ -53,7 +60,7 @@ export function RunHistoryList({ entries, onOpen, onDelete }: RunHistoryListProp
                   </span>
                 </p>
                 <dl className="grid grid-cols-2 gap-x-4 gap-y-1 pt-2 text-sm sm:grid-cols-4">
-                  {COUNT_LABELS.map(([key, label]) => (
+                  {(entry.isPreview ? PREVIEW_COUNT_LABELS : LIVE_COUNT_LABELS).map(([key, label]) => (
                     <div key={key} className="flex gap-1">
                       <dt className="text-muted-foreground">{label}:</dt>
                       <dd className="font-medium tabular-nums">{entry.counts[key]}</dd>

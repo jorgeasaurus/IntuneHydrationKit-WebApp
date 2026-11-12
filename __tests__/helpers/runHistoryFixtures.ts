@@ -49,7 +49,14 @@ export function buildTasks(count: number, start = new Date('2026-11-01T10:00:00.
         error: 'Graph API error 400 - Bad Request: The setting definition id is not valid for this tenant. Request ID: 3f2a1b0c-9d8e-7f6a-5b4c-3d2e1f0a9b8c',
       }
     }
-    return { ...base, status: 'success' }
+    return {
+      ...base,
+      status: 'success',
+      createdObject: {
+        id: `0f9e8d7c-6b5a-4f3e-2d1c-${String(index).padStart(12, '0')}`,
+        ...(category === 'baseline' ? { policyType: 'SettingsCatalog' } : {}),
+      },
+    }
   })
 }
 
@@ -66,7 +73,7 @@ export function buildEntry(
     provenance: { runId, appVersion: '2.6.67', baselineVersion: '4.0', baselineSourceSha: 'a'.repeat(40) },
   }
   return createRunHistoryEntry({
-    configuration: { ...owner, tenantName: 'Contoso Ltd', operationMode: 'create', isPreview: false, selectedObjectCount: taskCount },
+    configuration: { ...owner, tenantName: 'Contoso Ltd', cloudEnvironment: 'global', operationMode: 'create', isPreview: false, selectedObjectCount: taskCount },
     tasks,
     summary,
     outcome: tasks.some((task) => task.status === 'failed') ? 'completedWithIssues' : 'succeeded',

@@ -12,11 +12,13 @@ import { z } from "@/lib/utils/zod";
 import { RUN_HISTORY_STORAGE_KEY } from "@/lib/storageKeys";
 import type { ExecutionRunConfiguration } from "@/lib/hydration/executionStateStore";
 import {
+  CLOUD_ENVIRONMENTS,
   EXECUTION_OUTCOMES,
   NON_SKIPPED_TASK_STATUSES,
   OPERATION_MODES,
   SKIP_KINDS,
   TASK_CATEGORIES,
+  type CloudEnvironment,
   type ExecutionOutcome,
   type HydrationSummary,
   type HydrationTask,
@@ -27,19 +29,26 @@ export const MAX_RUN_HISTORY_ENTRIES = 20;
 /**
  * Maximum serialized size of the history, in UTF-16 code units. sessionStorage has about
  * 5 million code units per origin, shared with the MSAL cache, the latest execution record,
- * and template caches, so history uses less than a third of it.
+ * and template caches, so history uses about a third of it. Three runs of 990 tasks
+ * (about 515,000 code units each with created-object IDs) fit.
  */
-export const MAX_RUN_HISTORY_CHARS = 1_500_000;
+export const MAX_RUN_HISTORY_CHARS = 1_600_000;
 
 export interface RunOwner {
   homeAccountId: string;
   tenantId: string;
 }
 
+/**
+ * Task counts. A preview changes nothing, so its successful tasks count as wouldCreate or
+ * wouldDelete and created and deleted stay 0, as in the reports.
+ */
 export interface RunHistoryCounts {
   total: number;
   created: number;
   deleted: number;
+  wouldCreate: number;
+  wouldDelete: number;
   skipped: number;
   failed: number;
 }
@@ -47,6 +56,8 @@ export interface RunHistoryCounts {
 export interface RunHistoryEntry extends RunOwner {
   id: string;
   tenantName?: string;
+  /** Cloud of the run. The admin portal links of created objects use it. */
+  cloudEnvironment?: CloudEnvironment;
   operationMode: HydrationSummary["operationMode"];
   isPreview: boolean;
   outcome: ExecutionOutcome;
@@ -70,9 +81,10 @@ export type RunHistoryWriteResult =
 const isoDate = z.string().refine((value) => !Number.isNaN(Date.parse(value)), { message: "Expected an ISO date." })
   .transform((value) => new Date(value));
 const countSchema = z.number().int().nonnegative();
-const countsSchema = z.object({
+const summaryStatsSchema = z.object({
   total: countSchema, created: countSchema, deleted: countSchema, skipped: countSchema, failed: countSchema,
 });
+const countsSchema = summaryStatsSchema.extend({ wouldCreate: countSchema, wouldDelete: countSchema });
 const issueSchema = z.object({ task: z.string(), message: z.string(), timestamp: isoDate });
 
 // The task and summary schemas strip fields that they do not know, so a new optional
@@ -89,6 +101,7 @@ const taskBase = {
   drift: z.object({
     status: z.enum(["matches", "different", "notChecked"]), differences: z.array(z.string()), reason: z.string().optional(),
   }).optional(),
+  createdObject: z.object({ id: z.string().min(1), policyType: z.string().optional() }).optional(),
   error: z.string().optional(),
   warning: z.string().optional(),
   startTime: isoDate.optional(),
@@ -110,7 +123,7 @@ const summarySchema = z.object({
   endTime: isoDate,
   duration: z.number().nonnegative(),
   pausedDuration: z.number().nonnegative().optional(),
-  stats: countsSchema,
+  stats: summaryStatsSchema,
   categoryBreakdown: z.record(z.string(), z.object({
     total: countSchema, success: countSchema, skipped: countSchema, failed: countSchema,
   })),
@@ -127,6 +140,7 @@ const entrySchema = z.object({
   homeAccountId: z.string().min(1),
   tenantId: z.string().min(1),
   tenantName: z.string().optional(),
+  cloudEnvironment: z.enum(CLOUD_ENVIRONMENTS).optional(),
   operationMode: z.enum(OPERATION_MODES),
   isPreview: z.boolean(),
   outcome: z.enum(EXECUTION_OUTCOMES),
@@ -151,7 +165,10 @@ export function getRunHistoryStorage(): Storage | null {
   }
 }
 
-/** Keep the task fields that the results view and reports use. Unknown task fields are dropped. */
+/**
+ * Keep the task fields that the results view, the portal links, and the reports use.
+ * Unknown task fields are dropped.
+ */
 function compactTask(task: HydrationTask): HydrationTask {
   const compact = {
     id: task.id,
@@ -163,6 +180,9 @@ function compactTask(task: HydrationTask): HydrationTask {
     templatePath: task.templatePath,
     match: task.match,
     drift: task.drift,
+    createdObject: task.createdObject
+      ? { id: task.createdObject.id, policyType: task.createdObject.policyType }
+      : undefined,
     error: task.error,
     warning: task.warning,
     startTime: task.startTime,
@@ -171,12 +191,18 @@ function compactTask(task: HydrationTask): HydrationTask {
   return compact as HydrationTask;
 }
 
-function countTasks(tasks: HydrationTask[], isPreview: boolean, operationMode: string): RunHistoryCounts {
-  const success = tasks.filter((task) => task.status === "success").length;
+/** Count the tasks the same way for every outcome, with preview successes as "would" counts. */
+function countTasks(tasks: HydrationTask[], isPreview: boolean): RunHistoryCounts {
+  const successes = (operation: HydrationTask["operation"]) =>
+    tasks.filter((task) => task.status === "success" && task.operation === operation).length;
+  const created = successes("create");
+  const deleted = successes("delete");
   return {
     total: tasks.length,
-    created: !isPreview && operationMode === "create" ? success : 0,
-    deleted: !isPreview && operationMode === "delete" ? success : 0,
+    created: isPreview ? 0 : created,
+    deleted: isPreview ? 0 : deleted,
+    wouldCreate: isPreview ? created : 0,
+    wouldDelete: isPreview ? deleted : 0,
     skipped: tasks.filter((task) => task.status === "skipped").length,
     failed: tasks.filter((task) => task.status === "failed").length,
   };
@@ -203,6 +229,7 @@ export function createRunHistoryEntry(run: FinishedRun): RunHistoryEntry {
     homeAccountId: configuration.homeAccountId,
     tenantId: configuration.tenantId,
     tenantName: configuration.tenantName,
+    cloudEnvironment: configuration.cloudEnvironment,
     operationMode: configuration.operationMode,
     isPreview: configuration.isPreview,
     outcome: run.outcome,
@@ -210,9 +237,7 @@ export function createRunHistoryEntry(run: FinishedRun): RunHistoryEntry {
     endTime: run.endTime,
     durationMs: summary ? summary.duration : Math.max(0, wallTime - run.pausedMs),
     selectedObjectCount: configuration.selectedObjectCount,
-    counts: summary
-      ? { ...summary.stats }
-      : countTasks(run.tasks, configuration.isPreview, configuration.operationMode),
+    counts: countTasks(run.tasks, configuration.isPreview),
     summary,
     fatalError: run.fatalError,
     tasks: run.tasks.map(compactTask),
