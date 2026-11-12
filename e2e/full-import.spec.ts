@@ -20,21 +20,20 @@ test.describe("Full Import Flow", () => {
 
     // Step 2: Click sign-in - user authenticates manually in the browser
     console.log("Waiting for manual sign-in. Please authenticate in the browser.");
-    const signInButton = page.getByRole("button", {
-      name: /sign in with microsoft/i,
-    });
+    // The call to action opens the MSAL popup directly. The app goes to
+    // /wizard after the popup sign-in completes.
+    const signInButton = page
+      .getByRole("button", { name: /sign in with microsoft/i })
+      .first();
     await expect(signInButton).toBeVisible();
     await signInButton.click();
-    await page.getByRole("button", { name: /continue to sign in/i }).click();
 
-    // Wait for authentication to complete - user will interact with MSAL popup/redirect
-    // After auth, the wizard page or a "signed in" indicator should appear
     console.log("Waiting for authentication to complete.");
     await page.waitForURL("**/wizard**", { timeout: 120_000 });
     console.log("Authentication complete - on wizard page.");
 
-    // Step 3: Wizard - verify we're on the wizard
-    await expect(page.getByText(/IntuneHydrationKit/i)).toBeVisible();
+    // Step 3: Wizard - verify the first step is visible
+    await expect(page.getByText("Tenant Configuration", { exact: true }).first()).toBeVisible();
 
     // Take screenshots at each step for documentation
     await page.screenshot({ path: "test-results/wizard-step1.png", fullPage: true });
