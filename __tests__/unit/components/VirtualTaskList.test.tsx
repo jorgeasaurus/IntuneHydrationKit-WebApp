@@ -87,7 +87,7 @@ describe('TaskList windowing', () => {
     const labelSpy = vi.spyOn(categoryLabels, 'getTaskCategoryLabel')
 
     const updated = tasks.slice()
-    updated[0] = { ...tasks[0], status: 'running' }
+    updated[0] = { ...tasks[0], status: 'running' } as HydrationTask
     rerender(<TaskList tasks={updated} />)
 
     // Each rendered row calls getTaskCategoryLabel once. About 20 rows are in
