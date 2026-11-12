@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { Navigation } from '@/components/Navigation'
 import {
   beginExecution,
@@ -143,5 +143,37 @@ describe('Navigation', () => {
     expect(consoleError).toHaveBeenCalledWith('Sign in error:', expect.any(Error))
 
     consoleError.mockRestore()
+  })
+
+  it('offers the section links in an accessible menu below the desktop breakpoint', async () => {
+    const user = userEvent.setup()
+    useIsAuthenticated.mockReturnValue(false)
+    usePathname.mockReturnValue('/templates')
+
+    render(<Navigation />)
+
+    const menuButton = screen.getByRole('button', { name: 'Open navigation menu' })
+    expect(menuButton).toHaveClass('lg:hidden')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(menuButton)
+
+    const menu = await screen.findByRole('dialog', { name: 'Menu' })
+    const links = within(menu).getAllByRole('link')
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Features', '/#features'],
+      ['Configurations', '/#what-gets-deployed'],
+      ['FAQs', '/#faq'],
+      ['Template Docs', '/templates'],
+    ])
+
+    await user.click(within(menu).getByRole('link', { name: 'FAQs' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith('/#faq')
+    })
   })
 })

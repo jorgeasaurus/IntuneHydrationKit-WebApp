@@ -3,20 +3,42 @@
 import { useIsAuthenticated } from "@azure/msal-react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRef, useState } from "react";
 import { NavigationBrand } from "@/components/NavigationBrand";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { signIn } from "@/lib/auth/authUtils";
 import { toast } from "sonner";
 import { useWizardState } from "@/hooks/useWizardState";
-import { Terminal, Github } from "lucide-react";
+import { Terminal, Github, Menu } from "lucide-react";
 import { resetHydrationFlow } from "@/lib/hydration/resetHydrationFlow";
+
+const SECTION_LINKS = [
+  { hash: "#features", label: "Features" },
+  { hash: "#what-gets-deployed", label: "Configurations" },
+  { hash: "#faq", label: "FAQs" },
+] as const;
 
 export function Navigation() {
   const isAuthenticated = useIsAuthenticated();
   const pathname = usePathname();
   const router = useRouter();
   const { resetWizard } = useWizardState();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // The modal menu locks page scroll while open, so a menu link navigates
+  // only after the menu has closed and released the lock.
+  const pendingMenuHref = useRef<string | null>(null);
   const getSectionHref = (hash: string) => (pathname === "/" ? hash : `/${hash}`);
+  const navLinks = [
+    ...SECTION_LINKS.map((link) => ({ href: getSectionHref(link.hash), label: link.label })),
+    { href: "/templates", label: "Template Docs" },
+  ];
 
   const handleSignInClick = async () => {
     try {
@@ -52,18 +74,11 @@ export function Navigation() {
 
               {/* Navigation Links */}
               <div className="hidden items-center gap-8 lg:flex">
-                <Link href={getSectionHref("#features")} className="nav-link text-sm font-medium">
-                  Features
-                </Link>
-                <Link href={getSectionHref("#what-gets-deployed")} className="nav-link text-sm font-medium">
-                  Configurations
-                </Link>
-                <Link href={getSectionHref("#faq")} className="nav-link text-sm font-medium">
-                  FAQs
-                </Link>
-                <Link href="/templates" className="nav-link text-sm font-medium">
-                  Template Docs
-                </Link>
+                {navLinks.map((link) => (
+                  <Link key={link.label} href={link.href} className="nav-link text-sm font-medium">
+                    {link.label}
+                  </Link>
+                ))}
               </div>
 
               {/* Right Section */}
@@ -86,6 +101,54 @@ export function Navigation() {
                     {isAuthenticated ? "CONNECTED" : "OFFLINE"}
                   </span>
                 </div>
+
+                {/* Section links below the lg breakpoint */}
+                <Dialog open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+                  <DialogTrigger asChild>
+                    <button
+                      type="button"
+                      className="landing-nav-icon rounded-md p-2 transition-colors hover:bg-muted lg:hidden"
+                      aria-label="Open navigation menu"
+                    >
+                      <Menu className="size-5" aria-hidden="true" />
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent
+                    onCloseAutoFocus={(event) => {
+                      const href = pendingMenuHref.current;
+                      if (!href) {
+                        return;
+                      }
+                      event.preventDefault();
+                      pendingMenuHref.current = null;
+                      setTimeout(() => router.push(href), 0);
+                    }}
+                    className="top-24 max-w-[calc(100%-2rem)] translate-y-0 rounded-lg data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 sm:max-w-sm">
+                    <DialogTitle>Menu</DialogTitle>
+                    <DialogDescription className="sr-only">
+                      Go to a section of the Intune Hydration Kit site.
+                    </DialogDescription>
+                    <nav aria-label="Site sections">
+                      <ul className="grid gap-1">
+                        {navLinks.map((link) => (
+                          <li key={link.label}>
+                            <Link
+                              href={link.href}
+                              onClick={(event) => {
+                                event.preventDefault();
+                                pendingMenuHref.current = link.href;
+                                setIsMenuOpen(false);
+                              }}
+                              className="block rounded-md px-3 py-3 text-base font-medium transition-colors hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
+                            >
+                              {link.label}
+                            </Link>
+                          </li>
+                        ))}
+                      </ul>
+                    </nav>
+                  </DialogContent>
+                </Dialog>
 
                 {/* CTA Button */}
                 <Button
