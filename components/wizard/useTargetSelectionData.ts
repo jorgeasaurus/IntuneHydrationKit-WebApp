@@ -9,6 +9,7 @@ import {
   fetchConditionalAccessPolicies,
   fetchAppProtectionPolicies,
   fetchEnrollmentProfiles,
+  fetchNotificationTemplates,
   fetchCISBaselineManifest,
   type OIBManifest,
   type CISBaselineManifest,
@@ -65,6 +66,14 @@ async function fetchCategoryData(category: TaskCategory): Promise<CategoryItem[]
         displayName: p.displayName || p.name || "Unknown Profile",
         description: p.description,
         subtype: "Autopilot",
+      }));
+    }
+    case "notification": {
+      const templates = await fetchNotificationTemplates();
+      return templates.map(t => ({
+        displayName: t.displayName,
+        description: t.localizedMessages?.map((message) => message.subject).join(", "),
+        subtype: "Compliance notification",
       }));
     }
     case "win32Apps":

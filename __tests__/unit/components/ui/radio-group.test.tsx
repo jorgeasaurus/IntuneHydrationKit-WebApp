@@ -11,23 +11,23 @@ describe('radio-group', () => {
 
     render(
       <RadioGroup
-        defaultValue="global"
+        defaultValue="create"
         onValueChange={onValueChange}
         className="custom-grid"
-        aria-label="Cloud environment"
+        aria-label="Operation"
       >
         <label className="flex items-center gap-2">
-          <RadioGroupItem value="global" className="custom-item" />
-          <span>Global</span>
+          <RadioGroupItem value="create" className="custom-item" />
+          <span>Create</span>
         </label>
         <label className="flex items-center gap-2">
-          <RadioGroupItem value="usgov" />
-          <span>USGov</span>
+          <RadioGroupItem value="delete" />
+          <span>Delete</span>
         </label>
       </RadioGroup>
     )
 
-    const group = screen.getByRole('radiogroup', { name: 'Cloud environment' })
+    const group = screen.getByRole('radiogroup', { name: 'Operation' })
     const radios = screen.getAllByRole('radio')
 
     expect(group).toHaveClass('grid', 'gap-2', 'custom-grid')
@@ -36,7 +36,7 @@ describe('radio-group', () => {
 
     await user.click(radios[1])
 
-    expect(onValueChange).toHaveBeenCalledWith('usgov')
+    expect(onValueChange).toHaveBeenCalledWith('delete')
     expect(radios[1]).toHaveAttribute('data-state', 'checked')
   })
 })

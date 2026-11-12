@@ -36,21 +36,16 @@ const VALID_UPLOAD_STATES = new Set([
 // Intune app and file IDs are GUIDs and content version IDs are integers. The
 // segments do not allow "." so that "." and ".." cannot change the Graph path.
 const CONTENT_FILE_ENDPOINT_PATTERN = /^\/deviceAppManagement\/mobileApps\/[A-Za-z0-9-]+\/microsoft\.graph\.win32LobApp\/contentVersions\/[A-Za-z0-9-]+\/files\/[A-Za-z0-9-]+$/;
-const AZURE_BLOB_HOST_SUFFIXES = [
-  ".blob.core.windows.net",
-  ".blob.core.usgovcloudapi.net",
-  ".blob.core.chinacloudapi.cn",
-  ".blob.core.cloudapi.de",
-] as const;
+// The web app supports the Global (commercial) cloud only. Intune in that cloud
+// issues upload URLs on the global Azure Blob host.
+const AZURE_BLOB_HOST_SUFFIX = ".blob.core.windows.net";
 
 export const runtime = "nodejs";
 
 function isAzureBlobUploadUrl(value: string): boolean {
   try {
     const url = new URL(value);
-    return url.protocol === "https:" && AZURE_BLOB_HOST_SUFFIXES.some(
-      (suffix) => url.hostname.endsWith(suffix)
-    );
+    return url.protocol === "https:" && url.hostname.endsWith(AZURE_BLOB_HOST_SUFFIX);
   } catch {
     return false;
   }

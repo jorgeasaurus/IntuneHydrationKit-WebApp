@@ -61,6 +61,12 @@ export const TEMPLATE_METADATA = {
     count: 4,
     icon: "Download",
   },
+  notification: {
+    displayName: "Notification Templates",
+    description: "Compliance notification message templates with localized messages",
+    count: 1,
+    icon: "Bell",
+  },
   conditionalAccess: {
     displayName: "Conditional Access",
     description: "Microsoft starter pack CA policies (created in disabled state)",
