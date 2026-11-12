@@ -7,17 +7,11 @@ const {
   mockGetAllTemplateCacheKeys,
   mockGetCachedTemplates,
   mockDetectCISPolicyType,
-  mockSettingsCatalogPolicyExists,
   mockCreateSettingsCatalogPolicy,
-  mockV2CompliancePolicyExists,
   mockCreateV2CompliancePolicy,
-  mockCompliancePolicyExistsByName,
   mockCreateCISCompliancePolicy,
-  mockDeviceConfigurationExists,
   mockCreateCISDeviceConfiguration,
-  mockGroupPolicyConfigurationExists,
   mockCreateCISGroupPolicyConfiguration,
-  mockSecurityIntentExists,
   mockCreateCISSecurityIntent,
   mockEscapeODataString,
   mockHasODataUnsafeChars,
@@ -25,17 +19,11 @@ const {
   mockGetAllTemplateCacheKeys: vi.fn(),
   mockGetCachedTemplates: vi.fn(),
   mockDetectCISPolicyType: vi.fn(),
-  mockSettingsCatalogPolicyExists: vi.fn(),
   mockCreateSettingsCatalogPolicy: vi.fn(),
-  mockV2CompliancePolicyExists: vi.fn(),
   mockCreateV2CompliancePolicy: vi.fn(),
-  mockCompliancePolicyExistsByName: vi.fn(),
   mockCreateCISCompliancePolicy: vi.fn(),
-  mockDeviceConfigurationExists: vi.fn(),
   mockCreateCISDeviceConfiguration: vi.fn(),
-  mockGroupPolicyConfigurationExists: vi.fn(),
   mockCreateCISGroupPolicyConfiguration: vi.fn(),
-  mockSecurityIntentExists: vi.fn(),
   mockCreateCISSecurityIntent: vi.fn(),
   mockEscapeODataString: vi.fn(),
   mockHasODataUnsafeChars: vi.fn(),
@@ -51,17 +39,11 @@ vi.mock("@/lib/hydration/policyDetection", () => ({
 }));
 
 vi.mock("@/lib/hydration/policyCreators", () => ({
-  settingsCatalogPolicyExists: mockSettingsCatalogPolicyExists,
   createSettingsCatalogPolicy: mockCreateSettingsCatalogPolicy,
-  v2CompliancePolicyExists: mockV2CompliancePolicyExists,
   createV2CompliancePolicy: mockCreateV2CompliancePolicy,
-  compliancePolicyExistsByName: mockCompliancePolicyExistsByName,
   createCISCompliancePolicy: mockCreateCISCompliancePolicy,
-  deviceConfigurationExists: mockDeviceConfigurationExists,
   createCISDeviceConfiguration: mockCreateCISDeviceConfiguration,
-  groupPolicyConfigurationExists: mockGroupPolicyConfigurationExists,
   createCISGroupPolicyConfiguration: mockCreateCISGroupPolicyConfiguration,
-  securityIntentExists: mockSecurityIntentExists,
   createCISSecurityIntent: mockCreateCISSecurityIntent,
 }));
 
@@ -104,9 +86,6 @@ describe("executeCISBaselineTask", () => {
     ]);
     mockEscapeODataString.mockImplementation((value: string) => value);
     mockHasODataUnsafeChars.mockReturnValue(false);
-    mockSettingsCatalogPolicyExists.mockResolvedValue(false);
-    mockGroupPolicyConfigurationExists.mockResolvedValue(false);
-    mockSecurityIntentExists.mockResolvedValue(false);
   });
 
   it("returns a failure when the CIS template cannot be found", async () => {
@@ -145,6 +124,7 @@ describe("executeCISBaselineTask", () => {
         operationMode: "create",
         isPreview: true,
         stopOnFirstError: false,
+        cachedSettingsCatalogPolicies: [],
       }
     );
 
@@ -222,6 +202,7 @@ describe("executeCISBaselineTask", () => {
       operationMode: "create",
       isPreview: false,
       stopOnFirstError: false,
+      cachedSettingsCatalogPolicies: [],
     });
 
     expect(result).toMatchObject({
@@ -231,7 +212,7 @@ describe("executeCISBaselineTask", () => {
     });
   });
 
-  it("skips group policy creates when an OData-unsafe name already exists in the fetched cache", async () => {
+  it("skips group policy creates when the name already exists in the prefetched cache", async () => {
     const policyName = "[IHD] CIS Group/Policy";
 
     mockGetCachedTemplates.mockReturnValue([
@@ -242,22 +223,20 @@ describe("executeCISBaselineTask", () => {
       },
     ]);
     mockDetectCISPolicyType.mockReturnValue("GroupPolicyConfiguration");
-    mockHasODataUnsafeChars.mockReturnValue(true);
 
     const client = createClient();
-    vi.mocked(client.getCollection).mockResolvedValue([
-      {
-        id: "group-policy-id",
-        displayName: policyName,
-        description: "Imported by Intune Hydration Kit",
-      },
-    ]);
-
     const context: ExecutionContext = {
       client,
       operationMode: "create",
       isPreview: false,
       stopOnFirstError: false,
+      cachedGroupPolicyConfigurations: [
+        {
+          id: "group-policy-id",
+          displayName: policyName.toLowerCase(),
+          description: "Imported by Intune Hydration Kit",
+        },
+      ],
     };
 
     const result = await executeCISBaselineTask(createTask(policyName), context);
@@ -267,13 +246,8 @@ describe("executeCISBaselineTask", () => {
       skipped: true,
       error: "Already exists",
     });
-    expect(context.cachedGroupPolicyConfigurations).toEqual([
-      {
-        id: "group-policy-id",
-        displayName: policyName,
-        description: "Imported by Intune Hydration Kit",
-      },
-    ]);
+    expect(client.getCollection).not.toHaveBeenCalled();
+    expect(client.get).not.toHaveBeenCalled();
   });
 
   it("supports preview creates for security intents", async () => {
@@ -293,6 +267,7 @@ describe("executeCISBaselineTask", () => {
       operationMode: "create",
       isPreview: true,
       stopOnFirstError: false,
+      cachedSecurityIntents: [],
     });
 
     expect(result).toMatchObject({ success: true, skipped: false });
@@ -344,13 +319,13 @@ describe("executeCISBaselineTask", () => {
       },
     ]);
     mockDetectCISPolicyType.mockReturnValue("SettingsCatalog");
-    mockSettingsCatalogPolicyExists.mockResolvedValue(true);
 
     const result = await executeCISBaselineTask(createTask(policyName), {
       client: createClient(),
       operationMode: "create",
       isPreview: false,
       stopOnFirstError: false,
+      cachedSettingsCatalogPolicies: [{ id: "existing-id", name: policyName }],
     });
 
     expect(result).toMatchObject({

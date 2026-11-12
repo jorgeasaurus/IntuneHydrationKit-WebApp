@@ -11,14 +11,14 @@ import {
   createSettingsCatalogPolicy,
   createDeviceConfigurationPolicy,
   createDriverUpdateProfile,
-  compliancePolicyExistsByName,
   createBaselineCompliancePolicy,
 } from "../policyCreators";
-import { escapeODataString, hasODataUnsafeChars } from "../utils";
+import { escapeODataString, hasODataUnsafeChars, requireTenantCache } from "../utils";
 import { findBaselineMatch, recordBaselineMatch } from "../baselineEvidence";
 import { resolveOIBOrganizationId } from "../templatePlaceholders";
 import { createAppProtectionPolicy, deleteAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy, AppProtectionTemplate } from "@/lib/templates/loader";
+import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
 
 /**
  * Execute a baseline task (create or delete)
@@ -35,9 +35,7 @@ export async function executeBaselineTask(
   let template: BaselinePolicy | undefined;
 
   if (cachedBaseline && Array.isArray(cachedBaseline)) {
-    template = (cachedBaseline as BaselinePolicy[]).find(
-      (b) => b.displayName === task.itemName || b.name === task.itemName
-    );
+    template = findBaselineTemplateForTask(cachedBaseline as BaselinePolicy[], task);
   }
 
   if (!template) {
@@ -58,18 +56,7 @@ export async function executeBaselineTask(
       // Route based on policy type
       if (policyType === "CompliancePolicies") {
         // Compliance policies go to deviceCompliancePolicies endpoint
-        let compliancePolicies = context.cachedCompliancePolicies;
-
-        if (
-          (!compliancePolicies || compliancePolicies.length === 0) &&
-          hasODataUnsafeChars(policyName)
-        ) {
-          compliancePolicies = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
-            "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
-          );
-          context.cachedCompliancePolicies = compliancePolicies;
-        }
-
+        const compliancePolicies = requireTenantCache(context, "cachedCompliancePolicies");
         const existingCompliancePolicy = findBaselineMatch("CompliancePolicies", policyName, compliancePolicies);
 
         if (existingCompliancePolicy) {
@@ -78,29 +65,18 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
         }
 
-        const exists = await compliancePolicyExistsByName(client, policyName);
-        if (exists) {
-          task.drift = { status: "notChecked", differences: [], reason: "An existing policy was found, but its identity was not returned by the lookup." };
-          console.log(`[Baseline Task] Compliance policy already exists, skipping: "${policyName}"`);
-          return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
-        }
         if (isPreview) {
           return { task, success: true, skipped: false };
         }
         const created = await createBaselineCompliancePolicy(client, template as Record<string, unknown>);
-        if (context.cachedCompliancePolicies && created.id) {
-          context.cachedCompliancePolicies.push({
-            id: created.id,
-            displayName: policyName,
-            description: "",
-          });
-        }
+        compliancePolicies.push({ id: created.id, displayName: policyName, description: "" });
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else if (policyType === "AppProtection") {
         // App Protection policies - use existing app protection handler
         const platform = template["@odata.type"] === "#microsoft.graph.iosManagedAppProtection" ? "iOS" : "android";
-        const platformPolicies = context.cachedAppProtectionPolicies?.filter((policy) => {
+        const appProtectionPolicies = requireTenantCache(context, "cachedAppProtectionPolicies");
+        const platformPolicies = appProtectionPolicies.filter((policy) => {
           if (policy._platform) return policy._platform === platform;
           const expectedType = platform === "iOS" ? "#microsoft.graph.iosManagedAppProtection" : "#microsoft.graph.androidManagedAppProtection";
           return policy["@odata.type"] === expectedType;
@@ -115,15 +91,12 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: false };
         }
         const created = await createAppProtectionPolicy(client, template as AppProtectionTemplate);
+        appProtectionPolicies.push(created);
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else if (policyType === "DeviceConfiguration" || policyType === "UpdatePolicies") {
         // DeviceConfiguration and UpdatePolicies use deviceConfigurations endpoint
-        const policies = context.cachedDeviceConfigurations?.length
-          ? context.cachedDeviceConfigurations
-          : await client.getCollection<{ id: string; displayName: string }>(
-          "/deviceManagement/deviceConfigurations?$select=id,displayName"
-        );
+        const policies = requireTenantCache(context, "cachedDeviceConfigurations");
         const existingPolicy = findBaselineMatch("DeviceConfiguration", policyName, policies);
         if (existingPolicy) {
           await recordBaselineMatch(task, template, existingPolicy, "DeviceConfiguration", client);
@@ -134,15 +107,11 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: false };
         }
         const created = await createDeviceConfigurationPolicy(client, template as Record<string, unknown>);
+        policies.push({ id: created.id, displayName: policyName, description: "" });
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else if (policyType === "DriverUpdateProfiles") {
-        // DriverUpdateProfiles endpoint doesn't support $filter, fetch all and filter client-side
-        const policies = context.cachedDriverUpdateProfiles?.length
-          ? context.cachedDriverUpdateProfiles
-          : await client.getCollection<{ id: string; displayName: string }>(
-          "/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName"
-        );
+        const policies = requireTenantCache(context, "cachedDriverUpdateProfiles");
         const existingProfile = findBaselineMatch("DriverUpdateProfiles", policyName, policies);
         if (existingProfile) {
           await recordBaselineMatch(task, template, existingProfile, "DriverUpdateProfiles", client);
@@ -153,13 +122,13 @@ export async function executeBaselineTask(
           return { task, success: true, skipped: false };
         }
         const created = await createDriverUpdateProfile(client, template as Record<string, unknown>);
+        policies.push({ id: created.id, displayName: policyName, description: "" });
         return { task, success: true, skipped: false, createdId: created.id };
 
       } else {
         // SettingsCatalog (default) - use configurationPolicies endpoint
-        // Use cache-based existence check for consistency with batch executor
-        // The $filter API is unreliable for this endpoint
-        const existingSettingsPolicy = findBaselineMatch("SettingsCatalog", policyName, context.cachedSettingsCatalogPolicies);
+        const settingsCatalogPolicies = requireTenantCache(context, "cachedSettingsCatalogPolicies");
+        const existingSettingsPolicy = findBaselineMatch("SettingsCatalog", policyName, settingsCatalogPolicies);
 
         if (existingSettingsPolicy) {
           await recordBaselineMatch(task, template, existingSettingsPolicy, "SettingsCatalog", client);
@@ -174,13 +143,7 @@ export async function executeBaselineTask(
         const created = await createSettingsCatalogPolicy(client, template as Record<string, unknown>);
 
         // Add to cache to prevent duplicate creation
-        if (context.cachedSettingsCatalogPolicies && created.id) {
-          context.cachedSettingsCatalogPolicies.push({
-            id: created.id,
-            name: policyName,
-            description: ""
-          });
-        }
+        settingsCatalogPolicies.push({ id: created.id, name: policyName, description: "" });
 
         return { task, success: true, skipped: false, createdId: created.id, warning: created.warning };
       }

@@ -14,7 +14,6 @@ const {
   mockFetchBaselinePolicies,
   mockGetCachedTemplates,
   mockCacheTemplates,
-  mockClearCategoryCache,
 } = vi.hoisted(() => ({
   mockGetWin32AppTemplates: vi.fn(),
   mockFetchDynamicGroups: vi.fn(),
@@ -29,7 +28,6 @@ const {
   mockFetchBaselinePolicies: vi.fn(),
   mockGetCachedTemplates: vi.fn(),
   mockCacheTemplates: vi.fn(),
-  mockClearCategoryCache: vi.fn(),
 }));
 
 vi.mock("@/templates", () => ({
@@ -59,7 +57,6 @@ vi.mock("@/lib/templates/loader", () => ({
   fetchBaselinePolicies: mockFetchBaselinePolicies,
   getCachedTemplates: mockGetCachedTemplates,
   cacheTemplates: mockCacheTemplates,
-  clearCategoryCache: mockClearCategoryCache,
 }));
 
 import {
@@ -159,11 +156,11 @@ describe("taskQueue", () => {
       },
     });
 
-    expect(mockClearCategoryCache).toHaveBeenCalledWith("groups");
     expect(mockCacheTemplates).toHaveBeenCalledWith("groups", [
+      { displayName: "Dynamic Group A" },
       { displayName: "Dynamic Group B" },
       { displayName: "Static Group A" },
-    ]);
+    ], { complete: true });
     expect(tasks.map((task) => task.itemName)).toEqual([
       "Dynamic Group B",
       "Static Group A",
@@ -307,7 +304,7 @@ describe("taskQueue", () => {
 
     expect(mockFetchCISBaselinePolicies).toHaveBeenCalledTimes(1);
     expect(mockFetchCISBaselinePoliciesByCategories).not.toHaveBeenCalled();
-    expect(mockClearCategoryCache).toHaveBeenCalledWith("cisBaseline");
+    expect(mockCacheTemplates).toHaveBeenCalledWith("cisBaseline", expect.any(Array), { complete: true });
     expect(tasks).toHaveLength(2);
     expect(tasks.map((task) => task.itemName)).toEqual([
       "Known CIS Policy",

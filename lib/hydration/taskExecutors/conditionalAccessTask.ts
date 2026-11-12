@@ -13,7 +13,7 @@ import {
 } from "@/lib/graph/conditionalAccess";
 import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
-import { normalizeName } from "../utils";
+import { normalizeName, requireTenantCache } from "../utils";
 
 function findCachedConditionalAccessPolicy(
   displayName: string,
@@ -89,21 +89,10 @@ export async function executeConditionalAccessTask(
 
     const existingPolicy = findCachedConditionalAccessPolicy(
       template.displayName,
-      context.cachedConditionalAccessPolicies
+      requireTenantCache(context, "cachedConditionalAccessPolicies")
     );
 
     if (existingPolicy) {
-      return {
-        task,
-        success: true,
-        skipped: true,
-        skipKind: "noOp",
-        error: "Already exists",
-      };
-    }
-
-    const exists = await conditionalAccessPolicyExists(client, template.displayName);
-    if (exists) {
       return {
         task,
         success: true,
@@ -134,6 +123,10 @@ export async function executeConditionalAccessTask(
 
     // Create the policy (will be forced to disabled state)
     const created = await createConditionalAccessPolicy(client, fullCATemplate);
+    requireTenantCache(context, "cachedConditionalAccessPolicies").push({
+      id: created.id ?? "",
+      displayName: template.displayName,
+    });
     return {
       task,
       success: true,

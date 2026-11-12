@@ -10,20 +10,21 @@ import { ExecutionContext, ExecutionResult } from "../types";
 import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { detectCISPolicyType } from "../policyDetection";
 import {
-  settingsCatalogPolicyExists,
   createSettingsCatalogPolicy,
-  v2CompliancePolicyExists,
   createV2CompliancePolicy,
-  compliancePolicyExistsByName,
   createCISCompliancePolicy,
-  deviceConfigurationExists,
   createCISDeviceConfiguration,
-  groupPolicyConfigurationExists,
   createCISGroupPolicyConfiguration,
-  securityIntentExists,
   createCISSecurityIntent,
 } from "../policyCreators";
-import { escapeODataString, hasODataUnsafeChars, findUniquePartialMatch, normalizeName } from "../utils";
+import {
+  escapeODataString,
+  hasODataUnsafeChars,
+  findUniquePartialMatch,
+  normalizeName,
+  findExistingByName,
+  requireTenantCache,
+} from "../utils";
 import { getCachedTemplates, getAllTemplateCacheKeys, CISBaselinePolicy } from "@/lib/templates/loader";
 
 function findCachedGroupPolicyConfiguration(
@@ -34,6 +35,11 @@ function findCachedGroupPolicyConfiguration(
   return context.cachedGroupPolicyConfigurations?.find(
     (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
   );
+}
+
+function alreadyExists(task: HydrationTask, label: string, policyName: string): ExecutionResult {
+  console.log(`[CIS Baseline Task] ${label} already exists, skipping: "${policyName}"`);
+  return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
 }
 
 /**
@@ -104,172 +110,89 @@ export async function executeCISBaselineTask(
           };
 
         case "GroupPolicyConfiguration": {
-          const normalizedPolicyName = policyName.toLowerCase().trim();
-          let groupPolicyConfigurations = context.cachedGroupPolicyConfigurations;
-
-          if (
-            (!groupPolicyConfigurations || groupPolicyConfigurations.length === 0) &&
-            hasODataUnsafeChars(policyName)
-          ) {
-            groupPolicyConfigurations = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
-              "/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description"
-            );
-            context.cachedGroupPolicyConfigurations = groupPolicyConfigurations;
-          }
-
-          const existingGroupPolicyConfiguration = groupPolicyConfigurations?.find(
-            (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
-          );
-
-          if (existingGroupPolicyConfiguration) {
-            console.log(`[CIS Baseline Task] Group Policy Configuration already exists (cache), skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
-          }
-
-          const groupPolicyExists = await groupPolicyConfigurationExists(client, policyName);
-          if (groupPolicyExists) {
-            console.log(`[CIS Baseline Task] Group Policy Configuration already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
+          const groupPolicyConfigurations = requireTenantCache(context, "cachedGroupPolicyConfigurations");
+          if (findExistingByName(groupPolicyConfigurations, policyName, (policy) => policy.displayName)) {
+            return alreadyExists(task, "Group Policy Configuration", policyName);
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
           }
           const createdGroupPolicy = await createCISGroupPolicyConfiguration(client, template as Record<string, unknown>);
-          if (context.cachedGroupPolicyConfigurations && createdGroupPolicy.id) {
-            context.cachedGroupPolicyConfigurations.push({
-              id: createdGroupPolicy.id,
-              displayName: policyName,
-              description: "",
-            });
-          }
+          groupPolicyConfigurations.push({ id: createdGroupPolicy.id, displayName: policyName, description: "" });
           return { task, success: true, skipped: false, createdId: createdGroupPolicy.id };
         }
 
         case "SecurityIntent": {
-          const normalizedPolicyName = policyName.toLowerCase().trim();
-          let securityIntents = context.cachedSecurityIntents;
-
-          if (
-            (!securityIntents || securityIntents.length === 0) &&
-            hasODataUnsafeChars(policyName)
-          ) {
-            securityIntents = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
-              "/deviceManagement/intents?$select=id,displayName,description"
-            );
-            context.cachedSecurityIntents = securityIntents;
-          }
-
-          const existingSecurityIntent = securityIntents?.find(
-            (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
-          );
-
-          if (existingSecurityIntent) {
-            console.log(`[CIS Baseline Task] Security Intent already exists (cache), skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
-          }
-
-          const intentExists = await securityIntentExists(client, policyName);
-          if (intentExists) {
-            console.log(`[CIS Baseline Task] Security Intent already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
+          const securityIntents = requireTenantCache(context, "cachedSecurityIntents");
+          if (findExistingByName(securityIntents, policyName, (policy) => policy.displayName)) {
+            return alreadyExists(task, "Security Intent", policyName);
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
           }
           const createdIntent = await createCISSecurityIntent(client, template as Record<string, unknown>);
-          if (context.cachedSecurityIntents && createdIntent.id) {
-            context.cachedSecurityIntents.push({
-              id: createdIntent.id,
-              displayName: policyName,
-              description: "",
-            });
-          }
+          securityIntents.push({ id: createdIntent.id, displayName: policyName, description: "" });
           return { task, success: true, skipped: false, createdId: createdIntent.id };
         }
 
         case "V2Compliance": {
           // Settings Catalog compliance -> /compliancePolicies
-          const v2Exists = await v2CompliancePolicyExists(client, policyName);
-          if (v2Exists) {
-            console.log(`[CIS Baseline Task] V2 Compliance policy already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
+          const v2CompliancePolicies = requireTenantCache(context, "cachedV2CompliancePolicies");
+          // V2 policies can also appear in the Settings Catalog list
+          const existingV2Policy =
+            findExistingByName(v2CompliancePolicies, policyName, (policy) => policy.name) ??
+            findExistingByName(context.cachedSettingsCatalogPolicies ?? [], policyName, (policy) => policy.name);
+          if (existingV2Policy) {
+            return alreadyExists(task, "V2 Compliance policy", policyName);
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
           }
           const v2Created = await createV2CompliancePolicy(client, template as Record<string, unknown>);
+          v2CompliancePolicies.push({ id: v2Created.id, name: policyName, description: "" });
           return { task, success: true, skipped: false, createdId: v2Created.id };
         }
 
         case "V1Compliance": {
           // Legacy compliance -> /deviceCompliancePolicies
-          const normalizedPolicyName = policyName.toLowerCase().trim();
-          let compliancePolicies = context.cachedCompliancePolicies;
-
-          if (
-            (!compliancePolicies || compliancePolicies.length === 0) &&
-            hasODataUnsafeChars(policyName)
-          ) {
-            compliancePolicies = await client.getCollection<{ id: string; displayName?: string; description?: string }>(
-              "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"
-            );
-            context.cachedCompliancePolicies = compliancePolicies;
-          }
-
-          const existingV1Policy = compliancePolicies?.find(
-            (policy) => policy.displayName?.toLowerCase().trim() === normalizedPolicyName
-          );
-
-          if (existingV1Policy) {
-            console.log(`[CIS Baseline Task] V1 Compliance policy already exists (cache), skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
-          }
-
-          const v1Exists = await compliancePolicyExistsByName(client, policyName);
-          if (v1Exists) {
-            console.log(`[CIS Baseline Task] V1 Compliance policy already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
+          const compliancePolicies = requireTenantCache(context, "cachedCompliancePolicies");
+          if (findExistingByName(compliancePolicies, policyName, (policy) => policy.displayName)) {
+            return alreadyExists(task, "V1 Compliance policy", policyName);
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
           }
           const v1Created = await createCISCompliancePolicy(client, template as Record<string, unknown>);
-          if (context.cachedCompliancePolicies && v1Created.id) {
-            context.cachedCompliancePolicies.push({
-              id: v1Created.id,
-              displayName: policyName,
-              description: "",
-            });
-          }
+          compliancePolicies.push({ id: v1Created.id, displayName: policyName, description: "" });
           return { task, success: true, skipped: false, createdId: v1Created.id };
         }
 
         case "DeviceConfiguration": {
           // Device configuration -> /deviceConfigurations
-          const dcExists = await deviceConfigurationExists(client, policyName);
-          if (dcExists) {
-            console.log(`[CIS Baseline Task] Device Configuration already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
+          const deviceConfigurations = requireTenantCache(context, "cachedDeviceConfigurations");
+          if (findExistingByName(deviceConfigurations, policyName, (policy) => policy.displayName)) {
+            return alreadyExists(task, "Device Configuration", policyName);
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
           }
           const dcCreated = await createCISDeviceConfiguration(client, template as Record<string, unknown>);
+          deviceConfigurations.push({ id: dcCreated.id, displayName: policyName, description: "" });
           return { task, success: true, skipped: false, createdId: dcCreated.id };
         }
 
         case "SettingsCatalog":
         default: {
           // Settings Catalog -> /configurationPolicies
-          const scExists = await settingsCatalogPolicyExists(client, policyName);
-          if (scExists) {
-            console.log(`[CIS Baseline Task] Settings Catalog policy already exists, skipping: "${policyName}"`);
-            return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
+          const settingsCatalogPolicies = requireTenantCache(context, "cachedSettingsCatalogPolicies");
+          if (findExistingByName(settingsCatalogPolicies, policyName, (policy) => policy.name)) {
+            return alreadyExists(task, "Settings Catalog policy", policyName);
           }
           if (isPreview) {
             return { task, success: true, skipped: false };
           }
           const scCreated = await createSettingsCatalogPolicy(client, template as Record<string, unknown>);
+          settingsCatalogPolicies.push({ id: scCreated.id, name: policyName, description: "" });
           return { task, success: true, skipped: false, createdId: scCreated.id, warning: scCreated.warning };
         }
       }

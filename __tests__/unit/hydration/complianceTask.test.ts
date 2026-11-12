@@ -9,14 +9,12 @@ const {
   mockDeleteCompliancePolicyByName,
   mockCompliancePolicyExists,
   mockCreateV2CompliancePolicy,
-  mockV2CompliancePolicyExists,
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockCreateCompliancePolicy: vi.fn(),
   mockDeleteCompliancePolicyByName: vi.fn(),
   mockCompliancePolicyExists: vi.fn(),
   mockCreateV2CompliancePolicy: vi.fn(),
-  mockV2CompliancePolicyExists: vi.fn(),
 }));
 
 vi.mock("@/lib/templates/loader", () => ({
@@ -31,7 +29,6 @@ vi.mock("@/lib/graph/compliance", () => ({
 
 vi.mock("@/lib/hydration/policyCreators", () => ({
   createV2CompliancePolicy: mockCreateV2CompliancePolicy,
-  v2CompliancePolicyExists: mockV2CompliancePolicyExists,
 }));
 
 import { executeComplianceTask } from "@/lib/hydration/taskExecutors/complianceTask";
@@ -61,7 +58,6 @@ describe("executeComplianceTask", () => {
     vi.clearAllMocks();
     mockGetCachedTemplates.mockReturnValue(undefined);
     mockCompliancePolicyExists.mockResolvedValue(false);
-    mockV2CompliancePolicyExists.mockResolvedValue(false);
   });
 
   it("returns a failure when no compliance template can be resolved", async () => {
@@ -142,7 +138,6 @@ describe("executeComplianceTask", () => {
       skipped: true,
       error: "Already exists",
     });
-    expect(mockV2CompliancePolicyExists).not.toHaveBeenCalled();
   });
 
   it("supports preview creates for V2 compliance policies", async () => {
@@ -160,6 +155,7 @@ describe("executeComplianceTask", () => {
       operationMode: "create",
       isPreview: true,
       stopOnFirstError: false,
+      cachedV2CompliancePolicies: [],
     });
 
     expect(result).toMatchObject({ success: true, skipped: false });
@@ -181,6 +177,7 @@ describe("executeComplianceTask", () => {
       operationMode: "create",
       isPreview: true,
       stopOnFirstError: false,
+      cachedCompliancePolicies: [],
     });
 
     expect(result).toMatchObject({ success: true, skipped: false });
@@ -199,7 +196,7 @@ describe("executeComplianceTask", () => {
       },
     ]);
     mockCreateCompliancePolicy.mockRejectedValue(new Error("504 Gateway Timeout"));
-    mockCompliancePolicyExists.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+    mockCompliancePolicyExists.mockResolvedValueOnce(true);
 
     const client = createClient();
     vi.mocked(client.get).mockResolvedValue({
@@ -211,6 +208,7 @@ describe("executeComplianceTask", () => {
       operationMode: "create",
       isPreview: false,
       stopOnFirstError: false,
+      cachedCompliancePolicies: [],
     });
 
     await vi.runAllTimersAsync();
@@ -236,13 +234,14 @@ describe("executeComplianceTask", () => {
       },
     ]);
     mockCreateCompliancePolicy.mockRejectedValue(new Error("504 Gateway Timeout"));
-    mockCompliancePolicyExists.mockResolvedValueOnce(false).mockResolvedValueOnce(false);
+    mockCompliancePolicyExists.mockResolvedValueOnce(false);
 
     const promise = executeComplianceTask(createTask(policyName), {
       client: createClient(),
       operationMode: "create",
       isPreview: false,
       stopOnFirstError: false,
+      cachedCompliancePolicies: [],
     });
 
     await vi.runAllTimersAsync();

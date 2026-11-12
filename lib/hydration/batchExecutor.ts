@@ -17,20 +17,16 @@ import {
 import type { ApiVersion } from "@/lib/graph/batch";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
-import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage } from "./types";
+import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage, TenantCacheKey } from "./types";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
-import { sleep, sleepWithExecutionControl, waitWhilePaused, hasODataUnsafeChars, normalizeName, findByNamePrecedence } from "./utils";
+import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
+import { sleep, sleepWithExecutionControl, waitWhilePaused, normalizeName, findByNamePrecedence } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
-  settingsCatalogPolicyExists,
-  v2CompliancePolicyExists,
-  deviceConfigurationExists,
-  groupPolicyConfigurationExists,
   buildCISGroupPolicyConfigurationPayload,
-  securityIntentExists,
   buildCISSecurityIntentPayload,
 } from "./policyCreators";
 import {
@@ -45,7 +41,6 @@ import {
 import {
   CONDITIONAL_ACCESS_POLICIES_ENDPOINT,
   buildConditionalAccessCreatePlan,
-  conditionalAccessPolicyExists,
 } from "@/lib/graph/conditionalAccess";
 import {
   getPrivatePreviewFeatureName,
@@ -269,11 +264,13 @@ function buildGroupRequestBody(task: HydrationTask, context: ExecutionContext): 
     return { type: "error", reason: "Template not found" };
   }
 
-  // Check if already exists in cache - match with or without [IHD] prefix
-  console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups?.length || 0} cached groups`);
+  // Check if already exists in cache - match with or without [IHD] prefix.
+  // Without a loaded cache, the sequential executor fails the task with the prefetch error.
+  if (!context.cachedIntuneGroups) return { type: "error", reason: "Group cache is not loaded" };
+  console.log(`[BatchExecutor:groups] Checking existence in ${context.cachedIntuneGroups.length} cached groups`);
   const templateName = template!.displayName.toLowerCase();
   const templateNameStripped = templateName.startsWith("[ihd] ") ? templateName.slice(6) : templateName;
-  const existingGroup = context.cachedIntuneGroups?.find((g) => {
+  const existingGroup = context.cachedIntuneGroups.find((g) => {
     const cachedName = g.displayName.toLowerCase();
     const cachedNameStripped = cachedName.startsWith("[ihd] ") ? cachedName.slice(6) : cachedName;
     return cachedName === templateName || cachedNameStripped === templateNameStripped;
@@ -345,8 +342,10 @@ function buildFilterRequestBody(task: HydrationTask, context: ExecutionContext):
 
   if (!template) return { type: "error", reason: "Template not found" };
 
-  // Check if already exists in cache
-  const existingFilter = context.cachedFilters?.find(
+  // Check if already exists in cache.
+  // Without a loaded cache, the sequential executor fails the task with the prefetch error.
+  if (!context.cachedFilters) return { type: "error", reason: "Filter cache is not loaded" };
+  const existingFilter = context.cachedFilters.find(
     (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
   );
   if (existingFilter) return { type: "skip", reason: "Filter already exists" };
@@ -438,9 +437,7 @@ async function buildBaselineRequestBody(
       console.log(`[BatchExecutor:baseline] Sample cached names: ${sampleNames.join(', ')}`);
     }
 
-    template = (cachedPolicies as BaselinePolicy[]).find(
-      (p) => (p.name || p.displayName) === task.itemName
-    );
+    template = findBaselineTemplateForTask(cachedPolicies as BaselinePolicy[], task);
   }
 
   if (!template) {
@@ -499,8 +496,10 @@ async function buildBaselineRequestBody(
     return null;
   }
 
-  // Check if policy already exists (cache-first with API fallback)
-  if (await policyExistsInCacheOrApi(policyType as PolicyExistsPolicyType, policyName, context, "[BatchExecutor]", { task, template })) {
+  // Check if policy already exists in the prefetched tenant cache
+  const exists = await policyExistsInCache(policyType as PolicyExistsPolicyType, policyName, context, "[BatchExecutor]", { task, template });
+  if (exists === undefined) return null;
+  if (exists) {
     return { skip: true, reason: `${policyType} "${policyName}" already exists` };
   }
 
@@ -601,8 +600,10 @@ async function buildCISBaselineRequestBody(
     return null;
   }
 
-  // Check if policy already exists (cache-first with API fallback)
-  if (await policyExistsInCacheOrApi(policyType, policyName, context, "[BatchExecutor] CIS")) {
+  // Check if policy already exists in the prefetched tenant cache
+  const exists = await policyExistsInCache(policyType as PolicyExistsPolicyType, policyName, context, "[BatchExecutor] CIS");
+  if (exists === undefined) return null;
+  if (exists) {
     return { skip: true, reason: `${policyType} "${policyName}" already exists` };
   }
 
@@ -691,8 +692,10 @@ async function prepareTaskForBatch(
         return { type: "skip", reason: "No Entra ID Premium (P1) license", skipKind: "blocked" };
       }
 
-      // Check if policy already exists
-      if (await policyExistsInCacheOrApi("ConditionalAccess", task.itemName, context)) {
+      // Check if policy already exists in the prefetched tenant cache
+      const exists = await policyExistsInCache("ConditionalAccess", task.itemName, context);
+      if (exists === undefined) return { type: "sequential" };
+      if (exists) {
         return { type: "skip", reason: "Already exists", skipKind: "noOp" };
       }
 
@@ -1025,7 +1028,7 @@ async function executeBatchGroup(
             context.onTaskComplete?.(task);
 
             // Update caches
-            updateCacheAfterCreate(task, response, context);
+            updateCacheAfterCreate(item, response, context);
           } else if (isBatchResponseConflict(response.status)) {
             markTaskSkipped(task, "noOp", "Already exists"); // Set skip reason on task object for UI display
             task.endTime = new Date();
@@ -1197,61 +1200,56 @@ function isThrottleErrorMessage(message: string): boolean {
 }
 
 /**
- * Update context caches after successful creation
+ * Update context caches after successful creation.
+ * The cache is chosen from the endpoint that created the object.
  */
 function updateCacheAfterCreate(
-  task: HydrationTask,
+  { task, request }: PreparedBatchTask,
   response: BatchResponse,
   context: ExecutionContext
 ): void {
-  const body = response.body as Record<string, unknown> | undefined;
+  const created = response.body as Record<string, unknown> | undefined;
+  const sent = (request.body ?? {}) as Record<string, unknown>;
+  const id = created?.id as string | undefined;
+  if (!id) return;
+  const name = (created?.name ?? sent.name ?? created?.displayName ?? sent.displayName) as string | undefined;
+  const displayName = (created?.displayName ?? sent.displayName ?? name) as string | undefined;
+  const description = (created?.description ?? sent.description) as string | undefined;
 
-  switch (task.category) {
-    case "groups":
-      if (context.cachedIntuneGroups && body) {
-        context.cachedIntuneGroups.push(body as unknown as DeviceGroup);
-      }
+  if (task.category === "groups") {
+    context.cachedIntuneGroups?.push(created as unknown as DeviceGroup);
+    return;
+  }
+  if (task.category === "filters") {
+    context.cachedFilters?.push(created as unknown as DeviceFilter);
+    return;
+  }
+  if (task.category === "conditionalAccess") {
+    context.cachedConditionalAccessPolicies?.push({ id, displayName, description });
+    return;
+  }
+
+  switch (request.url) {
+    case CATEGORY_ENDPOINTS.compliance:
+      context.cachedCompliancePolicies?.push({ id, displayName, description });
       break;
-
-    case "filters":
-      if (context.cachedFilters && body) {
-        context.cachedFilters.push(body as unknown as DeviceFilter);
-      }
+    case CATEGORY_ENDPOINTS.settingsCatalog:
+      if (name) context.cachedSettingsCatalogPolicies?.push({ id, name, description });
       break;
-
-    case "compliance":
-      // Add to Compliance cache to prevent duplicates
-      if (context.cachedCompliancePolicies && body && body.id && body.displayName) {
-        context.cachedCompliancePolicies.push({
-          id: body.id as string,
-          displayName: body.displayName as string,
-          description: body.description as string | undefined,
-        });
-      }
+    case CATEGORY_ENDPOINTS.v2Compliance:
+      if (name) context.cachedV2CompliancePolicies?.push({ id, name, description });
       break;
-
-    case "baseline":
-    case "cisBaseline":
-      // Add to Settings Catalog cache if it's a Settings Catalog policy
-      if (context.cachedSettingsCatalogPolicies && body && body.id && body.name) {
-        context.cachedSettingsCatalogPolicies.push({
-          id: body.id as string,
-          name: body.name as string,
-          description: body.description as string | undefined,
-        });
-      } else if (context.cachedSecurityIntents && body && body.id && body.displayName && body.templateId) {
-        context.cachedSecurityIntents.push({
-          id: body.id as string,
-          displayName: body.displayName as string,
-          description: body.description as string | undefined,
-        });
-      } else if (context.cachedGroupPolicyConfigurations && body && body.id && body.displayName) {
-        context.cachedGroupPolicyConfigurations.push({
-          id: body.id as string,
-          displayName: body.displayName as string,
-          description: body.description as string | undefined,
-        });
-      }
+    case CATEGORY_ENDPOINTS.deviceConfiguration:
+      context.cachedDeviceConfigurations?.push({ id, displayName, description });
+      break;
+    case CATEGORY_ENDPOINTS.driverUpdate:
+      if (displayName) context.cachedDriverUpdateProfiles?.push({ id, displayName, description });
+      break;
+    case CATEGORY_ENDPOINTS.groupPolicyConfiguration:
+      context.cachedGroupPolicyConfigurations?.push({ id, displayName, description });
+      break;
+    case CATEGORY_ENDPOINTS.securityIntent:
+      context.cachedSecurityIntents?.push({ id, displayName, description });
       break;
   }
 }
@@ -1300,117 +1298,91 @@ type PolicyExistsPolicyType =
   | "DriverUpdateProfiles"
   | "ConditionalAccess";
 
+const POLICY_EXISTS_CACHE_KEYS: Record<PolicyExistsPolicyType, TenantCacheKey> = {
+  SettingsCatalog: "cachedSettingsCatalogPolicies",
+  V2Compliance: "cachedV2CompliancePolicies",
+  DeviceConfiguration: "cachedDeviceConfigurations",
+  GroupPolicyConfiguration: "cachedGroupPolicyConfigurations",
+  SecurityIntent: "cachedSecurityIntents",
+  DriverUpdateProfiles: "cachedDriverUpdateProfiles",
+  ConditionalAccess: "cachedConditionalAccessPolicies",
+};
+
 /**
- * Check if a policy already exists using cache-first strategy with API fallback.
+ * Check if a policy already exists in the prefetched tenant cache.
  * Cache matching uses exact > normalized precedence (no partial matching)
  * via findByNamePrecedence with allowPartialMatch=false. Note that
  * findResourceIdForDelete additionally allows unique partial matches, so
  * delete resolution can match a broader set of names than create-skip.
+ *
+ * Returns undefined when the required cache was not loaded. The caller then sends
+ * the task to the sequential executor, which fails it with the prefetch error.
  */
-async function policyExistsInCacheOrApi(
+async function policyExistsInCache(
   policyType: PolicyExistsPolicyType,
   policyName: string,
   context: ExecutionContext,
   logPrefix = "[BatchExecutor]",
   evidence?: { task: HydrationTask; template: Record<string, unknown> }
-): Promise<boolean> {
+): Promise<boolean | undefined> {
+  if (!context[POLICY_EXISTS_CACHE_KEYS[policyType]]) {
+    console.warn(`${logPrefix} ${policyType} cache is not loaded - "${policyName}" goes to sequential execution`);
+    return undefined;
+  }
+
   const lowerName = policyName.toLowerCase();
   const normalizedPolicyName = normalizeName(policyName);
-  // Skip the API fallback when the name has chars that break OData $filter (e.g. [IHD] prefix)
-  const canQueryApi = !hasODataUnsafeChars(policyName);
+  const byName = <T extends { name?: string; displayName?: string }>(items: T[] | undefined, getName: (item: T) => string | undefined) =>
+    findByNamePrecedence(items, lowerName, normalizedPolicyName, getName, false);
 
-  const sources: Array<{
-    policyType: PolicyExistsPolicyType;
-    label: string;
-    matches: () => { id: string; name?: string; displayName?: string } | undefined;
-    apiCheck?: () => Promise<boolean>;
-  }> = [
-    {
-      policyType: "SettingsCatalog",
-      label: "SettingsCatalog",
-      matches: () =>
-        evidence ? findBaselineMatch(policyType, policyName, context.cachedSettingsCatalogPolicies) :
-        findByNamePrecedence(context.cachedSettingsCatalogPolicies, lowerName, normalizedPolicyName, (p) => p.name, false),
-      apiCheck: canQueryApi ? () => settingsCatalogPolicyExists(context.client, policyName) : undefined,
-    },
-    {
-      policyType: "V2Compliance",
-      label: "V2Compliance",
+  let existing: { id: string; name?: string; displayName?: string } | undefined;
+  switch (policyType) {
+    case "SettingsCatalog":
+      existing = evidence
+        ? findBaselineMatch(policyType, policyName, context.cachedSettingsCatalogPolicies)
+        : byName(context.cachedSettingsCatalogPolicies, (p) => p.name);
+      break;
+    case "V2Compliance":
       // V2 policies sometimes appear in the Settings Catalog cache too
-      matches: () =>
-        findByNamePrecedence(context.cachedV2CompliancePolicies, lowerName, normalizedPolicyName, (p) => p.name, false) ??
-        findByNamePrecedence(context.cachedSettingsCatalogPolicies, lowerName, normalizedPolicyName, (p) => p.name, false),
-      apiCheck: canQueryApi ? () => v2CompliancePolicyExists(context.client, policyName) : undefined,
-    },
-    {
-      policyType: "DeviceConfiguration",
-      label: "DeviceConfiguration",
-      matches: () =>
-        evidence ? findBaselineMatch(policyType, policyName, context.cachedDeviceConfigurations) :
-        findByNamePrecedence(context.cachedDeviceConfigurations, lowerName, normalizedPolicyName, (p) => p.displayName, false),
-      apiCheck: canQueryApi ? () => deviceConfigurationExists(context.client, policyName) : undefined,
-    },
-    {
-      policyType: "GroupPolicyConfiguration",
-      label: "GroupPolicyConfiguration",
-      matches: () =>
-        findByNamePrecedence(context.cachedGroupPolicyConfigurations, lowerName, normalizedPolicyName, (p) => p.displayName, false),
-      apiCheck: canQueryApi ? () => groupPolicyConfigurationExists(context.client, policyName) : undefined,
-    },
-    {
-      policyType: "SecurityIntent",
-      label: "SecurityIntent",
-      matches: () =>
-        findByNamePrecedence(context.cachedSecurityIntents, lowerName, normalizedPolicyName, (p) => p.displayName, false),
-      apiCheck: () => securityIntentExists(context.client, policyName),
-    },
-    {
-      policyType: "DriverUpdateProfiles",
-      label: "DriverUpdateProfile",
-      matches: () =>
-        evidence ? findBaselineMatch(policyType, policyName, context.cachedDriverUpdateProfiles) :
-        findByNamePrecedence(context.cachedDriverUpdateProfiles, lowerName, normalizedPolicyName, (p) => p.displayName, false),
-    },
-    {
-      policyType: "ConditionalAccess",
-      label: "ConditionalAccess policy",
+      existing =
+        byName(context.cachedV2CompliancePolicies, (p) => p.name) ??
+        byName(context.cachedSettingsCatalogPolicies, (p) => p.name);
+      break;
+    case "DeviceConfiguration":
+      existing = evidence
+        ? findBaselineMatch(policyType, policyName, context.cachedDeviceConfigurations)
+        : byName(context.cachedDeviceConfigurations, (p) => p.displayName);
+      break;
+    case "GroupPolicyConfiguration":
+      existing = byName(context.cachedGroupPolicyConfigurations, (p) => p.displayName);
+      break;
+    case "SecurityIntent":
+      existing = byName(context.cachedSecurityIntents, (p) => p.displayName);
+      break;
+    case "DriverUpdateProfiles":
+      existing = evidence
+        ? findBaselineMatch(policyType, policyName, context.cachedDriverUpdateProfiles)
+        : byName(context.cachedDriverUpdateProfiles, (p) => p.displayName);
+      break;
+    case "ConditionalAccess":
       // CA policies are created with " [Intune Hydration Kit]" suffix - check
       // both the original and the suffixed name in addition to standard matching
-      matches: () =>
-        findByNamePrecedence(
-          context.cachedConditionalAccessPolicies,
-          lowerName,
-          normalizedPolicyName,
-          (p) => p.displayName,
-          false
-        ) ?? context.cachedConditionalAccessPolicies?.find(
-          (p) => {
-            const policyLower = p.displayName?.toLowerCase();
-            return (
-              policyLower === `${lowerName} [intune hydration kit]` ||
-              policyLower === `${lowerName} [imported by intune hydration kit]`
-            );
-          }
-        ),
-      apiCheck: () => conditionalAccessPolicyExists(context.client, policyName),
-    },
-  ];
-
-  const source = sources.find((s) => s.policyType === policyType);
-  if (!source) return false;
-
-  const existing = source.matches();
-  if (existing) {
-    if (evidence) await recordBaselineMatch(evidence.task, evidence.template, existing, policyType, context.client);
-    console.log(`${logPrefix} ${source.label} already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name ?? existing.displayName}")`);
-    return true;
+      existing =
+        byName(context.cachedConditionalAccessPolicies, (p) => p.displayName) ??
+        context.cachedConditionalAccessPolicies?.find((p) => {
+          const policyLower = p.displayName?.toLowerCase();
+          return (
+            policyLower === `${lowerName} [intune hydration kit]` ||
+            policyLower === `${lowerName} [imported by intune hydration kit]`
+          );
+        });
+      break;
   }
-  if (source.apiCheck && await source.apiCheck()) {
-    if (evidence) evidence.task.drift = { status: "notChecked", differences: [], reason: "An existing policy was found, but its identity was not returned by the lookup." };
-    console.log(`${logPrefix} ${source.label} already exists (API fallback), skipping: "${policyName}"`);
-    return true;
-  }
-  return false;
+
+  if (!existing) return false;
+  if (evidence) await recordBaselineMatch(evidence.task, evidence.template, existing, policyType, context.client);
+  console.log(`${logPrefix} ${policyType} already exists (cache hit), skipping: "${policyName}" (matched: "${existing.name ?? existing.displayName}")`);
+  return true;
 }
 
 /**

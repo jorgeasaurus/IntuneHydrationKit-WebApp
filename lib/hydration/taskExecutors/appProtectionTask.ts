@@ -6,6 +6,7 @@
 import { HydrationTask } from "@/types/hydration";
 import { AppProtectionPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
+import { requireTenantCache } from "../utils";
 import {
   createAppProtectionPolicy,
   deleteAppProtectionPolicy,
@@ -59,7 +60,7 @@ export async function executeAppProtectionTask(
     }
 
     // Check if policy already exists using cached policies
-    const existingPolicy = context.cachedAppProtectionPolicies?.find(
+    const existingPolicy = requireTenantCache(context, "cachedAppProtectionPolicies").find(
       (p) => p.displayName.toLowerCase() === template!.displayName.toLowerCase()
     );
 
