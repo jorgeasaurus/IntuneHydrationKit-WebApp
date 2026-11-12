@@ -200,4 +200,14 @@ describe('useRunHistoryRecorder', () => {
     expect(setItem.mock.calls.length).toBe(writesAfterFirst)
     setItem.mockRestore()
   })
+
+  it('does not add an interrupted run that the dashboard restored', () => {
+    const run = completedRun('interrupted-run')
+    const checkpoint = { ...restoredRecord(run), outcome: null, summary: null, endTime: null } as unknown as ExecutionRecord
+    sessionStorage.setItem(RUN_HISTORY_PENDING_STORAGE_KEY, 'interrupted-run')
+
+    expect(() => renderHook(() => useRunHistoryRecorder(IDLE_LIVE, checkpoint))).not.toThrow()
+    expect(readRunHistory(sessionStorage, OWNER_A)).toEqual([])
+    expect(toastWarning).not.toHaveBeenCalled()
+  })
 })
