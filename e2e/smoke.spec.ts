@@ -199,11 +199,13 @@ test.describe("Glass visual system", () => {
       "color",
       "rgb(255, 255, 255)"
     );
-    expect(
-      await page.evaluate(
-        (storageKey) => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
-        APP_SETTINGS_STORAGE_KEY
-      )
-    ).toEqual({ stopOnFirstError: false, demoMode: false });
+    const stored = await page.evaluate(
+      (storageKey) => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
+      APP_SETTINGS_STORAGE_KEY
+    );
+    // The retired theme setting is dropped. Other settings keep their values; new settings
+    // may be added over time, so the stored object is not compared as a whole.
+    expect(stored).toMatchObject({ stopOnFirstError: false, demoMode: false });
+    expect(stored).not.toHaveProperty("theme");
   });
 });
