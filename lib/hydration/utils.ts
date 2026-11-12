@@ -4,6 +4,57 @@
  * Common utility functions used across the hydration engine
  */
 
+import type { ExecutionContext, TenantCacheKey } from "./types";
+
+/**
+ * Display labels for the prefetched tenant caches.
+ */
+export const TENANT_CACHE_LABELS: Record<TenantCacheKey, string> = {
+  cachedIntuneGroups: "groups",
+  cachedFilters: "device filters",
+  cachedAppProtectionPolicies: "App Protection policies",
+  cachedConditionalAccessPolicies: "Conditional Access policies",
+  cachedCompliancePolicies: "Compliance policies",
+  cachedV2CompliancePolicies: "V2 Compliance policies",
+  cachedSettingsCatalogPolicies: "Settings Catalog policies",
+  cachedDeviceConfigurations: "Device Configurations",
+  cachedDriverUpdateProfiles: "Driver Update profiles",
+  cachedGroupPolicyConfigurations: "Administrative Templates",
+  cachedSecurityIntents: "Endpoint Security profiles",
+};
+
+/**
+ * Get a prefetched tenant cache for a create existence check.
+ * Throws when the cache was not loaded, so the caller does not create an object
+ * without a duplicate check.
+ */
+export function requireTenantCache<K extends TenantCacheKey>(
+  context: ExecutionContext,
+  key: K
+): NonNullable<ExecutionContext[K]> {
+  const cache = context[key];
+  if (cache) {
+    return cache as NonNullable<ExecutionContext[K]>;
+  }
+  const reason = context.prefetchErrors?.[key];
+  throw new Error(
+    `Could not read the existing ${TENANT_CACHE_LABELS[key]} from the tenant${reason ? ` (${reason})` : ""}. ` +
+      "The task did not run, to prevent a duplicate object."
+  );
+}
+
+/**
+ * Find an existing tenant object by name: exact (case-insensitive) match first,
+ * then a punctuation-tolerant match. Partial matches are not used.
+ */
+export function findExistingByName<T>(
+  items: T[],
+  name: string,
+  getName: (item: T) => string | undefined
+): T | undefined {
+  return findByNamePrecedence(items, name, normalizeName(name), getName, false);
+}
+
 /**
  * Sleep utility for delays between tasks
  */

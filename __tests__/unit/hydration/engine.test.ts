@@ -71,7 +71,8 @@ vi.mock("@/lib/hydration/batchExecutor", () => ({
   isBatchableCategory: mockIsBatchableCategory,
 }));
 
-vi.mock("@/lib/hydration/utils", () => ({
+vi.mock("@/lib/hydration/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/hydration/utils")>()),
   sleep: mockSleep,
   sleepWithExecutionControl: mockSleepWithExecutionControl,
   waitWhilePaused: mockWaitWhilePaused,
@@ -265,9 +266,6 @@ describe("executeTasks", () => {
       }
       return Promise.resolve([]);
     });
-    client.get.mockResolvedValue({
-      value: [{ id: "driver-profile-1", displayName: "[IHD] WUfB Drivers" }],
-    });
 
     const statusUpdates: ActivityMessage[] = [];
     const context = createContext({
@@ -288,7 +286,7 @@ describe("executeTasks", () => {
     expect(client.getCollection).toHaveBeenCalledWith("/deviceManagement/deviceConfigurations?$select=id,displayName,description");
     expect(client.getCollection).toHaveBeenCalledWith("/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description");
     expect(client.getCollection).toHaveBeenCalledWith("/deviceManagement/intents?$select=id,displayName,description");
-    expect(client.get).toHaveBeenCalledWith("/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description");
+    expect(client.getCollection).toHaveBeenCalledWith("/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description");
     expect(context.cachedBaselineTemplates).toEqual(baselineTemplates);
     expect(mockExecuteTasksInBatches).toHaveBeenCalledWith(
       [batchFallbackTask, filterTask, complianceTask, conditionalAccessTask, baselineTask],
@@ -304,6 +302,60 @@ describe("executeTasks", () => {
         "Starting batch creation (3 items per batch)...",
       ])
     );
+  });
+
+  it.each([
+    ["sequential", { enableBatching: false }, { stopOnFirstError: true }],
+    ["batch", { enableBatching: true }, { stopOnFirstError: false }],
+  ])("prefetches every tenant cache that compliance and CIS creates need in %s mode", async (_label, batchConfig, contextOverrides) => {
+    mockGetBatchConfig.mockReturnValue({ defaultBatchSize: 20, delayBetweenBatches: 0, ...batchConfig });
+    const client = createClient();
+    client.getCollection.mockResolvedValue([]);
+    const context = createContext({
+      client: client as unknown as ExecutionContext["client"],
+      ...contextOverrides,
+    });
+
+    await executeTasks(
+      [createTask("compliance-1", "compliance", "[IHD] Linux"), createTask("cis-1", "cisBaseline", "[IHD] CIS")],
+      context,
+    );
+
+    const endpoints = client.getCollection.mock.calls.map(([endpoint]) => endpoint);
+    expect(endpoints).toEqual(expect.arrayContaining([
+      "/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description",
+      "/deviceManagement/compliancePolicies?$select=id,name,description",
+      "/deviceManagement/configurationPolicies?$select=id,name,description",
+      "/deviceManagement/deviceConfigurations?$select=id,displayName,description",
+      "/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description",
+      "/deviceManagement/intents?$select=id,displayName,description",
+      "/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description",
+    ]));
+    expect(client.get).not.toHaveBeenCalled();
+    expect(context.cachedV2CompliancePolicies).toEqual([]);
+  });
+
+  it("leaves a cache unset and records the reason when its prefetch fails", async () => {
+    const client = createClient();
+    client.getCollection.mockImplementation((endpoint: string) =>
+      endpoint.startsWith("/deviceManagement/compliancePolicies")
+        ? Promise.reject(new Error("Graph API error 403 - Forbidden"))
+        : Promise.resolve([]),
+    );
+    const statusUpdates: ActivityMessage[] = [];
+    const context = createContext({
+      client: client as unknown as ExecutionContext["client"],
+      onStatusUpdate: (message) => statusUpdates.push(message),
+    });
+
+    await executeTasks([createTask("compliance-1", "compliance", "[IHD] Linux")], context);
+
+    expect(context.cachedV2CompliancePolicies).toBeUndefined();
+    expect(context.cachedCompliancePolicies).toEqual([]);
+    expect(context.prefetchErrors?.cachedV2CompliancePolicies).toContain("403");
+    expect(statusUpdates).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "error", message: expect.stringContaining("V2 Compliance policies") }),
+    ]));
   });
 
   it("marks remaining non-batchable delete tasks as cancelled after parallel deletes pause-cancel", async () => {

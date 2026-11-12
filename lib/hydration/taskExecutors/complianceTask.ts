@@ -11,10 +11,8 @@ import {
   deleteCompliancePolicyByName,
   compliancePolicyExists,
 } from "@/lib/graph/compliance";
-import {
-  createV2CompliancePolicy,
-  v2CompliancePolicyExists,
-} from "../policyCreators";
+import { createV2CompliancePolicy } from "../policyCreators";
+import { requireTenantCache } from "../utils";
 import { getCachedTemplates, ComplianceTemplate } from "@/lib/templates/loader";
 import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 
@@ -72,10 +70,8 @@ export async function executeComplianceTask(
     }
 
     if (isV2ComplianceTemplate(template)) {
-      const existsInCache = context.cachedV2CompliancePolicies?.some((policy) =>
-        namesMatch(policy.name, template.displayName)
-      );
-      const exists = existsInCache || await v2CompliancePolicyExists(client, template.displayName);
+      const v2CompliancePolicies = requireTenantCache(context, "cachedV2CompliancePolicies");
+      const exists = v2CompliancePolicies.some((policy) => namesMatch(policy.name, template.displayName));
       if (exists) {
         return {
           task,
@@ -91,13 +87,11 @@ export async function executeComplianceTask(
       }
 
       const created = await createV2CompliancePolicy(client, template as Record<string, unknown>);
-      if (context.cachedV2CompliancePolicies && created.id) {
-        context.cachedV2CompliancePolicies.push({
-          id: created.id,
-          name: template.displayName,
-          description: template.description,
-        });
-      }
+      v2CompliancePolicies.push({
+        id: created.id,
+        name: template.displayName,
+        description: template.description,
+      });
 
       return {
         task,
@@ -108,7 +102,8 @@ export async function executeComplianceTask(
     }
 
     // Check if policy already exists
-    const exists = await compliancePolicyExists(client, template.displayName);
+    const compliancePolicies = requireTenantCache(context, "cachedCompliancePolicies");
+    const exists = compliancePolicies.some((policy) => namesMatch(policy.displayName, template.displayName));
     if (exists) {
       return {
         task,
@@ -127,6 +122,7 @@ export async function executeComplianceTask(
     // Create the policy with 504 verification
     try {
       const created = await createCompliancePolicy(client, template as CompliancePolicy);
+      compliancePolicies.push({ id: created.id ?? "", displayName: template.displayName, description: template.description });
       return {
         task,
         success: true,

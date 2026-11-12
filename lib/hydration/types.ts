@@ -77,11 +77,32 @@ export interface ExecutionContext {
   cachedSecurityIntents?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached baseline templates for batch creation (passed directly to avoid cache issues)
   cachedBaselineTemplates?: BaselinePolicy[];
+  /**
+   * Reasons why a tenant cache prefetch failed. A failed cache stays unset, so a task
+   * that needs it fails instead of creating an object without a duplicate check.
+   */
+  prefetchErrors?: Partial<Record<TenantCacheKey, string>>;
   // License flags for conditional skipping
   hasConditionalAccessLicense?: boolean;
   hasPremiumP2License?: boolean;
   hasWindowsDriverUpdateLicense?: boolean;
 }
+
+/**
+ * Execution context fields that hold existing tenant objects, used for existence checks.
+ */
+export type TenantCacheKey =
+  | "cachedIntuneGroups"
+  | "cachedFilters"
+  | "cachedAppProtectionPolicies"
+  | "cachedConditionalAccessPolicies"
+  | "cachedCompliancePolicies"
+  | "cachedV2CompliancePolicies"
+  | "cachedSettingsCatalogPolicies"
+  | "cachedDeviceConfigurations"
+  | "cachedDriverUpdateProfiles"
+  | "cachedGroupPolicyConfigurations"
+  | "cachedSecurityIntents";
 
 /**
  * Task execution result

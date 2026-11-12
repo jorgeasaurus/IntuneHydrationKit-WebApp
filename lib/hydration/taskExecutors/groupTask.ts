@@ -6,6 +6,7 @@
 import { HydrationTask } from "@/types/hydration";
 import { DeviceGroup } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
+import { requireTenantCache } from "../utils";
 import { createGroup, deleteGroupByName } from "@/lib/graph/groups";
 import { getCachedTemplates, GroupTemplate } from "@/lib/templates/loader";
 
@@ -34,7 +35,7 @@ export async function executeGroupTask(
     // Check if group already exists using pre-fetched cache (match with or without [IHD] prefix)
     const targetName = template!.displayName.toLowerCase();
     const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
-    const existingGroup = context.cachedIntuneGroups?.find((g) => {
+    const existingGroup = requireTenantCache(context, "cachedIntuneGroups").find((g) => {
       const n = g.displayName.toLowerCase();
       const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
       return n === targetName || ns === targetNameStripped;

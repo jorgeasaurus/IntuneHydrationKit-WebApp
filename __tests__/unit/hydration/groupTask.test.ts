@@ -199,6 +199,7 @@ describe("executeGroupTask", () => {
         operationMode: "create",
         isPreview: false,
         stopOnFirstError: false,
+        cachedIntuneGroups: [],
       }
     );
 

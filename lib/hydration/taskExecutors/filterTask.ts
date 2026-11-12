@@ -6,6 +6,7 @@
 import { HydrationTask } from "@/types/hydration";
 import { DeviceFilter } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
+import { requireTenantCache } from "../utils";
 import { createFilter } from "@/lib/graph/filters";
 import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { getCachedTemplates, FilterTemplate } from "@/lib/templates/loader";
@@ -33,7 +34,7 @@ export async function executeFilterTask(
     }
 
     // Check if filter already exists using pre-fetched cache
-    const existingFilter = context.cachedFilters?.find(
+    const existingFilter = requireTenantCache(context, "cachedFilters").find(
       (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
     );
 

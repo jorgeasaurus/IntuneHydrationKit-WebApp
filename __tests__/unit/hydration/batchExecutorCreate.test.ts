@@ -124,7 +124,7 @@ describe("executeTasksInBatches", () => {
     vi.clearAllMocks();
   });
 
-  it("skips preview create for conditional access when the API fallback finds an existing policy", async () => {
+  it("skips preview create for conditional access when the tenant cache has an existing policy", async () => {
     const policyName = "[IHD] Require password change for high-risk users";
 
     mockConditionalAccessTemplate({
@@ -134,21 +134,11 @@ describe("executeTasksInBatches", () => {
       grantControls: { operator: "OR", builtInControls: ["mfa"] },
     });
     const task = createConditionalAccessTask("batch-preview-existing-ca", policyName);
-    const client = createBatchClient({
-      getCollection: vi.fn().mockImplementation((endpoint: string) => {
-        if (endpoint === CONDITIONAL_ACCESS_POLICIES_ENDPOINT) {
-          return Promise.resolve([
-            {
-              id: "ca-id",
-              displayName: policyName,
-              state: "disabled",
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      }),
+    const client = createBatchClient();
+    const context = createCreateContext(client, {
+      isPreview: true,
+      cachedConditionalAccessPolicies: [{ id: "ca-id", displayName: policyName }],
     });
-    const context = createCreateContext(client, { isPreview: true });
 
     const results = await executeTasksInBatches([task], context);
 
@@ -159,10 +149,11 @@ describe("executeTasksInBatches", () => {
       error: "Already exists",
     });
     expect(task.skipKind).toBe("noOp");
+    expect(client.getCollection).not.toHaveBeenCalled();
     expect(client.batch).not.toHaveBeenCalled();
   });
 
-  it("skips preview create for CIS security intents when the API fallback finds an existing policy", async () => {
+  it("skips preview create for CIS security intents when the tenant cache has an existing policy", async () => {
     const policyName = "[IHD] Baseline - MacOS - Firewall";
 
     mockGetCachedTemplates.mockImplementation((category?: string) => {
@@ -209,17 +200,7 @@ describe("executeTasksInBatches", () => {
       get: vi.fn(),
       post: vi.fn(),
       delete: vi.fn(),
-      getCollection: vi.fn().mockImplementation((endpoint: string) => {
-        if (endpoint === "/deviceManagement/intents?$select=id,displayName") {
-          return Promise.resolve([
-            {
-              id: "intent-id",
-              displayName: policyName,
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      }),
+      getCollection: vi.fn(),
       patch: vi.fn(),
       batch: vi.fn(),
     } as unknown as ExecutionContext["client"];
@@ -229,7 +210,7 @@ describe("executeTasksInBatches", () => {
       operationMode: "create",
       isPreview: true,
       stopOnFirstError: false,
-      cachedSecurityIntents: [],
+      cachedSecurityIntents: [{ id: "intent-id", displayName: policyName }],
     };
 
     const results = await executeTasksInBatches([task], context);
@@ -240,6 +221,7 @@ describe("executeTasksInBatches", () => {
       skipped: true,
       error: `SecurityIntent "${policyName}" already exists`,
     });
+    expect(client.getCollection).not.toHaveBeenCalled();
     expect(client.batch).not.toHaveBeenCalled();
   });
 
@@ -281,7 +263,7 @@ describe("executeTasksInBatches", () => {
       status: "pending",
     };
     const client = createBatchClient();
-    const context = createCreateContext(client);
+    const context = createCreateContext(client, { cachedSettingsCatalogPolicies: [] });
 
     await executeTasksInBatches([task], context);
 
@@ -332,7 +314,7 @@ describe("executeTasksInBatches", () => {
     };
     const client = createBatchClient();
 
-    await executeTasksInBatches([task], createCreateContext(client, { tenantId }));
+    await executeTasksInBatches([task], createCreateContext(client, { tenantId, cachedSettingsCatalogPolicies: [] }));
 
     expect(client.batch).toHaveBeenCalledWith(
       [

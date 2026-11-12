@@ -153,6 +153,7 @@ describe("executeConditionalAccessTask", () => {
       stopOnFirstError: false,
       hasConditionalAccessLicense: true,
       hasPremiumP2License: true,
+      cachedConditionalAccessPolicies: [],
     });
 
     expect(result).toMatchObject({
