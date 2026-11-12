@@ -47,6 +47,7 @@ export default function DashboardPage(): React.JSX.Element {
         isPreview={displayRun.isPreview}
         tenantName={displayRun.tenantName}
         tenantId={displayRun.tenantId}
+        cloudEnvironment={displayRun.cloudEnvironment}
         selectedObjectCount={selectedObjectCount}
         phase={displayCompleted ? "completed" : phase}
         batchProgress={restoredRecord ? null : batchProgress}

@@ -61,7 +61,7 @@ vi.mock('@/lib/hydration/batchExecutor', () => ({
 }))
 
 import { useHydrationExecution, resetExecutionControlForTests } from '@/hooks/useHydrationExecution'
-import { clearCreatedObjectsForTests, useCreatedObjectLinks } from '@/hooks/useCreatedObjectLinks'
+import { getCreatedObjectLinks } from '@/lib/utils/portalLinks'
 
 function createPrerequisiteResult(): PrerequisiteCheckResult {
   return {
@@ -380,24 +380,39 @@ describe('useHydrationExecution', () => {
     )
   })
 
-  it('keeps created object IDs from the execution results for portal links', async () => {
-    const queuedTasks = [createTask('group-1', 'groups', 'All Windows Devices')]
+  it('shows the portal link of a created object as soon as its task completes', async () => {
+    const queuedTasks = [
+      createTask('group-1', 'groups', 'All Windows Devices'),
+      createTask('group-2', 'groups', 'All macOS Devices'),
+    ]
+    const secondTask = createDeferred<void>()
     mockBuildTaskQueueAsync.mockResolvedValue(queuedTasks)
-    mockExecuteTasks.mockImplementation(async (tasks: HydrationTask[]) => {
-      Object.assign(tasks[0], { status: 'success' })
-      return [{ task: tasks[0], success: true, skipped: false, createdId: 'group-object-id' }]
+    mockExecuteTasks.mockImplementation(async (tasks: HydrationTask[], context: ExecutionContext) => {
+      Object.assign(tasks[0], { status: 'success', createdObject: { id: 'group-object-id' } })
+      context.onTaskComplete?.(tasks[0])
+      await secondTask.promise
+      Object.assign(tasks[1], { status: 'success', createdObject: { id: 'group-object-2' } })
+      context.onTaskComplete?.(tasks[1])
     })
 
-    const { result } = renderHook(() => {
-      const execution = useHydrationExecution()
-      return { execution, links: useCreatedObjectLinks(execution.tasks, false) }
+    const { result } = renderHook(() => useHydrationExecution())
+    let run!: Promise<void>
+    act(() => {
+      run = result.current.startExecution()
     })
+
+    await waitFor(() => expect(result.current.tasks[0]?.createdObject).toEqual({ id: 'group-object-id' }))
+    expect(result.current.isCompleted).toBe(false)
+    expect(result.current.configuration?.cloudEnvironment).toBe('global')
+    const liveLinks = getCreatedObjectLinks(result.current.tasks, result.current.configuration?.cloudEnvironment, false)
+    expect(liveLinks.get('group-1')?.href).toContain('groupId/group-object-id')
+    expect(liveLinks.has('group-2')).toBe(false)
+
     await act(async () => {
-      await result.current.execution.startExecution()
+      secondTask.resolve()
+      await run
     })
-
-    expect(result.current.links.get('group-1')?.href).toContain('groupId/group-object-id')
-    clearCreatedObjectsForTests()
+    expect(result.current.tasks[1]?.createdObject).toEqual({ id: 'group-object-2' })
   })
 
   it('ignores duplicate start requests while execution is already locked', async () => {

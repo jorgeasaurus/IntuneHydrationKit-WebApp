@@ -28,6 +28,7 @@ import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
 import { getAllNotificationTemplates } from "@/lib/graph/notifications";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
+import { recordCreatedObject } from "./createdObject";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
 import { getLicenseSkipReason, sleep, sleepWithExecutionControl, waitWhilePaused, TENANT_CACHE_LABELS } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage, TenantCacheKey } from "./types";
@@ -325,6 +326,7 @@ async function executeTask(
       markTaskSkipped(task, result.skipKind, result.error);
     } else {
       task.status = result.success ? "success" : "failed";
+      recordCreatedObject(task, result.createdId, context);
     }
     task.error = result.error;
     task.warning = result.warning;
