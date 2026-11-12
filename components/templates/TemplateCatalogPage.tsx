@@ -27,6 +27,7 @@ import {
   loadTemplateDocumentationCatalog,
   loadTemplateDocumentationPayload,
   getPlatformFilterOrder,
+  getTemplatePath,
   TEMPLATE_DOCUMENTATION_CATEGORY_ORDER,
   TemplateDocumentationCatalog,
   TemplateDocumentationItem,
@@ -779,36 +780,50 @@ export function TemplateCatalogPage() {
                                               value={item.id}
                                               className="border-b border-border/60 px-6"
                                             >
-                                              <AccordionTrigger className="hover:no-underline">
-                                                <div className="flex w-full flex-col gap-3 pr-6 text-left">
-                                                  <div className="flex flex-wrap items-center gap-2">
-                                                    <span className="text-base font-semibold text-foreground">
-                                                      {item.displayName}
-                                                    </span>
-                                                    <span className="rounded-full border border-border/70 bg-black/20 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-                                                      {item.itemType}
-                                                    </span>
-                                                    {item.platform ? (
-                                                      <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-                                                        {item.platform}
-                                                      </span>
-                                                    ) : null}
-                                                    {showSubcategoryBadge(item) ? (
-                                                      <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
-                                                        {item.subcategory}
-                                                      </span>
-                                                    ) : null}
-                                                  </div>
-                                                  <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
-                                                    {item.description}
-                                                  </p>
-                                                  {item.sourcePath ? (
-                                                    <div className="font-mono text-xs text-muted-foreground">
-                                                      {item.sourcePath}
+                                              <div className="flex flex-col sm:flex-row sm:items-center sm:gap-4">
+                                                <div className="min-w-0 flex-1">
+                                                  <AccordionTrigger className="hover:no-underline">
+                                                    <div className="flex w-full flex-col gap-3 pr-6 text-left">
+                                                      <div className="flex flex-wrap items-center gap-2">
+                                                        <span className="text-base font-semibold text-foreground">
+                                                          {item.displayName}
+                                                        </span>
+                                                        <span className="rounded-full border border-border/70 bg-black/20 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                                                          {item.itemType}
+                                                        </span>
+                                                        {item.platform ? (
+                                                          <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                                                            {item.platform}
+                                                          </span>
+                                                        ) : null}
+                                                        {showSubcategoryBadge(item) ? (
+                                                          <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
+                                                            {item.subcategory}
+                                                          </span>
+                                                        ) : null}
+                                                      </div>
+                                                      <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
+                                                        {item.description}
+                                                      </p>
+                                                      {item.sourcePath ? (
+                                                        <div className="font-mono text-xs text-muted-foreground">
+                                                          {item.sourcePath}
+                                                        </div>
+                                                      ) : null}
                                                     </div>
-                                                  ) : null}
+                                                  </AccordionTrigger>
                                                 </div>
-                                              </AccordionTrigger>
+                                                <Link
+                                                  href={getTemplatePath(item)}
+                                                  // Detail pages embed the full payload. Do not download them for every visible row.
+                                                  prefetch={false}
+                                                  aria-label={`Details for ${item.displayName}`}
+                                                  className="mb-4 inline-flex shrink-0 items-center gap-1.5 self-start rounded-md border border-border/70 bg-background/70 px-3 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-foreground/40 hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background motion-reduce:transition-none sm:mb-0 sm:self-center"
+                                                >
+                                                  Details
+                                                  <ArrowRight className="size-4" aria-hidden="true" />
+                                                </Link>
+                                              </div>
                                               <AccordionContent className="space-y-5 pb-6">
                                                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                                   <div className="rounded-2xl border border-border/60 bg-black/20 p-4">
