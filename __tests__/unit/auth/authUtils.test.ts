@@ -34,28 +34,6 @@ vi.mock("@/lib/auth/msalConfig", () => ({
   loginRequest: {
     scopes: ["User.Read"],
   },
-  CLOUD_ENVIRONMENTS: {
-    global: {
-      authority: "https://login.microsoftonline.com",
-      graphEndpoint: "https://graph.microsoft.com",
-    },
-    usgov: {
-      authority: "https://login.microsoftonline.us",
-      graphEndpoint: "https://graph.microsoft.us",
-    },
-    usgovdod: {
-      authority: "https://login.microsoftonline.us",
-      graphEndpoint: "https://dod-graph.microsoft.us",
-    },
-    germany: {
-      authority: "https://login.microsoftonline.de",
-      graphEndpoint: "https://graph.microsoft.de",
-    },
-    china: {
-      authority: "https://login.chinacloudapi.cn",
-      graphEndpoint: "https://microsoftgraph.chinacloudapi.cn",
-    },
-  },
   getAuthorityUrl: mocks.getAuthorityUrl,
   initializeMsal: mocks.initializeMsal,
 }));
@@ -211,7 +189,7 @@ describe("authUtils", () => {
     await expect(getAccessToken()).rejects.toBe(silentError);
   });
 
-  it("signs in with the global cloud environment and activates the returned account", async () => {
+  it("signs in through the common Global authority and activates the returned account", async () => {
     mocks.msalInstance.loginPopup.mockResolvedValue({ account });
 
     await expect(signIn()).resolves.toEqual(account);
