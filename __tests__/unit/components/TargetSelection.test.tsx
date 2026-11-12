@@ -24,6 +24,7 @@ const fetchCompliancePoliciesMock = vi.fn()
 const fetchConditionalAccessPoliciesMock = vi.fn()
 const fetchAppProtectionPoliciesMock = vi.fn()
 const fetchEnrollmentProfilesMock = vi.fn()
+const fetchNotificationTemplatesMock = vi.fn()
 const fetchCISBaselineManifestMock = vi.fn()
 
 vi.mock('@/hooks/useWizardState', () => ({
@@ -43,6 +44,7 @@ vi.mock('@/lib/templates/loader', async () => {
     fetchConditionalAccessPolicies: (...args: unknown[]) => fetchConditionalAccessPoliciesMock(...args),
     fetchAppProtectionPolicies: (...args: unknown[]) => fetchAppProtectionPoliciesMock(...args),
     fetchEnrollmentProfiles: (...args: unknown[]) => fetchEnrollmentProfilesMock(...args),
+    fetchNotificationTemplates: (...args: unknown[]) => fetchNotificationTemplatesMock(...args),
     fetchCISBaselineManifest: (...args: unknown[]) => fetchCISBaselineManifestMock(...args),
   }
 })
@@ -212,6 +214,12 @@ describe('TargetSelection', () => {
     fetchEnrollmentProfilesMock.mockResolvedValue([
       { displayName: `${IMPORT_PREFIX}Windows Autopilot`, description: 'Windows enrollment profile' },
     ])
+    fetchNotificationTemplatesMock.mockResolvedValue([
+      {
+        displayName: `${IMPORT_PREFIX}First Alert`,
+        localizedMessages: [{ locale: 'en-US', subject: 'First Warning', messageTemplate: 'Body' }],
+      },
+    ])
     fetchOIBManifestMock.mockResolvedValue(createOIBManifest())
     fetchCISBaselineManifestMock.mockResolvedValue(createCISManifest())
 
@@ -330,6 +338,22 @@ describe('TargetSelection', () => {
     })
     expect(setBaselineSelection).not.toHaveBeenCalled()
     expect(nextStep).toHaveBeenCalledTimes(1)
+  })
+
+  it('lists notification templates and persists their selection', async () => {
+    const user = userEvent.setup()
+
+    render(<TargetSelectionHarness />)
+
+    await user.click(screen.getByRole('button', { name: 'Select Notification Templates' }))
+    expect(await screen.findByText(`${IMPORT_PREFIX}First Alert`)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+
+    expect(setSelectedTargets).toHaveBeenCalledWith(['notification'])
+    expect(setCategorySelections).toHaveBeenCalledWith({
+      notification: { selectedItems: [`${IMPORT_PREFIX}First Alert`] },
+    })
   })
 
   it('labels category icon buttons and exposes expansion state', async () => {
@@ -486,13 +510,13 @@ describe('TargetSelection', () => {
       expect(fetchCISBaselineManifestMock).toHaveBeenCalled()
     })
 
-    expect(screen.getByText('Total: 9 categories (17 items)')).toBeInTheDocument()
+    expect(screen.getByText('Total: 10 categories (18 items)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review Selection' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Deselect All' }))
 
     await waitFor(() => {
-      expect(screen.queryByText('Total: 9 categories (17 items)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Total: 10 categories (18 items)')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
     })
   })

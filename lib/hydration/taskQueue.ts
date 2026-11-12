@@ -21,6 +21,7 @@ import {
   fetchConditionalAccessPolicies,
   fetchAppProtectionPolicies,
   fetchEnrollmentProfiles,
+  fetchNotificationTemplates,
   fetchCISBaselinePolicies,
   fetchCISBaselinePoliciesByCategories,
   fetchBaselinePolicies,
@@ -105,6 +106,8 @@ function getTemplateSource(
       return { cacheKey: category, load: asItems(() => [...Templates.getWin32AppTemplates()]) };
     case "enrollment":
       return { cacheKey: category, load: fetchEnrollmentTemplates };
+    case "notification":
+      return { cacheKey: category, load: asItems(fetchNotificationTemplates) };
     case "baseline":
       return { cacheKey: category, load: asItems(fetchBaselinePolicies) };
     case "cisBaseline": {

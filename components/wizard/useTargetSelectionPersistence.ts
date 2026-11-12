@@ -38,7 +38,7 @@ function buildCategorySelections({
       selections.cisBaseline = {
         selectedItems: Array.from(selectedCISPolicies),
       };
-    } else if (target !== "notification") {
+    } else {
       const categorySelection = { selectedItems: Array.from(selectedItems[target] || []) };
       if (target === "groups") selections.groups = categorySelection;
       else if (target === "filters") selections.filters = categorySelection;
@@ -47,6 +47,7 @@ function buildCategorySelections({
       else if (target === "appProtection") selections.appProtection = categorySelection;
       else if (target === "win32Apps") selections.win32Apps = categorySelection;
       else if (target === "enrollment") selections.enrollment = categorySelection;
+      else if (target === "notification") selections.notification = categorySelection;
     }
   }
 
