@@ -223,6 +223,8 @@ describe("authUtils", () => {
     expect(mocks.msalInstance.loginPopup).toHaveBeenCalledWith({
       authority: "https://authority.example/global/common",
       scopes: ["User.Read"],
+      // A new click replaces a popup that the user closed before MSAL timed it out.
+      overrideInteractionInProgress: true,
     });
     expect(mocks.msalInstance.setActiveAccount).toHaveBeenCalledWith(account);
   });

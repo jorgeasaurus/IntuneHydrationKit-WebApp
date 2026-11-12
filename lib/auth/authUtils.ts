@@ -103,6 +103,7 @@ export class InteractionRequiredError extends AuthSessionExpiredError {
 
 /**
  * Sign in the user (global/commercial cloud only).
+ * Call only from a user click: each call cancels a sign-in popup that is still pending.
  */
 export async function signIn(): Promise<AccountInfo> {
   // Public pages render before MSAL finishes startup, so wait for initialization here.
@@ -112,6 +113,9 @@ export async function signIn(): Promise<AccountInfo> {
   const response = await msalInstance.loginPopup({
     ...loginRequest,
     authority,
+    // MSAL detects a closed popup only after its 60-second bridge timeout. Without this,
+    // a new click in that time fails with interaction_in_progress.
+    overrideInteractionInProgress: true,
   });
 
   if (response.account) {
