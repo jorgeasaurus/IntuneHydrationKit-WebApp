@@ -79,6 +79,9 @@ function useActiveElapsedTime(
       }
       if (!pausedNow && prev.pausedAt !== null) {
         const closedAt = isCompleted && endTime ? endTime.getTime() : Date.now();
+        // `now` stopped ticking during the pause. Refresh it with the same
+        // timestamp so the closed pause is not subtracted from a stale clock.
+        setNow(closedAt);
         return {
           pausedMs: prev.pausedMs + Math.max(0, closedAt - prev.pausedAt),
           pausedAt: null,
@@ -98,8 +101,17 @@ function useActiveElapsedTime(
 
   const until = isCompleted && endTime
     ? endTime.getTime()
-    : (tracking.pausedAt ?? now);
-  return Math.max(0, until - startTime.getTime() - tracking.pausedMs);
+    : pausedNow
+      ? (tracking.pausedAt ?? now)
+      : now;
+  // A pause interval can still be open for one render after the run resumes
+  // or completes, before the effect above closes it. Subtract it here too.
+  const openPauseMs =
+    tracking.pausedAt === null ? 0 : Math.max(0, until - tracking.pausedAt);
+  return Math.max(
+    0,
+    until - startTime.getTime() - tracking.pausedMs - openPauseMs,
+  );
 }
 
 export function ExecutionControls({

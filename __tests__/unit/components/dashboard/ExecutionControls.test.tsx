@@ -139,6 +139,10 @@ describe('ExecutionControls', () => {
     expect(screen.getByText('8s')).toBeInTheDocument()
 
     rerender(<ExecutionControls {...props} isPaused={false} />)
+    // Right after resume, before the next one-second tick, the elapsed time
+    // must not drop to 0s.
+    expect(screen.getByText('8s')).toBeInTheDocument()
+    expect(screen.queryByText('0s')).not.toBeInTheDocument()
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000)
     })
@@ -218,5 +222,35 @@ describe('ExecutionControls', () => {
 
     expect(screen.getByText('Execution cancelled')).toBeInTheDocument()
     expect(screen.getByText('3s')).toBeInTheDocument()
+  })
+  it('excludes an open pause when the run completes while paused', async () => {
+    const props = {
+      tasks: activeTasks,
+      isCancelling: false,
+      outcome: null,
+      startTime,
+    }
+    const { rerender } = render(
+      <ExecutionControls {...props} isPaused={false} isCompleted={false} />
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    rerender(<ExecutionControls {...props} isPaused isCompleted={false} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60 * 1000)
+    })
+
+    rerender(
+      <ExecutionControls
+        {...props}
+        isPaused
+        isCompleted
+        endTime={new Date(Date.now())}
+      />
+    )
+
+    expect(screen.getByText('8s')).toBeInTheDocument()
+    expect(screen.queryByText('1m 8s')).not.toBeInTheDocument()
   })
 })
