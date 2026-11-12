@@ -96,6 +96,8 @@ function createExecutionState(overrides: Partial<ExecutionHookState> = {}): Exec
     isBuildingQueue: false,
     startTime: null,
     endTime: null,
+    pausedMs: 0,
+    pauseStartedAt: null,
     summary: null,
     outcome: null,
     fatalError: null,
@@ -367,6 +369,70 @@ describe('DashboardPage', () => {
     expect(startExecution).not.toHaveBeenCalled()
     expect(push).not.toHaveBeenCalledWith('/wizard')
     getItemSpy.mockRestore()
+  })
+
+  it('keeps the active duration of a paused run after a refresh', async () => {
+    getActiveAccount.mockImplementation(() => ({
+      tenantId: 'tenant-id',
+      homeAccountId: 'home-tenant-id'
+    }))
+    const startTime = new Date('2026-08-17T01:00:00.000Z')
+    const endTime = new Date('2026-08-17T01:01:10.000Z')
+    const tasks = [
+      {
+        id: 'group-1',
+        category: 'groups' as const,
+        operation: 'delete' as const,
+        itemName: 'Paused Group',
+        status: 'success' as const,
+        startTime,
+        endTime
+      }
+    ] satisfies HydrationTask[]
+    const summary = {
+      tenantId: 'tenant-id',
+      tenantName: 'Delete Test Tenant',
+      operationMode: 'delete' as const,
+      startTime,
+      endTime,
+      duration: 10_000,
+      pausedDuration: 60_000,
+      stats: { total: 1, created: 0, deleted: 1, skipped: 0, failed: 0 },
+      categoryBreakdown: {
+        groups: { total: 1, success: 1, skipped: 0, failed: 0 }
+      },
+      errors: [],
+      warnings: []
+    } satisfies HydrationSummary
+    useHydrationExecutionMock.mockReturnValue(
+      createExecutionState({
+        tasks,
+        configuration: runConfiguration,
+        phase: 'completed',
+        isCompleted: true,
+        startTime,
+        endTime,
+        pausedMs: 60_000,
+        summary,
+        outcome: 'succeeded'
+      })
+    )
+
+    const { unmount } = renderPage()
+    await waitFor(() => expect(readExecutionRecord(sessionStorage)?.pausedMs).toBe(60_000))
+    expect(screen.getByText('Elapsed Time').nextElementSibling).toHaveTextContent('10s')
+    unmount()
+
+    // After a refresh the execution store is empty, and the dashboard reads the record.
+    useHydrationExecutionMock.mockReturnValue(createExecutionState())
+    const wizard = createWizardState()
+    wizard.state.confirmed = false
+    useWizardStateMock.mockReturnValue(wizard)
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Run complete')).toBeInTheDocument())
+    expect(screen.getByText('Elapsed Time').nextElementSibling).toHaveTextContent(/^10s$/)
+    expect(startExecution).not.toHaveBeenCalled()
   })
 
   it('waits for the authenticated account before checking a stored run', async () => {
