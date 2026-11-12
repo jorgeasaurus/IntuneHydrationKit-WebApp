@@ -1,6 +1,7 @@
-import { useState, type Dispatch, type SetStateAction } from "react";
+import { useContext, useState, type Dispatch, type SetStateAction } from "react";
 import type { TaskCategory } from "@/types/hydration";
 import type { CISBaselineManifest, OIBManifest } from "@/lib/templates/loader";
+import { ProfileApplyContext } from "@/components/wizard/profileApplyContext";
 import { TARGETS, type CategoryItem } from "@/components/wizard/targetSelectionModel";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 import {
@@ -44,7 +45,9 @@ function catalogUnavailable(category: string): ProfileError {
 
 /** Save the current target selection as a profile selection, and apply a profile selection. */
 export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) {
-  const [isApplying, setIsApplying] = useState(false);
+  // The wizard page shares the state, so that it can pause step navigation during an apply.
+  const localApplying = useState(false);
+  const [isApplying, setIsApplying] = useContext(ProfileApplyContext) ?? localApplying;
   const getCurrentSelection = (): ScopeSelection => {
     const items: Record<string, string[]> = {};
     for (const target of options.targets) {
