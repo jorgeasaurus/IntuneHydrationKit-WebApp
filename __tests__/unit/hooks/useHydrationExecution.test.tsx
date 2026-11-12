@@ -43,7 +43,8 @@ vi.mock('@/lib/graph/client', () => ({
 
 vi.mock('@/lib/hydration/engine', () => ({
   buildTaskQueueAsync: mockBuildTaskQueueAsync,
-  executeTasks: mockExecuteTasks,
+  // The real engine returns the execution results. The mocks here only change tasks.
+  executeTasks: async (...args: unknown[]) => (await mockExecuteTasks(...args)) ?? [],
   getEstimatedTaskCount: mockGetEstimatedTaskCount
 }))
 
@@ -60,6 +61,7 @@ vi.mock('@/lib/hydration/batchExecutor', () => ({
 }))
 
 import { useHydrationExecution, resetExecutionControlForTests } from '@/hooks/useHydrationExecution'
+import { clearCreatedObjectsForTests, useCreatedObjectLinks } from '@/hooks/useCreatedObjectLinks'
 
 function createPrerequisiteResult(): PrerequisiteCheckResult {
   return {
@@ -372,6 +374,26 @@ describe('useHydrationExecution', () => {
       'Contoso',
       expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
     )
+  })
+
+  it('keeps created object IDs from the execution results for portal links', async () => {
+    const queuedTasks = [createTask('group-1', 'groups', 'All Windows Devices')]
+    mockBuildTaskQueueAsync.mockResolvedValue(queuedTasks)
+    mockExecuteTasks.mockImplementation(async (tasks: HydrationTask[]) => {
+      Object.assign(tasks[0], { status: 'success' })
+      return [{ task: tasks[0], success: true, skipped: false, createdId: 'group-object-id' }]
+    })
+
+    const { result } = renderHook(() => {
+      const execution = useHydrationExecution()
+      return { execution, links: useCreatedObjectLinks(execution.tasks, false) }
+    })
+    await act(async () => {
+      await result.current.execution.startExecution()
+    })
+
+    expect(result.current.links.get('group-1')?.href).toContain('groupId/group-object-id')
+    clearCreatedObjectsForTests()
   })
 
   it('ignores duplicate start requests while execution is already locked', async () => {
