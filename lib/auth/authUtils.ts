@@ -4,7 +4,6 @@ import {
   loginRequest,
   getAuthorityUrl,
   initializeMsal,
-  silentRedirectUri,
 } from "./msalConfig";
 import { markLeavingForSignOut, notifySignOut } from "./sessionEvents";
 import { clearHydrationSession } from "@/lib/hydration/executionRecord";
@@ -54,7 +53,6 @@ export async function getAccessToken(): Promise<string> {
       ...loginRequest,
       account,
       authority,
-      redirectUri: silentRedirectUri,
     });
     return response.accessToken;
   } catch (error) {

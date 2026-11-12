@@ -31,7 +31,7 @@ const SITE_POLICY_DIRECTIVES: Record<string, string[]> = {
     VERCEL_ANALYTICS_CONNECT_ORIGIN,
   ],
   // MSAL renews tokens in a hidden iframe when no refresh token is usable.
-  // The iframe starts at the login host and ends at MSAL_SILENT_REDIRECT_SOURCE
+  // The iframe starts at the login host and ends at MSAL_REDIRECT_BRIDGE_SOURCE
   // on this origin, so 'self' is needed too. MsalProvider wraps every page.
   "frame-src": ["'self'", ...MSAL_AUTHORITY_ORIGINS],
   "style-src": ["'self'", "'unsafe-inline'"],
@@ -44,12 +44,13 @@ const SITE_POLICY_DIRECTIVES: Record<string, string[]> = {
 };
 
 /**
- * Content-Security-Policy for the blank MSAL redirect page. The page has no
- * scripts, styles, images, or forms, so it allows nothing except framing by
- * this origin.
+ * Content-Security-Policy for the MSAL redirect bridge page. The page runs one
+ * script file from this origin (no inline script) and has no styles, images,
+ * or forms. It can be framed by this origin only.
  */
-const SILENT_REDIRECT_POLICY_DIRECTIVES: Record<string, string[]> = {
+const REDIRECT_BRIDGE_POLICY_DIRECTIVES: Record<string, string[]> = {
   "default-src": ["'none'"],
+  "script-src": ["'self'"],
   "base-uri": ["'none'"],
   "form-action": ["'none'"],
   "frame-ancestors": ["'self'"],
@@ -72,11 +73,13 @@ const COMMON_SECURITY_HEADERS = [
   },
 ];
 
-// MSAL silent requests use <origin>/auth/redirect as the redirect URI
-// (MSAL_SILENT_REDIRECT_PATH in lib/auth/msalConfig.ts), so the hidden renewal
-// iframe lands on this blank page. Only this path may be framed, and only by
+// All MSAL flows use <origin>/auth/redirect as the redirect URI
+// (MSAL_REDIRECT_BRIDGE_PATH in lib/auth/msalConfig.ts). The hidden renewal
+// iframe lands on this page, so only this path may be framed, and only by
 // this origin. The source matches the path exactly, not its subpaths.
-const MSAL_SILENT_REDIRECT_SOURCE = "/auth/redirect";
+// Do not add a Cross-Origin-Opener-Policy header to this page: MSAL requires
+// the bridge page to be served without COOP.
+const MSAL_REDIRECT_BRIDGE_SOURCE = "/auth/redirect";
 
 const nextConfig: NextConfig = {
   env: {
@@ -94,11 +97,11 @@ const nextConfig: NextConfig = {
         ],
       },
       {
-        source: MSAL_SILENT_REDIRECT_SOURCE,
+        source: MSAL_REDIRECT_BRIDGE_SOURCE,
         headers: [
           {
             key: "Content-Security-Policy",
-            value: serializePolicy(SILENT_REDIRECT_POLICY_DIRECTIVES),
+            value: serializePolicy(REDIRECT_BRIDGE_POLICY_DIRECTIVES),
           },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
         ],

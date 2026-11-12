@@ -20,8 +20,8 @@
     "video:render": "remotion render video/index.ts IntuneHydrationKit-Ad out/intune-hydration-kit-ad.mp4"
   },
   "dependencies": {
-    "@azure/msal-browser": "^3.30.0",
-    "@azure/msal-react": "^2.2.0",
+    "@azure/msal-browser": "^5.29.0",
+    "@azure/msal-react": "^5.8.1",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-checkbox": "^1.1.3",
     "@radix-ui/react-dialog": "^1.1.15",

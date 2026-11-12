@@ -30,23 +30,23 @@ export function getAuthorityUrl(tenantId: string = "common"): string {
  */
 // Interactive browser flows must return to the origin that initiated them. This keeps
 // branch aliases and custom domains from inheriting a stale build-time redirect URI.
-const redirectUri =
+const appOrigin =
   (typeof window !== "undefined" ? window.location.origin : undefined) ||
   process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI ||
   "http://localhost:3000";
 
 /**
- * Path of the blank page (app/auth/redirect/route.ts) where silent token renewal ends.
+ * Path of the MSAL redirect bridge page (app/auth/redirect/route.ts).
  * The URI `<origin>/auth/redirect` must be registered as an SPA redirect URI in Entra ID.
  */
-export const MSAL_SILENT_REDIRECT_PATH = "/auth/redirect";
+export const MSAL_REDIRECT_BRIDGE_PATH = "/auth/redirect";
 
 /**
- * Redirect URI for silent requests (acquireTokenSilent, ssoSilent).
- * When MSAL falls back to a hidden iframe, the iframe ends on this blank page and not on
- * the full app. Popup sign-in and sign-out keep the origin redirect URI.
+ * Redirect URI for all MSAL flows.
+ * MSAL Browser v5 receives popup sign-in, hidden-iframe renewal, and popup sign-out
+ * responses through a redirect bridge page that sends them to the app window.
  */
-export const silentRedirectUri = new URL(MSAL_SILENT_REDIRECT_PATH, redirectUri).href;
+export const redirectBridgeUri = new URL(MSAL_REDIRECT_BRIDGE_PATH, appOrigin).href;
 
 export const msalConfig: Configuration = {
   auth: {
@@ -54,17 +54,20 @@ export const msalConfig: Configuration = {
     authority:
       process.env.NEXT_PUBLIC_MSAL_AUTHORITY ||
       "https://login.microsoftonline.com/common",
-    redirectUri,
-    postLogoutRedirectUri: redirectUri,
+    redirectUri: redirectBridgeUri,
+    // logoutPopup needs the bridge on this page to close the popup.
+    postLogoutRedirectUri: redirectBridgeUri,
   },
   cache: {
     cacheLocation: "sessionStorage", // Use sessionStorage instead of localStorage for security
-    storeAuthStateInCookie: false, // Set to true for IE11 or Edge
   },
   system: {
     loggerOptions: {
       loggerCallback: (level, message, containsPii) => {
-        if (containsPii) {
+        // msal-browser v5 tries sessionStorage when the instance is created during server
+        // rendering, logs "window is not defined", and uses memory storage. MSAL does no
+        // work on the server, so do not log there.
+        if (containsPii || typeof window === "undefined") {
           return;
         }
         switch (level) {
@@ -114,7 +117,6 @@ export const msalInstance = new PublicClientApplication(msalConfig);
 
 /**
  * Initialize MSAL instance - must be called before any authentication operations
- * Required for MSAL 3.x browser applications
  */
 let msalInitialized = false;
 let msalInitPromise: Promise<void> | null = null;

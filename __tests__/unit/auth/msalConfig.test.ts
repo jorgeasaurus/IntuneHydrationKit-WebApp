@@ -64,37 +64,28 @@ describe("msalConfig", () => {
     expect(module.loginRequest.scopes).toEqual(module.REQUIRED_SCOPES);
     expect(module.msalConfig.cache).toEqual({
       cacheLocation: "sessionStorage",
-      storeAuthStateInCookie: false,
     });
     expect(module.msalConfig.auth.authority).toBe("https://login.microsoftonline.com/common");
-    expect(module.msalConfig.auth.redirectUri).toBe("http://localhost:3000");
-    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe("http://localhost:3000");
+    expect(module.msalConfig.auth.redirectUri).toBe("http://localhost:3000/auth/redirect");
+    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(
+      "http://localhost:3000/auth/redirect"
+    );
   });
 
-  it("uses the initiating browser origin instead of a stale configured redirect", async () => {
+  it("sends every flow to the redirect bridge page on the initiating browser origin", async () => {
     vi.stubEnv(
       "NEXT_PUBLIC_MSAL_REDIRECT_URI",
       "https://www.intunehydrationkit.com"
     );
 
     const module = await importModule();
+    const bridgeUri = `${window.location.origin}/auth/redirect`;
 
-    expect(module.msalConfig.auth.redirectUri).toBe(window.location.origin);
-    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(window.location.origin);
-  });
-
-  it("sends silent requests to the blank redirect page on the current origin", async () => {
-    vi.stubEnv(
-      "NEXT_PUBLIC_MSAL_REDIRECT_URI",
-      "https://www.intunehydrationkit.com"
-    );
-
-    const module = await importModule();
-
-    expect(module.MSAL_SILENT_REDIRECT_PATH).toBe("/auth/redirect");
-    expect(module.silentRedirectUri).toBe(`${window.location.origin}/auth/redirect`);
-    // Popup sign-in and sign-out keep the origin redirect URI.
-    expect(module.msalConfig.auth.redirectUri).toBe(window.location.origin);
+    expect(module.MSAL_REDIRECT_BRIDGE_PATH).toBe("/auth/redirect");
+    expect(module.redirectBridgeUri).toBe(bridgeUri);
+    // Popup sign-in, silent iframe renewal, and popup sign-out all need the bridge.
+    expect(module.msalConfig.auth.redirectUri).toBe(bridgeUri);
+    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(bridgeUri);
   });
 
   it("explains when the Entra client ID is missing", async () => {
