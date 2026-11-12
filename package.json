@@ -36,7 +36,7 @@
     "clsx": "^2.1.1",
     "framer-motion": "^12.29.0",
     "lucide-react": "^0.468.0",
-    "next": "^15.1.6",
+    "next": "^15.5.29",
     "prism-react-renderer": "^2.4.1",
     "prismjs": "^1.30.0",
     "react": "^18.3.1",
@@ -46,7 +46,7 @@
     "tailwindcss-animate": "^1.0.7",
     "three": "0.134.0",
     "vanta": "^0.5.24",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
@@ -59,17 +59,17 @@
     "@types/react-dom": "^18.3.5",
     "@types/three": "0.134.0",
     "@vitejs/plugin-react": "^5.1.2",
-    "@vitest/coverage-v8": "^4.1.10",
-    "@vitest/ui": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.12",
+    "@vitest/ui": "^4.1.12",
     "eslint": "^9.18.0",
     "eslint-config-next": "^15.1.6",
     "jsdom": "^27.4.0",
     "msw": "^2.12.7",
-    "postcss": "^8.5.15",
+    "postcss": "^8.5.32",
     "remotion": "^4.0.498",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.12"
   },
   "overrides": {
     "postcss": "$postcss"
