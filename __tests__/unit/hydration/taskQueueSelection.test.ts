@@ -65,12 +65,14 @@ describe("taskQueue selection handling across runs", () => {
         categorySelections: { baseline: baselineSelection(firstPaths) },
       });
       expect(firstRun.map((task) => task.itemName)).toEqual(BASELINE_POLICIES.slice(0, 5).map((policy) => policy.name));
+      expect(firstRun.map((task) => task.templatePath)).toEqual(firstPaths);
 
       const secondRun = await buildTaskQueueAsync(["baseline"], operationMode, {
         baselineSelection: baselineSelection(secondPaths),
         categorySelections: { baseline: baselineSelection(secondPaths) },
       });
       expect(secondRun.map((task) => task.itemName)).toEqual(BASELINE_POLICIES.slice(5, 8).map((policy) => policy.name));
+      expect(secondRun.map((task) => task.templatePath)).toEqual(secondPaths);
     },
   );
 
@@ -110,6 +112,22 @@ describe("taskQueue selection handling across runs", () => {
   it("queues every template when there is no selection object for the category", async () => {
     const tasks = await buildTaskQueueAsync(["filters"], "create", { categorySelections: {} });
     expect(tasks.map((task) => task.itemName)).toEqual(["Filter A", "Filter B"]);
+  });
+
+  it("queues both selected OpenIntuneBaseline files when they share a name", async () => {
+    const shared = { name: "[IHD] Shared", displayName: "[IHD] Shared" };
+    mockFetchBaselinePolicies.mockResolvedValue([
+      { ...shared, _oibFilePath: "WINDOWS/a.json" },
+      { ...shared, _oibFilePath: "MACOS/a.json" },
+    ]);
+    const paths = ["MACOS/a.json"];
+
+    const tasks = await buildTaskQueueAsync(["baseline"], "create", {
+      baselineSelection: baselineSelection(paths),
+      categorySelections: { baseline: baselineSelection(paths) },
+    });
+
+    expect(tasks.map((task) => task.templatePath)).toEqual(["MACOS/a.json"]);
   });
 
   describe("incomplete template loads", () => {

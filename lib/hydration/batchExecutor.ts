@@ -22,6 +22,7 @@ import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
+import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
 import { sleep, sleepWithExecutionControl, waitWhilePaused, normalizeName, findByNamePrecedence } from "./utils";
 import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
@@ -436,9 +437,7 @@ async function buildBaselineRequestBody(
       console.log(`[BatchExecutor:baseline] Sample cached names: ${sampleNames.join(', ')}`);
     }
 
-    template = (cachedPolicies as BaselinePolicy[]).find(
-      (p) => (p.name || p.displayName) === task.itemName
-    );
+    template = findBaselineTemplateForTask(cachedPolicies as BaselinePolicy[], task);
   }
 
   if (!template) {

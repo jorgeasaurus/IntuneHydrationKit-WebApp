@@ -170,6 +170,27 @@ describe("executeBaselineTask", () => {
     });
   });
 
+  it("creates the template at the task's file path when another file shares its name", async () => {
+    const policyName = "[IHD] Duplicate OIB Policy";
+    mockGetCachedTemplates.mockReturnValue([
+      { displayName: policyName, name: policyName, description: "first", _oibFilePath: "WINDOWS/a.json" },
+      { displayName: policyName, name: policyName, description: "second", _oibFilePath: "WINDOWS/b.json" },
+    ]);
+    mockCreateSettingsCatalogPolicy.mockResolvedValue({ id: "settings-catalog-id" });
+    const client = createClient();
+
+    const result = await executeBaselineTask(
+      { ...createTask(policyName), templatePath: "WINDOWS/b.json" },
+      { client, operationMode: "create", isPreview: false, stopOnFirstError: false, cachedSettingsCatalogPolicies: [] }
+    );
+
+    expect(result).toMatchObject({ success: true, skipped: false });
+    expect(mockCreateSettingsCatalogPolicy).toHaveBeenCalledWith(
+      client,
+      expect.objectContaining({ description: "second" })
+    );
+  });
+
   it("skips V1 compliance duplicates found in the prefetched cache", async () => {
     const policyName = "[IHD] Win - OIB - Compliance - U - Password - v3.1";
 

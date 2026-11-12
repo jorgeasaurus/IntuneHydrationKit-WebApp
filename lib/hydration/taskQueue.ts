@@ -306,6 +306,7 @@ export async function buildTaskQueueAsync(
           category,
           operation: operationMode,
           itemName,
+          templatePath: itemRecord._oibFilePath as string | undefined,
           status: "pending",
         });
       }
@@ -337,7 +338,12 @@ export async function buildTaskQueueAsync(
           category,
           operation: operationMode,
           itemName,
-          templatePath: category === "cisBaseline" ? filePath : undefined,
+          templatePath:
+            category === "cisBaseline"
+              ? filePath
+              : category === "baseline"
+                ? (itemRecord._oibFilePath as string | undefined)
+                : undefined,
           status: "pending",
         });
       }

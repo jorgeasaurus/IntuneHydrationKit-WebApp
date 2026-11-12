@@ -18,6 +18,7 @@ import { findBaselineMatch, recordBaselineMatch } from "../baselineEvidence";
 import { resolveOIBOrganizationId } from "../templatePlaceholders";
 import { createAppProtectionPolicy, deleteAppProtectionPolicy } from "@/lib/graph/appProtection";
 import { getCachedTemplates, BaselinePolicy, AppProtectionTemplate } from "@/lib/templates/loader";
+import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
 
 /**
  * Execute a baseline task (create or delete)
@@ -34,9 +35,7 @@ export async function executeBaselineTask(
   let template: BaselinePolicy | undefined;
 
   if (cachedBaseline && Array.isArray(cachedBaseline)) {
-    template = (cachedBaseline as BaselinePolicy[]).find(
-      (b) => b.displayName === task.itemName || b.name === task.itemName
-    );
+    template = findBaselineTemplateForTask(cachedBaseline as BaselinePolicy[], task);
   }
 
   if (!template) {
