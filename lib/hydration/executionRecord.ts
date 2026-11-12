@@ -136,7 +136,9 @@ const recordBase = z.strictObject({
   /** Paused time of the run. Records saved before this field was added do not have it. */
   pausedMs: z.number().nonnegative().optional(),
   /** Wizard scope of the run, for "Run this for real". Older records do not have it. */
-  scope: runScopeSchema.optional(),
+  // A stored scope that the schema cannot read exactly is dropped, so the run stays readable
+  // but "Run this for real" is not offered from it (fail closed).
+  scope: runScopeSchema.optional().catch(undefined),
   /** Pre-flight license results of the run. Older records do not have it. */
   licenses: runLicensesSchema.optional(),
 });

@@ -324,11 +324,12 @@ export function useHydrationExecution() {
       scope,
       licenses: getWizardRunLicenses(state),
     };
+    // The queue uses the wizard state directly. The stored scope is only for a later live run.
     await runExecution(configuration, ({ shouldCancel, onProgress }) =>
-      buildTaskQueueAsync(scope.selectedTargets, operationMode, {
-        selectedCISCategories: scope.selectedCISCategories,
-        baselineSelection: scope.baselineSelection,
-        categorySelections: scope.categorySelections,
+      buildTaskQueueAsync(state.selectedTargets, operationMode, {
+        selectedCISCategories: state.selectedCISCategories,
+        baselineSelection: state.baselineSelection,
+        categorySelections: state.categorySelections,
         shouldCancel,
         onProgress,
       }),

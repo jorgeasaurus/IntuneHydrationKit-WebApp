@@ -2,6 +2,7 @@ import { z } from "@/lib/utils/zod";
 import {
   TASK_CATEGORIES,
   type BaselineSelection,
+  type CategorySelection,
   type CategorySelections,
   type CISCategoryId,
   type OIBPlatformId,
@@ -47,32 +48,57 @@ type MissingOIBPlatform = Exclude<OIBPlatformId, (typeof OIB_PLATFORM_IDS)[numbe
 const allIdsListed: [MissingCISCategory, MissingOIBPlatform] extends [never, never] ? true : never = true;
 void allIdsListed;
 
+/**
+ * Zod shape for every key of T. The `satisfies` checks below fail to compile when the wizard
+ * type gets a key that the schema does not have, so a stored scope can never drop a selection.
+ */
+type ShapeFor<T> = { [K in keyof Required<T>]: z.ZodType };
+
 const baselineSelectionSchema = z.strictObject({
   platforms: z.array(z.enum(OIB_PLATFORM_IDS)),
   selectedPolicies: z.array(z.string()),
   excludedPolicies: z.array(z.string()),
-});
-const categorySelectionSchema = z.strictObject({ selectedItems: z.array(z.string()) });
+} satisfies ShapeFor<BaselineSelection>);
+const categorySelectionSchema = z.strictObject({
+  selectedItems: z.array(z.string()),
+} satisfies ShapeFor<CategorySelection>);
 
+const categorySelectionsShape = {
+  groups: categorySelectionSchema.optional(),
+  filters: categorySelectionSchema.optional(),
+  compliance: categorySelectionSchema.optional(),
+  conditionalAccess: categorySelectionSchema.optional(),
+  appProtection: categorySelectionSchema.optional(),
+  win32Apps: categorySelectionSchema.optional(),
+  enrollment: categorySelectionSchema.optional(),
+  notification: categorySelectionSchema.optional(),
+  baseline: baselineSelectionSchema.optional(),
+  cisBaseline: categorySelectionSchema.optional(),
+} satisfies ShapeFor<CategorySelections>;
+
+/** Category selection keys that a stored scope can keep. Tests compare it with the wizard categories. */
+export const STORED_SELECTION_KEYS = Object.keys(categorySelectionsShape) as Array<keyof CategorySelections>;
+
+/**
+ * Strict schema: an unknown key is rejected, never removed. Removing a selection would make the
+ * whole category selected, so "Run this for real" would create more than the preview checked.
+ */
 export const runScopeSchema = z.strictObject({
   selectedTargets: z.array(z.enum(TASK_CATEGORIES)).min(1),
   selectedCISCategories: z.array(z.enum(CIS_CATEGORY_IDS)),
   baselineSelection: baselineSelectionSchema.optional(),
-  // Unknown selection keys are removed instead of rejected, so a new wizard category cannot block the record.
-  categorySelections: z
-    .object({
-      groups: categorySelectionSchema.optional(),
-      filters: categorySelectionSchema.optional(),
-      compliance: categorySelectionSchema.optional(),
-      conditionalAccess: categorySelectionSchema.optional(),
-      appProtection: categorySelectionSchema.optional(),
-      win32Apps: categorySelectionSchema.optional(),
-      enrollment: categorySelectionSchema.optional(),
-      baseline: baselineSelectionSchema.optional(),
-      cisBaseline: categorySelectionSchema.optional(),
-    })
-    .optional(),
-});
+  categorySelections: z.strictObject(categorySelectionsShape).optional(),
+} satisfies ShapeFor<RunScope>);
+
+/**
+ * The scope to keep with a run, or undefined when the schema cannot keep it exactly.
+ * Without a scope, "Run this for real" is not offered (fail closed).
+ */
+export function toStoredRunScope(scope: RunScope | undefined): RunScope | undefined {
+  if (!scope) return undefined;
+  const parsed = runScopeSchema.safeParse(scope);
+  return parsed.success ? (parsed.data as RunScope) : undefined;
+}
 
 export const runLicensesSchema = z.strictObject({
   hasConditionalAccessLicense: z.boolean(),
@@ -80,14 +106,17 @@ export const runLicensesSchema = z.strictObject({
   hasWindowsDriverUpdateLicense: z.boolean(),
 });
 
-/** The scope of a wizard run. */
-export function getWizardRunScope(state: WizardState): RunScope {
-  return {
+/**
+ * The scope of a wizard run, or undefined when it cannot be kept exactly
+ * (then the preview cannot be run for real from the dashboard).
+ */
+export function getWizardRunScope(state: WizardState): RunScope | undefined {
+  return toStoredRunScope({
     selectedTargets: [...state.selectedTargets],
     selectedCISCategories: [...state.selectedCISCategories],
     ...(state.baselineSelection ? { baselineSelection: state.baselineSelection } : {}),
     ...(state.categorySelections ? { categorySelections: state.categorySelections } : {}),
-  };
+  });
 }
 
 /** The license results of the wizard pre-flight check, or undefined when the check did not run. */
