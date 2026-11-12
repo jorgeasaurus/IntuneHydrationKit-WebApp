@@ -6,15 +6,14 @@
 import { HydrationTask } from "@/types/hydration";
 import { CompliancePolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
+import { executeDeleteTask } from "../deleteResolver";
 import {
   createCompliancePolicy,
-  deleteCompliancePolicyByName,
   compliancePolicyExists,
 } from "@/lib/graph/compliance";
 import { createV2CompliancePolicy } from "../policyCreators";
 import { requireTenantCache } from "../utils";
 import { getCachedTemplates, ComplianceTemplate } from "@/lib/templates/loader";
-import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 type V2ComplianceTemplate = ComplianceTemplate & {
   name?: string;
@@ -52,6 +51,11 @@ export async function executeComplianceTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
   const requestedName = task.itemName;
 
@@ -167,118 +171,6 @@ export async function executeComplianceTask(
         skipped: false,
         error: errorMessage,
       };
-    }
-  } else if (mode === "delete") {
-    const targetName = template?.displayName ?? requestedName;
-
-    if (!template && !context.cachedV2CompliancePolicies) {
-      try {
-        context.cachedV2CompliancePolicies = await client.getCollection<{
-          id: string;
-          name: string;
-          description?: string;
-        }>("/deviceManagement/compliancePolicies?$select=id,name,description");
-      } catch (error) {
-        console.warn("[Engine:Compliance] V2 policy lookup failed; continuing with V1 deletion", error);
-        context.cachedV2CompliancePolicies = [];
-      }
-    }
-
-    const v2Policy = context.cachedV2CompliancePolicies?.find((existingPolicy) =>
-      namesMatch(existingPolicy.name, targetName)
-    );
-
-    if ((template && isV2ComplianceTemplate(template)) || v2Policy) {
-      let policy = v2Policy;
-
-      if (!policy) {
-        const allPolicies = await client.getCollection<{ id: string; name: string; description?: string }>(
-          "/deviceManagement/compliancePolicies?$select=id,name,description"
-        );
-        context.cachedV2CompliancePolicies = allPolicies;
-        policy = allPolicies.find((existingPolicy) =>
-          namesMatch(existingPolicy.name, targetName)
-        );
-      }
-
-      if (!policy) {
-        return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-      }
-
-      if (!hasHydrationMarker(policy.description)) {
-        return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-      }
-
-      if (isPreview) {
-        return { task, success: true, skipped: false };
-      }
-
-      const assignmentsResponse = await client.get<{ value?: Array<{ id: string }> }>(
-        `/deviceManagement/compliancePolicies/${policy.id}/assignments`
-      );
-      const assignmentCount = assignmentsResponse.value?.length ?? 0;
-      if (assignmentCount > 0) {
-        return {
-          task,
-          success: true,
-          skipped: true,
-          skipKind: "blocked",
-          error: `Policy has ${assignmentCount} active assignment(s)`,
-        };
-      }
-
-      await client.delete(`/deviceManagement/compliancePolicies/${policy.id}`);
-      if (context.cachedV2CompliancePolicies) {
-        context.cachedV2CompliancePolicies = context.cachedV2CompliancePolicies.filter(
-          (existingPolicy) => existingPolicy.id !== policy.id
-        );
-      }
-      return { task, success: true, skipped: false };
-    }
-
-    // Check if policy exists first
-    const exists = await compliancePolicyExists(client, targetName);
-    if (!exists) {
-      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    // Delete the policy with 504 verification
-    try {
-      const result = await deleteCompliancePolicyByName(client, targetName);
-
-      // Check if skipped due to active assignments
-      if (result.skipped) {
-        return { task, success: true, skipped: true, skipKind: "blocked", error: result.reason };
-      }
-
-      return { task, success: true, skipped: false };
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
-      // Check if it's a 504 timeout error
-      if (errorMessage.includes("504") || errorMessage.includes("Gateway Timeout")) {
-        console.log(`[Engine:Compliance] Got 504 for delete of "${targetName}", verifying if policy was deleted...`);
-
-        // Wait for async deletion to complete
-        await new Promise(resolve => setTimeout(resolve, 5000));
-
-        // Check if policy was actually deleted despite 504
-        const stillExists = await compliancePolicyExists(client, targetName);
-        if (!stillExists) {
-          console.log(`[Engine:Compliance] Policy "${targetName}" was deleted despite 504 - marking as success`);
-          return { task, success: true, skipped: false };
-        }
-
-        console.log(`[Engine:Compliance] Policy "${targetName}" still exists after 504 - deletion failed`);
-      }
-
-      // Policy not found or not created by hydration kit - skip
-      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
     }
   }
 

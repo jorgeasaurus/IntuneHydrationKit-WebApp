@@ -510,6 +510,24 @@ describe("executeTasks", () => {
     });
   });
 
+  it("sends driver update delete tasks to the delete path when the license is missing", async () => {
+    mockGetBatchConfig.mockReturnValue({
+      enableBatching: false,
+      defaultBatchSize: 20,
+      delayBetweenBatches: 0,
+    });
+    const driverDeleteTask = createTask("driver-delete", "baseline", "[IHD] WUfB Drivers - Windows 11", "delete");
+    mockExecuteBaselineTask.mockResolvedValueOnce({ task: driverDeleteTask, success: true, skipped: false });
+
+    const results = await executeTasks(
+      [driverDeleteTask],
+      createContext({ operationMode: "delete", hasWindowsDriverUpdateLicense: false })
+    );
+
+    expect(mockExecuteBaselineTask).toHaveBeenCalledTimes(1);
+    expect(results).toEqual([expect.objectContaining({ task: driverDeleteTask, success: true, skipped: false })]);
+  });
+
   it("uses sequential delete execution when stop on first error is enabled", async () => {
     const failingTask = createTask("delete-failure", "groups", "[IHD] Delete Failure", "delete");
     const untouchedTask = createTask("delete-untouched", "groups", "[IHD] Delete Untouched", "delete");

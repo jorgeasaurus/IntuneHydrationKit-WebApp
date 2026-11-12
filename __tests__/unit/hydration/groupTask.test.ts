@@ -3,10 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
 
-const { mockGetCachedTemplates, mockCreateGroup, mockDeleteGroupByName } = vi.hoisted(() => ({
+const { mockGetCachedTemplates, mockCreateGroup } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockCreateGroup: vi.fn(),
-  mockDeleteGroupByName: vi.fn(),
 }));
 
 vi.mock("@/lib/templates/loader", () => ({
@@ -15,7 +14,6 @@ vi.mock("@/lib/templates/loader", () => ({
 
 vi.mock("@/lib/graph/groups", () => ({
   createGroup: mockCreateGroup,
-  deleteGroupByName: mockDeleteGroupByName,
 }));
 
 import { executeGroupTask } from "@/lib/hydration/taskExecutors/groupTask";
@@ -221,114 +219,6 @@ describe("executeGroupTask", () => {
   });
 
 
-
-  it("skips delete when the group is not cached in the tenant", async () => {
-    mockGetCachedTemplates.mockReturnValue([
-      {
-        displayName: "[IHD] All Windows Devices",
-        description: "Imported by Intune Hydration Kit",
-        membershipRule: '(device.deviceOSType -eq "Windows")',
-      },
-    ]);
-
-    const result = await executeGroupTask(
-      { ...task, operation: "delete" },
-      {
-        client: createClient(),
-        operationMode: "delete",
-        isPreview: false,
-        stopOnFirstError: false,
-        cachedIntuneGroups: [],
-      }
-    );
-
-    expect(result).toMatchObject({
-      success: true,
-      skipped: true,
-      error: "Not found in tenant",
-    });
-    expect(mockDeleteGroupByName).not.toHaveBeenCalled();
-  });
-
-  it("deletes matching groups by template display name", async () => {
-    mockGetCachedTemplates.mockReturnValue([
-      {
-        displayName: "[IHD] All Windows Devices",
-        description: "Imported by Intune Hydration Kit",
-        membershipRule: '(device.deviceOSType -eq "Windows")',
-      },
-    ]);
-    mockDeleteGroupByName.mockResolvedValue(undefined);
-    const client = createClient();
-
-    const result = await executeGroupTask(
-      { ...task, operation: "delete" },
-      {
-        client,
-        operationMode: "delete",
-        isPreview: false,
-        stopOnFirstError: false,
-        cachedIntuneGroups: [
-          {
-            id: "tenant-group-id",
-            "@odata.type": "#microsoft.graph.group",
-            displayName: "All Windows Devices",
-            description: "Imported by Intune Hydration Kit",
-            groupTypes: ["DynamicMembership"],
-            mailEnabled: false,
-            mailNickname: "AllWindowsDevices",
-            securityEnabled: true,
-            membershipRule: '(device.deviceOSType -eq "Windows")',
-            membershipRuleProcessingState: "On",
-          },
-        ],
-      }
-    );
-
-    expect(result).toMatchObject({ success: true, skipped: false });
-    expect(mockDeleteGroupByName).toHaveBeenCalledWith(client, "[IHD] All Windows Devices");
-  });
-
-  it("surfaces delete errors as skipped results", async () => {
-    mockGetCachedTemplates.mockReturnValue([
-      {
-        displayName: "[IHD] All Windows Devices",
-        description: "Imported by Intune Hydration Kit",
-        membershipRule: '(device.deviceOSType -eq "Windows")',
-      },
-    ]);
-    mockDeleteGroupByName.mockRejectedValue(new Error("Not created by Hydration Kit"));
-
-    const result = await executeGroupTask(
-      { ...task, operation: "delete" },
-      {
-        client: createClient(),
-        operationMode: "delete",
-        isPreview: false,
-        stopOnFirstError: false,
-        cachedIntuneGroups: [
-          {
-            id: "tenant-group-id",
-            "@odata.type": "#microsoft.graph.group",
-            displayName: "[IHD] All Windows Devices",
-            description: "Imported by Intune Hydration Kit",
-            groupTypes: ["DynamicMembership"],
-            mailEnabled: false,
-            mailNickname: "IHDAllWindowsDevices",
-            securityEnabled: true,
-            membershipRule: '(device.deviceOSType -eq "Windows")',
-            membershipRuleProcessingState: "On",
-          },
-        ],
-      }
-    );
-
-    expect(result).toMatchObject({
-      success: true,
-      skipped: true,
-      error: "Not created by Hydration Kit",
-    });
-  });
 
   it("returns an invalid mode error for unsupported operations", async () => {
     mockGetCachedTemplates.mockReturnValue([

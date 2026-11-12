@@ -46,7 +46,7 @@ export const TEMPLATE_METADATA = {
   appProtection: {
     displayName: "App Protection",
     description: "Mobile application management (MAM) policies",
-    count: 8,
+    count: 10,
     icon: "Smartphone",
   },
   win32Apps: {
@@ -70,7 +70,7 @@ export const TEMPLATE_METADATA = {
   cisBaseline: {
     displayName: "CIS Intune Baselines",
     description: "CIS security benchmarks for Windows, macOS, iOS, Android, and browsers",
-    count: 717,
+    count: 728,
     icon: "ShieldAlert",
     hasSubcategories: true,
   },

@@ -52,35 +52,9 @@ export interface BatchResponseError {
 }
 
 /**
- * Result of processing a batch with success/failure separation
- */
-export interface ProcessedBatchResult {
-  successful: BatchResponse[];
-  failed: BatchResponse[];
-  retryable: BatchResponse[];
-}
-
-/**
  * API version mapping for different resource types
  */
 export type ApiVersion = "v1.0" | "beta";
-
-/**
- * Map of task categories to their API versions
- * v1.0: groups, conditionalAccess
- * beta: everything else
- */
-export const API_VERSION_MAP: Record<string, ApiVersion> = {
-  groups: "v1.0",
-  conditionalAccess: "v1.0",
-  filters: "beta",
-  compliance: "beta",
-  appProtection: "beta",
-  enrollment: "beta",
-  baseline: "beta",
-  cisBaseline: "beta",
-  notification: "beta",
-};
 
 /**
  * Check if a batch response status indicates success
@@ -150,54 +124,4 @@ export function getRetryAfterFromBatchResponse(
 
   const seconds = parseInt(retryAfter, 10);
   return isNaN(seconds) ? undefined : seconds * 1000; // Convert to milliseconds
-}
-
-/**
- * Process batch responses and categorize by success/failure/retryable
- */
-export function processBatchResponses(result: BatchResult): ProcessedBatchResult {
-  const successful: BatchResponse[] = [];
-  const failed: BatchResponse[] = [];
-  const retryable: BatchResponse[] = [];
-
-  for (const response of result.responses) {
-    if (isBatchResponseSuccess(response.status) || isBatchResponseConflict(response.status)) {
-      successful.push(response);
-    } else if (isBatchResponseRetryable(response.status)) {
-      retryable.push(response);
-    } else {
-      failed.push(response);
-    }
-  }
-
-  return { successful, failed, retryable };
-}
-
-/**
- * Chunk an array into smaller arrays of specified size
- */
-export function chunkArray<T>(array: T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < array.length; i += size) {
-    chunks.push(array.slice(i, i + size));
-  }
-  return chunks;
-}
-
-/**
- * Group batch requests by API version
- */
-export function groupRequestsByVersion(
-  requests: Array<BatchRequest & { apiVersion: ApiVersion }>
-): Map<ApiVersion, BatchRequest[]> {
-  const grouped = new Map<ApiVersion, BatchRequest[]>();
-
-  for (const request of requests) {
-    const { apiVersion, ...batchRequest } = request;
-    const existing = grouped.get(apiVersion) || [];
-    existing.push(batchRequest);
-    grouped.set(apiVersion, existing);
-  }
-
-  return grouped;
 }

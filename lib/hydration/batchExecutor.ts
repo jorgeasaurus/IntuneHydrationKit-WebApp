@@ -7,7 +7,6 @@
 import {
   BatchRequest,
   BatchResponse,
-  chunkArray,
   extractBatchError,
   isBatchResponseSuccess,
   isBatchResponseConflict,
@@ -18,13 +17,14 @@ import type { ApiVersion } from "@/lib/graph/batch";
 import { getBatchConfig } from "@/lib/config/batchConfig";
 import { HydrationTask, BatchProgress } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult, CISPolicyType, ActivityMessage, TenantCacheKey } from "./types";
+import { DeleteTarget, deleteResolutionResult, resolveDeleteTarget, sendDeleteRequest } from "./deleteResolver";
 import { detectCISPolicyType } from "./policyDetection";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
 import { findBaselineMatch, recordBaselineMatch } from "./baselineEvidence";
 import { resolveOIBOrganizationId } from "./templatePlaceholders";
 import { findBaselineTemplateForTask } from "@/lib/templates/baselineLookup";
 import { sleep, sleepWithExecutionControl, waitWhilePaused, normalizeName, findByNamePrecedence } from "./utils";
-import { addHydrationMarker, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import {
   buildCISGroupPolicyConfigurationPayload,
   buildCISSecurityIntentPayload,
@@ -1225,7 +1225,7 @@ function updateCacheAfterCreate(
     return;
   }
   if (task.category === "conditionalAccess") {
-    context.cachedConditionalAccessPolicies?.push({ id, displayName, description });
+    context.cachedConditionalAccessPolicies?.push({ id, displayName });
     return;
   }
 
@@ -1263,32 +1263,6 @@ export function isBatchableCategory(category: string): boolean {
   return ["groups", "filters", "compliance", "conditionalAccess", "baseline", "cisBaseline"].includes(category);
 }
 
-// ============================================================================
-// DELETE BATCH OPERATIONS
-// ============================================================================
-
-/**
- * Result of preparing a delete task for batch execution
- */
-type DeletePrepareResult =
-  | { type: "batch"; data: PreparedBatchTask }
-  | { type: "skip"; reason: string; skipKind: "noOp" | "blocked" }
-  | { type: "sequential" };
-
-/**
- * Endpoint type for baseline policies (determines delete URL)
- */
-type BaselineEndpointType =
-  | "settingsCatalog"
-  | "v2Compliance"
-  | "v1Compliance"
-  | "deviceConfiguration"
-  | "groupPolicyConfiguration"
-  | "securityIntent"
-  | "driverUpdate"
-  | "appProtection_ios"
-  | "appProtection_android";
-
 type PolicyExistsPolicyType =
   | "SettingsCatalog"
   | "V2Compliance"
@@ -1311,9 +1285,7 @@ const POLICY_EXISTS_CACHE_KEYS: Record<PolicyExistsPolicyType, TenantCacheKey> =
 /**
  * Check if a policy already exists in the prefetched tenant cache.
  * Cache matching uses exact > normalized precedence (no partial matching)
- * via findByNamePrecedence with allowPartialMatch=false. Note that
- * findResourceIdForDelete additionally allows unique partial matches, so
- * delete resolution can match a broader set of names than create-skip.
+ * via findByNamePrecedence with allowPartialMatch=false.
  *
  * Returns undefined when the required cache was not loaded. The caller then sends
  * the task to the sequential executor, which fails it with the prefetch error.
@@ -1385,803 +1357,6 @@ async function policyExistsInCache(
   return true;
 }
 
-/**
- * Find resource ID for deletion by name
- * For Settings Catalog policies, the task.itemName may be from displayName in the template,
- * but the policy was created with 'name' field. We search by name match.
- */
-function findResourceIdForDelete(
-  task: HydrationTask,
-  context: ExecutionContext
-): { id: string; hasMarker: boolean; endpointType?: BaselineEndpointType } | null {
-  const nameToFind = task.itemName.toLowerCase();
-  const normalizedNameToFind = normalizeName(task.itemName);
-
-  switch (task.category) {
-    case "groups": {
-      const nameStripped = nameToFind.startsWith("[ihd] ") ? nameToFind.slice(6) : nameToFind;
-      const group = context.cachedIntuneGroups?.find((g) => {
-        const n = g.displayName.toLowerCase();
-        const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
-        return n === nameToFind || ns === nameStripped;
-      });
-      if (group?.id) {
-        return { id: group.id, hasMarker: hasHydrationMarker(group.description) };
-      }
-      return null;
-    }
-
-    case "filters": {
-      const filter = context.cachedFilters?.find(
-        (f) => f.displayName.toLowerCase() === nameToFind
-      );
-      if (filter?.id) {
-        return { id: filter.id, hasMarker: hasHydrationMarker(filter.description) };
-      }
-      return null;
-    }
-
-    case "baseline":
-    case "cisBaseline": {
-      // Baseline tasks can resolve to several policy endpoints. Search each
-      // cache in priority order with uniform matching semantics
-      // (exact > normalized > unique partial - see findByNamePrecedence).
-      const baselineSources: Array<{
-        label: string;
-        endpointType: BaselineEndpointType;
-        match: () =>
-          | { id?: string; name?: string; displayName?: string; description?: string }
-          | undefined;
-      }> = [
-        {
-          label: "Settings Catalog policy",
-          endpointType: "settingsCatalog",
-          match: () =>
-            findByNamePrecedence(context.cachedSettingsCatalogPolicies, nameToFind, normalizedNameToFind, (p) => p.name),
-        },
-        {
-          label: "V2 Compliance policy",
-          endpointType: "v2Compliance",
-          match: () =>
-            findByNamePrecedence(context.cachedV2CompliancePolicies, nameToFind, normalizedNameToFind, (p) => p.name),
-        },
-        {
-          label: "V1 Compliance policy",
-          endpointType: "v1Compliance",
-          match: () =>
-            findByNamePrecedence(context.cachedCompliancePolicies, nameToFind, normalizedNameToFind, (p) => p.displayName),
-        },
-        {
-          label: "Device Configuration",
-          endpointType: "deviceConfiguration",
-          match: () =>
-            findByNamePrecedence(context.cachedDeviceConfigurations, nameToFind, normalizedNameToFind, (p) => p.displayName),
-        },
-        {
-          label: "Group Policy Configuration",
-          endpointType: "groupPolicyConfiguration",
-          match: () =>
-            findByNamePrecedence(context.cachedGroupPolicyConfigurations, nameToFind, normalizedNameToFind, (p) => p.displayName),
-        },
-        {
-          label: "Security Intent",
-          endpointType: "securityIntent",
-          match: () =>
-            findByNamePrecedence(context.cachedSecurityIntents, nameToFind, normalizedNameToFind, (p) => p.displayName),
-        },
-        {
-          label: "Driver Update Profile",
-          endpointType: "driverUpdate",
-          match: () =>
-            findByNamePrecedence(context.cachedDriverUpdateProfiles, nameToFind, normalizedNameToFind, (p) => p.displayName),
-        },
-      ];
-
-      for (const source of baselineSources) {
-        const found = source.match();
-        if (found?.id) {
-          const hasMarker = hasHydrationMarker(found.description);
-          console.log(`[BatchExecutor:DELETE] Found ${source.label} "${found.name ?? found.displayName}" (ID: ${found.id}), hasMarker: ${hasMarker}`);
-          return { id: found.id, hasMarker, endpointType: source.endpointType };
-        }
-      }
-
-      // App Protection is exact/normalized only (no partial match) and derives
-      // its endpoint from the policy platform
-      const appProtectionPolicy = findByNamePrecedence(
-        context.cachedAppProtectionPolicies,
-        nameToFind,
-        normalizedNameToFind,
-        (p) => p.displayName,
-        false
-      );
-
-      if (appProtectionPolicy?.id) {
-        const endpointType = appProtectionPolicy._platform === "iOS"
-          ? "appProtection_ios"
-          : "appProtection_android";
-        const hasMarker = hasHydrationMarker(appProtectionPolicy.description);
-        console.log(`[BatchExecutor:DELETE] Found App Protection policy "${appProtectionPolicy.displayName}" (ID: ${appProtectionPolicy.id}), hasMarker: ${hasMarker}`);
-        return { id: appProtectionPolicy.id, hasMarker, endpointType };
-      }
-
-      console.log(`[BatchExecutor:DELETE] Policy "${task.itemName}" not found in Settings Catalog (${context.cachedSettingsCatalogPolicies?.length || 0}), V2 Compliance (${context.cachedV2CompliancePolicies?.length || 0}), V1 Compliance (${context.cachedCompliancePolicies?.length || 0}), Device Configurations (${context.cachedDeviceConfigurations?.length || 0}), Group Policy Configurations (${context.cachedGroupPolicyConfigurations?.length || 0}), Security Intents (${context.cachedSecurityIntents?.length || 0}), Driver Update Profiles (${context.cachedDriverUpdateProfiles?.length || 0}), or App Protection (${context.cachedAppProtectionPolicies?.length || 0})`);
-      return null;
-    }
-
-    case "compliance": {
-      const v2Compliance = findByNamePrecedence(
-        context.cachedV2CompliancePolicies,
-        nameToFind,
-        normalizedNameToFind,
-        (c) => c.name
-      );
-      if (v2Compliance?.id) {
-        return {
-          id: v2Compliance.id,
-          hasMarker: hasHydrationMarker(v2Compliance.description),
-          endpointType: "v2Compliance",
-        };
-      }
-
-      const compliance = findByNamePrecedence(
-        context.cachedCompliancePolicies,
-        nameToFind,
-        normalizedNameToFind,
-        (c) => c.displayName
-      );
-      if (compliance?.id) {
-        return {
-          id: compliance.id,
-          hasMarker: hasHydrationMarker(compliance.description),
-          endpointType: "v1Compliance",
-        };
-      }
-      return null;
-    }
-
-    case "conditionalAccess": {
-      // CA policies have the marker in displayName (not description) since CA policies don't support descriptions
-      // Support BOTH marker formats:
-      //   - Old: "[Intune Hydration Kit]"
-      //   - New: "[Imported by Intune Hydration Kit]"
-      // IMPORTANT: Only search for policies WITH the marker - do NOT fall back to exact name match
-      // because there may be existing policies with the same base name that weren't created by this tool
-      const markerShort = "[Intune Hydration Kit]";
-      const markerFull = "[Imported by Intune Hydration Kit]";
-      const searchNameWithShortMarker = `${nameToFind} ${markerShort}`.toLowerCase();
-      const searchNameWithFullMarker = `${nameToFind} ${markerFull}`.toLowerCase();
-
-      const ca = context.cachedConditionalAccessPolicies?.find((c) => {
-        const policyName = c.displayName?.toLowerCase();
-        if (!policyName || !hasHydrationMarker(c.displayName)) {
-          return false;
-        }
-
-        return (
-          policyName === nameToFind ||
-          policyName === searchNameWithShortMarker ||
-          policyName === searchNameWithFullMarker
-        );
-      });
-      if (ca?.id) {
-        // Policy found with marker in displayName - it was created by this tool
-        return { id: ca.id, hasMarker: true };
-      }
-      return null;
-    }
-
-    default:
-      return null;
-  }
-}
-
-/**
- * Get the assignment endpoint for a resource to check if it has active assignments
- * Returns null for resource types that don't have assignments (groups, filters)
- */
-function getAssignmentEndpoint(
-  category: string,
-  resourceId: string,
-  endpointType?: BaselineEndpointType
-): string | null {
-  switch (category) {
-    case "groups":
-    case "filters":
-      // Groups and filters don't have assignments - they ARE the assignment targets
-      return null;
-
-    case "conditionalAccess":
-      // CA policies don't have assignments in the traditional sense
-      return null;
-
-    case "compliance":
-      return endpointType === "v2Compliance"
-        ? `/deviceManagement/compliancePolicies/${resourceId}/assignments`
-        : `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
-
-    case "baseline":
-    case "cisBaseline":
-      switch (endpointType) {
-        case "settingsCatalog":
-          return `/deviceManagement/configurationPolicies/${resourceId}/assignments`;
-        case "v2Compliance":
-          return `/deviceManagement/compliancePolicies/${resourceId}/assignments`;
-        case "v1Compliance":
-          return `/deviceManagement/deviceCompliancePolicies/${resourceId}/assignments`;
-        case "deviceConfiguration":
-          return `/deviceManagement/deviceConfigurations/${resourceId}/assignments`;
-        case "groupPolicyConfiguration":
-          return `/deviceManagement/groupPolicyConfigurations/${resourceId}/assignments`;
-        case "securityIntent":
-          return `/deviceManagement/intents/${resourceId}/assignments`;
-        case "driverUpdate":
-          return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}/assignments`;
-        case "appProtection_ios":
-        case "appProtection_android":
-          return null;
-        default:
-          return `/deviceManagement/configurationPolicies/${resourceId}/assignments`;
-      }
-
-    case "appProtection":
-      // App protection policies have a different assignment structure
-      return null;
-
-    case "enrollment":
-      return `/deviceManagement/windowsAutopilotDeploymentProfiles/${resourceId}/assignments`;
-
-    default:
-      return null;
-  }
-}
-
-/**
- * Check if a resource has active assignments
- * Returns the assignment count, or null when assignment state can't be checked.
- */
-async function checkResourceAssignments(
-  context: ExecutionContext,
-  category: string,
-  resourceId: string,
-  endpointType?: BaselineEndpointType
-): Promise<number | null> {
-  // Skip assignment checks in preview mode - they're read-only but slow
-  if (context.isPreview) {
-    return 0;
-  }
-
-  const assignmentEndpoint = getAssignmentEndpoint(category, resourceId, endpointType);
-
-  if (!assignmentEndpoint) {
-    // Resource type doesn't have assignments
-    return 0;
-  }
-
-  try {
-    const response = await context.client.get<{ value: Array<{ id: string }> }>(assignmentEndpoint);
-    return response.value?.length ?? 0;
-  } catch (error) {
-    // A failed assignment read is unsafe for a destructive operation.
-    console.log(`[BatchExecutor:DELETE] Could not check assignments: ${error instanceof Error ? error.message : String(error)}`);
-    return null;
-  }
-}
-
-/**
- * Get the endpoint for a DELETE request
- */
-function getDeleteEndpoint(category: string, resourceId: string, endpointType?: BaselineEndpointType): string {
-  switch (category) {
-    case "groups":
-      return `/groups/${resourceId}`;
-    case "filters":
-      return `/deviceManagement/assignmentFilters/${resourceId}`;
-    case "compliance":
-      return endpointType === "v2Compliance"
-        ? `/deviceManagement/compliancePolicies/${resourceId}`
-        : `/deviceManagement/deviceCompliancePolicies/${resourceId}`;
-    case "conditionalAccess":
-      return `/identity/conditionalAccess/policies/${resourceId}`;
-    case "baseline":
-    case "cisBaseline":
-      // Use the endpoint type to determine the correct URL
-      if (endpointType === "v2Compliance") {
-        return `/deviceManagement/compliancePolicies/${resourceId}`;
-      }
-      if (endpointType === "v1Compliance") {
-        return `/deviceManagement/deviceCompliancePolicies/${resourceId}`;
-      }
-      if (endpointType === "deviceConfiguration") {
-        return `/deviceManagement/deviceConfigurations/${resourceId}`;
-      }
-      if (endpointType === "groupPolicyConfiguration") {
-        return `/deviceManagement/groupPolicyConfigurations/${resourceId}`;
-      }
-      if (endpointType === "securityIntent") {
-        return `/deviceManagement/intents/${resourceId}`;
-      }
-      if (endpointType === "driverUpdate") {
-        return `/deviceManagement/windowsDriverUpdateProfiles/${resourceId}`;
-      }
-      return `/deviceManagement/configurationPolicies/${resourceId}`;
-    default:
-      throw new Error(`Unknown category for delete: ${category}`);
-  }
-}
-
-/**
- * Prepare a task for batch DELETE execution
- * Now async to support assignment checking
- */
-async function prepareTaskForDeleteBatch(
-  task: HydrationTask,
-  context: ExecutionContext,
-  requestId: string
-): Promise<DeletePrepareResult> {
-  console.log(`[BatchExecutor:DELETE] Preparing "${task.itemName}" (${task.category})`);
-
-  // Conditional Access policy deletion must validate the disabled state in its sequential executor.
-  if (task.category === "conditionalAccess") {
-    return { type: "sequential" };
-  }
-
-  // Find the resource ID
-  const resource = findResourceIdForDelete(task, context);
-
-  if (!resource) {
-    console.log(`[BatchExecutor:DELETE] ○ Not found: "${task.itemName}"`);
-    return { type: "skip", reason: `Not found in tenant: "${task.itemName}" does not exist`, skipKind: "noOp" };
-  }
-
-  // Check for hydration marker
-  if (!resource.hasMarker) {
-    console.log(`[BatchExecutor:DELETE] ○ No hydration marker: "${task.itemName}"`);
-    return { type: "skip", reason: `Not created by Intune Hydration Kit (missing marker in description)`, skipKind: "blocked" };
-  }
-
-  // Check for active assignments - skip deletion if policy is assigned
-  const assignmentCount = await checkResourceAssignments(
-    context,
-    task.category,
-    resource.id,
-    resource.endpointType
-  );
-  if (assignmentCount === null) {
-    return { type: "skip", reason: "Could not verify active assignments - deletion skipped", skipKind: "blocked" };
-  }
-  if (assignmentCount > 0) {
-    console.log(`[BatchExecutor:DELETE] ○ Has assignments: "${task.itemName}" (${assignmentCount} assignment(s))`);
-    return { type: "skip", reason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting`, skipKind: "blocked" };
-  }
-
-  // Determine API version
-  const apiVersion: ApiVersion = task.category === "groups" ? "v1.0" : "beta";
-
-  // Build DELETE request (pass endpointType for baseline/cisBaseline to use correct URL)
-  const endpoint = getDeleteEndpoint(task.category, resource.id, resource.endpointType);
-
-  console.log(`[BatchExecutor:DELETE] ✓ Will delete: "${task.itemName}" -> ${endpoint}`);
-
-  return {
-    type: "batch",
-    data: {
-      task,
-      apiVersion,
-      request: {
-        id: requestId,
-        method: "DELETE",
-        url: endpoint,
-        headers: {},
-      },
-    },
-  };
-}
-
-/**
- * Execute DELETE tasks in batches
- */
-export async function executeDeleteTasksInBatches(
-  tasks: HydrationTask[],
-  context: ExecutionContext
-): Promise<ExecutionResult[]> {
-  const config = getBatchConfig();
-  const results: ExecutionResult[] = [];
-  const batchableTasks: PreparedBatchTask[] = [];
-  const nonBatchableTasks: HydrationTask[] = [];
-  const skippedTasks: { task: HydrationTask; reason: string; skipKind: "noOp" | "blocked" }[] = [];
-
-  console.log(`[BatchExecutor:DELETE] Preparing ${tasks.length} tasks for batch deletion (batch size: ${config.defaultBatchSize})`);
-
-  // Separate tasks into: batchable, skipped, or needs sequential
-  // Assignment checks are async, so we await each prepare
-  for (let i = 0; i < tasks.length; i++) {
-    if ((await waitWhilePaused(context)) === "cancelled") {
-      markPendingTasksCancelled(tasks, results, context);
-      return results;
-    }
-    const task = tasks[i];
-    const prepared = await prepareTaskForDeleteBatch(task, context, `del-${i}`);
-
-    switch (prepared.type) {
-      case "batch":
-        batchableTasks.push(prepared.data);
-        break;
-      case "skip":
-        skippedTasks.push({ task, reason: prepared.reason, skipKind: prepared.skipKind });
-        break;
-      case "sequential":
-        nonBatchableTasks.push(task);
-        break;
-    }
-  }
-
-  // Immediately add skipped tasks to results
-  const skipTime = new Date();
-  for (const { task, reason, skipKind } of skippedTasks) {
-    markTaskSkipped(task, skipKind, reason); // Set skip reason on task object for UI display
-    task.startTime = skipTime;
-    task.endTime = skipTime;
-    results.push({ task, success: false, skipped: true, skipKind, error: reason });
-    context.onTaskComplete?.(task);
-  }
-
-  console.log(`[BatchExecutor:DELETE] Summary: ${batchableTasks.length} to delete, ${skippedTasks.length} skipped, ${nonBatchableTasks.length} sequential`);
-
-  // Group by API version
-  const v1Tasks = batchableTasks.filter((t) => t.apiVersion === "v1.0");
-  const betaTasks = batchableTasks.filter((t) => t.apiVersion === "beta");
-
-  // Execute v1.0 deletes
-  if (v1Tasks.length > 0) {
-    console.log(`[BatchExecutor:DELETE] Executing ${v1Tasks.length} v1.0 deletions`);
-    const v1Results = await executeDeleteBatchGroup(v1Tasks, context, "v1.0");
-    results.push(...v1Results);
-  }
-
-  // Execute beta deletes
-  if (betaTasks.length > 0) {
-    console.log(`[BatchExecutor:DELETE] Executing ${betaTasks.length} beta deletions`);
-    const betaResults = await executeDeleteBatchGroup(betaTasks, context, "beta");
-    results.push(...betaResults);
-  }
-
-  // Mark non-batchable for sequential execution
-  for (const task of nonBatchableTasks) {
-    results.push({
-      task,
-      success: false,
-      skipped: false,
-      error: "NEEDS_SEQUENTIAL_EXECUTION",
-    });
-  }
-
-  return results;
-}
-
-/**
- * Execute a group of DELETE tasks with the same API version
- */
-async function executeDeleteBatchGroup(
-  preparedTasks: PreparedBatchTask[],
-  context: ExecutionContext,
-  version: ApiVersion
-): Promise<ExecutionResult[]> {
-  const config = getBatchConfig();
-  const results: ExecutionResult[] = [];
-  const chunks = chunkArray(preparedTasks, config.defaultBatchSize);
-  const maxRetries = 3;
-
-  console.log(`[BatchExecutor:DELETE] Processing ${chunks.length} batch(es) of ${version} deletions`);
-
-  for (let i = 0; i < chunks.length; i++) {
-    const chunk = chunks[i];
-
-    // Check for cancellation
-    if (context.shouldCancel?.()) {
-      console.log(`[BatchExecutor:DELETE] Execution cancelled`);
-      markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
-      break;
-    }
-
-    // Handle pause
-    const pauseResult = await waitWhilePaused(context);
-    if (pauseResult === "cancelled") {
-      console.log(`[BatchExecutor:DELETE] Execution cancelled while paused`);
-      markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
-      break;
-    }
-
-    // Report batch progress to UI
-    const batchProgress: BatchProgress = {
-      isActive: true,
-      currentBatch: i + 1,
-      totalBatches: chunks.length,
-      itemsInBatch: chunk.length,
-      apiVersion: version,
-      batchStartTime: new Date(),
-    };
-    context.onBatchProgress?.(batchProgress);
-
-    // Notify task start
-    for (const { task } of chunk) {
-      task.status = "running";
-      task.startTime = new Date();
-      context.onTaskStart?.(task);
-    }
-
-    console.log(`[BatchExecutor:DELETE] Executing batch ${i + 1}/${chunks.length} with ${chunk.length} deletions`);
-
-    // Retry logic for entire batch
-    let retryCount = 0;
-    let batchSuccess = false;
-
-    while (!batchSuccess && retryCount < maxRetries) {
-      try {
-        // Preview mode: simulate successful deletions without making API calls
-        if (context.isPreview) {
-          for (const { task } of chunk) {
-            task.status = "success";
-            task.endTime = new Date();
-            results.push({ task, success: true, skipped: false });
-            context.onTaskComplete?.(task);
-          }
-          batchSuccess = true;
-          continue;
-        }
-
-        const batchResult = await context.client.batch(
-          chunk.map((t) => t.request),
-          version
-        );
-
-        // Process responses
-        const responseMap = new Map<string, BatchResponse>();
-        for (const response of batchResult.responses) {
-          responseMap.set(response.id, response);
-        }
-
-        for (const { task, request } of chunk) {
-          const response = responseMap.get(request.id);
-
-          if (!response) {
-            task.status = "failed";
-            task.error = "No response received";
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: false, error: "No response received" });
-            context.onTaskError?.(task, new Error("No response received"));
-            continue;
-          }
-
-          // 204 No Content = success for DELETE, also accept 200-299
-          if (response.status >= 200 && response.status < 300) {
-            task.status = "success";
-            task.endTime = new Date();
-            results.push({ task, success: true, skipped: false });
-            context.onTaskComplete?.(task);
-
-            // Update cache - remove deleted item
-            updateCacheAfterDelete(task, context);
-          } else if (response.status === 404) {
-            // Already deleted
-            markTaskSkipped(task, "noOp", "Already deleted"); // Set skip reason on task object for UI display
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: true, skipKind: "noOp", error: "Already deleted" });
-            context.onTaskComplete?.(task);
-          } else if (response.status === 504 && task.category === "compliance") {
-            // Special handling for compliance policies with 504 timeout
-            // The Graph API often returns 504 but the policy was actually deleted
-            // Trust the operation - with duplicates, name-based verification doesn't work
-            // (deleting one policy still leaves another with the same name)
-            console.log(`[BatchExecutor:DELETE] Got 504 for "${task.itemName}" - trusting delete succeeded (duplicates may exist)`);
-            task.status = "success";
-            task.endTime = new Date();
-            results.push({ task, success: true, skipped: false });
-            context.onTaskComplete?.(task);
-
-            // Update cache - remove one instance of this policy
-            updateCacheAfterDelete(task, context);
-          } else {
-            const error = extractBatchError(response);
-            task.status = "failed";
-            task.error = error.message;
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: false, error: error.message });
-            context.onTaskError?.(task, new Error(error.message));
-          }
-        }
-
-        batchSuccess = true;
-      } catch (error) {
-        retryCount++;
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[BatchExecutor:DELETE] Batch ${i + 1} failed (attempt ${retryCount}/${maxRetries}):`, errorMessage);
-
-        if (retryCount < maxRetries) {
-          const retryDelay = Math.pow(2, retryCount) * 1000; // Exponential backoff
-          console.log(`[BatchExecutor:DELETE] Retrying in ${retryDelay}ms...`);
-          const waitResult = await sleepWithExecutionControl(retryDelay, context);
-          if (waitResult === "cancelled") {
-            console.log(`[BatchExecutor:DELETE] Execution cancelled during retry delay`);
-            markPreparedTasksCancelled(chunks.slice(i).flat(), results, context);
-            batchSuccess = true;
-          }
-        } else {
-          // Max retries reached, mark all as failed
-          for (const { task } of chunk) {
-            task.status = "failed";
-            task.error = errorMessage;
-            task.endTime = new Date();
-            results.push({ task, success: false, skipped: false, error: errorMessage });
-            context.onTaskError?.(task, error instanceof Error ? error : new Error(errorMessage));
-          }
-        }
-      }
-    }
-
-    if (context.shouldCancel?.()) {
-      markPreparedTasksCancelled(chunks.slice(i + 1).flat(), results, context);
-      break;
-    }
-
-    // Delay between batches
-    if (i < chunks.length - 1) {
-      console.log(`[BatchExecutor:DELETE] Waiting ${config.delayBetweenBatches}ms before next batch`);
-      const waitResult = await sleepWithExecutionControl(config.delayBetweenBatches, context);
-      if (waitResult === "cancelled") {
-        console.log(`[BatchExecutor:DELETE] Execution cancelled during inter-batch delay`);
-        markPreparedTasksCancelled(chunks.slice(i + 1).flat(), results, context);
-        break;
-      }
-    }
-  }
-
-  return results;
-}
-
-/**
- * Update context caches after successful deletion
- */
-function updateCacheAfterDelete(task: HydrationTask, context: ExecutionContext): void {
-  const nameToRemove = task.itemName.toLowerCase();
-
-  switch (task.category) {
-    case "groups":
-      if (context.cachedIntuneGroups) {
-        const index = context.cachedIntuneGroups.findIndex(
-          (g) => g.displayName.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedIntuneGroups.splice(index, 1);
-        }
-      }
-      break;
-
-    case "filters":
-      if (context.cachedFilters) {
-        const index = context.cachedFilters.findIndex(
-          (f) => f.displayName.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedFilters.splice(index, 1);
-        }
-      }
-      break;
-
-    case "baseline":
-    case "cisBaseline":
-      // Try Settings Catalog first
-      if (context.cachedSettingsCatalogPolicies) {
-        const index = context.cachedSettingsCatalogPolicies.findIndex(
-          (p) => p.name.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedSettingsCatalogPolicies.splice(index, 1);
-          break;
-        }
-      }
-      // If not found in Settings Catalog, try V2 Compliance
-      if (context.cachedV2CompliancePolicies) {
-        const index = context.cachedV2CompliancePolicies.findIndex(
-          (p) => p.name.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedV2CompliancePolicies.splice(index, 1);
-          break;
-        }
-      }
-      // If not found in V2 Compliance, try V1 Compliance
-      if (context.cachedCompliancePolicies) {
-        const index = context.cachedCompliancePolicies.findIndex(
-          (p) => p.displayName?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedCompliancePolicies.splice(index, 1);
-          break;
-        }
-      }
-      // If not found in V1 Compliance, try Device Configurations
-      if (context.cachedDeviceConfigurations) {
-        const index = context.cachedDeviceConfigurations.findIndex(
-          (p) => p.displayName?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedDeviceConfigurations.splice(index, 1);
-          break;
-        }
-      }
-      // If not found in Device Configurations, try Driver Update Profiles
-      if (context.cachedDriverUpdateProfiles) {
-        const index = context.cachedDriverUpdateProfiles.findIndex(
-          (p) => p.displayName?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedDriverUpdateProfiles.splice(index, 1);
-          break;
-        }
-      }
-      if (context.cachedGroupPolicyConfigurations) {
-        const index = context.cachedGroupPolicyConfigurations.findIndex(
-          (p) => p.displayName?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedGroupPolicyConfigurations.splice(index, 1);
-          break;
-        }
-      }
-      if (context.cachedSecurityIntents) {
-        const index = context.cachedSecurityIntents.findIndex(
-          (p) => p.displayName?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedSecurityIntents.splice(index, 1);
-          break;
-        }
-      }
-      if (context.cachedAppProtectionPolicies) {
-        const index = context.cachedAppProtectionPolicies.findIndex(
-          (p) => p.displayName?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedAppProtectionPolicies.splice(index, 1);
-        }
-      }
-      break;
-
-    case "compliance":
-      if (context.cachedCompliancePolicies) {
-        const index = context.cachedCompliancePolicies.findIndex(
-          (c) => c.displayName?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedCompliancePolicies.splice(index, 1);
-        }
-      }
-      if (context.cachedV2CompliancePolicies) {
-        const index = context.cachedV2CompliancePolicies.findIndex(
-          (c) => c.name?.toLowerCase() === nameToRemove
-        );
-        if (index !== -1) {
-          context.cachedV2CompliancePolicies.splice(index, 1);
-        }
-      }
-      break;
-
-    case "conditionalAccess":
-      if (context.cachedConditionalAccessPolicies) {
-        const index = context.cachedConditionalAccessPolicies.findIndex(
-          (c) => c.displayName?.toLowerCase() === nameToRemove ||
-                 c.displayName?.toLowerCase() === `${nameToRemove} [intune hydration kit]` ||
-                 c.displayName?.toLowerCase() === `${nameToRemove} [imported by intune hydration kit]`
-        );
-        if (index !== -1) {
-          context.cachedConditionalAccessPolicies.splice(index, 1);
-        }
-      }
-      break;
-  }
-}
-
 // ============================================================================
 // FAST PARALLEL DELETE OPERATIONS (NukeTune-style)
 // ============================================================================
@@ -2202,6 +1377,9 @@ const FAST_DELETE_CONFIG = {
  * Execute DELETE tasks in parallel for maximum speed
  * Uses Promise.all() to send multiple requests concurrently
  * Based on NukeTune's proven fast deletion pattern
+ *
+ * Every task is resolved and checked by resolveDeleteTarget, the same function that
+ * the sequential executors use, so both paths give the same outcome for a task.
  */
 export async function executeDeletesInParallel(
   tasks: HydrationTask[],
@@ -2213,21 +1391,9 @@ export async function executeDeletesInParallel(
   console.log(`[FastDelete] Starting parallel deletion of ${tasks.length} tasks (${parallelRequests} concurrent)`);
   emitStatus(context, `Preparing ${tasks.length} items for deletion...`, "progress", "delete");
 
-  // Prepare all tasks first
-  type PreparedDeleteTask =
-    | {
-        task: HydrationTask;
-        deleteUrl: string;
-        apiVersion: "v1.0" | "beta";
-      }
-    | {
-        task: HydrationTask;
-        deleteUrl: null;
-        apiVersion: "v1.0" | "beta";
-        skipReason: string;
-        skipKind: "noOp" | "blocked";
-      };
-  const preparedTasks: PreparedDeleteTask[] = [];
+  // Resolve and check all tasks first
+  const toDelete: Array<{ task: HydrationTask; target: DeleteTarget }> = [];
+  const notDeleted: ExecutionResult[] = [];
 
   let checkedCount = 0;
   for (const task of tasks) {
@@ -2241,101 +1407,48 @@ export async function executeDeletesInParallel(
       emitStatus(context, `Checking assignments: ${checkedCount}/${tasks.length} items...`, "progress", "delete");
     }
 
-    const resourceInfo = findResourceIdForDelete(task, context);
-
-    if (!resourceInfo) {
-      preparedTasks.push({
-        task,
-        deleteUrl: null,
-        apiVersion: "beta",
-        skipReason: "Resource not found in tenant",
-        skipKind: "noOp",
-      });
-      continue;
-    }
-
-    if (!resourceInfo.hasMarker) {
-      preparedTasks.push({
-        task,
-        deleteUrl: null,
-        apiVersion: "beta",
-        skipReason: "Missing hydration marker - not created by this tool",
-        skipKind: "blocked",
-      });
-      continue;
-    }
-
     if (task.category === "conditionalAccess") {
-      preparedTasks.push({
+      // Conditional Access deletion must read the policy state again on the sequential path.
+      notDeleted.push({
         task,
-        deleteUrl: null,
-        apiVersion: "beta",
-        skipReason: "Conditional Access deletion must use the sequential safety check",
+        success: false,
+        skipped: true,
         skipKind: "blocked",
+        error: "Conditional Access deletion must use the sequential safety check",
       });
       continue;
     }
 
-    // Check for active assignments - skip deletion if policy is assigned
-    const assignmentCount = await checkResourceAssignments(
-      context,
-      task.category,
-      resourceInfo.id,
-      resourceInfo.endpointType
-    );
+    const resolution = await resolveDeleteTarget(task, context);
     if (context.shouldCancel?.()) {
       markPendingTasksCancelled(tasks, results, context);
       return results;
     }
-    if (assignmentCount === null) {
-      preparedTasks.push({
-        task,
-        deleteUrl: null,
-        apiVersion: "beta",
-        skipReason: "Could not verify active assignments - deletion skipped",
-        skipKind: "blocked",
-      });
-      continue;
+    if (resolution.action === "delete") {
+      toDelete.push({ task, target: resolution.target });
+    } else {
+      notDeleted.push(deleteResolutionResult(task, resolution, context.isPreview));
     }
-    if (assignmentCount > 0) {
-      preparedTasks.push({
-        task,
-        deleteUrl: null,
-        apiVersion: "beta",
-        skipReason: `Policy has ${assignmentCount} active assignment(s) - remove assignments before deleting`,
-        skipKind: "blocked",
-      });
-      continue;
-    }
-
-    // Build delete URL based on category and endpoint type
-    const deleteUrl = buildDeleteUrl(task, resourceInfo);
-    // Groups use v1.0 API, everything else uses beta
-    const apiVersion: "v1.0" | "beta" = task.category === "groups" ? "v1.0" : "beta";
-    preparedTasks.push({ task, deleteUrl, apiVersion });
   }
 
-  // Count by type
-  const toDelete = preparedTasks.filter(
-    (item): item is Extract<PreparedDeleteTask, { deleteUrl: string }> =>
-      item.deleteUrl !== null
-  );
-  const toSkip = preparedTasks.filter(
-    (item): item is Extract<PreparedDeleteTask, { deleteUrl: null }> =>
-      item.deleteUrl === null
-  );
+  console.log(`[FastDelete] ${toDelete.length} to delete, ${notDeleted.length} not deleted`);
+  emitStatus(context, `Deleting ${toDelete.length} items (${notDeleted.length} not deleted)...`, "info", "delete");
 
-  console.log(`[FastDelete] ${toDelete.length} to delete, ${toSkip.length} to skip`);
-  emitStatus(context, `Deleting ${toDelete.length} items (${toSkip.length} skipped)...`, "info", "delete");
-
-  // Process skipped tasks immediately
-  const skipTime = new Date();
-  for (const { task, skipReason, skipKind } of toSkip) {
-    markTaskSkipped(task, skipKind, skipReason);
-    task.startTime = skipTime;
-    task.endTime = skipTime;
-    results.push({ task, success: false, skipped: true, skipKind, error: skipReason });
-    context.onTaskComplete?.(task);
+  // Record skipped tasks and failed safety checks immediately
+  const checkTime = new Date();
+  for (const result of notDeleted) {
+    const { task } = result;
+    task.startTime = checkTime;
+    task.endTime = checkTime;
+    if (result.skipped) {
+      markTaskSkipped(task, result.skipKind, result.error);
+      context.onTaskComplete?.(task);
+    } else {
+      task.status = "failed";
+      task.error = result.error;
+      context.onTaskError?.(task, new Error(result.error));
+    }
+    results.push(result);
   }
 
   // Process deletions in parallel batches
@@ -2362,79 +1475,34 @@ export async function executeDeletesInParallel(
 
     // Execute all deletes in this batch concurrently with retry logic
     const batchResults = await Promise.all(
-      batch.map(async ({ task, deleteUrl, apiVersion }): Promise<ExecutionResult> => {
+      batch.map(async ({ task, target }): Promise<ExecutionResult> => {
         task.status = "running";
         task.startTime = new Date();
         context.onTaskStart?.(task);
 
-        // Retry logic for transient 400 errors
-        const maxRetries = 3;
-        let lastError: string | undefined;
+        // Preview mode: the checks passed, so the object would be deleted. No API call.
+        const outcome = context.isPreview
+          ? ({ status: "deleted" } as const)
+          : await sendDeleteRequest(task, target, context);
 
-        for (let attempt = 0; attempt < maxRetries; attempt++) {
-          try {
-            // Preview mode: skip actual API call and cache updates
-            if (!context.isPreview) {
-              await context.client.delete(deleteUrl, apiVersion);
-              updateCacheAfterDelete(task, context);
-            }
-
+        switch (outcome.status) {
+          case "deleted":
             task.status = "success";
             task.endTime = new Date();
             context.onTaskComplete?.(task);
-
             return { task, success: true, skipped: false };
-          } catch (error) {
-            lastError = error instanceof Error ? error.message : String(error);
-
-            // Check if it's a ResourceNotFound error - this means success (resource is gone)
-            const isResourceNotFound = lastError.toLowerCase().includes("resourcenotfound");
-            if (isResourceNotFound) {
-              console.log(`[FastDelete] "${task.itemName}" - ResourceNotFound, treating as success`);
-              task.status = "success";
-              task.endTime = new Date();
-              updateCacheAfterDelete(task, context);
-              context.onTaskComplete?.(task);
-              return { task, success: true, skipped: false };
-            }
-
-            // Check if it's a 429 (throttled) or 400 error (transient backend issue) but NOT ResourceNotFound.
-            // Match only the bracketed status marker - a bare "400" would match any
-            // error message containing "400" (IDs, counts) and retry non-transient failures.
-            const is429Error = /\[429\]|TooManyRequests/.test(lastError);
-            const is400Error = /\[400\]/.test(lastError);
-            const isRetryable = (is429Error || is400Error) && attempt < maxRetries - 1;
-
-            if (isRetryable) {
-              const retryDelay = is429Error
-                ? (attempt + 1) * 3000  // 3s, 6s, 9s for throttling
-                : (attempt + 1) * 500;  // 500ms, 1000ms, 1500ms for transient
-              console.log(`[FastDelete] Retry ${attempt + 1}/${maxRetries} for "${task.itemName}" in ${retryDelay}ms (${is429Error ? "throttled" : "transient"})`);
-              const waitResult = await sleepWithExecutionControl(retryDelay, context);
-              if (waitResult === "cancelled") {
-                markTaskSkipped(task, "cancelled", "Cancelled");
-                task.endTime = new Date();
-                context.onTaskComplete?.(task);
-                return { task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled" };
-              }
-              continue;
-            }
-
-            // Final failure
-            task.status = "failed";
-            task.error = lastError;
+          case "cancelled":
+            markTaskSkipped(task, "cancelled", "Cancelled");
             task.endTime = new Date();
-            context.onTaskError?.(task, error instanceof Error ? error : new Error(lastError));
-
-            return { task, success: false, skipped: false, error: lastError };
-          }
+            context.onTaskComplete?.(task);
+            return { task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled" };
+          case "failed":
+            task.status = "failed";
+            task.error = outcome.error.message;
+            task.endTime = new Date();
+            context.onTaskError?.(task, outcome.error);
+            return { task, success: false, skipped: false, error: outcome.error.message };
         }
-
-        // Shouldn't reach here, but handle just in case
-        task.status = "failed";
-        task.error = lastError || "Unknown error after retries";
-        task.endTime = new Date();
-        return { task, success: false, skipped: false, error: task.error };
       })
     );
 
@@ -2483,66 +1551,4 @@ export async function executeDeletesInParallel(
   );
 
   return results;
-}
-
-/**
- * Build the delete URL for a task
- */
-function buildDeleteUrl(
-  task: HydrationTask,
-  resourceInfo: { id: string; endpointType?: string }
-): string {
-  switch (task.category) {
-    case "groups":
-      return `/groups/${resourceInfo.id}`;
-
-    case "filters":
-      return `/deviceManagement/assignmentFilters/${resourceInfo.id}`;
-
-    case "compliance":
-      return resourceInfo.endpointType === "v2Compliance"
-        ? `/deviceManagement/compliancePolicies/${resourceInfo.id}`
-        : `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
-
-    case "conditionalAccess":
-      return `/identity/conditionalAccess/policies/${resourceInfo.id}`;
-
-    case "appProtection":
-      // App protection policies have different endpoints based on platform
-      // This is handled separately in sequential execution
-      return `/deviceAppManagement/managedAppPolicies/${resourceInfo.id}`;
-
-    case "enrollment":
-      return `/deviceManagement/windowsAutopilotDeploymentProfiles/${resourceInfo.id}`;
-
-    case "baseline":
-    case "cisBaseline":
-      // Use the endpoint type to determine the correct URL
-      switch (resourceInfo.endpointType) {
-        case "settingsCatalog":
-          return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;
-        case "v2Compliance":
-          return `/deviceManagement/compliancePolicies/${resourceInfo.id}`;
-        case "v1Compliance":
-          return `/deviceManagement/deviceCompliancePolicies/${resourceInfo.id}`;
-        case "deviceConfiguration":
-          return `/deviceManagement/deviceConfigurations/${resourceInfo.id}`;
-        case "groupPolicyConfiguration":
-          return `/deviceManagement/groupPolicyConfigurations/${resourceInfo.id}`;
-        case "securityIntent":
-          return `/deviceManagement/intents/${resourceInfo.id}`;
-        case "driverUpdate":
-          return `/deviceManagement/windowsDriverUpdateProfiles/${resourceInfo.id}`;
-        case "appProtection_ios":
-          return `/deviceAppManagement/iosManagedAppProtections/${resourceInfo.id}`;
-        case "appProtection_android":
-          return `/deviceAppManagement/androidManagedAppProtections/${resourceInfo.id}`;
-        default:
-          // Default to Settings Catalog
-          return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;
-      }
-
-    default:
-      return `/deviceManagement/configurationPolicies/${resourceInfo.id}`;
-  }
 }

@@ -67,8 +67,8 @@ export interface ExecutionContext {
   cachedV2CompliancePolicies?: Array<{ id: string; name: string; description?: string }>;
   // Cached compliance policies for delete operations (legacy V1 compliance)
   cachedCompliancePolicies?: Array<{ id: string; displayName?: string; description?: string }>;
-  // Cached conditional access policies for delete operations
-  cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; description?: string }>;
+  // Cached conditional access policies. Delete reads the state again before it deletes a policy.
+  cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; state?: string }>;
   // Cached device configurations for delete operations (Health Monitoring, etc.)
   cachedDeviceConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached group policy configurations for delete operations (Administrative Templates / ADMX)

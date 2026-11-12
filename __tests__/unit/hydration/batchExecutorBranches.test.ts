@@ -49,7 +49,6 @@ vi.mock("@/lib/hydration/utils", async () => {
 });
 
 import {
-  executeDeleteTasksInBatches,
   executeDeletesInParallel,
   executeTasksInBatches,
 } from "@/lib/hydration/batchExecutor";
@@ -286,140 +285,6 @@ describe("batchExecutor branch coverage", () => {
     expect(onTaskComplete).toHaveBeenCalledTimes(2);
   });
 
-  it("trusts 504 compliance deletes and keeps unmatched delete responses as failures", async () => {
-    const deletedTask = createTask("delete-504", "compliance", "delete", "[IHD] Compliance One");
-    const failedTask = createTask("delete-missing", "compliance", "delete", "[IHD] Compliance Two");
-    const onTaskComplete = vi.fn();
-    const onTaskError = vi.fn();
-
-    const context: ExecutionContext = {
-      client: {
-        get: vi.fn().mockResolvedValue({ value: [] }),
-        post: vi.fn(),
-        delete: vi.fn(),
-        patch: vi.fn(),
-        getCollection: vi.fn(),
-        batch: vi.fn().mockResolvedValue({
-          responses: [
-            {
-              id: "del-0",
-              status: 504,
-              headers: {},
-              body: { error: { message: "Gateway Timeout" } },
-            },
-          ],
-        }),
-      } as unknown as ExecutionContext["client"],
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedCompliancePolicies: [
-        {
-          id: "compliance-1",
-          displayName: "[IHD] Compliance One",
-          description: "Imported by Intune Hydration Kit",
-        },
-        {
-          id: "compliance-2",
-          displayName: "[IHD] Compliance Two",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-      onTaskComplete,
-      onTaskError,
-    };
-
-    const results = await executeDeleteTasksInBatches([deletedTask, failedTask], context);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        task: deletedTask,
-        success: true,
-        skipped: false,
-      }),
-      expect.objectContaining({
-        task: failedTask,
-        success: false,
-        skipped: false,
-        error: "No response received",
-      }),
-    ]);
-    expect(context.cachedCompliancePolicies).toEqual([
-      expect.objectContaining({
-        id: "compliance-2",
-        displayName: "[IHD] Compliance Two",
-      }),
-    ]);
-    expect(onTaskComplete).toHaveBeenCalledWith(deletedTask);
-    expect(onTaskError).toHaveBeenCalledWith(failedTask, expect.any(Error));
-  });
-
-  it("marks delete tasks as cancelled when retry delay is cancelled after a batch failure", async () => {
-    mockGetBatchConfig.mockReturnValue({
-      ...defaultBatchConfig,
-      defaultBatchSize: 2,
-    });
-    mockSleepWithExecutionControl.mockResolvedValueOnce("cancelled");
-
-    const firstTask = createTask("delete-cancel-1", "groups", "delete", "[IHD] Group Delete One");
-    const secondTask = createTask("delete-cancel-2", "groups", "delete", "[IHD] Group Delete Two");
-
-    const context: ExecutionContext = {
-      client: {
-        get: vi.fn(),
-        post: vi.fn(),
-        delete: vi.fn(),
-        patch: vi.fn(),
-        getCollection: vi.fn(),
-        batch: vi.fn().mockRejectedValue(new Error("Network failure")),
-      } as unknown as ExecutionContext["client"],
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedIntuneGroups: [
-        {
-          id: "group-delete-1",
-          "@odata.type": "#microsoft.graph.group",
-          displayName: "[IHD] Group Delete One",
-          description: "Imported by Intune Hydration Kit",
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: "groupdeleteone",
-          securityEnabled: true,
-        },
-        {
-          id: "group-delete-2",
-          "@odata.type": "#microsoft.graph.group",
-          displayName: "[IHD] Group Delete Two",
-          description: "Imported by Intune Hydration Kit",
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: "groupdeletetwo",
-          securityEnabled: true,
-        },
-      ],
-    };
-
-    const results = await executeDeleteTasksInBatches([firstTask, secondTask], context);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        task: firstTask,
-        success: false,
-        skipped: true,
-        error: "Cancelled",
-      }),
-      expect.objectContaining({
-        task: secondTask,
-        success: false,
-        skipped: true,
-        error: "Cancelled",
-      }),
-    ]);
-    expect(firstTask.status).toBe("skipped");
-    expect(secondTask.status).toBe("skipped");
-  });
-
   it("skips conditional access without a license and routes unsupported baseline creates to sequential execution", async () => {
     const conditionalAccessTask = createTask(
       "ca-no-license",
@@ -476,125 +341,6 @@ describe("batchExecutor branch coverage", () => {
       }),
     ]);
     expect(context.client.batch).not.toHaveBeenCalled();
-  });
-
-  it("marks remaining delete tasks cancelled during inter-batch delay after a successful batch", async () => {
-    mockGetBatchConfig.mockReturnValue({
-      ...defaultBatchConfig,
-      defaultBatchSize: 1,
-    });
-    mockSleepWithExecutionControl.mockResolvedValueOnce("cancelled");
-
-    const firstTask = createTask("delete-success-1", "groups", "delete", "[IHD] Delay Group One");
-    const secondTask = createTask("delete-success-2", "groups", "delete", "[IHD] Delay Group Two");
-
-    const batch = vi.fn().mockResolvedValue({
-      responses: [{ id: "del-0", status: 204, headers: {} }],
-    });
-
-    const context: ExecutionContext = {
-      client: {
-        get: vi.fn(),
-        post: vi.fn(),
-        delete: vi.fn(),
-        patch: vi.fn(),
-        getCollection: vi.fn(),
-        batch,
-      } as unknown as ExecutionContext["client"],
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedIntuneGroups: [
-        {
-          id: "delay-group-1",
-          "@odata.type": "#microsoft.graph.group",
-          displayName: "[IHD] Delay Group One",
-          description: "Imported by Intune Hydration Kit",
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: "delaygroupone",
-          securityEnabled: true,
-        },
-        {
-          id: "delay-group-2",
-          "@odata.type": "#microsoft.graph.group",
-          displayName: "[IHD] Delay Group Two",
-          description: "Imported by Intune Hydration Kit",
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: "delaygrouptwo",
-          securityEnabled: true,
-        },
-      ],
-    };
-
-    const results = await executeDeleteTasksInBatches([firstTask, secondTask], context);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        task: firstTask,
-        success: true,
-        skipped: false,
-      }),
-      expect.objectContaining({
-        task: secondTask,
-        success: false,
-        skipped: true,
-        error: "Cancelled",
-      }),
-    ]);
-    expect(batch).toHaveBeenCalledTimes(1);
-    expect(context.cachedIntuneGroups).toEqual([
-      expect.objectContaining({
-        id: "delay-group-2",
-        displayName: "[IHD] Delay Group Two",
-      }),
-    ]);
-  });
-
-  it("marks delete tasks cancelled before execution when pause handling returns cancelled", async () => {
-    mockWaitWhilePaused.mockResolvedValueOnce("cancelled");
-
-    const task = createTask("delete-paused-cancel", "groups", "delete", "[IHD] Paused Group");
-    const batch = vi.fn();
-
-    const context: ExecutionContext = {
-      client: {
-        get: vi.fn(),
-        post: vi.fn(),
-        delete: vi.fn(),
-        patch: vi.fn(),
-        getCollection: vi.fn(),
-        batch,
-      } as unknown as ExecutionContext["client"],
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedIntuneGroups: [
-        {
-          id: "paused-group",
-          "@odata.type": "#microsoft.graph.group",
-          displayName: "[IHD] Paused Group",
-          description: "Imported by Intune Hydration Kit",
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: "pausedgroup",
-          securityEnabled: true,
-        },
-      ],
-    };
-
-    const results = await executeDeleteTasksInBatches([task], context);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        task,
-        success: false,
-        skipped: true,
-        error: "Cancelled",
-      }),
-    ]);
-    expect(batch).not.toHaveBeenCalled();
   });
 
   it("creates cached filter tasks while skipping existing filters", async () => {
@@ -821,19 +567,19 @@ describe("batchExecutor branch coverage", () => {
         task: missingTask,
         success: false,
         skipped: true,
-        error: "Resource not found in tenant",
+        error: "Not found in tenant",
       }),
       expect.objectContaining({
         task: noMarkerTask,
         success: false,
         skipped: true,
-        error: "Missing hydration marker - not created by this tool",
+        error: "Not created by Intune Hydration Kit (no marker in the description)",
       }),
       expect.objectContaining({
         task: assignedTask,
         success: false,
         skipped: true,
-        error: "Policy has 1 active assignment(s) - remove assignments before deleting",
+        error: "Policy has 1 active assignment(s). Remove the assignments before you delete it.",
       }),
       expect.objectContaining({
         task: resourceGoneTask,
