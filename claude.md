@@ -395,6 +395,7 @@ interface AppSettings {
 - All app pages use one policy. No third-party script host is allowed except Vercel Analytics.
 - `'unsafe-eval'` is allowed only for the development server. Scripts keep `'unsafe-inline'` because statically generated pages contain inline Next.js bootstrap scripts.
 - `frame-src` allows the MSAL authority for hidden-iframe token renewal. `object-src 'none'`, `base-uri 'self'`, `form-action 'self'`, and `frame-ancestors 'none'` are set.
+- Silent token renewal ends on `/auth/redirect` (`app/auth/redirect/route.ts`), a blank page with no scripts. It is the only path that can be framed, and only by the same origin (`frame-ancestors 'self'`, `X-Frame-Options: SAMEORIGIN`). Its policy is `default-src 'none'`. All other routes send `frame-ancestors 'none'` and `X-Frame-Options: DENY`.
 - The app also sends `Strict-Transport-Security`, `Permissions-Policy`, `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
 
 ## Technical Stack
@@ -439,6 +440,7 @@ The source folders are at the repository root (there is no `src/` folder). Main 
 │   ├── wizard/                    # Four-step wizard (layout sets noindex)
 │   ├── dashboard/                 # Live execution, results, and reports (layout sets noindex)
 │   ├── api/win32-upload/route.ts  # Server relay for Win32 package upload to Azure Blob
+│   ├── auth/redirect/route.ts     # Blank redirect page for MSAL silent token renewal
 │   ├── robots.ts, sitemap.ts, manifest.ts
 ├── components/
 │   ├── auth/                      # MsalProvider.tsx, ProtectedRoute.tsx
@@ -556,7 +558,7 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 
 **Entra ID App Registration** (production):
 1. Create new app registration in Azure Portal
-2. Set redirect URI to production URL
+2. Register two SPA redirect URIs for each origin that you use (production, each preview alias, and `http://localhost:3000`): `<origin>` for popup sign-in and sign-out, and `<origin>/auth/redirect` for silent token renewal. Both use the Single-page application platform.
 3. Add all required Graph API delegated permissions
 4. Grant admin consent
 5. Configure token claims if needed

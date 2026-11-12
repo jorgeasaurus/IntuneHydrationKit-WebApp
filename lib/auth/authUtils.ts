@@ -1,5 +1,11 @@
 import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
-import { msalInstance, loginRequest, getAuthorityUrl, initializeMsal } from "./msalConfig";
+import {
+  msalInstance,
+  loginRequest,
+  getAuthorityUrl,
+  initializeMsal,
+  silentRedirectUri,
+} from "./msalConfig";
 import { markLeavingForSignOut, notifySignOut } from "./sessionEvents";
 import { clearHydrationSession } from "@/lib/hydration/executionRecord";
 import { resetExecutionSession } from "@/lib/hydration/executionStateStore";
@@ -48,6 +54,7 @@ export async function getAccessToken(): Promise<string> {
       ...loginRequest,
       account,
       authority,
+      redirectUri: silentRedirectUri,
     });
     return response.accessToken;
   } catch (error) {
