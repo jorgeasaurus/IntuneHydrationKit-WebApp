@@ -145,16 +145,17 @@ test.describe("Protected Routes", () => {
     page,
   }) => {
     await page.goto("/wizard");
-    await page.waitForURL("/");
-    expect(page.url()).toMatch(/\/$/);
+    // ProtectedRoute sends signed-out visitors to the landing page with a marker.
+    await page.waitForURL("/?signin=required");
+    expect(new URL(page.url()).pathname).toBe("/");
   });
 
   test("dashboard redirects to landing when unauthenticated", async ({
     page,
   }) => {
     await page.goto("/dashboard");
-    await page.waitForURL("/");
-    expect(page.url()).toMatch(/\/$/);
+    await page.waitForURL("/?signin=required");
+    expect(new URL(page.url()).pathname).toBe("/");
   });
 
 });
