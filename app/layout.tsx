@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { DM_Sans, JetBrains_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import "./landing.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
@@ -12,20 +12,25 @@ import { SITE_URL } from "@/lib/siteUrl";
 import { Analytics } from "@vercel/analytics/next";
 import { ExecutionRouteGuard } from "@/components/dashboard/ExecutionRouteGuard";
 
+// Fonts are self-hosted (latin subset, variable weight) so the build does not
+// fetch from Google Fonts. The files and their OFL licences are in app/fonts.
+
 // DM Sans - Geometric, bold display font
-const dmSans = DM_Sans({
-  subsets: ["latin"],
+const dmSans = localFont({
+  src: "./fonts/dm-sans-latin-wght-normal.woff2",
   variable: "--font-dm-sans",
   display: "swap",
-  weight: ["400", "500", "600", "700", "800", "900"],
+  weight: "100 1000",
+  style: "normal",
 });
 
 // JetBrains Mono - Technical, precise monospace for data displays
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ["latin"],
+const jetbrainsMono = localFont({
+  src: "./fonts/jetbrains-mono-latin-wght-normal.woff2",
   variable: "--font-jetbrains-mono",
   display: "swap",
-  weight: ["400", "500", "600", "700"],
+  weight: "100 800",
+  style: "normal",
 });
 
 export const metadata: Metadata = {

@@ -46,6 +46,74 @@ function formatDuration(ms: number): string {
   }
 }
 
+interface PauseTracking {
+  /** Total paused time of closed pause intervals. */
+  pausedMs: number;
+  /** Start of the open pause interval, or null when not paused. */
+  pausedAt: number | null;
+}
+
+/**
+ * Elapsed run time without paused intervals. The run state has no pause
+ * timestamps, so this component records them when `isPaused` changes. A pause
+ * that started before this component mounted counts from the mount time.
+ */
+function useActiveElapsedTime(
+  startTime: Date,
+  endTime: Date | null,
+  isPaused: boolean,
+  isCompleted: boolean,
+): number {
+  const [now, setNow] = useState(() => Date.now());
+  const [tracking, setTracking] = useState<PauseTracking>(() => ({
+    pausedMs: 0,
+    pausedAt: isPaused && !isCompleted ? Date.now() : null,
+  }));
+  const pausedNow = isPaused && !isCompleted;
+
+  // Open or close a pause interval when the pause state changes.
+  useEffect(() => {
+    // `now` stops ticking during a pause. Refresh it when the run is active
+    // again so a closed pause is not subtracted from a stale clock.
+    if (!pausedNow && !isCompleted) setNow(Date.now());
+    setTracking((prev) => {
+      if (pausedNow && prev.pausedAt === null) {
+        return { ...prev, pausedAt: Date.now() };
+      }
+      if (!pausedNow && prev.pausedAt !== null) {
+        const closedAt = isCompleted && endTime ? endTime.getTime() : Date.now();
+        return {
+          pausedMs: prev.pausedMs + Math.max(0, closedAt - prev.pausedAt),
+          pausedAt: null,
+        };
+      }
+      return prev;
+    });
+  }, [endTime, isCompleted, pausedNow]);
+
+  // Tick every second while the run is active.
+  useEffect(() => {
+    if (isCompleted || isPaused) return;
+
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [isCompleted, isPaused]);
+
+  const until = isCompleted && endTime
+    ? endTime.getTime()
+    : pausedNow
+      ? (tracking.pausedAt ?? now)
+      : now;
+  // A pause interval can still be open for one render after the run resumes
+  // or completes, before the effect above closes it. Subtract it here too.
+  const openPauseMs =
+    tracking.pausedAt === null ? 0 : Math.max(0, until - tracking.pausedAt);
+  return Math.max(
+    0,
+    until - startTime.getTime() - tracking.pausedMs - openPauseMs,
+  );
+}
+
 export function ExecutionControls({
   tasks,
   isPaused,
@@ -202,18 +270,12 @@ function ExecutionTiming({
   ExecutionControlsProps,
   "tasks" | "isPaused" | "isCompleted" | "startTime" | "endTime"
 >): React.JSX.Element {
-  const [elapsedTime, setElapsedTime] = useState(0);
-
-  // Update elapsed time every second
-  useEffect(() => {
-    if (isCompleted || isPaused) return;
-
-    const interval = setInterval(() => {
-      setElapsedTime(Date.now() - startTime.getTime());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [startTime, isCompleted, isPaused]);
+  const displayedElapsedTime = useActiveElapsedTime(
+    startTime,
+    endTime ?? null,
+    isPaused,
+    isCompleted,
+  );
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(
@@ -221,14 +283,11 @@ function ExecutionTiming({
       t.status === "success" || t.status === "failed" || t.status === "skipped",
   ).length;
 
-  // Calculate estimated time remaining
-  const avgTimePerTask = completedTasks > 0 ? elapsedTime / completedTasks : 0;
+  // Estimate the remaining time from active (not paused) time only.
+  const avgTimePerTask =
+    completedTasks > 0 ? displayedElapsedTime / completedTasks : 0;
   const remainingTasks = totalTasks - completedTasks;
   const estimatedTimeRemaining = avgTimePerTask * remainingTasks;
-  const displayedElapsedTime =
-    isCompleted && endTime
-      ? Math.max(0, endTime.getTime() - startTime.getTime())
-      : elapsedTime;
 
   return (
     <>

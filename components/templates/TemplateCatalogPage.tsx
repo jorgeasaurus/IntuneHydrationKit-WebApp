@@ -224,6 +224,16 @@ function matchesSearch(item: TemplateDocumentationItem, query: string): boolean 
   return haystack.includes(query.toLowerCase());
 }
 
+/** Show the subcategory badge only when it adds a label not already shown. */
+function showSubcategoryBadge(item: TemplateDocumentationItem): boolean {
+  const subcategory = item.subcategory?.toLowerCase();
+  return Boolean(
+    subcategory &&
+      subcategory !== item.itemType.toLowerCase() &&
+      subcategory !== item.platform?.toLowerCase()
+  );
+}
+
 export function TemplateCatalogPage() {
   const [catalog, setCatalog] = useState<TemplateDocumentationCatalog | null>(null);
   const [loading, setLoading] = useState(true);
@@ -285,15 +295,7 @@ export function TemplateCatalogPage() {
       return [];
     }
 
-    return getPlatformFilterOrder(
-      Array.from(
-        new Set(
-          catalog.items
-            .map((item) => item.platform)
-            .filter((platform): platform is string => Boolean(platform))
-        )
-      )
-    );
+    return getPlatformFilterOrder(catalog.items.map((item) => item.platform));
   }, [catalog]);
 
   const filteredItems = useMemo(() => {
@@ -380,8 +382,12 @@ export function TemplateCatalogPage() {
       return;
     }
 
-    await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
-    toast.success("Template JSON copied to clipboard.");
+    try {
+      await navigator.clipboard.writeText(JSON.stringify(payload, null, 2));
+      toast.success("Template JSON copied to clipboard.");
+    } catch {
+      toast.error("Could not copy the template JSON. Select the JSON and copy it manually.");
+    }
   };
 
   const toggleCategory = (category: TaskCategory) => {
@@ -507,6 +513,7 @@ export function TemplateCatalogPage() {
                                   ? ACTIVE_FILTER_BUTTON_CLASSNAME
                                   : undefined
                               }
+                              aria-pressed={activeCategory === "all"}
                               onClick={() => setActiveCategory("all")}
                             >
                               All
@@ -521,6 +528,7 @@ export function TemplateCatalogPage() {
                                     ? ACTIVE_FILTER_BUTTON_CLASSNAME
                                     : undefined
                                 }
+                                aria-pressed={activeCategory === category.id}
                                 onClick={() => {
                                   setActiveCategory(category.id);
                                   setOpenCategories((previous) => {
@@ -549,6 +557,7 @@ export function TemplateCatalogPage() {
                                   ? ACTIVE_FILTER_BUTTON_CLASSNAME
                                   : undefined
                               }
+                              aria-pressed={activePlatform === "all"}
                               onClick={() => setActivePlatform("all")}
                             >
                               All
@@ -563,6 +572,7 @@ export function TemplateCatalogPage() {
                                     ? ACTIVE_FILTER_BUTTON_CLASSNAME
                                     : undefined
                                 }
+                                aria-pressed={activePlatform === platform}
                                 onClick={() => setActivePlatform(platform)}
                               >
                                 {platform}
@@ -638,6 +648,9 @@ export function TemplateCatalogPage() {
                             <button
                               key={category.id}
                               type="button"
+                              aria-label={`Show ${category.label} templates`}
+                              aria-describedby={`template-category-${category.id}-description`}
+                              aria-pressed={activeCategory === category.id}
                               onClick={() => {
                                 setActiveCategory(category.id);
                                 setOpenCategories((previous) => {
@@ -654,7 +667,10 @@ export function TemplateCatalogPage() {
                                 <div className="text-lg font-semibold text-foreground">
                                   {category.label}
                                 </div>
-                                <p className="text-sm leading-6 text-muted-foreground">
+                                <p
+                                  id={`template-category-${category.id}-description`}
+                                  className="text-sm leading-6 text-muted-foreground"
+                                >
                                   {category.description}
                                 </p>
                               </div>
@@ -712,6 +728,7 @@ export function TemplateCatalogPage() {
                                 >
                                   <button
                                     type="button"
+                                    aria-expanded={isOpen}
                                     onClick={() => toggleCategory(category)}
                                     className="w-full border-b border-border/60 bg-black/10 px-6 py-5 text-left"
                                   >
@@ -776,7 +793,7 @@ export function TemplateCatalogPage() {
                                                         {item.platform}
                                                       </span>
                                                     ) : null}
-                                                    {item.subcategory ? (
+                                                    {showSubcategoryBadge(item) ? (
                                                       <span className="rounded-full border border-border/70 bg-background/70 px-2.5 py-1 text-[11px] font-mono uppercase tracking-[0.18em] text-muted-foreground">
                                                         {item.subcategory}
                                                       </span>

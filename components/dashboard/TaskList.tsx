@@ -15,6 +15,8 @@ import { HydrationTask, TaskStatus } from "@/types/hydration";
 import { AlertCircle, Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TaskRow } from "@/components/dashboard/TaskRow";
+import { VirtualTaskList } from "@/components/dashboard/VirtualTaskList";
+import { VIRTUALIZE_THRESHOLD } from "@/components/dashboard/taskWindow";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
 
 interface TaskListProps {
@@ -179,21 +181,34 @@ export function TaskList({ tasks }: TaskListProps) {
           })}
         </div>
 
-        <div className="max-h-[600px] overflow-y-auto pr-1">
-          {filteredTasks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-black/15 py-12 text-center">
-              <AlertCircle className="mb-3 size-7 text-slate-400" />
-              <p className="text-sm font-medium text-slate-200">No tasks match your filters</p>
-              <p className="mt-1 text-xs text-slate-400">Change the search or filter selection.</p>
-            </div>
-          ) : (
+        {filteredTasks.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-white/15 bg-black/15 py-12 text-center">
+            <AlertCircle aria-hidden="true" className="mb-3 size-7 text-slate-400" />
+            <p className="text-sm font-medium text-slate-200">No tasks match your filters</p>
+            <p className="mt-1 text-xs text-slate-400">Change the search or filter selection.</p>
+          </div>
+        ) : filteredTasks.length > VIRTUALIZE_THRESHOLD ? (
+          // The key resets the scroll position when the filters change.
+          <VirtualTaskList
+            key={`${statusFilter}|${categoryFilter}|${deferredSearchTerm}`}
+            tasks={filteredTasks}
+          />
+        ) : (
+          <div
+            role="region"
+            aria-label={`Task list, ${filteredTasks.length} tasks`}
+            tabIndex={0}
+            className="max-h-[600px] overflow-y-auto pr-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
             <ol aria-label="Hydration tasks" className="space-y-2">
               {filteredTasks.map((task) => (
-                <TaskRow key={task.id} task={task} />
+                <li key={task.id}>
+                  <TaskRow task={task} />
+                </li>
               ))}
             </ol>
-          )}
-        </div>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

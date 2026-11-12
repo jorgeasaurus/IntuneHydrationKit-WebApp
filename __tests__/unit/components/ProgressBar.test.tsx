@@ -54,6 +54,25 @@ describe('ProgressBar', () => {
     expect(container.querySelector('[style="width: 75%;"]')).toBeTruthy()
   })
 
+  it('exposes overall and category bars as named progressbars', () => {
+    render(<ProgressBar tasks={mixedTasks} />)
+
+    const overall = screen.getByRole('progressbar', { name: 'Overall progress' })
+    expect(overall).toHaveAttribute('aria-valuenow', '75')
+    expect(overall).toHaveAttribute('aria-valuemin', '0')
+    expect(overall).toHaveAttribute('aria-valuemax', '100')
+    expect(overall).toHaveAttribute('aria-valuetext', '75% (3 of 4 tasks complete)')
+
+    const filters = screen.getByRole('progressbar', { name: 'Device Filters progress' })
+    expect(filters).toHaveAttribute('aria-valuenow', '2')
+    expect(filters).toHaveAttribute('aria-valuemax', '2')
+    expect(filters).toHaveAttribute('aria-valuetext', '2 of 2 complete, 1 failed')
+
+    const groups = screen.getByRole('progressbar', { name: 'Dynamic Groups progress' })
+    expect(groups).toHaveAttribute('aria-valuenow', '1')
+    expect(groups).toHaveAttribute('aria-valuetext', '1 of 2 complete')
+  })
+
   it('hides category breakdown when all tasks belong to one category', () => {
     render(
       <ProgressBar
