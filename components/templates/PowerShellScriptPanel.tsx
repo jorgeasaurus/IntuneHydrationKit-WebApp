@@ -25,6 +25,8 @@ interface PowerShellScriptPanelProps {
   id: string;
   title: string;
   content: string;
+  /** Heading level of the panel title. Use the level that follows the parent heading. */
+  headingLevel?: "h3" | "h4";
 }
 
 function getTokenClassName(types: readonly string[]): string {
@@ -42,6 +44,7 @@ export function PowerShellScriptPanel({
   id,
   title,
   content,
+  headingLevel: Heading = "h4",
 }: PowerShellScriptPanelProps) {
   return (
     <section
@@ -50,7 +53,7 @@ export function PowerShellScriptPanel({
     >
       <div className="flex items-center gap-2 border-b border-white/10 px-4 py-3 text-xs font-mono uppercase tracking-[0.24em] text-slate-300">
         <FileCode2 aria-hidden="true" className="size-3.5" />
-        <h4 id={id}>{title}</h4>
+        <Heading id={id}>{title}</Heading>
       </div>
       <Highlight code={content} language="powershell" prism={Prism}>
         {({ tokens, getTokenProps }) => (
