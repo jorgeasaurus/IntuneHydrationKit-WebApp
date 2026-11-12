@@ -2,8 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { describe, expect, it, vi } from 'vitest'
 
 import { TaskList } from '@/components/dashboard/TaskList'
-import { TASK_ROW_HEIGHT } from '@/components/dashboard/TaskRow'
-import { buildRowOffsets, getRowWindow, WINDOW_OVERSCAN } from '@/components/dashboard/taskWindow'
+import { buildRowOffsets, getRowWindow, getTaskRowHeight, TASK_ROW_HEIGHT, WINDOW_OVERSCAN } from '@/components/dashboard/taskWindow'
 import * as categoryLabels from '@/lib/hydration/categoryLabels'
 import type { HydrationTask } from '@/types/hydration'
 
@@ -96,5 +95,20 @@ describe('TaskList windowing', () => {
     expect(labelSpy.mock.calls.length).toBeLessThanOrEqual(3)
     expect(screen.getByRole('article', { name: 'Group 0: Running' })).toBeInTheDocument()
     labelSpy.mockRestore()
+  })
+
+  it('renders portal links in windowed rows without changing the row height', () => {
+    const tasks = makeTasks(60).map((task) => ({ ...task, status: 'success', error: undefined }) as HydrationTask)
+    const link = {
+      href: 'https://intune.microsoft.com/#view/Microsoft_Intune_DeviceSettings/DevicesMenu/~/assignmentFilters',
+      label: 'Open Assignment filters in Intune',
+      accessibleName: 'Open Assignment filters in Intune (list that contains Group 0)',
+      target: 'list' as const,
+    }
+    render(<TaskList tasks={tasks} portalLinks={new Map([['task-0', link]])} />)
+
+    expect(screen.getByRole('link', { name: link.accessibleName })).toHaveAttribute('href', link.href)
+    expect(getTaskRowHeight(tasks[0])).toBe(TASK_ROW_HEIGHT)
+    expect(screen.getByText('Group 0').closest('li')).toHaveStyle({ height: `${TASK_ROW_HEIGHT}px` })
   })
 })

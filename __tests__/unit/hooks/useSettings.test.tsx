@@ -6,6 +6,7 @@ import { SettingsProvider, useSettings } from "@/hooks/useSettings";
 const DEFAULT_SETTINGS = {
   stopOnFirstError: false,
   demoMode: false,
+  notifyOnCompletion: false,
 } as const;
 
 let store: Record<string, string> = {};
@@ -90,10 +91,11 @@ describe("useSettings", () => {
       result.current.updateSettings({ stopOnFirstError: true });
     });
 
-    expect(result.current.settings).toEqual({ stopOnFirstError: true, demoMode: false });
+    expect(result.current.settings).toEqual({ stopOnFirstError: true, demoMode: false, notifyOnCompletion: false });
     expect(JSON.parse(window.localStorage.getItem("app-settings:v1") ?? "{}")).toEqual({
       stopOnFirstError: true,
       demoMode: false,
+      notifyOnCompletion: false,
     });
   });
 

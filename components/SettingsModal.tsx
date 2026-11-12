@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { useSettings } from "@/hooks/useSettings";
+import { getNotificationPermissionHint, useNotificationPermission } from "@/hooks/useRunCompletionNotification";
 import { DEFAULT_APP_SETTINGS } from "@/lib/settings";
 import { EyeOff, RotateCcw } from "lucide-react";
 
@@ -24,6 +25,14 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { settings, updateSettings } = useSettings();
   const [localSettings, setLocalSettings] = useState(settings);
+  const { availability: notificationAvailability, request: requestNotificationPermission } = useNotificationPermission();
+  const notificationHint = getNotificationPermissionHint(notificationAvailability);
+
+  // Permission is requested from the switch click. The option stays off without permission.
+  const handleNotifyChange = async (checked: boolean) => {
+    const permitted = checked && (await requestNotificationPermission()) === "granted";
+    setLocalSettings((current) => ({ ...current, notifyOnCompletion: permitted }));
+  };
 
   const handleSave = () => {
     updateSettings(localSettings);
@@ -67,6 +76,23 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                 onCheckedChange={(checked: boolean) =>
                   setLocalSettings({ ...localSettings, stopOnFirstError: checked })
                 }
+              />
+            </div>
+
+            <div className="flex items-center justify-between gap-6">
+              <div className="space-y-0.5">
+                <Label htmlFor="notifyOnCompletion">Notify When a Run Finishes</Label>
+                <p id="notifyOnCompletion-description" className="text-sm text-muted-foreground">
+                  {notificationHint ??
+                    "Show a browser notification with the result counts when a run finishes while the tab is hidden"}
+                </p>
+              </div>
+              <Switch
+                id="notifyOnCompletion"
+                aria-describedby="notifyOnCompletion-description"
+                checked={localSettings.notifyOnCompletion && notificationAvailability === "granted"}
+                disabled={notificationAvailability === "unsupported" || notificationAvailability === "denied"}
+                onCheckedChange={(checked: boolean) => void handleNotifyChange(checked)}
               />
             </div>
           </div>

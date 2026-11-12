@@ -11,6 +11,7 @@ import { getBatchConfig } from "@/lib/config/batchConfig";
 import { createRunTelemetry } from "@/lib/hydration/runTelemetry";
 import { createRunProvenance } from "@/lib/hydration/runProvenance";
 import { useSettings } from "./useSettings";
+import { recordCreatedObjects } from "./useCreatedObjectLinks";
 import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { markTaskSkipped } from "@/lib/hydration/taskTransitions";
 import {
@@ -227,7 +228,8 @@ export function useHydrationExecution() {
       };
 
       // Execute tasks with pause/cancel support
-      await executeTasks(tasks, context);
+      const results = await executeTasks(tasks, context);
+      recordCreatedObjects(runId, tenantConfig.cloudEnvironment, results);
       if (
         shouldCancelExecution(runId) &&
         tasks.some((task) => task.status === "pending" || task.status === "running")

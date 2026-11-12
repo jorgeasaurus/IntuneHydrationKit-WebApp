@@ -6,6 +6,7 @@ import { AppNavigation } from "@/components/AppNavigation";
 import { SensitiveData } from "@/components/SensitiveData";
 import { SettingsModal } from "@/components/SettingsModal";
 import { ActivityLog } from "@/components/dashboard/ActivityLog";
+import { CompletionNotificationToggle } from "@/components/dashboard/CompletionNotificationToggle";
 import { ExecutionControls } from "@/components/dashboard/ExecutionControls";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 import { ResultsSummary } from "@/components/dashboard/ResultsSummary";
@@ -15,6 +16,11 @@ import { RunStatusAnnouncer } from "@/components/dashboard/RunStatusAnnouncer";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useCreatedObjectLinks } from "@/hooks/useCreatedObjectLinks";
+import { useRunCompletionNotification } from "@/hooks/useRunCompletionNotification";
+import { useRunWakeLock } from "@/hooks/useRunWakeLock";
+import { useSettings } from "@/hooks/useSettings";
+import type { PortalLink } from "@/lib/utils/portalLinks";
 import type { ActivityMessage } from "@/lib/hydration/types";
 import type { ExecutionState } from "@/lib/hydration/executionStateStore";
 import type {
@@ -98,6 +104,10 @@ export function DashboardRunView({
     (task) => task.status === "success",
   ).length;
   const controlsStartTime = startTime ?? (isCompleted ? endTime : null);
+  const portalLinks = useCreatedObjectLinks(tasks, isPreview);
+  const { settings } = useSettings();
+  useRunWakeLock();
+  useRunCompletionNotification(settings.notifyOnCompletion);
 
   return (
     <div className="relative z-10 min-h-screen">
@@ -165,6 +175,8 @@ export function DashboardRunView({
           />
         )}
 
+        {!isCompleted && <CompletionNotificationToggle />}
+
         <ActivityLog messages={activityLog} />
 
         <RunResults
@@ -174,6 +186,7 @@ export function DashboardRunView({
           tasks={tasks}
           isPreview={isPreview}
           operationMode={operationMode}
+          portalLinks={portalLinks}
         />
       </main>
     </div>
@@ -255,10 +268,11 @@ function RunResults({
   tasks,
   isPreview,
   operationMode,
+  portalLinks,
 }: Pick<
   DashboardRunViewProps,
   "summary" | "outcome" | "tasks" | "isPreview" | "operationMode"
-> & { isCompleted: boolean }): React.JSX.Element {
+> & { isCompleted: boolean; portalLinks: ReadonlyMap<string, PortalLink> }): React.JSX.Element {
   return (
     <>
       {isCompleted && summary && outcome && outcome !== "failed" && (
@@ -280,13 +294,14 @@ function RunResults({
             tasks={tasks}
             isPreview={isPreview}
             outcome={outcome}
+            portalLinks={portalLinks}
           />
         </div>
       )}
       {isCompleted && !summary && tasks.length > 0 && (
-        <TaskList tasks={tasks} />
+        <TaskList tasks={tasks} portalLinks={portalLinks} />
       )}
-      {!isCompleted && <TaskList tasks={tasks} />}
+      {!isCompleted && <TaskList tasks={tasks} portalLinks={portalLinks} />}
     </>
   );
 }
