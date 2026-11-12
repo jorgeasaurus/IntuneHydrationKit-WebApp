@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/utils/zod";
 import { EXECUTION_RECORD_STORAGE_KEY } from "@/lib/storageKeys";
 import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { summaryMatchesExecution } from "@/lib/hydration/reporter";
@@ -10,11 +10,6 @@ import {
   SKIP_KINDS,
   TASK_CATEGORIES,
 } from "@/types/hydration";
-
-// Zod's JIT feature probe calls `new Function("")`. The production Content-Security-Policy
-// has no 'unsafe-eval', so the probe causes a script-src violation report on every page.
-// Jitless mode must be set before the first schema is built.
-z.config({ jitless: true });
 
 const operationModeSchema = z.enum(OPERATION_MODES);
 const taskCategorySchema = z.enum(TASK_CATEGORIES);
