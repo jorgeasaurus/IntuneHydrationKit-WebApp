@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
+import { useRunHistoryRecorder } from "@/hooks/useRunHistoryRecorder";
 import { useWizardState } from "@/hooks/useWizardState";
 import {
   clearHydrationSession,
@@ -142,6 +143,7 @@ export function useDashboardRun() {
     startRerun,
     reset,
   } = execution;
+  useRunHistoryRecorder(execution, restoredRecord);
 
   // Liveness of runs for the displayed tenant in other tabs (a duplicated tab copies the checkpoint).
   const [lockCheck, setLockCheck] = useState<{ tenantId: string; state: RunLockState } | null>(null);
