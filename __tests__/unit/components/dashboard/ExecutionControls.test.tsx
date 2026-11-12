@@ -115,6 +115,48 @@ describe('ExecutionControls', () => {
     expect(onResume).toHaveBeenCalledTimes(1)
   })
 
+  it('excludes paused time from elapsed time and the estimate', async () => {
+    const props = {
+      tasks: activeTasks,
+      isCancelling: false,
+      isCompleted: false,
+      outcome: null,
+      startTime,
+    }
+    const { rerender } = render(<ExecutionControls {...props} isPaused={false} />)
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1000)
+    })
+    // 8s active, 2 of 3 tasks done -> 4s remaining.
+    expect(screen.getByText('8s')).toBeInTheDocument()
+    expect(screen.getByText('4s')).toBeInTheDocument()
+
+    rerender(<ExecutionControls {...props} isPaused />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5 * 60 * 1000)
+    })
+    expect(screen.getByText('8s')).toBeInTheDocument()
+
+    rerender(<ExecutionControls {...props} isPaused={false} />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000)
+    })
+    expect(screen.getByText('10s')).toBeInTheDocument()
+    expect(screen.getByText('5s')).toBeInTheDocument()
+
+    rerender(
+      <ExecutionControls
+        {...props}
+        isPaused={false}
+        isCompleted
+        outcome="succeeded"
+        endTime={new Date(Date.now())}
+      />
+    )
+    expect(screen.getByText('10s')).toBeInTheDocument()
+  })
+
   it('offers log download controls after completion', () => {
     const onDownloadLog = vi.fn()
 
