@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   containsSecretPlaceholders,
-  escapeODataString,
   hasODataUnsafeChars,
   isActualSecretField,
   sleepWithExecutionControl,
@@ -107,8 +106,7 @@ describe("hydration execution controls", () => {
 });
 
 describe("hydration utility helpers", () => {
-  it("escapes OData strings and detects OData-unsafe characters", () => {
-    expect(escapeODataString("O'Brien")).toBe("O''Brien");
+  it("detects OData-unsafe characters", () => {
     expect(hasODataUnsafeChars("[IHD] Baseline: Windows")).toBe(true);
     expect(hasODataUnsafeChars("Baseline Windows")).toBe(false);
   });

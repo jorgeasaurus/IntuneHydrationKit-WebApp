@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildConditionalAccessCreatePlan,
-  conditionalAccessPolicyExists,
   createConditionalAccessPolicy,
-  deleteConditionalAccessPolicyByName,
+  findHydrationConditionalAccessPolicy,
+  getConditionalAccessDeleteBlockReason,
 } from "@/lib/graph/conditionalAccess";
 import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
 import type { ConditionalAccessPolicy } from "@/types/graph";
@@ -26,34 +26,6 @@ function createPolicy(
 describe("conditionalAccess graph helpers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it("matches current and legacy marker formats and rejects unmarked name collisions", async () => {
-    const client = {
-      getCollection: vi.fn().mockResolvedValue([
-        createPolicy({ displayName: "Require MFA" }),
-        createPolicy({ displayName: "Block legacy auth [Imported by Intune Hydration Kit]" }),
-        createPolicy({ displayName: "Legacy policy [Imported by Intune-Hydration-Kit]" }),
-        createPolicy({ displayName: "Short legacy policy [Intune Hydration Kit]" }),
-        createPolicy({ displayName: "[IHD] Prefix policy" }),
-      ]),
-    } as const;
-
-    await expect(
-      conditionalAccessPolicyExists(client as never, "Block legacy auth")
-    ).resolves.toBe(true);
-    await expect(
-      conditionalAccessPolicyExists(client as never, "Require MFA")
-    ).resolves.toBe(false);
-    await expect(
-      conditionalAccessPolicyExists(client as never, "Legacy policy")
-    ).resolves.toBe(true);
-    await expect(
-      conditionalAccessPolicyExists(client as never, "Short legacy policy")
-    ).resolves.toBe(true);
-    await expect(
-      conditionalAccessPolicyExists(client as never, "Prefix policy")
-    ).resolves.toBe(true);
   });
 
   it("forces created policies to disabled state and appends the marker once", async () => {
@@ -138,93 +110,50 @@ describe("conditionalAccess graph helpers", () => {
     expect(grantControls).not.toHaveProperty("authenticationStrength");
   });
 
-  it("enforces marker and disabled-state safety before deletion by name", async () => {
-    const markedUnsafe = createPolicy({
-      id: "unsafe",
-      displayName: "Unsafe policy [Imported by Intune Hydration Kit]",
-    });
-    const enabled = createPolicy({
-      id: "enabled",
-      displayName: "Enabled policy [Imported by Intune Hydration Kit]",
-      state: "enabled",
-    });
-    const safe = createPolicy({
-      id: "safe",
-      displayName: "Safe policy [Imported by Intune Hydration Kit]",
-    });
+  it("matches current and legacy marker formats and rejects unmarked name collisions", () => {
+    const policies = [
+      createPolicy({ id: "unmarked", displayName: "Require MFA" }),
+      createPolicy({ id: "current", displayName: "Block legacy auth [Imported by Intune Hydration Kit]" }),
+      createPolicy({ id: "legacy", displayName: "Legacy policy [Imported by Intune-Hydration-Kit]" }),
+      createPolicy({ id: "short", displayName: "Short legacy policy [Intune Hydration Kit]" }),
+      createPolicy({ id: "prefix", displayName: "[IHD] Prefix policy" }),
+    ];
+
+    expect(findHydrationConditionalAccessPolicy(policies, "Block legacy auth")?.id).toBe("current");
+    expect(findHydrationConditionalAccessPolicy(policies, "Require MFA")).toBeNull();
+    expect(findHydrationConditionalAccessPolicy(policies, "Legacy policy")?.id).toBe("legacy");
+    expect(findHydrationConditionalAccessPolicy(policies, "Short legacy policy")?.id).toBe("short");
+    expect(findHydrationConditionalAccessPolicy(policies, "[IHD] Prefix policy")?.id).toBe("prefix");
+  });
+
+  it("prefers the current marker when duplicate legacy names exist", () => {
+    const policies = [
+      createPolicy({ id: "legacy", displayName: "Duplicate policy [Imported by Intune-Hydration-Kit]" }),
+      createPolicy({ id: "current", displayName: "Duplicate policy [Imported by Intune Hydration Kit]" }),
+    ];
+
+    expect(findHydrationConditionalAccessPolicy(policies, "Duplicate policy")?.id).toBe("current");
+  });
+
+  it("reads the policy again and blocks delete unless it is marked and disabled", async () => {
     const client = {
-      getCollection: vi
-        .fn()
-        .mockResolvedValueOnce([markedUnsafe])
-        .mockResolvedValueOnce([enabled])
-        .mockResolvedValueOnce([safe])
-        .mockResolvedValueOnce([]),
       get: vi
         .fn()
-        .mockResolvedValueOnce(createPolicy({ id: "unsafe", displayName: "Unsafe policy" }))
-        .mockResolvedValueOnce(enabled)
-        .mockResolvedValueOnce(safe),
-      delete: vi.fn().mockResolvedValue(undefined),
+        .mockResolvedValueOnce(createPolicy({ displayName: "Unsafe policy" }))
+        .mockResolvedValueOnce(createPolicy({ displayName: "[IHD] Enabled policy", state: "enabled" }))
+        .mockResolvedValueOnce(createPolicy({ displayName: "[IHD] Safe policy", state: "disabled" }))
+        .mockRejectedValueOnce(new Error("[503] Service unavailable")),
     } as const;
 
-    await expect(
-      deleteConditionalAccessPolicyByName(client as never, "Unsafe policy")
-    ).rejects.toThrow('Cannot delete policy "Unsafe policy": Not created by Intune Hydration Kit');
-    await expect(
-      deleteConditionalAccessPolicyByName(client as never, "Enabled policy")
-    ).rejects.toThrow("Policy must be disabled before deletion");
-    await expect(
-      deleteConditionalAccessPolicyByName(client as never, "Safe policy")
-    ).resolves.toBeUndefined();
-    await expect(
-      deleteConditionalAccessPolicyByName(client as never, "Missing policy")
-    ).rejects.toThrow('Conditional access policy "Missing policy" not found');
-
-    expect(client.delete).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/safe"
+    await expect(getConditionalAccessDeleteBlockReason(client as never, "unsafe")).resolves.toContain(
+      "Not created by Intune Hydration Kit"
     );
-  });
-
-  it("prefers the current marker when duplicate legacy names exist", async () => {
-    const legacy = createPolicy({
-      id: "legacy",
-      displayName: "Duplicate policy [Imported by Intune-Hydration-Kit]",
-    });
-    const current = createPolicy({
-      id: "current",
-      displayName: "Duplicate policy [Imported by Intune Hydration Kit]",
-    });
-    const client = {
-      getCollection: vi.fn().mockResolvedValue([legacy, current]),
-      get: vi.fn().mockResolvedValue(current),
-      delete: vi.fn().mockResolvedValue(undefined),
-    } as const;
-
-    await deleteConditionalAccessPolicyByName(client as never, "Duplicate policy");
-
-    expect(client.get).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/current"
+    await expect(getConditionalAccessDeleteBlockReason(client as never, "enabled")).resolves.toContain(
+      'Policy state is "enabled"'
     );
-    expect(client.delete).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/current"
-    );
-  });
+    await expect(getConditionalAccessDeleteBlockReason(client as never, "safe")).resolves.toBeNull();
+    await expect(getConditionalAccessDeleteBlockReason(client as never, "error")).rejects.toThrow("[503]");
 
-  it("deletes policies with the legacy short marker", async () => {
-    const legacy = createPolicy({
-      id: "legacy-short",
-      displayName: "Legacy short policy [Intune Hydration Kit]",
-    });
-    const client = {
-      getCollection: vi.fn().mockResolvedValue([legacy]),
-      get: vi.fn().mockResolvedValue(legacy),
-      delete: vi.fn().mockResolvedValue(undefined),
-    } as const;
-
-    await deleteConditionalAccessPolicyByName(client as never, "Legacy short policy");
-
-    expect(client.delete).toHaveBeenCalledWith(
-      "/identity/conditionalAccess/policies/legacy-short"
-    );
+    expect(client.get).toHaveBeenCalledWith("/identity/conditionalAccess/policies/unsafe");
   });
 });

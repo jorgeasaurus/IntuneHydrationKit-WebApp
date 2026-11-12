@@ -6,11 +6,8 @@
 import { HydrationTask } from "@/types/hydration";
 import { ConditionalAccessPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
-import {
-  createConditionalAccessPolicy,
-  deleteConditionalAccessPolicyByName,
-  conditionalAccessPolicyExists,
-} from "@/lib/graph/conditionalAccess";
+import { executeDeleteTask } from "../deleteResolver";
+import { createConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
 import { policyRequiresPremiumP2 } from "@/lib/graph/conditionalAccessP2";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
 import { normalizeName, requireTenantCache } from "../utils";
@@ -42,6 +39,11 @@ export async function executeConditionalAccessTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   // Templates are loaded from the bundled JSON files before execution.
@@ -133,35 +135,6 @@ export async function executeConditionalAccessTask(
       skipped: false,
       createdId: created.id,
     };
-  } else if (mode === "delete") {
-    const targetName = template?.displayName ?? task.itemName;
-    const existingPolicy = findCachedConditionalAccessPolicy(
-      targetName,
-      context.cachedConditionalAccessPolicies
-    );
-
-    if (!existingPolicy) {
-      // If no cache, check via API
-      const exists = await conditionalAccessPolicyExists(client, targetName);
-      if (!exists) {
-        return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-      }
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    // Delete the policy (must be disabled first)
-    try {
-      await deleteConditionalAccessPolicyByName(client, targetName);
-      return { task, success: true, skipped: false };
-    } catch (error) {
-      // Policy not found or not created by hydration kit - skip
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
-    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

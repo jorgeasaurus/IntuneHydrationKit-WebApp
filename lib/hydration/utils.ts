@@ -119,15 +119,6 @@ export async function sleepWithExecutionControl(
 }
 
 /**
- * Escape special characters in OData filter strings
- * Single quotes must be doubled in OData $filter expressions
- */
-export function escapeODataString(value: string): string {
-  // Escape single quotes for OData string literals
-  return value.replace(/'/g, "''");
-}
-
-/**
  * Check if a string contains characters that break OData $filter on Graph API
  * Square brackets, colons, and other special chars cause InternalServerError
  * on the configurationPolicies endpoint

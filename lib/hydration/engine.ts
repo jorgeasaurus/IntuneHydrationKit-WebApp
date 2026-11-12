@@ -11,10 +11,11 @@
  *
  * Implementation is split across modular files:
  * - ./types.ts - ExecutionContext, ExecutionResult, CISPolicyType
- * - ./utils.ts - sleep, escapeODataString, utility functions
+ * - ./utils.ts - sleep, tenant cache access, name matching, utility functions
  * - ./cleaners.ts - Policy cleaning functions
  * - ./policyCreators.ts - Graph API create functions
  * - ./policyDetection.ts - Policy type detection
+ * - ./deleteResolver.ts - Delete target resolution and safety checks (all delete paths)
  * - ./taskExecutors/ - Category-specific task executors
  * - ./taskQueue.ts - Task queue building functions
  */
@@ -186,7 +187,9 @@ async function executeTask(
     const isDriverUpdateProfile = task.itemName.toLowerCase().includes("wufb drivers") ||
       task.itemName.toLowerCase().includes("driver update");
 
-    if (isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
+    // Create only: a delete task goes to the delete resolver on both delete paths,
+    // so that existing kit objects can be removed after a license change.
+    if (task.operation === "create" && isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
       markTaskSkipped(
         task,
         "blocked",

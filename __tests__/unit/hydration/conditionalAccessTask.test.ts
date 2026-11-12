@@ -6,14 +6,10 @@ import type { HydrationTask } from "@/types/hydration";
 const {
   mockGetCachedTemplates,
   mockCreateConditionalAccessPolicy,
-  mockDeleteConditionalAccessPolicyByName,
-  mockConditionalAccessPolicyExists,
   mockPolicyRequiresPremiumP2,
 } = vi.hoisted(() => ({
   mockGetCachedTemplates: vi.fn(),
   mockCreateConditionalAccessPolicy: vi.fn(),
-  mockDeleteConditionalAccessPolicyByName: vi.fn(),
-  mockConditionalAccessPolicyExists: vi.fn(),
   mockPolicyRequiresPremiumP2: vi.fn(),
 }));
 
@@ -23,8 +19,6 @@ vi.mock("@/lib/templates/loader", () => ({
 
 vi.mock("@/lib/graph/conditionalAccess", () => ({
   createConditionalAccessPolicy: mockCreateConditionalAccessPolicy,
-  deleteConditionalAccessPolicyByName: mockDeleteConditionalAccessPolicyByName,
-  conditionalAccessPolicyExists: mockConditionalAccessPolicyExists,
 }));
 
 vi.mock("@/lib/graph/conditionalAccessP2", () => ({
@@ -57,7 +51,6 @@ describe("executeConditionalAccessTask", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCachedTemplates.mockReturnValue(undefined);
-    mockConditionalAccessPolicyExists.mockResolvedValue(false);
     mockPolicyRequiresPremiumP2.mockReturnValue(false);
   });
 
@@ -193,7 +186,6 @@ describe("executeConditionalAccessTask", () => {
         {
           id: "ca-id",
           displayName: `${policyName} [Imported by Intune Hydration Kit]`,
-          description: undefined,
         },
       ],
     });
@@ -205,78 +197,4 @@ describe("executeConditionalAccessTask", () => {
     });
   });
 
-  it("supports preview deletes after confirming the policy exists in the tenant", async () => {
-    const policyName = "[IHD] Require MFA";
-
-    mockGetCachedTemplates.mockReturnValue([
-      {
-        displayName: policyName,
-        state: "disabled",
-        conditions: {},
-        grantControls: { operator: "OR", builtInControls: ["mfa"] },
-      },
-    ]);
-    mockConditionalAccessPolicyExists.mockResolvedValue(true);
-
-    const result = await executeConditionalAccessTask(createTask(policyName, "delete"), {
-      client: createClient(),
-      operationMode: "delete",
-      isPreview: true,
-      stopOnFirstError: false,
-    });
-
-    expect(result).toMatchObject({
-      success: true,
-      skipped: false,
-    });
-  });
-
-  it("deletes a directly selected policy when no template is cached", async () => {
-    const policyName = "[IHD] Legacy Conditional Access";
-    mockDeleteConditionalAccessPolicyByName.mockResolvedValue(undefined);
-
-    const result = await executeConditionalAccessTask(createTask(policyName, "delete"), {
-      client: createClient(),
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedConditionalAccessPolicies: [{ id: "legacy-ca-id", displayName: policyName }],
-    });
-
-    expect(result).toMatchObject({ success: true, skipped: false });
-    expect(mockDeleteConditionalAccessPolicyByName).toHaveBeenCalledWith(
-      expect.anything(),
-      policyName
-    );
-  });
-
-  it("turns delete failures into skipped results with the Graph error message", async () => {
-    const policyName = "[IHD] Require MFA";
-
-    mockGetCachedTemplates.mockReturnValue([
-      {
-        displayName: policyName,
-        state: "disabled",
-        conditions: {},
-        grantControls: { operator: "OR", builtInControls: ["mfa"] },
-      },
-    ]);
-    mockConditionalAccessPolicyExists.mockResolvedValue(true);
-    mockDeleteConditionalAccessPolicyByName.mockRejectedValue(
-      new Error("Policy must be disabled before deletion")
-    );
-
-    const result = await executeConditionalAccessTask(createTask(policyName, "delete"), {
-      client: createClient(),
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-    });
-
-    expect(result).toMatchObject({
-      success: true,
-      skipped: true,
-      error: "Policy must be disabled before deletion",
-    });
-  });
 });

@@ -3,12 +3,15 @@
  */
 
 import { GraphClient } from "./client";
-import { AppProtectionPolicy, DeletionResult, TenantAppProtectionPolicy } from "@/types/graph";
-import { hasHydrationMarker, addHydrationMarker } from "@/lib/utils/hydrationMarker";
+import { AppProtectionPolicy, TenantAppProtectionPolicy } from "@/types/graph";
+import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
 
-type AppProtectionPlatform = "iOS" | "android";
+export type AppProtectionPlatform = "iOS" | "android";
 
-const PLATFORM_ENDPOINTS: Record<AppProtectionPlatform, string> = {
+/**
+ * Graph collection endpoint for each App Protection platform.
+ */
+export const APP_PROTECTION_PLATFORM_ENDPOINTS: Record<AppProtectionPlatform, string> = {
   iOS: "/deviceAppManagement/iosManagedAppProtections",
   android: "/deviceAppManagement/androidManagedAppProtections",
 };
@@ -147,11 +150,6 @@ const EMPTY_ARRAY_OPTIONAL_FIELDS = new Set([
 
 const PLACEHOLDER_VERSION_VALUES = new Set(["0000-00-00"]);
 
-function getPlatformEndpoint(platform: AppProtectionPlatform, policyId?: string): string {
-  const base = PLATFORM_ENDPOINTS[platform];
-  return policyId ? `${base}/${policyId}` : base;
-}
-
 /**
  * Get all iOS app protection policies
  */
@@ -191,17 +189,6 @@ export async function getAllAppProtectionPolicies(
   const taggedAndroidPolicies = androidPolicies.map(p => ({ ...p, _platform: "android" as const }));
 
   return [...taggedIosPolicies, ...taggedAndroidPolicies];
-}
-
-/**
- * Get an app protection policy by ID
- */
-async function getAppProtectionPolicyById(
-  client: GraphClient,
-  policyId: string,
-  platform: AppProtectionPlatform
-): Promise<AppProtectionPolicy> {
-  return client.get<AppProtectionPolicy>(getPlatformEndpoint(platform, policyId));
 }
 
 /**
@@ -367,44 +354,3 @@ export async function createAppProtectionPolicy(
     : createAndroidAppProtectionPolicy(client, policy);
 }
 
-/**
- * Delete an app protection policy by ID
- * Only deletes if created by Intune Hydration Kit and has no active assignments
- */
-export async function deleteAppProtectionPolicy(
-  client: GraphClient,
-  policyId: string,
-  platform: AppProtectionPlatform
-): Promise<DeletionResult> {
-  const policy = await getAppProtectionPolicyById(client, policyId, platform);
-
-  if (!hasHydrationMarker(policy.description)) {
-    throw new Error(
-      `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  const assignments = await getAppProtectionPolicyAssignments(client, policyId, platform);
-  if (assignments.length > 0) {
-    console.log(`[AppProtection] Skipping deletion of ${platform} policy "${policy.displayName}" - has ${assignments.length} active assignment(s)`);
-    return {
-      deleted: false,
-      skipped: true,
-      reason: `Policy has ${assignments.length} active assignment(s)`
-    };
-  }
-
-  await client.delete(`${PLATFORM_ENDPOINTS[platform]}/${policyId}`);
-  return { deleted: true, skipped: false };
-}
-
-/**
- * Get assignments for an app protection policy
- */
-async function getAppProtectionPolicyAssignments(
-  client: GraphClient,
-  policyId: string,
-  platform: AppProtectionPlatform
-): Promise<unknown[]> {
-  return client.getCollection(`${getPlatformEndpoint(platform, policyId)}/assignments`);
-}
