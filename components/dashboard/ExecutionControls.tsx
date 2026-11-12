@@ -73,15 +73,15 @@ function useActiveElapsedTime(
 
   // Open or close a pause interval when the pause state changes.
   useEffect(() => {
+    // `now` stops ticking during a pause. Refresh it when the run is active
+    // again so a closed pause is not subtracted from a stale clock.
+    if (!pausedNow && !isCompleted) setNow(Date.now());
     setTracking((prev) => {
       if (pausedNow && prev.pausedAt === null) {
         return { ...prev, pausedAt: Date.now() };
       }
       if (!pausedNow && prev.pausedAt !== null) {
         const closedAt = isCompleted && endTime ? endTime.getTime() : Date.now();
-        // `now` stopped ticking during the pause. Refresh it with the same
-        // timestamp so the closed pause is not subtracted from a stale clock.
-        setNow(closedAt);
         return {
           pausedMs: prev.pausedMs + Math.max(0, closedAt - prev.pausedAt),
           pausedAt: null,
