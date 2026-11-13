@@ -857,4 +857,72 @@ describe('TargetSelection', () => {
     expect(await screen.findByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark`)).not.toBeChecked()
     expect(screen.getByLabelText(`${IMPORT_PREFIX}macOS CIS Benchmark`)).toBeChecked()
   })
+
+  it('customizes the Autopilot Branding app and keeps the customization with its selection', async () => {
+    const user = userEvent.setup()
+    const autopilotBranding = 'Autopilot Branding (Cleanup) - [IHD]'
+
+    useWizardStateMock.mockReturnValue({
+      state: createState({
+        selectedTargets: ['win32Apps'],
+        categorySelections: { win32Apps: { selectedItems: [autopilotBranding, '7-Zip - [IHD]'] } },
+      }),
+      setSelectedTargets,
+      setSelectedCISCategories,
+      setBaselineSelection,
+      setCategorySelections,
+      nextStep,
+      previousStep,
+    })
+
+    render(<TargetSelectionHarness />)
+
+    const expand = screen.queryByRole('button', { name: 'Expand Win32 Apps' })
+    if (expand) await user.click(expand)
+    // Only the Autopilot Branding item has a Customize button.
+    expect(await screen.findAllByRole('button', { name: 'Customize Autopilot Branding' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Customize Autopilot Branding' }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: /MSTeams/ }))
+    await user.click(within(dialog).getByRole('switch', { name: /Update Edge/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(screen.getByText('Customized')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    const selections = setCategorySelections.mock.calls[0][0]
+    expect(selections.win32Apps.selectedItems).toEqual([autopilotBranding, '7-Zip - [IHD]'])
+    expect(selections.win32Apps.autopilotBranding.removedApps).toContain('MSTeams')
+    expect(selections.win32Apps.autopilotBranding.enabledTasks).not.toContain('Update-ABEdge')
+  })
+
+  it('drops the customization when the Autopilot Branding app is not selected, and hides it in delete mode', async () => {
+    const user = userEvent.setup()
+    const customization = { removedApps: ['MSTeams'], enabledTasks: [] }
+
+    useWizardStateMock.mockReturnValue({
+      state: createState({
+        operationMode: 'delete',
+        selectedTargets: ['win32Apps'],
+        categorySelections: {
+          win32Apps: { selectedItems: ['7-Zip - [IHD]'], autopilotBranding: customization },
+        } as WizardState['categorySelections'],
+      }),
+      setSelectedTargets,
+      setSelectedCISCategories,
+      setBaselineSelection,
+      setCategorySelections,
+      nextStep,
+      previousStep,
+    })
+
+    render(<TargetSelectionHarness />)
+
+    const expand = screen.queryByRole('button', { name: 'Expand Win32 Apps' })
+    if (expand) await user.click(expand)
+    expect(await screen.findByLabelText('7-Zip - [IHD]')).toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Customize Autopilot Branding' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    expect(setCategorySelections).toHaveBeenCalledWith({ win32Apps: { selectedItems: ['7-Zip - [IHD]'] } })
+  })
 })

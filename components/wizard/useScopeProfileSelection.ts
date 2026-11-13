@@ -10,11 +10,14 @@ import {
   type DroppedProfileItem,
   type ScopeSelection,
 } from "@/lib/profiles/scopeProfiles";
+import type { AutopilotBrandingCustomization } from "@/lib/win32/autopilotBrandingConfig";
 
 interface ScopeProfileSelectionOptions {
   targets: TaskCategory[];
   selectedItems: Record<string, Set<string>>;
   selectedCISPolicies: Set<string>;
+  autopilotBranding: AutopilotBrandingCustomization | undefined;
+  setAutopilotBranding: Dispatch<SetStateAction<AutopilotBrandingCustomization | undefined>>;
   setTargets: Dispatch<SetStateAction<TaskCategory[]>>;
   setSelectedItems: Dispatch<SetStateAction<Record<string, Set<string>>>>;
   setSelectedCISPolicies: Dispatch<SetStateAction<Set<string>>>;
@@ -55,7 +58,12 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
         ? [...options.selectedCISPolicies]
         : [...(options.selectedItems[target] ?? [])];
     }
-    return { targets: [...options.targets], items };
+    // normalizeSelection keeps the customization only while the Autopilot Branding app is selected.
+    return {
+      targets: [...options.targets],
+      items,
+      ...(options.autopilotBranding ? { autopilotBranding: options.autopilotBranding } : {}),
+    };
   };
 
   /**
@@ -109,6 +117,8 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
     options.setTargets(targets);
     options.setSelectedItems(nextItems);
     options.setSelectedCISPolicies(new Set(resolved.selection.items.cisBaseline ?? []));
+    // A profile without a customization gives the kit configuration.
+    options.setAutopilotBranding(resolved.selection.autopilotBranding);
     options.setExpandedCategories(new Set(targets));
     return resolved.dropped;
   };

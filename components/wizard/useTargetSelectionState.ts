@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { TaskCategory, OIBPlatformId, CategorySelections } from "@/types/hydration";
+import type { AutopilotBrandingCustomization } from "@/lib/win32/autopilotBrandingConfig";
 
 function getInitialSelectedItems(
   categorySelections?: CategorySelections
@@ -33,6 +34,10 @@ export function useTargetSelectionState(
   const [expandedCISCategories, setExpandedCISCategories] = useState<Set<string>>(() => new Set());
   const [selectedCISPolicies, setSelectedCISPolicies] = useState<Set<string>>(
     () => new Set(categorySelections?.cisBaseline?.selectedItems || [])
+  );
+  // Undefined: the Autopilot Branding app uses the kit configuration without change.
+  const [autopilotBranding, setAutopilotBranding] = useState<AutopilotBrandingCustomization | undefined>(
+    categorySelections?.win32Apps?.autopilotBranding
   );
 
   // Async selection writers (category defaults, platform filters, Select All) check this
@@ -122,6 +127,8 @@ export function useTargetSelectionState(
     expandedCISCategories,
     selectedCISPolicies,
     setSelectedCISPolicies,
+    autopilotBranding,
+    setAutopilotBranding,
     toggleItem,
     toggleCISPolicy,
     toggleCISCategoryExpanded,
