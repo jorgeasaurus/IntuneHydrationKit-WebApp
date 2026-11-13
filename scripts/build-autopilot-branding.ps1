@@ -52,6 +52,40 @@ $packagePath = Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-brandin
 $licensePath = Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding/LICENSE-AutopilotBranding.txt'
 $contentZipPath = Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding/content.zip'
 
+function Assert-StoredZip {
+    <#
+    .SYNOPSIS
+        Fails when a ZIP file has an entry that the web app cannot read.
+    .DESCRIPTION
+        The web app reads only stored (method 0) entries without data descriptors. Windows
+        PowerShell 5.1 and PowerShell 7.2 or earlier write Deflate entries for
+        CompressionLevel.NoCompression, so a file from those hosts must not be committed.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$ZipPath
+    )
+
+    $bytes = [System.IO.File]::ReadAllBytes($ZipPath)
+    $offset = 0
+    $count = 0
+    while ($offset + 30 -le $bytes.Length -and [System.BitConverter]::ToUInt32($bytes, $offset) -eq 0x04034b50) {
+        $flags = [System.BitConverter]::ToUInt16($bytes, $offset + 6)
+        $method = [System.BitConverter]::ToUInt16($bytes, $offset + 8)
+        if ($method -ne 0 -or ($flags -band 0x08) -ne 0) {
+            throw "The content ZIP has an entry that is not stored (method $method, flags $flags). Run this script with PowerShell 7.4 or later; older versions compress entries even with NoCompression."
+        }
+        $compressedSize = [System.BitConverter]::ToUInt32($bytes, $offset + 18)
+        $nameLength = [System.BitConverter]::ToUInt16($bytes, $offset + 26)
+        $extraLength = [System.BitConverter]::ToUInt16($bytes, $offset + 28)
+        $offset += 30 + $nameLength + $extraLength + $compressedSize
+        $count++
+    }
+    if ($count -eq 0) {
+        throw "The content ZIP has no readable entry: $ZipPath"
+    }
+}
+
 function Write-StoredContentZip {
     <#
     .SYNOPSIS
@@ -140,6 +174,7 @@ try {
     # The template catalog shows the script that the install command runs.
     Copy-Item -Path (Join-Path -Path $staging -ChildPath 'AutopilotBranding.ps1') -Destination (Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding/AutopilotBranding.ps1') -Force
     Write-StoredContentZip -SourcePath $staging -ZipPath $contentZipPath
+    Assert-StoredZip -ZipPath $contentZipPath
 
     $kitModule = Import-Module -Name $kitManifest -Force -PassThru
     $package = & $kitModule {
