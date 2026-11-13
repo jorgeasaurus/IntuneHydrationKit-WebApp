@@ -10,9 +10,11 @@ vi.mock("@/lib/auth/authUtils", () => ({
 
 import {
   createWin32AppFromPackage,
+  getIncompleteWin32AppId,
   isLegacyOwnedWin32App,
   isOwnedWin32App,
 } from "@/lib/graph/win32Apps";
+import { isRunCancelledError, RunCancelledError } from "@/lib/utils/retry";
 import { SEVEN_ZIP_WIN32_APP } from "@/templates/win32Apps";
 
 describe("createWin32AppFromPackage", () => {
@@ -419,7 +421,22 @@ describe("createWin32AppFromPackage", () => {
     expect(error.message).toContain("[503] content version unavailable");
     expect(error.message).toContain(`The incomplete app "${SEVEN_ZIP_WIN32_APP.displayName}" could not be removed`);
     expect(error.status).toBe(503);
+    expect(getIncompleteWin32AppId(error)).toBe("app-id");
     expect(deleteApp).toHaveBeenCalledWith("/deviceAppManagement/mobileApps/app-id", "beta");
+  });
+
+  it("keeps a cancelled create a cancelled run when the incomplete app cannot be removed", async () => {
+    const cancelled = new RunCancelledError();
+    const postNoRetry = vi.fn().mockResolvedValueOnce({ id: "app-id" }).mockRejectedValueOnce(cancelled);
+    const client = { postNoRetry, postAction: vi.fn(), delete: vi.fn().mockRejectedValue(new RunCancelledError()) };
+
+    const error = await createWin32AppFromPackage(client as never, SEVEN_ZIP_WIN32_APP, packageFile(), "detected").then(
+      () => { throw new Error("The create did not fail."); },
+      (caught: unknown) => caught
+    );
+
+    expect(isRunCancelledError(error)).toBe(true);
+    expect(getIncompleteWin32AppId(error)).toBe("app-id");
   });
 
   it("removes the uncommitted app when content publishing fails", async () => {

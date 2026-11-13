@@ -458,4 +458,42 @@ describe("executeWin32AppTask", () => {
     await expect(resultPromise).resolves.toMatchObject({ success: true, skipped: true, error: "Already exists" });
     expect(mockCreateWin32AppFromPackage).not.toHaveBeenCalled();
   });
+
+  it("does not create the app when the app that this session created cannot be read", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const hint = JSON.stringify({
+      "7-zip - [ihd]": { id: "new-app", displayName: "7-Zip - [IHD]", createdAt: Date.now() },
+    });
+    sessionStorage.setItem("intune-hydration-recent-win32-apps", hint);
+    const context = createContext();
+    vi.mocked(context.client.get).mockRejectedValue(Object.assign(new Error("Service unavailable"), { status: 503 }));
+
+    await expect(executeWin32AppTask(task, context)).rejects.toThrow("Service unavailable");
+
+    expect(mockCreateWin32AppFromPackage).not.toHaveBeenCalled();
+    // The hint stays for the next attempt.
+    expect(sessionStorage.getItem("intune-hydration-recent-win32-apps")).toBe(hint);
+  });
+
+  it("remembers the incomplete app of a failed create, so a retry does not create a second app", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("content")));
+    mockReadIntuneWinPackage.mockResolvedValue({ setupFile: getWin32AppTemplates()[0].setupFilePath });
+    mockCreateWin32AppFromPackage.mockRejectedValue(
+      Object.assign(new Error("upload failed"), { incompleteAppId: "incomplete-app" })
+    );
+    const context = createContext();
+    const firstTask = { ...task, itemName: getWin32AppTemplates()[0].displayName };
+
+    await expect(executeWin32AppTask(firstTask, context)).rejects.toThrow("upload failed");
+
+    serveApps(context, [{
+      id: "incomplete-app",
+      displayName: firstTask.itemName,
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    }]);
+    await expect(executeWin32AppTask(firstTask, { ...context, cachedWin32LobApps: undefined }))
+      .resolves.toMatchObject({ skipped: true, error: "Already exists" });
+    expect(mockCreateWin32AppFromPackage).toHaveBeenCalledTimes(1);
+  });
 });

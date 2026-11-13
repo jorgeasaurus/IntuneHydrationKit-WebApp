@@ -2,6 +2,7 @@ import { HydrationTask } from "@/types/hydration";
 import { ExecutionContext, ExecutionResult } from "../types";
 import {
   createWin32AppFromPackage,
+  getIncompleteWin32AppId,
   getWin32AppDisplayNameVariants,
   getWin32LobApps,
   isLegacyOwnedWin32App,
@@ -143,6 +144,9 @@ async function getRecentOwnedApp(
       // Keep a recent creation hint because Intune may not expose the new app immediately.
       return { app: null, notVisible: true };
     }
+    // Fail closed: a cancelled run stays cancelled, and a read that failed does not prove that
+    // the app is gone. The hint stays for the next attempt.
+    throw error;
   }
 
   forgetRecentWin32App(displayName);
@@ -415,13 +419,22 @@ export async function executeWin32AppTask(
     }
     const detectionScript = createPackage.detectionScript;
     const iconBase64 = await fetchOptionalIcon(template.iconUrl);
-    const app = await createWin32AppFromPackage(
-      context.client,
-      createTemplate,
-      packageFile,
-      detectionScript,
-      iconBase64
-    );
+    let app: Win32LobApp;
+    try {
+      app = await createWin32AppFromPackage(
+        context.client,
+        createTemplate,
+        packageFile,
+        detectionScript,
+        iconBase64
+      );
+    } catch (error) {
+      // The failed create left its app in the tenant. Remember it, so a retry finds it by ID
+      // and does not make a second app before the collection lists the first.
+      const incompleteAppId = getIncompleteWin32AppId(error);
+      if (incompleteAppId) rememberRecentWin32App({ id: incompleteAppId, displayName: template.displayName });
+      throw error;
+    }
     if (context.cachedWin32LobApps && app.displayName) {
       context.cachedWin32LobApps.push(app);
     }

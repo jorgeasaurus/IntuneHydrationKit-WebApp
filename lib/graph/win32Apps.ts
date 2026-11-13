@@ -227,6 +227,17 @@ export async function getWin32LobApps(client: GraphClient): Promise<Win32LobApp[
   );
 }
 
+/** On an error of createWin32AppFromPackage when the app that it created is still in the tenant. */
+export interface IncompleteWin32App {
+  incompleteAppId: string;
+}
+
+/** ID of the incomplete app that a failed create left in the tenant, or null. */
+export function getIncompleteWin32AppId(error: unknown): string | null {
+  const id = (error as Partial<IncompleteWin32App> | null)?.incompleteAppId;
+  return typeof id === "string" && id.length > 0 ? id : null;
+}
+
 export async function createWin32AppFromPackage(
   client: GraphClient,
   template: Win32AppTemplate,
@@ -280,8 +291,12 @@ export async function createWin32AppFromPackage(
       () => false
     );
     if (removed) throw error;
-    // The app is in the tenant without content. A later create skips it as "Already exists",
-    // so the error must say that it is there.
+    // The app is in the tenant without content. The caller gets its ID, so a later create
+    // in this session finds it and does not make a second app.
+    const incomplete: IncompleteWin32App = { incompleteAppId: app.id };
+    // A cancelled run stays a cancelled run: the engine reads the type of this error.
+    if (isRunCancelledError(error)) throw Object.assign(error, incomplete);
+    // A later create skips the app as "Already exists", so the error must say that it is there.
     const message = error instanceof Error ? error.message : String(error);
     const status = (error as { status?: unknown } | null)?.status;
     throw Object.assign(
@@ -290,6 +305,7 @@ export async function createWin32AppFromPackage(
           "Delete it in Intune or with Delete mode before you create it again.",
         { cause: error }
       ),
+      incomplete,
       // Callers classify the failure by the status of the first error.
       typeof status === "number" ? { status } : {}
     );
