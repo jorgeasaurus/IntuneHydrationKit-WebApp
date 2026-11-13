@@ -3,6 +3,7 @@
  * Handles create and delete operations for Entra ID Conditional Access policies
  */
 
+import { getConditionalAccessBlockReason } from "../conditionalAccessBatch";
 import { HydrationTask } from "@/types/hydration";
 import { ConditionalAccessPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
@@ -74,7 +75,15 @@ export async function executeConditionalAccessTask(
     }
 
     // Create the policy (will be forced to disabled state)
-    const created = await createConditionalAccessPolicy(client, fullCATemplate);
+    let created: Awaited<ReturnType<typeof createConditionalAccessPolicy>>;
+    try {
+      created = await createConditionalAccessPolicy(client, fullCATemplate);
+    } catch (error) {
+      // A license or service refusal is not a failure of the run. Graph created nothing.
+      const blockReason = error instanceof Error ? getConditionalAccessBlockReason({ message: error.message }) : null;
+      if (!blockReason) throw error;
+      return { task, success: false, skipped: true, skipKind: "blocked", error: blockReason };
+    }
     requireTenantCache(context, "cachedConditionalAccessPolicies").push({
       id: created.id ?? "",
       displayName: template.displayName,

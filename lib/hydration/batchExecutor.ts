@@ -61,6 +61,7 @@ import {
   findHydrationConditionalAccessPolicy,
 } from "@/lib/graph/conditionalAccess";
 import {
+  getConditionalAccessBlockReason,
   getPrivatePreviewFeatureName,
   getPrivatePreviewSkipReason,
   logConditionalAccessBatchRequestFailureDiagnostics,
@@ -967,8 +968,12 @@ async function executeBatchGroup(
             logConditionalAccessCreateFailureDiagnostics(item, response, error, version);
           }
           const privatePreviewFeatureName = getPrivatePreviewFeatureName(error);
-          if (privatePreviewFeatureName) {
-            const skipReason = getPrivatePreviewSkipReason(privatePreviewFeatureName);
+          const skipReason = privatePreviewFeatureName
+            ? getPrivatePreviewSkipReason(privatePreviewFeatureName)
+            : task.category === "conditionalAccess"
+              ? getConditionalAccessBlockReason(error)
+              : null;
+          if (skipReason) {
             markTaskSkipped(task, "blocked", skipReason);
             task.endTime = new Date();
             results.push({ task, success: false, skipped: true, skipKind: "blocked", error: skipReason });

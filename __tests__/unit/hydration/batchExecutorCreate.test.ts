@@ -615,4 +615,47 @@ describe("executeTasksInBatches", () => {
       consoleErrorSpy.mockRestore();
     }
   });
+
+  it.each([
+    [
+      "1267: Cannot create or update Conditional Access policies that target agents. This capability requires a Microsoft Agent 365 or Microsoft 365 E7 license. Upgrade your organization's license and try again.",
+      "Requires a Microsoft Agent 365 or Microsoft 365 E7 license",
+    ],
+    [
+      "1342: Targeting 'AllAgentIdUsers' in the users condition is no longer supported. Please use the agents includeAgentUsers condition to target all agent users.",
+      "Microsoft Graph no longer accepts the 'AllAgentIdUsers' users condition that this template uses, so the policy cannot be created until the template is updated",
+    ],
+  ])("reports a refused agent policy as blocked, not failed: %s", async (innerMessage, reason) => {
+    const policyName = "[IHD] Block all agent identities from accessing resources";
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      mockConditionalAccessTemplate(accountRecoveryConditionalAccessTemplate(policyName));
+
+      const onTaskComplete = vi.fn();
+      const onTaskError = vi.fn();
+      const task = createConditionalAccessTask("batch-create-agent-policy", policyName);
+      const client = createBatchClient({
+        batchResult: {
+          responses: [
+            {
+              id: "req-0",
+              status: 400,
+              body: { error: { code: "BadRequest", message: "Bad request", innerError: { message: innerMessage } } },
+            },
+          ],
+        },
+      });
+      const context = createCreateContext(client, { onTaskComplete, onTaskError });
+
+      const results = await executeTasksInBatches([task], context);
+
+      expect(results).toEqual([expect.objectContaining({ success: false, skipped: true, skipKind: "blocked", error: reason })]);
+      expect(task).toMatchObject({ status: "skipped", skipKind: "blocked", error: reason });
+      expect(onTaskComplete).toHaveBeenCalledWith(task);
+      expect(onTaskError).not.toHaveBeenCalled();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
 });
