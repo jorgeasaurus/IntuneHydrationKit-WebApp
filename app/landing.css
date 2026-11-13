@@ -8,6 +8,29 @@
   background: #005588;
 }
 
+/*
+ * Phone browsers draw the page under their toolbars and status bar. `inset: 0` covers only
+ * the area between the bars, so cover the largest viewport instead.
+ */
+/*
+ * Any area that the wallpaper does not reach (overscroll, or under a translucent browser
+ * toolbar) shows the page canvas. Give it the wallpaper colour, not the near-black default.
+ */
+html:has(.dynamic-wallpaper) {
+  background-color: #023755;
+}
+
+html:has(.dynamic-wallpaper) body {
+  background-color: transparent;
+}
+
+@supports (height: 100lvh) {
+  .dynamic-wallpaper {
+    bottom: auto;
+    height: 100lvh;
+  }
+}
+
 .dynamic-wallpaper__scrim {
   position: absolute;
   inset: 0;

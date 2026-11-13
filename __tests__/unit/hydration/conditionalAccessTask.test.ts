@@ -104,6 +104,36 @@ describe("executeConditionalAccessTask", () => {
     );
   });
 
+  it("reports a policy that the tenant has no license for as blocked, and rethrows other errors", async () => {
+    const policyName = "[IHD] Block all agent identities from accessing resources";
+    const context: ExecutionContext = {
+      client: createClient(),
+      operationMode: "create",
+      isPreview: false,
+      stopOnFirstError: false,
+      hasConditionalAccessLicense: true,
+      hasPremiumP2License: true,
+      cachedConditionalAccessPolicies: [],
+    };
+    mockGetCachedTemplates.mockReturnValue([
+      { displayName: policyName, state: "disabled", conditions: {}, grantControls: { operator: "OR", builtInControls: ["block"] } },
+    ]);
+
+    mockCreateConditionalAccessPolicy.mockRejectedValueOnce(
+      new Error("[400] 1267: Cannot create or update Conditional Access policies that target agents. This capability requires a Microsoft Agent 365 or Microsoft 365 E7 license.")
+    );
+    await expect(executeConditionalAccessTask(createTask(policyName), context)).resolves.toMatchObject({
+      success: false,
+      skipped: true,
+      skipKind: "blocked",
+      error: "Requires a Microsoft Agent 365 or Microsoft 365 E7 license",
+    });
+    expect(context.cachedConditionalAccessPolicies).toEqual([]);
+
+    mockCreateConditionalAccessPolicy.mockRejectedValueOnce(new Error("[403] Insufficient privileges"));
+    await expect(executeConditionalAccessTask(createTask(policyName), context)).rejects.toThrow("Insufficient privileges");
+  });
+
   it("skips create when a kit policy with the other marker format exists", async () => {
     const policyName = "[IHD] Require MFA";
     mockGetCachedTemplates.mockReturnValue([
