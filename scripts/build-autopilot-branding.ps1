@@ -12,6 +12,10 @@
 
     The package holds the AutopilotBranding module, its runner script, and the configuration.
     The cleanup-only configuration uses no asset files (wallpaper, theme, layouts).
+
+    The script also writes the same package content, unencrypted, as one ZIP file with stored entries:
+    public/win32-apps/autopilot-branding/content.zip. When the user customizes the configuration in the
+    wizard, the web app builds the package in the browser from this file.
 .PARAMETER AutopilotBrandingRoot
     A checkout of mtniehaus/AutopilotBranding at the tag in -ExpectedVersion.
 .PARAMETER ModuleRoot
@@ -46,6 +50,65 @@ $resolvedOutputRoot = [System.IO.Path]::GetFullPath($OutputRoot)
 $configPath = Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding/AutopilotBranding.json'
 $packagePath = Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding.intunewin'
 $licensePath = Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding/LICENSE-AutopilotBranding.txt'
+$contentZipPath = Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding/content.zip'
+
+function Write-StoredContentZip {
+    <#
+    .SYNOPSIS
+        Writes the unencrypted package content as one ZIP file with stored (uncompressed) entries.
+    .DESCRIPTION
+        The web app reads this file when the user customizes the configuration. It replaces the
+        AutopilotBranding.json entry, then encrypts and wraps the content in the browser
+        (lib/win32/autopilotBrandingPackage.ts). The entries are sorted and have a fixed time,
+        so the same content gives the same file.
+    #>
+    param(
+        [Parameter(Mandatory)]
+        [string]$SourcePath,
+
+        [Parameter(Mandatory)]
+        [string]$ZipPath
+    )
+
+    Add-Type -AssemblyName System.IO.Compression
+    $entryTime = [System.DateTimeOffset]::new(2026, 1, 1, 0, 0, 0, [System.TimeSpan]::Zero)
+    $root = [System.IO.Path]::GetFullPath($SourcePath).TrimEnd([System.IO.Path]::DirectorySeparatorChar) + [System.IO.Path]::DirectorySeparatorChar
+    $files = @(Get-ChildItem -Path $SourcePath -Recurse -File | ForEach-Object {
+            [PSCustomObject]@{
+                Path = $_.FullName
+                Name = $_.FullName.Substring($root.Length).Replace([System.IO.Path]::DirectorySeparatorChar, '/')
+            }
+        } | Sort-Object -Property Name -CaseSensitive)
+
+    if (Test-Path -Path $ZipPath) {
+        Remove-Item -Path $ZipPath -Force
+    }
+    $fileStream = [System.IO.File]::Open($ZipPath, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    try {
+        $archive = [System.IO.Compression.ZipArchive]::new($fileStream, [System.IO.Compression.ZipArchiveMode]::Create, $false)
+        try {
+            foreach ($file in $files) {
+                $entry = $archive.CreateEntry($file.Name, [System.IO.Compression.CompressionLevel]::NoCompression)
+                $entry.LastWriteTime = $entryTime
+                $entryStream = $entry.Open()
+                try {
+                    $sourceStream = [System.IO.File]::OpenRead($file.Path)
+                    try {
+                        $sourceStream.CopyTo($entryStream)
+                    } finally {
+                        $sourceStream.Dispose()
+                    }
+                } finally {
+                    $entryStream.Dispose()
+                }
+            }
+        } finally {
+            $archive.Dispose()
+        }
+    } finally {
+        $fileStream.Dispose()
+    }
+}
 
 foreach ($requiredPath in @($brandingManifest, $kitManifest, $configPath)) {
     if (-not (Test-Path -Path $requiredPath -PathType Leaf)) {
@@ -76,6 +139,7 @@ try {
     Copy-Item -Path (Join-Path -Path $brandingRoot -ChildPath 'LICENSE') -Destination $licensePath -Force
     # The template catalog shows the script that the install command runs.
     Copy-Item -Path (Join-Path -Path $staging -ChildPath 'AutopilotBranding.ps1') -Destination (Join-Path -Path $resolvedOutputRoot -ChildPath 'autopilot-branding/AutopilotBranding.ps1') -Force
+    Write-StoredContentZip -SourcePath $staging -ZipPath $contentZipPath
 
     $kitModule = Import-Module -Name $kitManifest -Force -PassThru
     $package = & $kitModule {
@@ -98,6 +162,7 @@ try {
 
     [PSCustomObject]@{
         PackagePath  = $package.OutputPath
+        ContentZip   = $contentZipPath
         Version      = $brandingVersion
         EnabledTasks = @($output.EnabledTasks)
         Files        = @(Get-ChildItem -Path $staging -Recurse -File).Count
