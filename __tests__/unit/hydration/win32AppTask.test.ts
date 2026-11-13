@@ -48,7 +48,7 @@ const createContext = (isPreview = false): ExecutionContext => ({
 });
 
 /** Answer a read of one app by ID from the given apps, and 404 for any other app. */
-function serveApps(context: ExecutionContext, apps: Array<{ id: string }>): void {
+function serveApps(context: ExecutionContext, apps: Array<{ id: string } & Record<string, unknown>>): void {
   vi.mocked(context.client.get).mockImplementation(async (url: string) => {
     if (url.endsWith("/assignments")) return { value: [] };
     const app = apps.find((candidate) => url.endsWith(`/mobileApps/${candidate.id}`));

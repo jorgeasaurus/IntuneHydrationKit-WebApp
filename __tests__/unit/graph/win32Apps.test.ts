@@ -411,7 +411,10 @@ describe("createWin32AppFromPackage", () => {
       SEVEN_ZIP_WIN32_APP,
       packageFile(),
       "detected"
-    ).catch((caught: unknown) => caught as Error & { status?: number });
+    ).then(
+      () => { throw new Error("The create did not fail."); },
+      (caught: unknown) => caught as Error & { status?: number }
+    );
 
     expect(error.message).toContain("[503] content version unavailable");
     expect(error.message).toContain(`The incomplete app "${SEVEN_ZIP_WIN32_APP.displayName}" could not be removed`);
