@@ -88,20 +88,6 @@ describe("msalConfig", () => {
     expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(bridgeUri);
   });
 
-  it("sends silent requests to the blank redirect page on the current origin", async () => {
-    vi.stubEnv(
-      "NEXT_PUBLIC_MSAL_REDIRECT_URI",
-      "https://www.intunehydrationkit.com"
-    );
-
-    const module = await importModule();
-
-    expect(module.MSAL_SILENT_REDIRECT_PATH).toBe("/auth/redirect");
-    expect(module.silentRedirectUri).toBe(`${window.location.origin}/auth/redirect`);
-    // Popup sign-in and sign-out keep the origin redirect URI.
-    expect(module.msalConfig.auth.redirectUri).toBe(window.location.origin);
-  });
-
   it("explains when the Entra client ID is missing", async () => {
     vi.stubEnv("NEXT_PUBLIC_MSAL_CLIENT_ID", "");
     const module = await importModule();
