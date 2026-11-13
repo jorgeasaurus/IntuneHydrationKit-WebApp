@@ -51,8 +51,8 @@ describe('AutopilotBrandingCustomizeDialog', () => {
 
     expect(screen.getByRole('checkbox', { name: 'Solitaire Collection Microsoft.MicrosoftSolitaireCollection' }))
       .toBeChecked()
-    // An app without a certain plain name shows its package name only.
-    expect(screen.getByRole('checkbox', { name: '9NHT9RB2F4HD' })).toBeChecked()
+    // A Store ID is not readable, so the app name comes first.
+    expect(screen.getByRole('checkbox', { name: 'Microsoft Copilot 9NHT9RB2F4HD' })).toBeChecked()
     for (const checkbox of screen.getAllByRole('checkbox')) expect(checkbox).toHaveAccessibleName()
     const widgets = screen.getByRole('switch', { name: /Hide Widgets/ })
     expect(widgets).toHaveAccessibleDescription('Hides the Widgets button on the taskbar.')

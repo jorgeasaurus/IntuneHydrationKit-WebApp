@@ -180,7 +180,7 @@ describe("customization helpers", () => {
     expect(template.description).toContain("customized cleanup-only configuration");
     expect(template.description).toContain("it removes 2 in-box apps, and hides Widgets.");
     expect(template.description).toContain(
-      "Apps that it removes: Solitaire Collection (Microsoft.MicrosoftSolitaireCollection), 9NHT9RB2F4HD.",
+      "Apps that it removes: Solitaire Collection (Microsoft.MicrosoftSolitaireCollection), Microsoft Copilot (9NHT9RB2F4HD).",
     );
     expect(template.description).not.toContain("updates Edge");
     expect(template.notes).toContain(`${KIT_TEMPLATE_ID_NOTE} autopilot-branding`);
@@ -237,5 +237,11 @@ describe("buildAutopilotBrandingPackage", () => {
   it("fails closed on an invalid customization", async () => {
     await expect(buildAutopilotBrandingPackage(contentZip, { removedApps: ["Contoso.App"], enabledTasks: [] }))
       .rejects.toThrow("not valid");
+  });
+});
+
+describe("app names", () => {
+  it("gives every app in the removal list a plain name", () => {
+    for (const app of AUTOPILOT_BRANDING_APPS) expect(app.label, app.packageName).toBeTruthy();
   });
 });

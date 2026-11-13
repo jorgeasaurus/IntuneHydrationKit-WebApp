@@ -118,7 +118,7 @@ describe('ReviewConfirm', () => {
     const section = screen.getByRole('region', { name: 'Autopilot Branding (customized)' })
     expect(section).toHaveTextContent('Apps to remove (2)')
     expect(section).toHaveTextContent('Clipchamp (Clipchamp.Clipchamp)')
-    expect(section).toHaveTextContent('9NHT9RB2F4HD')
+    expect(section).toHaveTextContent('Microsoft Copilot (9NHT9RB2F4HD)')
     expect(section).toHaveTextContent('Tasks that run (2)')
     expect(section).toHaveTextContent('Hide-ABWidgets')
     expect(section).toHaveTextContent('Remove-ABProvisionedApps')
