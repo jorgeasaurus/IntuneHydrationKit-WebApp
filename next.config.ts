@@ -8,53 +8,54 @@ const MSAL_AUTHORITY_ORIGINS = [
 ];
 const VERCEL_ANALYTICS_SCRIPT_ORIGIN = "https://va.vercel-scripts.com";
 const VERCEL_ANALYTICS_CONNECT_ORIGIN = "https://vitals.vercel-insights.com";
-// Third-party widget on the landing page (components/landing/AppreciateButton.tsx).
-const APPRECIATE_WIDGET_ORIGIN = "https://appreciate-button.com";
 
 /**
- * Builds the Content-Security-Policy value.
+ * Content-Security-Policy for the app pages.
  *
  * Scripts keep 'unsafe-inline' because Next.js writes inline bootstrap scripts
  * into statically generated pages. A nonce policy needs middleware and makes
  * every page dynamic. 'unsafe-eval' is for the development server only.
  */
-function buildContentSecurityPolicy({
-  allowAppreciateWidget,
-  allowSameOriginFraming = false,
-}: {
-  allowAppreciateWidget: boolean;
-  allowSameOriginFraming?: boolean;
-}): string {
-  const widgetOrigins = allowAppreciateWidget ? [APPRECIATE_WIDGET_ORIGIN] : [];
-  const directives: Record<string, string[]> = {
-    "default-src": ["'self'"],
-    "script-src": [
-      "'self'",
-      "'unsafe-inline'",
-      ...(isDevelopment ? ["'unsafe-eval'"] : []),
-      VERCEL_ANALYTICS_SCRIPT_ORIGIN,
-      ...widgetOrigins,
-    ],
-    "connect-src": [
-      "'self'",
-      "https://graph.microsoft.com",
-      ...MSAL_AUTHORITY_ORIGINS,
-      VERCEL_ANALYTICS_CONNECT_ORIGIN,
-      ...widgetOrigins,
-    ],
-    // MSAL renews tokens in a hidden iframe when no refresh token is usable.
-    // The iframe starts at the login host and ends at the redirect URI on this
-    // origin, so 'self' is needed too. MsalProvider wraps every page.
-    "frame-src": ["'self'", ...MSAL_AUTHORITY_ORIGINS],
-    "style-src": ["'self'", "'unsafe-inline'"],
-    "img-src": ["'self'", "data:", "https:"],
-    "font-src": ["'self'", "data:"],
-    "object-src": ["'none'"],
-    "base-uri": ["'self'"],
-    "form-action": ["'self'"],
-    "frame-ancestors": [allowSameOriginFraming ? "'self'" : "'none'"],
-  };
+const SITE_POLICY_DIRECTIVES: Record<string, string[]> = {
+  "default-src": ["'self'"],
+  "script-src": [
+    "'self'",
+    "'unsafe-inline'",
+    ...(isDevelopment ? ["'unsafe-eval'"] : []),
+    VERCEL_ANALYTICS_SCRIPT_ORIGIN,
+  ],
+  "connect-src": [
+    "'self'",
+    "https://graph.microsoft.com",
+    ...MSAL_AUTHORITY_ORIGINS,
+    VERCEL_ANALYTICS_CONNECT_ORIGIN,
+  ],
+  // MSAL renews tokens in a hidden iframe when no refresh token is usable.
+  // The iframe starts at the login host and ends at MSAL_SILENT_REDIRECT_SOURCE
+  // on this origin, so 'self' is needed too. MsalProvider wraps every page.
+  "frame-src": ["'self'", ...MSAL_AUTHORITY_ORIGINS],
+  "style-src": ["'self'", "'unsafe-inline'"],
+  "img-src": ["'self'", "data:", "https:"],
+  "font-src": ["'self'", "data:"],
+  "object-src": ["'none'"],
+  "base-uri": ["'self'"],
+  "form-action": ["'self'"],
+  "frame-ancestors": ["'none'"],
+};
 
+/**
+ * Content-Security-Policy for the blank MSAL redirect page. The page has no
+ * scripts, styles, images, or forms, so it allows nothing except framing by
+ * this origin.
+ */
+const SILENT_REDIRECT_POLICY_DIRECTIVES: Record<string, string[]> = {
+  "default-src": ["'none'"],
+  "base-uri": ["'none'"],
+  "form-action": ["'none'"],
+  "frame-ancestors": ["'self'"],
+};
+
+function serializePolicy(directives: Record<string, string[]>): string {
   return Object.entries(directives)
     .map(([directive, sources]) => `${directive} ${sources.join(" ")}`)
     .join("; ");
@@ -71,50 +72,34 @@ const COMMON_SECURITY_HEADERS = [
   },
 ];
 
-// Routes that hold Graph tokens. Their policy does not allow the third-party widget.
-// A CSP applies to the document that the browser loaded. After a client-side
-// navigation from "/" to "/wizard", the landing policy stays in effect, so this
-// split protects only documents that load these routes directly.
-const TOKEN_ROUTE_SOURCES = [
-  "/wizard", "/wizard/:path*", "/dashboard", "/dashboard/:path*", "/history", "/history/:path*",
-];
-
-// The MSAL redirect URI is the site origin (lib/auth/msalConfig.ts), so the
-// silent renewal iframe lands on "/". Only this path may be framed, and only by
-// this origin. The source matches "/" exactly, not its subpaths.
-const MSAL_REDIRECT_SOURCE = "/";
+// MSAL silent requests use <origin>/auth/redirect as the redirect URI
+// (MSAL_SILENT_REDIRECT_PATH in lib/auth/msalConfig.ts), so the hidden renewal
+// iframe lands on this blank page. Only this path may be framed, and only by
+// this origin. The source matches the path exactly, not its subpaths.
+const MSAL_SILENT_REDIRECT_SOURCE = "/auth/redirect";
 
 const nextConfig: NextConfig = {
   env: {
     NEXT_PUBLIC_APP_VERSION: packageJson.version,
   },
   async headers() {
-    const landingPolicy = buildContentSecurityPolicy({ allowAppreciateWidget: true });
-    const tokenRoutePolicy = buildContentSecurityPolicy({ allowAppreciateWidget: false });
-    const redirectTargetPolicy = buildContentSecurityPolicy({
-      allowAppreciateWidget: true,
-      allowSameOriginFraming: true,
-    });
-
     // When two entries set the same header, Next.js uses the last entry. The
-    // token route and redirect entries come after the catch-all so that they
-    // replace its values.
+    // redirect entry comes after the catch-all so that it replaces its values.
     return [
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: landingPolicy },
+          { key: "Content-Security-Policy", value: serializePolicy(SITE_POLICY_DIRECTIVES) },
           ...COMMON_SECURITY_HEADERS,
         ],
       },
-      ...TOKEN_ROUTE_SOURCES.map((source) => ({
-        source,
-        headers: [{ key: "Content-Security-Policy", value: tokenRoutePolicy }],
-      })),
       {
-        source: MSAL_REDIRECT_SOURCE,
+        source: MSAL_SILENT_REDIRECT_SOURCE,
         headers: [
-          { key: "Content-Security-Policy", value: redirectTargetPolicy },
+          {
+            key: "Content-Security-Policy",
+            value: serializePolicy(SILENT_REDIRECT_POLICY_DIRECTIVES),
+          },
           { key: "X-Frame-Options", value: "SAMEORIGIN" },
         ],
       },

@@ -36,6 +36,7 @@ vi.mock("@/lib/auth/msalConfig", () => ({
   },
   getAuthorityUrl: mocks.getAuthorityUrl,
   initializeMsal: mocks.initializeMsal,
+  silentRedirectUri: "http://localhost:3000/auth/redirect",
 }));
 
 vi.mock("@/lib/auth/sessionEvents", () => ({
@@ -131,6 +132,7 @@ describe("authUtils", () => {
         account,
         authority: "https://authority.example/global/tenant-id",
         scopes: ["User.Read"],
+        redirectUri: "http://localhost:3000/auth/redirect",
       })
     );
   });
