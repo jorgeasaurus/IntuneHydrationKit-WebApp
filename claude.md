@@ -588,7 +588,7 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 ## Success Criteria
 
 **Functional**:
-- Successfully creates all catalog objects in test tenant (the template catalog lists 990 items)
+- Successfully creates all catalog objects in test tenant (the template catalog lists 991 items)
 - Delete mode safely removes only kit-created objects
 - Preview mode shows accurate diff without mutations
 - Handles Graph API throttling gracefully
@@ -656,7 +656,7 @@ These items are still wanted but are not in the app as built:
 - First contentful paint: < 1.5s
 - Time to interactive: < 3s
 - Task execution rate: set by Graph `$batch` size and batch delay (see Execution Flow)
-- Total hydration time (full catalog, about 990 objects): < 10 minutes
+- Total hydration time (full catalog, about 991 objects): < 10 minutes
 - Report generation: < 2 seconds
 - Memory usage: < 100MB (excluding browser baseline)
 

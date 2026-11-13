@@ -5,7 +5,7 @@ import {
   HYDRATION_MARKER_LEGACY,
 } from "@/lib/utils/hydrationMarker";
 import { IntuneWinPackage } from "@/lib/win32/intuneWinPackage";
-import { Win32AppTemplate } from "@/templates/win32Apps";
+import { KIT_TEMPLATE_ID_NOTE, Win32AppTemplate } from "@/templates/win32Apps";
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { utf8ToBase64 } from "@/lib/utils/base64";
 import { isAuthSessionError, isRunCancelledError } from "@/lib/utils/retry";
@@ -289,10 +289,14 @@ export function isOwnedWin32App(app: Win32LobApp): boolean {
   const hasFullHydrationMarker = fields.some((field) =>
     hydrationMarkers.some((marker) => field.includes(marker))
   );
-  const hasWinGetMarker = fields.some(
-    (field) => field.includes("imported from winget") || field.includes("wingetpackageidentifier:")
+  // The second marker is in the notes: WinGet apps carry the WinGet lines, other kit apps the template ID line.
+  const hasKitAppMarker = fields.some(
+    (field) =>
+      field.includes("imported from winget") ||
+      field.includes("wingetpackageidentifier:") ||
+      field.includes(KIT_TEMPLATE_ID_NOTE.toLowerCase())
   );
-  return hasFullHydrationMarker && hasWinGetMarker;
+  return hasFullHydrationMarker && hasKitAppMarker;
 }
 
 export function getWin32AppDisplayNameVariants(displayName: string): string[] {

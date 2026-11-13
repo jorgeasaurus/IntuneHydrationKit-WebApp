@@ -51,8 +51,8 @@ export const TEMPLATE_METADATA = {
   },
   win32Apps: {
     displayName: "Win32 Apps",
-    description: "WinGet applications packaged for Intune deployment",
-    count: 4,
+    description: "Windows applications and Autopilot scripts packaged for Intune deployment",
+    count: 5,
     icon: "Package",
   },
   enrollment: {
