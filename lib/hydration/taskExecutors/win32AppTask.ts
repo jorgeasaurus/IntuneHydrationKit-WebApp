@@ -8,9 +8,16 @@ import {
   isOwnedWin32App,
 } from "@/lib/graph/win32Apps";
 import type { Win32LobApp } from "@/lib/graph/win32Apps";
-import { getWin32AppTemplateByName } from "@/templates/win32Apps";
+import { AUTOPILOT_BRANDING_WIN32_APP, getWin32AppTemplateByName } from "@/templates/win32Apps";
 import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
+import {
+  getCustomizedAutopilotBrandingTemplate,
+  isDefaultAutopilotBrandingCustomization,
+  parseAutopilotBrandingCustomization,
+  type AutopilotBrandingCustomization,
+} from "@/lib/win32/autopilotBrandingConfig";
+import { fetchCustomizedAutopilotBrandingPackage } from "@/lib/win32/autopilotBrandingPackage";
 import { bytesToBase64 } from "@/lib/utils/base64";
 import { DELETE_REASONS, deleteResolutionResult, readAssignmentCount } from "../deleteResolver";
 import { isRunCancelledError } from "@/lib/utils/retry";
@@ -160,6 +167,26 @@ async function fetchOptionalIcon(iconUrl: string | undefined): Promise<string | 
   }
 }
 
+interface CreatePlan {
+  template: Win32AppTemplate;
+  /** Present when the package is built in the browser for a customized configuration. */
+  customization?: AutopilotBrandingCustomization;
+}
+
+/**
+ * The template and package source of a create task. A task without a customization, or with
+ * the default choices, uses the prebuilt package. Throws when the customization is not valid.
+ */
+function getCreatePlan(template: Win32AppTemplate, task: HydrationTask): CreatePlan {
+  if (task.autopilotBranding === undefined) return { template };
+  if (template.id !== AUTOPILOT_BRANDING_WIN32_APP.id) {
+    throw new Error("Only the Autopilot Branding app can have a configuration customization.");
+  }
+  const customization = parseAutopilotBrandingCustomization(task.autopilotBranding);
+  if (isDefaultAutopilotBrandingCustomization(customization)) return { template };
+  return { template: getCustomizedAutopilotBrandingTemplate(customization), customization };
+}
+
 async function getMatchingApps(
   template: Win32AppTemplate,
   context: ExecutionContext
@@ -240,6 +267,13 @@ export async function executeWin32AppTask(
   const existingApps = deleteCandidates?.apps ?? await getMatchingApps(template, context);
 
   if (task.operation === "create") {
+    let createPlan: CreatePlan;
+    try {
+      createPlan = getCreatePlan(template, task);
+    } catch (error) {
+      // Fail closed: nothing is fetched, built, or uploaded.
+      return { task, success: false, skipped: false, error: error instanceof Error ? error.message : String(error) };
+    }
     if (existingApps.length > 0) {
       return { task, success: true, skipped: true, skipKind: "noOp", error: "Already exists" };
     }
@@ -247,7 +281,10 @@ export async function executeWin32AppTask(
       return { task, success: true, skipped: false };
     }
 
-    const suppliedPackage = await fetchSuppliedPackage(template.packageUrl);
+    const createTemplate = createPlan.template;
+    const suppliedPackage = createPlan.customization
+      ? await fetchCustomizedAutopilotBrandingPackage(createPlan.customization)
+      : await fetchSuppliedPackage(template.packageUrl);
     const packageFile = await readIntuneWinPackage(suppliedPackage);
     if (packageFile.setupFile !== template.setupFilePath) {
       throw new Error(
@@ -258,7 +295,7 @@ export async function executeWin32AppTask(
     const iconBase64 = await fetchOptionalIcon(template.iconUrl);
     const app = await createWin32AppFromPackage(
       context.client,
-      template,
+      createTemplate,
       packageFile,
       detectionScript,
       iconBase64

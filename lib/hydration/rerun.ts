@@ -241,6 +241,10 @@ export async function buildRerunTaskQueue(
       operation: operationMode,
       itemName: sourceTask.itemName,
       ...(sourceTask.templatePath ? { templatePath: sourceTask.templatePath } : {}),
+      // The same app customization, so the retry uploads a package with the same configuration.
+      ...(operationMode === "create" && sourceTask.autopilotBranding
+        ? { autopilotBranding: sourceTask.autopilotBranding }
+        : {}),
       status: "pending",
     };
     if (operationMode === "create" && !templateKeys.has(getTaskKey(task.category, task))) {
