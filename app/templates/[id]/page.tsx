@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { TemplateDetailPage } from "@/components/templates/TemplateDetailPage";
 import {
   getServerTemplateBySlug,
+  getServerWinGetCatalogApp,
   loadServerTemplateCatalog,
   loadServerTemplatePayload,
 } from "@/lib/templates/serverCatalog";
@@ -39,7 +40,10 @@ export default async function TemplatePage({ params }: TemplatePageProps) {
     notFound();
   }
 
-  const result = await loadServerTemplatePayload(item);
+  const [result, winGetApp] = await Promise.all([
+    loadServerTemplatePayload(item),
+    getServerWinGetCatalogApp(item),
+  ]);
   if (result.status === "error") {
     // Every payload is a bundled file. At build time a missing file is a packaging
     // error, so the build stops. In other renders (for example `next dev`), the page
@@ -49,8 +53,8 @@ export default async function TemplatePage({ params }: TemplatePageProps) {
     }
 
     console.error(`[templates] Payload for ${item.slug} did not load: ${result.error}`);
-    return <TemplateDetailPage item={item} payload={null} />;
+    return <TemplateDetailPage item={item} payload={null} winGetApp={winGetApp} />;
   }
 
-  return <TemplateDetailPage item={item} payload={result.payload} />;
+  return <TemplateDetailPage item={item} payload={result.payload} winGetApp={winGetApp} />;
 }

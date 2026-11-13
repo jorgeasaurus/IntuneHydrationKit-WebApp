@@ -17,6 +17,12 @@ import {
   type TemplateDocumentationCatalog,
   type TemplateDocumentationItem,
 } from "@/lib/templates/catalog";
+import {
+  fetchWinGetVersionCatalog,
+  findWinGetCatalogApp,
+  type WinGetCatalogApp,
+  type WinGetVersionCatalog,
+} from "@/lib/winget/versionCatalog";
 
 const PUBLIC_DIR = path.join(process.cwd(), "public");
 const PUBLIC_FILE_FETCH = Symbol.for("intuneHydrationKit.publicFileFetch");
@@ -122,4 +128,28 @@ export async function loadServerTemplatePayload(
       error: error instanceof Error ? error.message : String(error),
     };
   }
+}
+
+let winGetCatalogPromise: Promise<WinGetVersionCatalog> | null = null;
+
+/**
+ * Returns the WinGet version catalog entry for a Win32 app item, or null when the item is
+ * not a WinGet app in the catalog. Throws when the catalog file is not valid, so a build
+ * with a malformed catalog fails.
+ */
+export async function getServerWinGetCatalogApp(
+  item: TemplateDocumentationItem
+): Promise<WinGetCatalogApp | null> {
+  if (item.payloadSource.kind !== "win32") {
+    return null;
+  }
+
+  installPublicFileFetch();
+  winGetCatalogPromise ??= fetchWinGetVersionCatalog().catch((error: unknown) => {
+    winGetCatalogPromise = null;
+    throw error;
+  });
+
+  const catalog = await winGetCatalogPromise;
+  return findWinGetCatalogApp(catalog, item.payloadSource.template.packageIdentifier) ?? null;
 }

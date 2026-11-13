@@ -19,6 +19,7 @@ const item = {
 
 vi.mock('@/lib/templates/serverCatalog', () => ({
   getServerTemplateBySlug: vi.fn(async (slug: string) => (slug === item.slug ? item : undefined)),
+  getServerWinGetCatalogApp: vi.fn(async () => null),
   loadServerTemplateCatalog: vi.fn(async () => ({ items: [item], categories: [], totalCount: 1 })),
   loadServerTemplatePayload: vi.fn(async () => ({
     status: 'error',

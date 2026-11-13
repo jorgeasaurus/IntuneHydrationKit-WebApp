@@ -16,11 +16,15 @@ import {
   getTemplateSourceLabel,
   type TemplateDocumentationItem,
 } from "@/lib/templates/catalog";
+import type { WinGetCatalogApp } from "@/lib/winget/versionCatalog";
+import { WinGetVersionsSection } from "@/components/templates/WinGetVersionsSection";
 
 interface TemplateDetailPageProps {
   item: TemplateDocumentationItem;
   /** The import-ready payload, or null when the payload could not load. */
   payload: unknown;
+  /** The WinGet versions of the app, for a Win32 app that is in the WinGet version catalog. */
+  winGetApp?: WinGetCatalogApp | null;
 }
 
 const JSON_ELEMENT_ID = "template-json";
@@ -212,7 +216,7 @@ function JsonSection({ json }: { json: string | null }) {
 }
 
 /** Server-rendered detail page for one catalog template. */
-export function TemplateDetailPage({ item, payload }: TemplateDetailPageProps) {
+export function TemplateDetailPage({ item, payload, winGetApp }: TemplateDetailPageProps) {
   const scripts = getWin32Scripts(payload);
   const json = payload === null || payload === undefined ? null : JSON.stringify(payload, null, 2);
 
@@ -252,6 +256,7 @@ export function TemplateDetailPage({ item, payload }: TemplateDetailPageProps) {
                 summary={payload === null ? null : summarizeTemplateSettings(payload)}
                 payloadLoaded={payload !== null}
               />
+              {winGetApp ? <WinGetVersionsSection app={winGetApp} /> : null}
               {scripts.length > 0 ? <ScriptsSection scripts={scripts} /> : null}
               <JsonSection json={json} />
             </article>
