@@ -1,6 +1,6 @@
 {
-  "sourceSha": "3c12e304196d4ab809fa5c78f2b76e084c23814a",
-  "windowsVersion": "4.0",
+  "sourceSha": "2089b9415185a482cc6e2a1856caf3f6bd5dd7ef",
+  "windowsVersion": "4.0.1",
   "totalFiles": 102,
   "platforms": [
     {
@@ -230,8 +230,8 @@
       "displayName": "Win - OIB - SC - Defender Antivirus - D - Additional Configuration - v4.0"
     },
     {
-      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Administrator Protection - v3.7.json",
-      "displayName": "Win - OIB - SC - Device Security - D - Administrator Protection - v3.7"
+      "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Administrator Protection - v4.0.1.json",
+      "displayName": "Win - OIB - SC - Device Security - D - Administrator Protection - v4.0.1"
     },
     {
       "path": "WINDOWS/IntuneManagement/SettingsCatalog/Win - OIB - SC - Device Security - D - Audit and Event Logging - v4.0.json",
