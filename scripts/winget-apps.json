@@ -1,0 +1,176 @@
+[
+  {
+    "templateId": "7-zip",
+    "packageIdentifier": "7zip.7zip",
+    "displayName": "7-Zip",
+    "publisher": "Igor Pavlov"
+  },
+  {
+    "templateId": "anysphere-cursor",
+    "packageIdentifier": "Anysphere.Cursor",
+    "displayName": "Cursor",
+    "publisher": "Anysphere"
+  },
+  {
+    "templateId": "claude-code",
+    "packageIdentifier": "Anthropic.ClaudeCode",
+    "displayName": "Claude Code",
+    "publisher": "Anthropic PBC"
+  },
+  {
+    "templateId": "claude",
+    "packageIdentifier": "Anthropic.Claude",
+    "displayName": "Claude",
+    "publisher": "Anthropic, PBC"
+  },
+  {
+    "templateId": "docker-desktop",
+    "packageIdentifier": "Docker.DockerDesktop",
+    "displayName": "Docker Desktop",
+    "publisher": "Docker Inc."
+  },
+  {
+    "templateId": "everything-search",
+    "packageIdentifier": "voidtools.Everything",
+    "displayName": "Everything",
+    "publisher": "voidtools"
+  },
+  {
+    "templateId": "foxit-pdf-reader",
+    "packageIdentifier": "Foxit.FoxitReader",
+    "displayName": "Foxit PDF Reader",
+    "publisher": "Foxit Software Inc."
+  },
+  {
+    "templateId": "git-for-windows",
+    "packageIdentifier": "Git.Git",
+    "displayName": "Git for Windows",
+    "publisher": "The Git Development Community"
+  },
+  {
+    "templateId": "github-desktop",
+    "packageIdentifier": "GitHub.GitHubDesktop",
+    "displayName": "GitHub Desktop",
+    "publisher": "GitHub, Inc."
+  },
+  {
+    "templateId": "google-chrome",
+    "packageIdentifier": "Google.Chrome",
+    "displayName": "Google Chrome",
+    "publisher": "Google LLC"
+  },
+  {
+    "templateId": "greenshot",
+    "packageIdentifier": "Greenshot.Greenshot",
+    "displayName": "Greenshot",
+    "publisher": "Greenshot"
+  },
+  {
+    "templateId": "microsoft-edge",
+    "packageIdentifier": "Microsoft.Edge",
+    "displayName": "Microsoft Edge",
+    "publisher": "Microsoft Corporation"
+  },
+  {
+    "templateId": "microsoft-powertoys",
+    "packageIdentifier": "Microsoft.PowerToys",
+    "displayName": "PowerToys",
+    "publisher": "Microsoft Corporation"
+  },
+  {
+    "templateId": "microsoft-teams",
+    "packageIdentifier": "Microsoft.Teams",
+    "displayName": "Microsoft Teams",
+    "publisher": "Microsoft Corporation"
+  },
+  {
+    "templateId": "mozilla-firefox",
+    "packageIdentifier": "Mozilla.Firefox",
+    "displayName": "Mozilla Firefox",
+    "publisher": "Mozilla"
+  },
+  {
+    "templateId": "notepad-plus-plus",
+    "packageIdentifier": "Notepad++.Notepad++",
+    "displayName": "Notepad++",
+    "publisher": "Don Ho"
+  },
+  {
+    "templateId": "notion",
+    "packageIdentifier": "Notion.Notion",
+    "displayName": "Notion",
+    "publisher": "Notion Labs Inc."
+  },
+  {
+    "templateId": "power-bi-desktop",
+    "packageIdentifier": "Microsoft.PowerBI",
+    "displayName": "Power BI Desktop",
+    "publisher": "Microsoft Corporation"
+  },
+  {
+    "templateId": "pstools",
+    "packageIdentifier": "Microsoft.Sysinternals.PsTools",
+    "displayName": "PsTools Suite",
+    "publisher": "Sysinternals"
+  },
+  {
+    "templateId": "putty",
+    "packageIdentifier": "PuTTY.PuTTY",
+    "displayName": "PuTTY",
+    "publisher": "Simon Tatham"
+  },
+  {
+    "templateId": "sharex",
+    "packageIdentifier": "ShareX.ShareX",
+    "displayName": "ShareX",
+    "publisher": "ShareX Team"
+  },
+  {
+    "templateId": "slack",
+    "packageIdentifier": "SlackTechnologies.Slack",
+    "displayName": "Slack",
+    "publisher": "Slack Technologies Inc."
+  },
+  {
+    "templateId": "treesize-free",
+    "packageIdentifier": "JAMSoftware.TreeSize.Free",
+    "displayName": "TreeSize Free",
+    "publisher": "JAM Software"
+  },
+  {
+    "templateId": "visual-studio-code",
+    "packageIdentifier": "Microsoft.VisualStudioCode",
+    "displayName": "Visual Studio Code",
+    "publisher": "Microsoft Corporation"
+  },
+  {
+    "templateId": "vlc-media-player",
+    "packageIdentifier": "VideoLAN.VLC",
+    "displayName": "VLC media player",
+    "publisher": "VideoLAN"
+  },
+  {
+    "templateId": "windows-app",
+    "packageIdentifier": "Microsoft.WindowsApp",
+    "displayName": "Windows App",
+    "publisher": "Microsoft Corp."
+  },
+  {
+    "templateId": "windows-terminal",
+    "packageIdentifier": "Microsoft.WindowsTerminal",
+    "displayName": "Windows Terminal",
+    "publisher": "Microsoft Corporation"
+  },
+  {
+    "templateId": "winscp",
+    "packageIdentifier": "WinSCP.WinSCP",
+    "displayName": "WinSCP",
+    "publisher": "Martin Prikryl"
+  },
+  {
+    "templateId": "zoom-workplace",
+    "packageIdentifier": "Zoom.Zoom",
+    "displayName": "Zoom Workplace",
+    "publisher": "Zoom Communications, Inc."
+  }
+]
