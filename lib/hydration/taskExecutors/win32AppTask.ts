@@ -254,7 +254,7 @@ export async function executeWin32AppTask(
         `The supplied Intune package setup file is ${packageFile.setupFile}; expected ${template.setupFilePath}.`
       );
     }
-    const detectionScript = await fetchTextAsset(template.detectionScriptUrl, "WinGet detection script");
+    const detectionScript = await fetchTextAsset(template.detectionScriptUrl, "Win32 detection script");
     const iconBase64 = await fetchOptionalIcon(template.iconUrl);
     const app = await createWin32AppFromPackage(
       context.client,

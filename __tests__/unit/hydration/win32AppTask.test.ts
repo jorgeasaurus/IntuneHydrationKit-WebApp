@@ -95,7 +95,7 @@ describe("executeWin32AppTask", () => {
     const packageBlob = new Blob(["package"]);
     const iconBytes = new Uint8Array([1, 2, 3]);
     const parsedPackage = {
-      setupFile: "Install-WinGetPackage.ps1",
+      setupFile: template.setupFilePath,
       encryptedContent: new Blob(["encrypted"]),
     };
     const fetchMock = vi
@@ -103,6 +103,8 @@ describe("executeWin32AppTask", () => {
       .mockResolvedValueOnce(new Response(packageBlob, { status: 200 }))
       .mockResolvedValueOnce(new Response("Write-Output 'detected'", { status: 200 }))
       .mockResolvedValueOnce(new Response(iconBytes, { status: 200 }));
+    // A template without an icon makes no icon request.
+    const expectedUrls = [template.packageUrl, template.detectionScriptUrl, template.iconUrl].filter(Boolean);
     vi.stubGlobal("fetch", fetchMock);
     mockReadIntuneWinPackage.mockResolvedValue(parsedPackage);
     const createdId = `created-${template.id}`;
@@ -112,17 +114,13 @@ describe("executeWin32AppTask", () => {
     const appTask = { ...task, id: template.id, itemName: template.displayName };
     const result = await executeWin32AppTask(appTask, context);
 
-    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      template.packageUrl,
-      template.detectionScriptUrl,
-      template.iconUrl,
-    ]);
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(expectedUrls);
     expect(mockCreateWin32AppFromPackage).toHaveBeenCalledWith(
       context.client,
       expect.objectContaining({ packageIdentifier: template.packageIdentifier }),
       parsedPackage,
       "Write-Output 'detected'",
-      "AQID"
+      template.iconUrl ? "AQID" : undefined
     );
     expect(result).toMatchObject({ success: true, skipped: false, createdId });
 
@@ -133,7 +131,7 @@ describe("executeWin32AppTask", () => {
             id: createdId,
             displayName: template.displayName,
             description: "Imported by Intune Hydration Kit",
-            notes: "Imported from WinGet",
+            notes: template.notes,
           }
     );
     await expect(executeWin32AppTask(
@@ -157,7 +155,7 @@ describe("executeWin32AppTask", () => {
     mockReadIntuneWinPackage.mockResolvedValue({ setupFile: "Install-WinGetPackage.ps1" });
 
     await expect(executeWin32AppTask(task, createContext())).rejects.toThrow(
-      "Unable to load the supplied WinGet detection script from /win32-apps/7-zip/Detect-WinGetPackage.ps1: 404 Not Found"
+      "Unable to load the supplied Win32 detection script from /win32-apps/7-zip/Detect-WinGetPackage.ps1: 404 Not Found"
     );
   });
 

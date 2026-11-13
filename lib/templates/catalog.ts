@@ -481,7 +481,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       app.description,
       "Packaged Windows application imported by Intune Hydration Kit."
     ),
-    subcategory: "WinGet Package",
+    subcategory: app.catalogSubcategory ?? "WinGet Package",
     platform: "Windows",
     itemType: "Windows app (Win32)",
     sourcePath: app.packageUrl,
@@ -570,7 +570,9 @@ export async function loadTemplateDocumentationPayload(
       ] = await Promise.all([
         fetchScriptContent(template.detectionScriptUrl, "Win32 detection script"),
         fetchScriptContent(template.installScriptUrl, "Win32 install script"),
-        fetchScriptContent(template.uninstallScriptUrl, "Win32 uninstall script"),
+        template.uninstallScriptUrl
+          ? fetchScriptContent(template.uninstallScriptUrl, "Win32 uninstall script")
+          : Promise.resolve(template.uninstallCommandLine),
       ]);
 
       return {

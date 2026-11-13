@@ -33,7 +33,7 @@ describe("readIntuneWinPackage", () => {
     );
 
     expect(packageFile.encryptedContentName).toBe("IntunePackage.intunewin");
-    expect(packageFile.setupFile).toBe("Install-WinGetPackage.ps1");
+    expect(packageFile.setupFile).toBe(template.setupFilePath);
     expect(packageFile.encryptedContent.size).toBeGreaterThan(0);
     expect(packageFile.unencryptedContentSize).toBeGreaterThan(0);
     expect(packageFile.encryptionInfo).toMatchObject({
@@ -67,7 +67,7 @@ describe("readIntuneWinPackage", () => {
     expect((encryptedContentPart as Uint8Array).buffer).toBe(packageBuffer);
   });
 
-  it.each(getWin32AppTemplates())("ships only the PowerShell module's WinGet wrapper source files for $displayName", (template) => {
+  it.each(getWin32AppTemplates().filter((template) => template.notes.includes("Imported from WinGet")))("ships only the PowerShell module's WinGet wrapper source files for $displayName", (template) => {
     const wrapperRoot = join(process.cwd(), "public/win32-apps", template.id);
     expect(template.installScriptUrl).toBe(
       `/win32-apps/${template.id}/Install-WinGetPackage.ps1`

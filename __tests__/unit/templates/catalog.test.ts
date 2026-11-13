@@ -155,10 +155,10 @@ describe('template catalog', () => {
   it('builds a catalog from loader-backed sources and manifests', async () => {
     const catalog = await loadTemplateDocumentationCatalog()
 
-    expect(catalog.totalCount).toBe(15)
+    expect(catalog.totalCount).toBe(16)
     expect(catalog.categories.find((category) => category.id === 'groups')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'notification')?.count).toBe(1)
-    expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(4)
+    expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(5)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.description).toBe('Baseline v4.0 includes macOS, Windows, and BYOD policies.')
     expect(catalog.categories.find((category) => category.id === 'cisBaseline')?.count).toBe(1)
@@ -187,9 +187,17 @@ describe('template catalog', () => {
     const win32Items = catalog.items.filter((item) => item.category === 'win32Apps')
     expect(win32Items.map((item) => item.displayName)).toEqual([
       '7-Zip - [IHD]',
+      'Autopilot Branding (Cleanup) - [IHD]',
       'Google Chrome - [IHD]',
       'Mozilla Firefox - [IHD]',
       'Visual Studio Code - [IHD]',
+    ])
+    expect(win32Items.map((item) => item.subcategory)).toEqual([
+      'WinGet Package',
+      'Autopilot script package',
+      'WinGet Package',
+      'WinGet Package',
+      'WinGet Package',
     ])
 
     const win32Item = win32Items.find((item) => item.displayName === '7-Zip - [IHD]')
