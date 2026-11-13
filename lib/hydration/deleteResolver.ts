@@ -93,6 +93,8 @@ export const DELETE_REASONS = {
   notificationInUse: (users: string[]) =>
     `Notification template is used by ${users.length} object(s): ${users.join(", ")}. ` +
     "Remove it from the compliance actions and enrollment notifications before you delete it.",
+  filterInUse:
+    "Device filter is used by one or more assignments. Remove the filter from those assignments, then delete it again.",
 } as const;
 
 type CachedObject = {
@@ -632,7 +634,20 @@ function removeFromCache(target: DeleteTarget, context: ExecutionContext): void 
 export type DeleteRequestOutcome =
   | { status: "deleted" }
   | { status: "cancelled" }
+  /** The tenant refused the delete because other objects use the object. Nothing changed. */
+  | { status: "inUse"; reason: string }
   | { status: "failed"; error: Error };
+
+/**
+ * True when Intune refused to delete a device filter because assignments use it
+ * (HTTP 400, error 5001). A filter has no assignments of its own to read before the
+ * delete, so the refusal is the check. The filter is unchanged.
+ */
+function isFilterInUseError(target: DeleteTarget, error: Error): boolean {
+  if (target.cacheKey !== "cachedFilters") return false;
+  if ((error as Error & { status?: number }).status !== 400) return false;
+  return /\b5001\b|associated with existing assignments/i.test(error.message);
+}
 
 /**
  * Send the DELETE request for a resolved object and remove the object from its cache
@@ -657,6 +672,9 @@ export async function sendDeleteRequest(
       console.log(`[Delete] "${task.itemName}" - ResourceNotFound, treating as success`);
       removeFromCache(target, context);
       return { status: "deleted" };
+    }
+    if (isFilterInUseError(target, lastError)) {
+      return { status: "inUse", reason: DELETE_REASONS.filterInUse };
     }
     return { status: "failed", error: lastError };
   }
@@ -686,6 +704,8 @@ export async function executeDeleteTask(task: HydrationTask, context: ExecutionC
       return { task, success: true, skipped: false };
     case "cancelled":
       return { task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled" };
+    case "inUse":
+      return { task, success: false, skipped: true, skipKind: "blocked", error: outcome.reason };
     case "failed":
       return { task, success: false, skipped: false, error: outcome.error.message };
   }

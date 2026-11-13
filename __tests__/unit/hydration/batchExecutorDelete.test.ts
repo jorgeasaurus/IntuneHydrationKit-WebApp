@@ -270,6 +270,55 @@ describe("executeDeletesInParallel", () => {
     expect(client.delete).not.toHaveBeenCalled();
   });
 
+  it("skips a device filter that assignments use, and does not count it as a failure", async () => {
+    const task: HydrationTask = {
+      id: "filter-in-use",
+      category: "filters",
+      operation: "delete",
+      itemName: "[IHD] Windows - Parallels VMs",
+      status: "pending",
+    };
+    const inUse = Object.assign(
+      new Error('[400] { "Message": "5001:An assignment filter is associated with existing assignments. Delete all the assignments for the filter and try again." }'),
+      { status: 400 },
+    );
+    const onTaskError = vi.fn();
+    const onTaskComplete = vi.fn();
+    const client = {
+      delete: vi.fn().mockRejectedValue(inUse),
+      get: vi.fn(),
+      post: vi.fn(),
+      getCollection: vi.fn(),
+      patch: vi.fn(),
+    } as unknown as ExecutionContext["client"];
+    const context: ExecutionContext = {
+      client,
+      operationMode: "delete",
+      isPreview: false,
+      stopOnFirstError: false,
+      onTaskError,
+      onTaskComplete,
+      cachedFilters: [{
+        id: "filter-id",
+        displayName: "[IHD] Windows - Parallels VMs",
+        description: "Imported by Intune Hydration Kit",
+      }] as never,
+    };
+
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
+
+    expect(results).toEqual([expect.objectContaining({
+      success: false,
+      skipped: true,
+      skipKind: "blocked",
+      error: expect.stringContaining("used by one or more assignments"),
+    })]);
+    expect(task).toMatchObject({ status: "skipped", skipKind: "blocked" });
+    expect(onTaskError).not.toHaveBeenCalled();
+    expect(onTaskComplete).toHaveBeenCalledWith(task);
+    expect(context.cachedFilters).toHaveLength(1);
+  });
+
   it("deletes Linux compliance policies from the V2 compliance cache", async () => {
     const task: HydrationTask = {
       id: "linux-compliance-delete",

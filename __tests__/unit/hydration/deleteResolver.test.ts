@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { executeDeleteTask, resolveDeleteTarget } from "@/lib/hydration/deleteResolver";
+import { DELETE_REASONS, executeDeleteTask, resolveDeleteTarget } from "@/lib/hydration/deleteResolver";
 import { cacheTemplates, clearCategoryCache, type BaselinePolicy } from "@/lib/templates/loader";
 import { RunCancelledError } from "@/lib/utils/retry";
 import type { ExecutionContext } from "@/lib/hydration/types";
@@ -240,6 +240,50 @@ describe("executeDeleteTask", () => {
 
     expect(result).toMatchObject({ success: true, skipped: false });
     expect(context.cachedFilters).toEqual([]);
+  });
+});
+
+describe("device filter that assignments use", () => {
+  const IN_USE_MESSAGE =
+    '[400] { "_version": 3, "Message": "5001:An assignment filter is associated with existing assignments. Delete all the assignments for the filter and try again." }';
+
+  function inUseError(status = 400, message = IN_USE_MESSAGE): Error {
+    return Object.assign(new Error(message), { status });
+  }
+
+  it("skips the filter as blocked and keeps it in the cache", async () => {
+    const context = createContext({
+      cachedFilters: [{ id: "used-id", displayName: "[IHD] Used", description: MARKER }] as never,
+    });
+    vi.mocked(context.client.delete).mockRejectedValue(inUseError());
+
+    const result = await executeDeleteTask(createTask("filters", "[IHD] Used"), context);
+
+    expect(result).toMatchObject({ success: false, skipped: true, skipKind: "blocked", error: DELETE_REASONS.filterInUse });
+    expect(context.client.delete).toHaveBeenCalledTimes(1);
+    expect(context.cachedFilters?.map((filter) => filter.id)).toEqual(["used-id"]);
+  });
+
+  it("still fails for another 400 error of a filter", async () => {
+    const context = createContext({
+      cachedFilters: [{ id: "bad-id", displayName: "[IHD] Bad", description: MARKER }] as never,
+    });
+    vi.mocked(context.client.delete).mockRejectedValue(inUseError(400, "[400] BadRequest: the request is not valid"));
+
+    const result = await executeDeleteTask(createTask("filters", "[IHD] Bad"), context);
+
+    expect(result).toMatchObject({ success: false, skipped: false });
+  });
+
+  it("still fails when the same text comes from another object type", async () => {
+    const context = createContext({
+      cachedIntuneGroups: [{ id: "group-id", displayName: "[IHD] Group", description: MARKER }] as never,
+    });
+    vi.mocked(context.client.delete).mockRejectedValue(inUseError());
+
+    const result = await executeDeleteTask(createTask("groups", "[IHD] Group"), context);
+
+    expect(result).toMatchObject({ success: false, skipped: false });
   });
 });
 
