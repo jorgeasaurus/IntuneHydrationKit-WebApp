@@ -8,6 +8,7 @@ import { TargetSelectionView } from '@/components/wizard/TargetSelectionView'
 import { useTargetSelectionController } from '@/components/wizard/useTargetSelectionController'
 import { WinGetVersionsReview } from '@/components/wizard/WinGetVersionsReview'
 import { WINGET_VERSION_CATALOG_URL } from '@/lib/winget/versionCatalog'
+import { getWin32AppTemplates } from '@/templates/win32Apps'
 import type { WizardState } from '@/types/hydration'
 
 const setSelectedTargets = vi.fn()
@@ -86,13 +87,27 @@ describe('WinGet version picker in the Win32 apps list', () => {
     for (const name of DEFAULT_APPS) expect(screen.getByLabelText(name)).toBeChecked()
     expect(screen.getByLabelText(NOTEPAD)).not.toBeChecked()
 
-    // The category All button does not select opt-in apps either.
-    const region = screen.getByLabelText(NOTEPAD).closest('.rounded-b-md') as HTMLElement
-    await user.click(within(region).getByRole('button', { name: 'All' }))
-    expect(screen.getByLabelText(NOTEPAD)).not.toBeChecked()
-
     await user.click(screen.getByRole('button', { name: 'Review Selection' }))
     expect(setCategorySelections.mock.calls[0][0].win32Apps).toEqual({ selectedItems: DEFAULT_APPS })
+  })
+
+  it('selects every app, opt-in apps included, with the category All button', async () => {
+    const user = userEvent.setup()
+    mockWizard({})
+    render(<Harness />)
+
+    await user.click(screen.getByLabelText('Win32 Apps'))
+    expect(await screen.findByLabelText(NOTEPAD)).not.toBeChecked()
+
+    const region = screen.getByLabelText(NOTEPAD).closest('.rounded-b-md') as HTMLElement
+    await user.click(within(region).getByRole('button', { name: 'All' }))
+    expect(screen.getByLabelText(NOTEPAD)).toBeChecked()
+    for (const name of DEFAULT_APPS) expect(screen.getByLabelText(name)).toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    const selected = setCategorySelections.mock.calls[0][0].win32Apps.selectedItems as string[]
+    expect(selected).toHaveLength(getWin32AppTemplates().length)
+    expect(selected).toContain(NOTEPAD)
   })
 
   it('offers Latest and the catalog versions, labels older versions Best effort, and keeps the choice', async () => {

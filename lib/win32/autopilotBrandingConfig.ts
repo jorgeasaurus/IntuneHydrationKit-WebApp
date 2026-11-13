@@ -22,7 +22,7 @@ import {
 export interface AutopilotBrandingApp {
   /** Appx package name (or Store ID) in Remove-ABProvisionedApps.AppNames. */
   packageName: string;
-  /** Plain name. Absent when the app name is not certain: then the UI shows the package name only. */
+  /** Plain name. Without one, the UI shows the package name only. */
   label?: string;
 }
 
@@ -40,7 +40,7 @@ export const AUTOPILOT_BRANDING_APPS = [
   { packageName: "Microsoft.MicrosoftSolitaireCollection", label: "Solitaire Collection" },
   { packageName: "Microsoft.MixedReality.Portal", label: "Mixed Reality Portal" },
   { packageName: "Microsoft.MSPaint", label: "Paint 3D" },
-  { packageName: "Microsoft.News" },
+  { packageName: "Microsoft.News", label: "Microsoft News" },
   { packageName: "Microsoft.OneConnect", label: "Mobile Plans" },
   { packageName: "Microsoft.OutlookForWindows", label: "Outlook (new)" },
   { packageName: "Microsoft.People", label: "People" },
@@ -54,16 +54,16 @@ export const AUTOPILOT_BRANDING_APPS = [
   { packageName: "Microsoft.YourPhone", label: "Phone Link" },
   { packageName: "Microsoft.ZuneMusic", label: "Media Player (Groove Music)" },
   { packageName: "Microsoft.ZuneVideo", label: "Movies & TV" },
-  { packageName: "Microsoft.Xbox.TCUI" },
-  { packageName: "Microsoft.XboxGameOverlay" },
+  { packageName: "Microsoft.Xbox.TCUI", label: "Xbox sign-in UI (TCUI)" },
+  { packageName: "Microsoft.XboxGameOverlay", label: "Xbox Game Bar plugin" },
   { packageName: "Microsoft.XboxGamingOverlay", label: "Xbox Game Bar" },
   { packageName: "Microsoft.XboxIdentityProvider", label: "Xbox Identity Provider" },
-  { packageName: "Microsoft.XboxSpeechToTextOverlay" },
+  { packageName: "Microsoft.XboxSpeechToTextOverlay", label: "Xbox speech to text overlay" },
   { packageName: "MicrosoftCorporationII.MicrosoftFamily", label: "Microsoft Family Safety" },
   { packageName: "MicrosoftTeams", label: "Microsoft Teams (personal)" },
   { packageName: "MSTeams", label: "Microsoft Teams (new)" },
-  { packageName: "Microsoft.M365Companions" },
-  { packageName: "9NHT9RB2F4HD" },
+  { packageName: "Microsoft.M365Companions", label: "Microsoft 365 companion apps" },
+  { packageName: "9NHT9RB2F4HD", label: "Microsoft Copilot" },
 ] as const satisfies readonly AutopilotBrandingApp[];
 
 export type AutopilotBrandingAppName = (typeof AUTOPILOT_BRANDING_APPS)[number]["packageName"];
