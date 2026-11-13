@@ -43,7 +43,8 @@ export function WinGetCatalogNotes({ catalogError }: { catalogError: string | nu
   return (
     <div className="space-y-1 text-xs text-muted-foreground" aria-live="polite">
       <p>
-        WinGet catalog apps are opt-in: Select All does not select them. Select each app that you want.
+        WinGet catalog apps are opt-in: the default selection and the page Select All do not select them.
+        Select each app that you want, or use All in this list to select every app.
       </p>
       <p>Each WinGet app installs the latest version, or a version that you select. {PINNED_DETECTION_NOTE}</p>
       <p>{BEST_EFFORT_NOTE}</p>

@@ -144,10 +144,12 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       return;
     }
 
-    // Without a search, opt-in items (WinGet catalog apps) are not selected.
+    // The All button of a category is an explicit choice, so it selects opt-in items too
+    // (WinGet catalog apps). Only the default selection, the page Select All, and a platform
+    // filter leave them out.
     selectionState.setSelectedItems(prev => ({
       ...prev,
-      [category]: new Set(getDefaultSelectableItems(items).map(i => i.displayName)),
+      [category]: new Set(items.map(i => i.displayName)),
     }));
   };
 
