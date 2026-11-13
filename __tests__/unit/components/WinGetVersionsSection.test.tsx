@@ -82,6 +82,8 @@ describe("WinGetVersionsSection", () => {
     expect(rows[1]).toHaveTextContent("Best effort");
     expect(rows[1]).toHaveTextContent("Not stated");
     expect(rows[1]).toHaveTextContent("x86");
+    expect(rows[0]).toHaveTextContent("Yes");
+    expect(rows[1]).toHaveTextContent("No (no machine-scope x64 installer)");
   });
 
   it("explains best effort and the detection rule, and offers no install action", () => {
@@ -90,7 +92,7 @@ describe("WinGetVersionsSection", () => {
     const section = screen.getByRole("region", { name: "Available versions" });
     expect(section).toHaveTextContent(/can remove or replace the download of an older version/);
     expect(section).toHaveTextContent(/this version or newer/);
-    expect(section).toHaveTextContent(/You cannot select a version yet/);
+    expect(section).toHaveTextContent(/a version that you\s+select/);
     expect(within(section).queryByRole("button")).toBeNull();
     expect(within(section).queryByRole("link")).toBeNull();
   });

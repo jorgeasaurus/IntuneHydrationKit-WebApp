@@ -52,6 +52,39 @@ function attachAutopilotBrandingCustomization(
   );
 }
 
+/**
+ * Copy the pinned WinGet version of each Win32 app to its create task. The executor checks the
+ * version against the catalog and builds the package for it. A delete does not use it.
+ */
+function attachWinGetVersions(
+  tasks: HydrationTask[],
+  operationMode: OperationMode,
+  options?: QueueOptions,
+): HydrationTask[] {
+  const versions = options?.categorySelections?.win32Apps?.wingetVersions;
+  if (operationMode !== "create" || !versions) return tasks;
+  return tasks.map((task) => {
+    if (task.category !== "win32Apps") return task;
+    const template = Templates.getWin32AppTemplateByName(task.itemName);
+    const version = template ? versions[template.id] : undefined;
+    return version === undefined ? task : { ...task, wingetVersion: version };
+  });
+}
+
+/**
+ * The templates that a category queues when it has no selection. A create does not queue an
+ * opt-in Win32 app (a WinGet catalog app) unless the user selected it. A delete queues every
+ * template, so it can remove an opt-in app that an earlier run created.
+ */
+function getUnselectedDefaultTemplates(
+  category: TaskCategory,
+  operationMode: OperationMode,
+  templates: TemplateItem[],
+): TemplateItem[] {
+  if (category !== "win32Apps" || operationMode !== "create") return templates;
+  return templates.filter((template) => template.optIn !== true);
+}
+
 function getTaskDedupKey(task: HydrationTask): string {
   return task.templatePath || task.itemName;
 }
@@ -264,7 +297,7 @@ export async function buildTaskQueueAsync(
 
       items = selectedKeys
         ? templates.filter((template) => selectedKeys.has(getTemplateSelectionKey(category, template)))
-        : templates;
+        : getUnselectedDefaultTemplates(category, operationMode, templates);
       if (selectedKeys) {
         emit?.(`Filtered to ${items.length} of ${templates.length} ${label.toLowerCase()} based on selection`, "info");
       }
@@ -413,7 +446,11 @@ export async function buildTaskQueueAsync(
 
   emit?.(`Deduplication complete. ${deduplicatedTasks.length} tasks ready for execution`, "success");
   console.log(`[Task Queue] Task queue built successfully with ${deduplicatedTasks.length} total tasks`);
-  return attachAutopilotBrandingCustomization(deduplicatedTasks, operationMode, options);
+  return attachWinGetVersions(
+    attachAutopilotBrandingCustomization(deduplicatedTasks, operationMode, options),
+    operationMode,
+    options,
+  );
 }
 
 /**

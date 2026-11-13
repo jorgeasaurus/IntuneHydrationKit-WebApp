@@ -6,7 +6,7 @@
  * (or template paths) per category. It holds no tenant ID, tenant name, account, operation
  * mode, or run confirmation. Thus profiles are device presets, and sign-out does not clear them.
  * It can also hold the Autopilot Branding customization (the apps to remove and the cleanup tasks),
- * which is app configuration, not tenant data.
+ * which is app configuration, not tenant data, and the pinned WinGet versions of selected apps.
  */
 import { z } from "@/lib/utils/zod";
 import { SCOPE_PROFILES_STORAGE_KEY } from "@/lib/storageKeys";
@@ -16,6 +16,8 @@ import {
   type AutopilotBrandingCustomization,
 } from "@/lib/win32/autopilotBrandingConfig";
 import { AUTOPILOT_BRANDING_WIN32_APP } from "@/templates/win32Apps";
+import { getSelectedWinGetVersions } from "@/lib/winget/selectedVersions";
+import { winGetVersionSelectionSchema } from "@/lib/winget/versionCatalog";
 
 export const MAX_PROFILES = 50;
 export const MAX_PROFILE_NAME_LENGTH = 80;
@@ -32,6 +34,8 @@ export interface ScopeSelection {
   items: Record<string, string[]>;
   /** Customization of the Autopilot Branding app. Kept only while that app is selected. */
   autopilotBranding?: AutopilotBrandingCustomization;
+  /** Pinned WinGet versions by Win32 app template ID. Kept only for selected apps. */
+  wingetVersions?: Record<string, string>;
 }
 
 export interface ScopeProfile {
@@ -54,6 +58,7 @@ const selectionSchema = z.strictObject({
   targets: z.array(categoryKeySchema).max(40),
   items: z.record(categoryKeySchema, itemListSchema),
   autopilotBranding: autopilotBrandingCustomizationSchema.optional(),
+  wingetVersions: winGetVersionSelectionSchema.optional(),
 });
 
 const profileSchema = z.strictObject({
@@ -125,9 +130,28 @@ function hasAutopilotBranding(targets: readonly string[], items: Record<string, 
   return targets.includes("win32Apps") && (items.win32Apps ?? []).includes(AUTOPILOT_BRANDING_WIN32_APP.displayName);
 }
 
+/** The selection with the app choices that apply to its selected apps. */
+function withAppChoices(
+  targets: string[],
+  items: Record<string, string[]>,
+  autopilotBranding: AutopilotBrandingCustomization | undefined,
+  wingetVersions: Record<string, string> | undefined,
+): ScopeSelection {
+  const versions = targets.includes("win32Apps")
+    ? getSelectedWinGetVersions(items.win32Apps ?? [], wingetVersions)
+    : undefined;
+  return {
+    targets,
+    items,
+    ...(autopilotBranding && hasAutopilotBranding(targets, items) ? { autopilotBranding } : {}),
+    ...(versions ? { wingetVersions: versions } : {}),
+  };
+}
+
 /**
  * Copy a selection into the stored form: only selected categories, sorted, without duplicates.
- * The Autopilot Branding customization is kept only while that app is selected.
+ * The Autopilot Branding customization is kept only while that app is selected, and a pinned
+ * WinGet version only while its app is selected.
  */
 export function normalizeSelection(selection: ScopeSelection): ScopeSelection {
   const targets = [...new Set(selection.targets)];
@@ -136,9 +160,12 @@ export function normalizeSelection(selection: ScopeSelection): ScopeSelection {
     const targetItems = selection.items[target];
     if (targetItems && targetItems.length > 0) items[target] = sortUnique(targetItems);
   }
-  return selection.autopilotBranding && hasAutopilotBranding(targets, items)
-    ? { targets, items, autopilotBranding: normalizeAutopilotBrandingCustomization(selection.autopilotBranding) }
-    : { targets, items };
+  return withAppChoices(
+    targets,
+    items,
+    selection.autopilotBranding ? normalizeAutopilotBrandingCustomization(selection.autopilotBranding) : undefined,
+    selection.wingetVersions,
+  );
 }
 
 function newProfileId(): string {
@@ -315,8 +342,8 @@ export function resolveSelection(
     items[target] = kept;
   }
 
-  const resolved: ScopeSelection = selection.autopilotBranding && hasAutopilotBranding(targets, items)
-    ? { targets, items, autopilotBranding: selection.autopilotBranding }
-    : { targets, items };
-  return { selection: resolved, dropped };
+  return {
+    selection: withAppChoices(targets, items, selection.autopilotBranding, selection.wingetVersions),
+    dropped,
+  };
 }

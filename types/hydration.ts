@@ -119,6 +119,11 @@ interface HydrationTaskBase {
    * A retry or resume copies it, so the new run uploads a package with the same configuration.
    */
   autopilotBranding?: AutopilotBrandingCustomization;
+  /**
+   * Create tasks of a WinGet Win32 app only: the pinned WinGet version. Absent means the latest
+   * version. A retry or resume copies it, so the new run pins the same version.
+   */
+  wingetVersion?: string;
   error?: string;
   warning?: string;
   startTime?: Date;
@@ -269,11 +274,14 @@ export interface CategorySelection {
 }
 
 /**
- * Selection of the Win32 apps category. The Autopilot Branding app can have a customization.
+ * Selection of the Win32 apps category. The Autopilot Branding app can have a customization,
+ * and a WinGet app can have a pinned version.
  */
 export interface Win32AppsSelection extends CategorySelection {
   /** Absent when the user did not customize the app (the prebuilt package is used). */
   autopilotBranding?: AutopilotBrandingCustomization;
+  /** Pinned WinGet versions by app template ID. An app that is not in the record uses the latest version. */
+  wingetVersions?: Record<string, string>;
 }
 
 /**

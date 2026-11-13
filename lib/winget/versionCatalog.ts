@@ -6,6 +6,7 @@
  * the schema is rejected completely; no part of it is used.
  */
 import { z } from "@/lib/utils/zod";
+import { PINNABLE_VERSION_PATTERN } from "@/lib/winget/versionText";
 
 /** Site-relative URL of the bundled catalog file. */
 export const WINGET_VERSION_CATALOG_URL = "/winget-versions.json";
@@ -152,4 +153,62 @@ export function getVersionArchitectures(version: WinGetCatalogVersion): WinGetAr
 /** Returns the installer types of a version, sorted. */
 export function getVersionInstallerTypes(version: WinGetCatalogVersion): string[] {
   return uniqueSorted(version.installers.map((installer) => installer.installerType));
+}
+
+/**
+ * True when the kit can pin the version: it has a machine-scope x64 installer (the wrapper
+ * installs with "--scope machine" and the app is x64 only), and its version text is safe for
+ * the winget command line.
+ */
+export function isPinnableVersion(version: WinGetCatalogVersion): boolean {
+  return (
+    PINNABLE_VERSION_PATTERN.test(version.version) &&
+    version.installers.some((installer) => installer.architecture === "x64" && installer.scope === "machine")
+  );
+}
+
+/** The versions of an app that the kit can pin, newest first. */
+export function getPinnableVersions(app: WinGetCatalogApp): WinGetCatalogVersion[] {
+  return app.versions.filter(isPinnableVersion);
+}
+
+/** Maximum number of pinned apps in one selection. */
+const MAX_PINNED_APPS = 100;
+
+/** A pinned version as it is stored: the version text only. Catalog membership is checked at use. */
+export const winGetVersionChoiceSchema = z.string().regex(PINNABLE_VERSION_PATTERN);
+
+/**
+ * Pinned versions per Win32 app template ID. An app that is not in the record uses the latest
+ * version. Strict: an invalid key or version rejects the whole record.
+ */
+export const winGetVersionSelectionSchema = z
+  .record(z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/).max(64), winGetVersionChoiceSchema)
+  .refine((record) => Object.keys(record).length <= MAX_PINNED_APPS, {
+    message: `More than ${MAX_PINNED_APPS} pinned versions.`,
+  });
+
+export type WinGetVersionSelection = z.infer<typeof winGetVersionSelectionSchema>;
+
+/**
+ * Returns the catalog version for a pinned choice. Throws when the app is not in the catalog,
+ * the version is not in the catalog for that app, or the kit cannot pin that version.
+ */
+export function resolvePinnedVersion(
+  catalog: WinGetVersionCatalog,
+  packageIdentifier: string,
+  version: string
+): WinGetCatalogVersion {
+  const app = findWinGetCatalogApp(catalog, packageIdentifier);
+  if (!app) {
+    throw new Error(`${packageIdentifier} is not in the WinGet version catalog.`);
+  }
+  const entry = app.versions.find((candidate) => candidate.version === version);
+  if (!entry) {
+    throw new Error(`Version ${version} of ${packageIdentifier} is not in the WinGet version catalog.`);
+  }
+  if (!isPinnableVersion(entry)) {
+    throw new Error(`Version ${version} of ${packageIdentifier} has no machine-scope x64 installer, so it cannot be pinned.`);
+  }
+  return entry;
 }

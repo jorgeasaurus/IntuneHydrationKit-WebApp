@@ -1,0 +1,234 @@
+[
+  {
+    "templateId": "7-zip",
+    "packageIdentifier": "7zip.7zip",
+    "displayName": "7-Zip",
+    "publisher": "Igor Pavlov",
+    "description": "Starter-pack WinGet template for 7-Zip Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "anysphere-cursor",
+    "packageIdentifier": "Anysphere.Cursor",
+    "displayName": "Cursor",
+    "publisher": "Anysphere",
+    "description": "Starter-pack WinGet template for Cursor Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "claude-code",
+    "packageIdentifier": "Anthropic.ClaudeCode",
+    "displayName": "Claude Code",
+    "publisher": "Anthropic PBC",
+    "description": "Starter-pack WinGet template for Claude Code Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "claude",
+    "packageIdentifier": "Anthropic.Claude",
+    "displayName": "Claude",
+    "publisher": "Anthropic, PBC",
+    "description": "Starter-pack WinGet template for Claude desktop Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "docker-desktop",
+    "packageIdentifier": "Docker.DockerDesktop",
+    "displayName": "Docker Desktop",
+    "publisher": "Docker Inc.",
+    "description": "Starter-pack WinGet template for Docker Desktop Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "everything-search",
+    "packageIdentifier": "voidtools.Everything",
+    "displayName": "Everything",
+    "publisher": "voidtools",
+    "description": "Starter-pack WinGet template for Everything Search Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "foxit-pdf-reader",
+    "packageIdentifier": "Foxit.FoxitReader",
+    "displayName": "Foxit PDF Reader",
+    "publisher": "Foxit Software Inc.",
+    "description": "Starter-pack WinGet template for Foxit PDF Reader Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "git-for-windows",
+    "packageIdentifier": "Git.Git",
+    "displayName": "Git for Windows",
+    "publisher": "The Git Development Community",
+    "description": "Starter-pack WinGet template for Git for Windows Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "github-desktop",
+    "packageIdentifier": "GitHub.GitHubDesktop",
+    "displayName": "GitHub Desktop",
+    "publisher": "GitHub, Inc.",
+    "description": "Starter-pack WinGet template for GitHub Desktop Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "google-chrome",
+    "packageIdentifier": "Google.Chrome",
+    "displayName": "Google Chrome",
+    "publisher": "Google LLC",
+    "description": "Starter-pack WinGet template for Google Chrome Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "greenshot",
+    "packageIdentifier": "Greenshot.Greenshot",
+    "displayName": "Greenshot",
+    "publisher": "Greenshot",
+    "description": "Starter-pack WinGet template for Greenshot Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "microsoft-edge",
+    "packageIdentifier": "Microsoft.Edge",
+    "displayName": "Microsoft Edge",
+    "publisher": "Microsoft Corporation",
+    "description": "Starter-pack WinGet template for Microsoft Edge Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "microsoft-powertoys",
+    "packageIdentifier": "Microsoft.PowerToys",
+    "displayName": "PowerToys",
+    "publisher": "Microsoft Corporation",
+    "description": "Starter-pack WinGet template for PowerToys Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "microsoft-teams",
+    "packageIdentifier": "Microsoft.Teams",
+    "displayName": "Microsoft Teams",
+    "publisher": "Microsoft Corporation",
+    "description": "Mobile-apps WinGet template for Microsoft Teams Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "mozilla-firefox",
+    "packageIdentifier": "Mozilla.Firefox",
+    "displayName": "Mozilla Firefox",
+    "publisher": "Mozilla",
+    "description": "Starter-pack WinGet template for Mozilla Firefox Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "notepad-plus-plus",
+    "packageIdentifier": "Notepad++.Notepad++",
+    "displayName": "Notepad++",
+    "publisher": "Don Ho",
+    "description": "Starter-pack WinGet template for Notepad++ Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "notion",
+    "packageIdentifier": "Notion.Notion",
+    "displayName": "Notion",
+    "publisher": "Notion Labs Inc.",
+    "description": "Mobile-apps WinGet template for Notion Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "power-bi-desktop",
+    "packageIdentifier": "Microsoft.PowerBI",
+    "displayName": "Power BI Desktop",
+    "publisher": "Microsoft Corporation",
+    "description": "Mobile-apps WinGet template for Power BI Desktop Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "pstools",
+    "packageIdentifier": "Microsoft.Sysinternals.PsTools",
+    "displayName": "PsTools Suite",
+    "publisher": "Sysinternals",
+    "description": "WinGet template for the Sysinternals PsTools command-line suite.",
+    "offered": false
+  },
+  {
+    "templateId": "putty",
+    "packageIdentifier": "PuTTY.PuTTY",
+    "displayName": "PuTTY",
+    "publisher": "Simon Tatham",
+    "description": "Starter-pack WinGet template for PuTTY Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "sharex",
+    "packageIdentifier": "ShareX.ShareX",
+    "displayName": "ShareX",
+    "publisher": "ShareX Team",
+    "description": "Starter-pack WinGet template for ShareX Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "slack",
+    "packageIdentifier": "SlackTechnologies.Slack",
+    "displayName": "Slack",
+    "publisher": "Slack Technologies Inc.",
+    "description": "Mobile-apps WinGet template for Slack Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "treesize-free",
+    "packageIdentifier": "JAMSoftware.TreeSize.Free",
+    "displayName": "TreeSize Free",
+    "publisher": "JAM Software",
+    "description": "Starter-pack WinGet template for TreeSize Free Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "visual-studio-code",
+    "packageIdentifier": "Microsoft.VisualStudioCode",
+    "displayName": "Visual Studio Code",
+    "publisher": "Microsoft Corporation",
+    "description": "Starter-pack WinGet template for Visual Studio Code Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "vlc-media-player",
+    "packageIdentifier": "VideoLAN.VLC",
+    "displayName": "VLC media player",
+    "publisher": "VideoLAN",
+    "description": "Starter-pack WinGet template for VLC media player Win32 packaging.",
+    "offered": true
+  },
+  {
+    "templateId": "windows-app",
+    "packageIdentifier": "Microsoft.WindowsApp",
+    "displayName": "Windows App",
+    "publisher": "Microsoft Corp.",
+    "description": "Mobile-apps WinGet template for Windows App Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "windows-terminal",
+    "packageIdentifier": "Microsoft.WindowsTerminal",
+    "displayName": "Windows Terminal",
+    "publisher": "Microsoft Corporation",
+    "description": "Mobile-apps WinGet template for Windows Terminal Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "winscp",
+    "packageIdentifier": "WinSCP.WinSCP",
+    "displayName": "WinSCP",
+    "publisher": "Martin Prikryl",
+    "description": "Starter-pack WinGet template for WinSCP Win32 packaging.",
+    "offered": false
+  },
+  {
+    "templateId": "zoom-workplace",
+    "packageIdentifier": "Zoom.Zoom",
+    "displayName": "Zoom Workplace",
+    "publisher": "Zoom Communications, Inc.",
+    "description": "Starter-pack WinGet template for Zoom Workplace Win32 packaging.",
+    "offered": true
+  }
+]

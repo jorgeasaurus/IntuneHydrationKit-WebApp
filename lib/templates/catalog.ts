@@ -16,7 +16,7 @@ import {
   OIBManifestFile,
 } from "@/lib/templates/loader";
 import { IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
-import { getWin32AppTemplates } from "@/templates/win32Apps";
+import { getWin32AppTemplates, NOT_OFFERED_WINGET_APPS } from "@/templates/win32Apps";
 import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { TaskCategory } from "@/types/hydration";
 
@@ -112,7 +112,9 @@ const CATEGORY_METADATA: Record<
   },
   win32Apps: {
     label: "Win32 Apps",
-    description: "Packaged Windows applications that install through Intune.",
+    description:
+      "Packaged Windows applications that install through Intune. WinGet catalog apps are opt-in. " +
+      `Not offered, because no catalog version has a machine-scope x64 installer: ${NOT_OFFERED_WINGET_APPS.map((app) => app.displayName).join(", ")}.`,
   },
   conditionalAccess: {
     label: "Conditional Access",
@@ -563,6 +565,21 @@ export async function loadTemplateDocumentationPayload(
       return fetchCISBaselinePolicyByManifestFile(item.payloadSource.file);
     case "win32": {
       const template = item.payloadSource.template;
+      // A WinGet catalog app has no committed scripts: its scripts are generated (latest version).
+      if (!template.detectionScriptUrl || !template.installScriptUrl) {
+        if (!template.winget) {
+          throw new Error(`${template.displayName} has no scripts.`);
+        }
+        // Loaded on demand: the script text is large and only this payload needs it.
+        const { getWinGetScripts } = await import("@/lib/win32/wingetScripts");
+        const scripts = getWinGetScripts(template.winget);
+        return {
+          ...template,
+          detectionScriptContent: scripts.detection,
+          installScriptContent: scripts.install,
+          uninstallScriptContent: scripts.uninstall,
+        };
+      }
       const [
         detectionScriptContent,
         installScriptContent,

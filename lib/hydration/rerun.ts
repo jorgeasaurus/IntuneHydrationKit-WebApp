@@ -230,7 +230,13 @@ export async function buildRerunTaskQueue(
 ): Promise<HydrationTask[]> {
   const categories = [...new Set(sourceTasks.map((task) => task.category))];
   options.onProgress?.(`Loading templates for ${categories.length} categor${categories.length === 1 ? "y" : "ies"}...`);
-  const templateTasks = await buildTaskQueueAsync(categories, operationMode, { shouldCancel: options.shouldCancel });
+  // A create without a selection leaves out the opt-in Win32 apps, so the Win32 apps of the
+  // source run are selected by name: an opt-in app that the first run created stays available.
+  const win32AppNames = sourceTasks.filter((task) => task.category === "win32Apps").map((task) => task.itemName);
+  const templateTasks = await buildTaskQueueAsync(categories, operationMode, {
+    shouldCancel: options.shouldCancel,
+    ...(win32AppNames.length > 0 ? { categorySelections: { win32Apps: { selectedItems: win32AppNames } } } : {}),
+  });
   const templateKeys = new Set(templateTasks.map((task) => getTaskKey(task.category, task)));
 
   const now = new Date();
@@ -244,6 +250,10 @@ export async function buildRerunTaskQueue(
       // The same app customization, so the retry uploads a package with the same configuration.
       ...(operationMode === "create" && sourceTask.autopilotBranding
         ? { autopilotBranding: sourceTask.autopilotBranding }
+        : {}),
+      // The same pinned WinGet version, so the retry installs the same version.
+      ...(operationMode === "create" && sourceTask.wingetVersion !== undefined
+        ? { wingetVersion: sourceTask.wingetVersion }
         : {}),
       status: "pending",
     };

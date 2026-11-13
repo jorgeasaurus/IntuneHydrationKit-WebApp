@@ -1,6 +1,7 @@
 import {
   getVersionArchitectures,
   getVersionInstallerTypes,
+  isPinnableVersion,
   type WinGetCatalogApp,
   type WinGetCatalogVersion,
 } from "@/lib/winget/versionCatalog";
@@ -45,15 +46,17 @@ export function WinGetVersionsSection({ app }: { app: WinGetCatalogApp }) {
           </li>
         </ul>
         <p>
-          You cannot select a version yet. At this time, the app installs the latest version. When
-          version selection is available, detection will use{" "}
+          In the wizard (create mode), the app installs the latest version, or a version that you
+          select. Only a version with a machine-scope x64 installer can be selected, because the app
+          installs with <span className="font-mono text-xs text-foreground">--scope machine</span>{" "}
+          on x64. A selected version uses detection{" "}
           <span className="font-semibold text-foreground">this version or newer</span>: a device
           that has the selected version or a newer version shows as installed. Thus Intune does not
           report a failure when the app updates itself.
         </p>
       </div>
       <div className="overflow-x-auto rounded-2xl border border-border/60 bg-black/20">
-        <table className="w-full min-w-[560px] text-left text-sm">
+        <table className="w-full min-w-[680px] text-left text-sm">
           <caption className="sr-only">WinGet versions of {app.displayName}</caption>
           <thead>
             <tr className="border-b border-border/60 text-xs font-mono uppercase tracking-[0.2em] text-muted-foreground">
@@ -62,6 +65,7 @@ export function WinGetVersionsSection({ app }: { app: WinGetCatalogApp }) {
               <th scope="col" className="px-4 py-3 font-medium">Released</th>
               <th scope="col" className="px-4 py-3 font-medium">Architectures</th>
               <th scope="col" className="px-4 py-3 font-medium">Installer types</th>
+              <th scope="col" className="px-4 py-3 font-medium">Can be selected</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/60">
@@ -79,6 +83,9 @@ export function WinGetVersionsSection({ app }: { app: WinGetCatalogApp }) {
                 </td>
                 <td className="px-4 py-3 font-mono text-xs text-foreground">
                   {getVersionInstallerTypes(version).join(", ")}
+                </td>
+                <td className="px-4 py-3 text-muted-foreground">
+                  {isPinnableVersion(version) ? "Yes" : "No (no machine-scope x64 installer)"}
                 </td>
               </tr>
             ))}

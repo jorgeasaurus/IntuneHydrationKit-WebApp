@@ -12,7 +12,7 @@ const { compareWinGetVersions, manifestPathFor, serializeCatalog } = require("..
 const ROOT = path.join(__dirname, "../../..");
 const catalogText = readFileSync(path.join(ROOT, "public/winget-versions.json"), "utf8");
 const appList: Array<{ templateId: string; packageIdentifier: string; displayName: string; publisher: string }> =
-  JSON.parse(readFileSync(path.join(ROOT, "scripts/winget-apps.json"), "utf8"));
+  JSON.parse(readFileSync(path.join(ROOT, "templates/wingetApps.json"), "utf8"));
 
 describe("committed WinGet version catalog", () => {
   const catalog = parseWinGetVersionCatalog(JSON.parse(catalogText));
@@ -49,9 +49,7 @@ describe("committed WinGet version catalog", () => {
   });
 
   it("includes the WinGet starter apps with their existing ids and manifest paths", () => {
-    const starterApps = getWin32AppTemplates().filter((template) =>
-      template.notes.includes("Imported from WinGet")
-    );
+    const starterApps = getWin32AppTemplates().filter((template) => template.packageUrl && template.winget);
     expect(starterApps.map((template) => template.id).sort()).toEqual([
       "7-zip",
       "google-chrome",

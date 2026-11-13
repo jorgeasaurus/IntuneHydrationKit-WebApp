@@ -8,7 +8,7 @@
  */
 
 import { buildAutopilotBrandingConfiguration } from "@/lib/win32/autopilotBrandingConfig";
-import { createIntuneWinPackage } from "@/lib/win32/intuneWinWriter";
+import { createIntuneWinPackage, MAX_WIN32_UPLOAD_BYTES } from "@/lib/win32/intuneWinWriter";
 import { readStoredZipEntries, writeStoredZip } from "@/lib/win32/storedZip";
 import { AUTOPILOT_BRANDING_WIN32_APP } from "@/templates/win32Apps";
 
@@ -16,8 +16,6 @@ export const AUTOPILOT_BRANDING_CONTENT_URL = "/win32-apps/autopilot-branding/co
 export const AUTOPILOT_BRANDING_CONFIGURATION_ENTRY = "AutopilotBranding.json";
 /** Name element of Detection.xml, the same as in the prebuilt package. */
 export const AUTOPILOT_BRANDING_PACKAGE_NAME = "Autopilot Branding";
-/** The largest package that /api/win32-upload accepts. */
-export const MAX_WIN32_UPLOAD_BYTES = 4 * 1024 * 1024;
 
 const CONTENT_LABEL = "The Autopilot Branding package content";
 

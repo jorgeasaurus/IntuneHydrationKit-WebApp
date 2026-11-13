@@ -2,7 +2,7 @@
 /**
  * Sync the WinGet version catalog from microsoft/winget-pkgs
  *
- * For each app in scripts/winget-apps.json, reads the version folders of the package,
+ * For each app in templates/wingetApps.json, reads the version folders of the package,
  * keeps the newest versions that have usable installers, and writes
  * public/winget-versions.json. The output has no timestamps, so the same upstream data
  * always gives the same file. The scheduled workflow opens a pull request only when the
@@ -32,7 +32,7 @@ const {
   validateAppList,
 } = require("./winget-catalog");
 
-const APP_LIST_FILE = path.join(__dirname, "winget-apps.json");
+const APP_LIST_FILE = path.join(__dirname, "../templates/wingetApps.json");
 const OUTPUT_FILE = path.join(__dirname, "../public/winget-versions.json");
 const UPSTREAM_BRANCH = "master";
 const USER_AGENT = "winget-version-catalog-sync";

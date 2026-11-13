@@ -155,10 +155,11 @@ describe('template catalog', () => {
   it('builds a catalog from loader-backed sources and manifests', async () => {
     const catalog = await loadTemplateDocumentationCatalog()
 
-    expect(catalog.totalCount).toBe(16)
+    // 11 mocked templates, 5 prebuilt Win32 apps, and 15 opt-in WinGet catalog apps.
+    expect(catalog.totalCount).toBe(31)
     expect(catalog.categories.find((category) => category.id === 'groups')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'notification')?.count).toBe(1)
-    expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(5)
+    expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(20)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(2)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.description).toBe('Baseline v4.0 includes macOS, Windows, and BYOD policies.')
     expect(catalog.categories.find((category) => category.id === 'cisBaseline')?.count).toBe(1)
@@ -184,7 +185,12 @@ describe('template catalog', () => {
     expect(cisItem?.subcategory).toBe('Windows 11 - Intune Benchmarks')
     expect(cisItem?.description).toBe('Windows 11 benchmark templates')
 
-    const win32Items = catalog.items.filter((item) => item.category === 'win32Apps')
+    const allWin32Items = catalog.items.filter((item) => item.category === 'win32Apps')
+    const catalogApps = allWin32Items.filter((item) => item.subcategory === 'WinGet catalog app')
+    expect(catalogApps).toHaveLength(15)
+    expect(catalogApps.map((item) => item.displayName)).toContain('Notepad++ - [IHD]')
+    expect(catalogApps.map((item) => item.displayName)).not.toContain('Windows Terminal - [IHD]')
+    const win32Items = allWin32Items.filter((item) => item.subcategory !== 'WinGet catalog app')
     expect(win32Items.map((item) => item.displayName)).toEqual([
       '7-Zip - [IHD]',
       'Autopilot Branding (Cleanup) - [IHD]',
