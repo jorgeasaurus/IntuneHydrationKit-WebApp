@@ -50,7 +50,7 @@ export function WinGetCatalogNotes({ catalogError }: { catalogError: string | nu
       <p>{EXISTING_WINGET_APP_NOTE}</p>
       {NOT_OFFERED_WINGET_APPS.length > 0 ? (
         <p>
-          Not offered, because no version in the catalog has a machine-scope x64 installer:{" "}
+          Not offered, because the newest version in the catalog has no machine-scope x64 installer:{" "}
           {NOT_OFFERED_WINGET_APPS.map((app) => app.displayName).join(", ")}.
         </p>
       ) : null}

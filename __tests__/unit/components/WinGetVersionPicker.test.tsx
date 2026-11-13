@@ -122,7 +122,7 @@ describe('WinGet version picker in the Win32 apps list', () => {
 
     expect(screen.getByText(/Best effort: an older version/)).toBeInTheDocument()
     expect(screen.getByText(/To change the version of an existing app, delete it and create it again/)).toBeInTheDocument()
-    expect(screen.getByText(/Not offered, because no version in the catalog has a machine-scope x64 installer: .*Windows Terminal/)).toBeInTheDocument()
+    expect(screen.getByText(/Not offered, because the newest version in the catalog has no machine-scope x64 installer: .*Windows Terminal/)).toBeInTheDocument()
 
     await user.click(screen.getByRole('button', { name: 'Review Selection' }))
     expect(setCategorySelections.mock.calls[0][0].win32Apps).toEqual({

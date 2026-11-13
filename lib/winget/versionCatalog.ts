@@ -172,6 +172,17 @@ export function getPinnableVersions(app: WinGetCatalogApp): WinGetCatalogVersion
   return app.versions.filter(isPinnableVersion);
 }
 
+/**
+ * True when the kit offers the app: its newest catalog version has a machine-scope x64
+ * installer. "Latest" installs the newest version with "--scope machine" and no version, so
+ * an app whose newest version cannot be installed that way is not offered, even when an
+ * older version could be pinned.
+ */
+export function isOfferableApp(app: WinGetCatalogApp): boolean {
+  const newest = app.versions[0];
+  return newest !== undefined && isPinnableVersion(newest);
+}
+
 /** Maximum number of pinned apps in one selection. */
 const MAX_PINNED_APPS = 100;
 

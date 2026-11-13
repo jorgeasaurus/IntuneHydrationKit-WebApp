@@ -114,7 +114,7 @@ const CATEGORY_METADATA: Record<
     label: "Win32 Apps",
     description:
       "Packaged Windows applications that install through Intune. WinGet catalog apps are opt-in. " +
-      `Not offered, because no catalog version has a machine-scope x64 installer: ${NOT_OFFERED_WINGET_APPS.map((app) => app.displayName).join(", ")}.`,
+      `Not offered, because the newest catalog version has no machine-scope x64 installer: ${NOT_OFFERED_WINGET_APPS.map((app) => app.displayName).join(", ")}.`,
   },
   conditionalAccess: {
     label: "Conditional Access",

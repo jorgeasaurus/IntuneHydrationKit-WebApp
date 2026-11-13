@@ -250,7 +250,7 @@ export interface WinGetCatalogAppListEntry {
   publisher: string;
   description: string;
   /**
-   * False when no catalog version has a machine-scope x64 installer. The wrapper installs with
+   * False when the newest catalog version has no machine-scope x64 installer. The wrapper installs with
    * "--scope machine" and the app is x64 only, so the kit does not offer such an app.
    */
   offered: boolean;
