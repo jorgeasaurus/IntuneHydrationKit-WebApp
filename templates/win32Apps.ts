@@ -163,6 +163,9 @@ export const KIT_TEMPLATE_ID_NOTE = "IntuneHydrationKitTemplateId:";
  * The package is built by scripts/build-autopilot-branding.ps1. The install and uninstall commands and
  * the tag file are the ones that AutopilotBranding documents, so an administrator can replace the app
  * content with a package from the AutopilotBranding builder.
+ * The wizard can customize the apps to remove and the cleanup tasks (lib/win32/autopilotBrandingConfig.ts).
+ * Then the browser builds the package from public/win32-apps/autopilot-branding/content.zip, and the
+ * description and notes describe the customized configuration.
  */
 export const AUTOPILOT_BRANDING_WIN32_APP: Win32AppTemplate = {
   id: "autopilot-branding",
