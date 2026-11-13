@@ -39,6 +39,8 @@ export function GET(): Response {
   return new Response(BRIDGE_SCRIPT, {
     headers: {
       "Content-Type": "text/javascript; charset=utf-8",
+      // Revalidate on each use. The page also puts the msal-browser version in the URL.
+      "Cache-Control": "no-cache",
     },
   });
 }

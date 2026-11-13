@@ -2,10 +2,13 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { version as msalBrowserVersion } from "@azure/msal-browser";
 import { GET as getRedirectPage } from "@/app/auth/redirect/route";
 import { GET as getBridgeScript } from "@/app/auth/redirect/bridge.js/route";
 
-const BRIDGE_SCRIPT_SRC = "/auth/redirect/bridge.js";
+const BRIDGE_SCRIPT_PATH = "/auth/redirect/bridge.js";
+// The version in the URL keeps a cached bridge of an earlier msal-browser version from loading.
+const BRIDGE_SCRIPT_SRC = `${BRIDGE_SCRIPT_PATH}?v=${msalBrowserVersion}`;
 
 describe("GET /auth/redirect", () => {
   it("returns an uncached page that loads only the same-origin bridge script", async () => {
@@ -30,7 +33,7 @@ describe("GET /auth/redirect", () => {
   });
 });
 
-describe(`GET ${BRIDGE_SCRIPT_SRC}`, () => {
+describe(`GET ${BRIDGE_SCRIPT_PATH}`, () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
@@ -41,6 +44,7 @@ describe(`GET ${BRIDGE_SCRIPT_SRC}`, () => {
     const response = getBridgeScript();
 
     expect(response.headers.get("content-type")).toBe("text/javascript; charset=utf-8");
+    expect(response.headers.get("cache-control")).toBe("no-cache");
     const script = await response.text();
     const { version } = JSON.parse(
       readFileSync(
@@ -49,6 +53,7 @@ describe(`GET ${BRIDGE_SCRIPT_SRC}`, () => {
       )
     ) as { version: string };
     expect(script.startsWith(`/*! @azure/msal-browser v${version} `)).toBe(true);
+    expect(msalBrowserVersion).toBe(version);
     expect(script).toContain("msalRedirectBridge.broadcastResponseToMainFrame()");
   });
 
