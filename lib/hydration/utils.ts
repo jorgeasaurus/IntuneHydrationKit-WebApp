@@ -126,6 +126,7 @@ export const TENANT_CACHE_LABELS: Record<TenantCacheKey, string> = {
   cachedFilters: "device filters",
   cachedAppProtectionPolicies: "App Protection policies",
   cachedConditionalAccessPolicies: "Conditional Access policies",
+  cachedNotificationTemplates: "notification templates",
   cachedCompliancePolicies: "Compliance policies",
   cachedV2CompliancePolicies: "V2 Compliance policies",
   cachedSettingsCatalogPolicies: "Settings Catalog policies",

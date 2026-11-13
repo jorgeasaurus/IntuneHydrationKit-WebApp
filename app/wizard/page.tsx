@@ -14,6 +14,7 @@ import { TenantConfig } from "@/components/wizard/TenantConfig";
 import { OperationModeSelection } from "@/components/wizard/OperationMode";
 import { TargetSelectionView } from "@/components/wizard/TargetSelectionView";
 import { useTargetSelectionController } from "@/components/wizard/useTargetSelectionController";
+import { ProfileApplyContext } from "@/components/wizard/profileApplyContext";
 import { WizardOperatorBrief } from "@/components/wizard/WizardOperatorBrief";
 import { ReviewConfirm } from "@/components/wizard/ReviewConfirm";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,8 @@ import {
   CheckCircle2,
   ChevronRight,
   FileCheck2,
+  GitCompare,
+  History,
   Home,
   Layers3,
   LogOut,
@@ -92,6 +95,10 @@ function WizardContent() {
   const stepHeadingRef = useRef<HTMLHeadingElement>(null);
   const previousStepRef = useRef(state.currentStep);
   const [stepAnnouncement, setStepAnnouncement] = useState("");
+  // True while the target selection step applies a scope profile. Leaving the step then would
+  // discard the profile, so step navigation pauses.
+  const profileApply = useState(false);
+  const isApplyingProfile = profileApply[0];
 
   const handleSignOut = async () => {
     await signOut();
@@ -164,19 +171,31 @@ function WizardContent() {
         )}
         actions={(
           <>
-            <Button variant="outline" onClick={() => setShowSettings(true)} className="size-9 px-0 sm:w-auto sm:px-3">
-              <Settings2 className="size-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only">Settings</span>
+            <Button variant="outline" onClick={() => setShowSettings(true)} className="size-9 px-0 lg:w-auto lg:px-3">
+              <Settings2 className="size-4 lg:mr-2" />
+              <span className="sr-only lg:not-sr-only">Settings</span>
             </Button>
-            <Button variant="outline" asChild className="size-9 px-0 sm:w-auto sm:px-3">
-              <Link href="/">
-                <Home className="size-4 sm:mr-2" />
-                <span className="sr-only sm:not-sr-only">Home</span>
+            <Button variant="outline" asChild className="size-9 px-0 lg:w-auto lg:px-3">
+              <Link href="/drift">
+                <GitCompare aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Drift Scan</span>
               </Link>
             </Button>
-            <Button variant="outline" onClick={handleSignOut} className="size-9 px-0 sm:w-auto sm:px-3">
-              <LogOut className="size-4 sm:mr-2" />
-              <span className="sr-only sm:not-sr-only">Sign Out</span>
+            <Button variant="outline" asChild className="size-9 px-0 lg:w-auto lg:px-3">
+              <Link href="/history">
+                <History aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Run history</span>
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="size-9 px-0 lg:w-auto lg:px-3">
+              <Link href="/">
+                <Home className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Home</span>
+              </Link>
+            </Button>
+            <Button variant="outline" onClick={handleSignOut} className="size-9 px-0 lg:w-auto lg:px-3">
+              <LogOut className="size-4 lg:mr-2" />
+              <span className="sr-only lg:not-sr-only">Sign Out</span>
             </Button>
           </>
         )}
@@ -215,16 +234,17 @@ function WizardContent() {
                   <button
                     key={step.id}
                     type="button"
-                    disabled={!step.accessible}
+                    disabled={!step.accessible || isApplyingProfile}
                     aria-current={step.current ? "step" : undefined}
-                    onClick={() => step.accessible && setCurrentStep(step.id)}
+                    aria-describedby={isApplyingProfile ? "wizard-steps-paused" : undefined}
+                    onClick={() => step.accessible && !isApplyingProfile && setCurrentStep(step.id)}
                     className={`w-full rounded-xl border px-4 py-3 text-left transition ${
                       step.current
                         ? "border-hydrate/60 bg-hydrate/10 shadow-[0_0_0_1px_hsl(var(--hydrate)/0.14)]"
                         : step.complete
                           ? "border-border/80 bg-background/60 hover:border-hydrate/40 hover:bg-muted/40"
                           : "border-transparent bg-transparent text-muted-foreground"
-                    } ${!step.accessible ? "cursor-not-allowed opacity-60" : ""}`}
+                    } ${!step.accessible || isApplyingProfile ? "cursor-not-allowed opacity-60" : ""}`}
                   >
                     <div className="flex items-start gap-3">
                       <div
@@ -267,6 +287,11 @@ function WizardContent() {
                   </button>
                 );
               })}
+              {isApplyingProfile && (
+                <p id="wizard-steps-paused" className="px-1 text-sm text-muted-foreground">
+                  Step navigation is paused while the app applies a scope profile.
+                </p>
+              )}
             </div>
           </div>
 
@@ -317,7 +342,9 @@ function WizardContent() {
             </div>
           </div>
 
-          <ActiveWizardStep currentStep={state.currentStep} />
+          <ProfileApplyContext.Provider value={profileApply}>
+            <ActiveWizardStep currentStep={state.currentStep} />
+          </ProfileApplyContext.Provider>
         </section>
       </main>
 

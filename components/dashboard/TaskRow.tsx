@@ -77,10 +77,20 @@ interface TaskRowProps {
 }
 
 /** One task card. The caller supplies the list item wrapper. */
+/** Status label: an update of an existing object says "Updated", or "Would update" in preview. */
+function getStatusLabel(task: HydrationTask): string {
+  if (task.status === "success" && task.update) return task.update.applied ? "Updated" : "Would update";
+  return STATUS_CONFIG[task.status].label;
+}
+
+function getUpdateDetail(task: HydrationTask): string | undefined {
+  return task.update ? `Settings changed to match the template: ${task.update.differences.join("; ")}` : undefined;
+}
+
 function TaskRowComponent({ task, fixedHeight = false, portalLink }: TaskRowProps): React.JSX.Element {
-  const status = STATUS_CONFIG[task.status];
+  const status = { ...STATUS_CONFIG[task.status], label: getStatusLabel(task) };
   const duration = formatDuration(task);
-  const detail = task.error ?? task.warning;
+  const detail = task.error ?? task.warning ?? getUpdateDetail(task);
   const DetailIcon = task.status === "failed" ? X : AlertCircle;
 
   return (

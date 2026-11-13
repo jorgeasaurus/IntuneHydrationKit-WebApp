@@ -8,6 +8,7 @@ import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hy
 import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filterManifest";
 import { DYNAMIC_GROUP_TEMPLATE_PATHS } from "@/templates/groupManifest";
 import type { DeviceFilter } from "@/types/graph";
+import type { NotificationTemplate } from "@/lib/graph/notifications";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
@@ -364,7 +365,7 @@ export async function fetchEnrollmentProfiles(report?: TemplateLoadReport): Prom
 /**
  * Fetch notification templates from local templates
  */
-export async function fetchNotificationTemplates(): Promise<unknown[]> {
+export async function fetchNotificationTemplates(report?: TemplateLoadReport): Promise<NotificationTemplate[]> {
   const notificationFiles = [
     "Notifications/First-Warning.json",
   ];
@@ -374,13 +375,13 @@ export async function fetchNotificationTemplates(): Promise<unknown[]> {
       return [
         {
           ...data,
-          displayName: `${IMPORT_PREFIX}${data.displayName}`,
+          displayName: addImportPrefix(data.displayName),
         },
       ];
     }
 
     return [];
-  });
+  }, { report });
 }
 
 /**

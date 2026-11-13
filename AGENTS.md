@@ -36,12 +36,8 @@ Build a web-based version of the IntuneHydrationKit PowerShell tool that enables
 **MSAL React Configuration**:
 - Single-page application (SPA) flow
 - Delegated permissions (no application/daemon auth)
-- Support for multiple cloud environments:
-  - Global (Commercial)
-  - USGov (GCC High)
-  - USGovDoD
-  - Germany
-  - China (21Vianet)
+- Global (Commercial) cloud only. The web app has no cloud selector.
+  - Sovereign clouds (USGov GCC High, USGovDoD, China 21Vianet) are supported only by the PowerShell module: https://github.com/jorgeasaurus/IntuneHydrationKit
 
 **Required Microsoft Graph Scopes**:
 ```typescript
@@ -91,7 +87,7 @@ interface LicenseCheck {
 **Step 1: Tenant Configuration**
 - Input: Tenant ID (GUID format validation)
 - Input: Tenant display name (optional, for UI display)
-- Cloud environment selector (dropdown)
+- Cloud environment is shown as fixed text: "Global (commercial) cloud" (no selector), with a link to the PowerShell module for sovereign clouds
 - "Connect to Tenant" button triggers MSAL login
 
 **Step 2: Operation Mode Selection**
@@ -125,7 +121,7 @@ interface LicenseCheck {
 **Step 5: Review & Confirm**
 - Summary table showing:
   - Tenant name and ID
-  - Cloud environment
+  - Cloud environment (always Global)
   - Operation mode
   - Selected targets with object counts
   - Estimated total objects to create/delete
@@ -378,7 +374,6 @@ interface HydrationSummary {
 **Persistent Settings** (localStorage):
 ```typescript
 interface AppSettings {
-  defaultCloudEnvironment: string;
   defaultBaselineRepo: string;
   defaultBaselineBranch: string;
   stopOnFirstError: boolean;

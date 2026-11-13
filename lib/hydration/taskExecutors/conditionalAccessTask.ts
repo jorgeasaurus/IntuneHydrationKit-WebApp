@@ -7,33 +7,10 @@ import { HydrationTask } from "@/types/hydration";
 import { ConditionalAccessPolicy } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
 import { executeDeleteTask } from "../deleteResolver";
-import { createConditionalAccessPolicy, findHydrationConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
+import { createConditionalAccessPolicy } from "@/lib/graph/conditionalAccess";
 import { getCachedTemplates, ConditionalAccessTemplate } from "@/lib/templates/loader";
-import { normalizeName, requireTenantCache } from "../utils";
-
-function findCachedConditionalAccessPolicy(
-  displayName: string,
-  policies: ExecutionContext["cachedConditionalAccessPolicies"]
-): { id: string; displayName?: string; description?: string } | undefined {
-  const lowerName = displayName.toLowerCase();
-  const suffixedLowerName = `${lowerName} [intune hydration kit]`;
-  const fullMarkerLowerName = `${lowerName} [imported by intune hydration kit]`;
-  const normalizedDisplayName = normalizeName(displayName);
-
-  const match = policies?.find((policy) => {
-    const policyLower = policy.displayName?.toLowerCase();
-    return (
-      policyLower === lowerName ||
-      policyLower === suffixedLowerName ||
-      policyLower === fullMarkerLowerName ||
-      normalizeName(policy.displayName) === normalizedDisplayName
-    );
-  });
-  if (match) return match;
-  // A kit policy can carry the other marker format, for example
-  // "Require MFA [Imported by Intune Hydration Kit]" for the template "[IHD] Require MFA".
-  return (policies && findHydrationConditionalAccessPolicy(policies, displayName)) ?? undefined;
-}
+import { requireTenantCache } from "../utils";
+import { findExistingConditionalAccessPolicy } from "../existingObjects";
 
 /**
  * Execute a conditional access policy task (create or delete)
@@ -62,7 +39,7 @@ export async function executeConditionalAccessTask(
     }
 
     // The Premium P1/P2 license checks run before dispatch (getLicenseSkipReason in utils.ts).
-    const existingPolicy = findCachedConditionalAccessPolicy(
+    const existingPolicy = findExistingConditionalAccessPolicy(
       template.displayName,
       requireTenantCache(context, "cachedConditionalAccessPolicies")
     );

@@ -28,7 +28,7 @@ Build a web-based version of the IntuneHydrationKit PowerShell tool that enables
 - Delegated permissions (no application/daemon auth)
 - Interactive sign-in and token renewal use MSAL popups (`loginPopup`, `acquireTokenPopup`)
 - Global (Commercial) cloud only. The web app has no cloud selector.
-  - Sovereign clouds (USGov GCC High, USGovDoD, China 21Vianet) are supported only by the PowerShell module.
+  - Sovereign clouds (USGov GCC High, USGovDoD, China 21Vianet) are supported only by the PowerShell module: https://github.com/jorgeasaurus/IntuneHydrationKit
 
 **Required Microsoft Graph Scopes**:
 ```typescript
@@ -80,7 +80,7 @@ The wizard has four steps: Tenant checkpoint, Execution mode, Deployment scope, 
 **Step 1: Tenant Checkpoint**
 - Sign-in button starts the MSAL popup login
 - Tenant ID and display name come from the signed-in account (no tenant ID input)
-- Cloud environment is shown as fixed text: "Global (Commercial)" (no selector)
+- Cloud environment is shown as fixed text: "Global (commercial) cloud" (no selector), with a link to the PowerShell module for sovereign clouds
 - Run pre-flight validation and show the results
 
 **Step 2: Execution Mode**

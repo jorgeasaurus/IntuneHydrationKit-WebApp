@@ -470,7 +470,7 @@ function ResultStatistics({
   const successRate =
     summary.stats.total > 0
       ? Math.round(
-          ((summary.stats.created + summary.stats.deleted) /
+          ((summary.stats.created + (summary.stats.updated ?? 0) + summary.stats.deleted) /
             summary.stats.total) *
             100,
         )
@@ -502,6 +502,12 @@ function ResultStatistics({
             : getOutcomeCount(tasks, "skipped", false)}
         </p>
       </div>
+      {summary.stats.updated !== undefined && (
+        <div>
+          <p className="text-xs text-slate-400">{isPreview ? "Would update" : "Updated"}</p>
+          <p className="mt-1 text-2xl font-semibold text-sky-200">{summary.stats.updated}</p>
+        </div>
+      )}
       <div>
         <p className="text-xs text-slate-400">Needs attention</p>
         <p className={cn("mt-1 text-2xl font-semibold", hasFailures ? "text-red-200" : "text-amber-200")}>
@@ -594,6 +600,14 @@ function TaskDecisionEvidence({ task }: { task: HydrationTask }): React.JSX.Elem
     <div className="mt-1 space-y-2 text-xs leading-5 text-slate-300">
       {existingMatch ? <p>Already exists · {task.match?.matchType} name match</p> : task.error && <p>{task.status === "failed" ? "Error" : "Reason"}: {task.error}</p>}
       {task.warning && <p>Warning: {task.warning}</p>}
+      {task.update && (
+        <div>
+          <p>{task.update.applied ? "Updated existing kit object" : "Would update existing kit object"} ({task.update.objectId}):</p>
+          <ul className="list-disc pl-4">
+            {task.update.differences.map((difference) => <li key={difference} className="break-all">{difference}</li>)}
+          </ul>
+        </div>
+      )}
       {task.drift && <DriftEvidence drift={task.drift} />}
       {task.match?.portalUrl && <a className="inline-block underline" href={task.match.portalUrl} target="_blank" rel="noreferrer">View matched object</a>}
       <TaskEvidenceDetails task={task} />

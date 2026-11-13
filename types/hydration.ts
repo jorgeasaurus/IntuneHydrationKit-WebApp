@@ -4,7 +4,9 @@
 
 import { PrerequisiteCheckResult } from "./prerequisites";
 
-export type CloudEnvironment = "global";
+export const CLOUD_ENVIRONMENTS = ["global"] as const;
+
+export type CloudEnvironment = (typeof CLOUD_ENVIRONMENTS)[number];
 
 export const OPERATION_MODES = ["create", "delete"] as const;
 
@@ -75,6 +77,25 @@ export interface TaskDriftEvidence {
   reason?: string;
 }
 
+/**
+ * Update of an existing kit object in a create run with "Update existing kit objects".
+ * A task with this evidence and status "success" updated the object (applied: true), or
+ * would update it in preview (applied: false).
+ */
+export interface TaskUpdateEvidence {
+  objectId: string;
+  applied: boolean;
+  /** Readable per-setting differences that the update changes. */
+  differences: string[];
+}
+
+/** The object that a successful live create made. The admin portal link uses it. */
+export interface TaskCreatedObject {
+  id: string;
+  /** OpenIntuneBaseline policy type (`_oibPolicyType`). Baseline tasks only. */
+  policyType?: string;
+}
+
 export interface RunProvenance {
   runId: string;
   appVersion: string;
@@ -90,6 +111,8 @@ interface HydrationTaskBase {
   templatePath?: string;
   match?: TaskMatchEvidence;
   drift?: TaskDriftEvidence;
+  update?: TaskUpdateEvidence;
+  createdObject?: TaskCreatedObject;
   error?: string;
   warning?: string;
   startTime?: Date;
@@ -151,6 +174,8 @@ export interface HydrationSummary {
   stats: {
     total: number;
     created: number;
+    /** Existing kit objects updated (or would update in preview). Absent when 0. */
+    updated?: number;
     deleted: number;
     skipped: number;
     failed: number;
@@ -248,6 +273,7 @@ export interface CategorySelections {
   appProtection?: CategorySelection;
   win32Apps?: CategorySelection;
   enrollment?: CategorySelection;
+  notification?: CategorySelection;
   baseline?: BaselineSelection;
   cisBaseline?: CategorySelection;
 }
@@ -262,5 +288,10 @@ export interface WizardState {
   categorySelections?: CategorySelections;
   baselineSelection?: BaselineSelection; // Keep for backwards compatibility
   confirmed: boolean;
+  /**
+   * Create runs only: update existing kit objects that differ from the template.
+   * Set by the review step when the run starts, never by a saved selection.
+   */
+  updateExisting?: boolean;
   prerequisiteResult?: PrerequisiteCheckResult;
 }
