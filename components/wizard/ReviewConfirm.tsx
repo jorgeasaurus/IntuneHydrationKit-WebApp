@@ -6,11 +6,21 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useWizardState } from "@/hooks/useWizardState";
+import type { WizardState } from "@/types/hydration";
 import { clearExecutionRecord } from "@/lib/hydration/executionRecord";
 import { getExecutionState, resetExecutionSession, subscribeExecutionState } from "@/lib/hydration/executionStateStore";
 import { SensitiveData } from "@/components/SensitiveData";
 import { BaselineChangeReview } from "@/components/wizard/BaselineChangeReview";
 import { ExecutionApprovalCard } from "@/components/wizard/ExecutionApprovalCard";
+import { ExistingObjectsReview } from "@/components/wizard/ConflictSummary";
+import { AutopilotBrandingReview } from "@/components/wizard/AutopilotBrandingReview";
+import { WinGetVersionsReview } from "@/components/wizard/WinGetVersionsReview";
+import {
+  INITIAL_EXISTING_OBJECTS_STATE,
+  getUpdateExisting,
+  isStartBlockedByUpdateChoice,
+  type ExistingObjectsState,
+} from "@/lib/hydration/updateChoice";
 import { TEMPLATE_METADATA } from "@/templates";
 import { getEstimatedTaskCount, getEstimatedCategoryCount } from "@/lib/hydration/engine";
 import { AlertTriangle, CheckCircle2, Eye, ShieldAlert, Sparkles } from "lucide-react";
@@ -109,9 +119,20 @@ function ActiveExecutionNotice({
   );
 }
 
+function isStartDisabled(
+  state: WizardState,
+  existing: ExistingObjectsState,
+  hasActiveExecution: boolean,
+  acknowledged: boolean
+): boolean {
+  return hasActiveExecution || (!acknowledged && !state.isPreview) || isStartBlockedByUpdateChoice(state, existing);
+}
+
 export function ReviewConfirm(): React.JSX.Element {
-  const { state, setConfirmed, previousStep } = useWizardState();
+  const { state, setConfirmed, setUpdateExisting, previousStep } = useWizardState();
   const [acknowledged, setAcknowledged] = useState(false);
+  // The conflict choice starts at "skip" each time the review step opens. It is not part of a saved selection.
+  const [existingObjects, setExistingObjects] = useState<ExistingObjectsState>(INITIAL_EXISTING_OBJECTS_STATE);
   const router = useRouter();
   const executionState = useSyncExternalStore(subscribeExecutionState, getExecutionState, getExecutionState);
   const hasActiveExecution = executionState.phase !== "idle" && executionState.phase !== "completed";
@@ -121,6 +142,7 @@ export function ReviewConfirm(): React.JSX.Element {
     if (hasActiveExecution) return;
     resetExecutionSession();
     clearExecutionRecord(sessionStorage);
+    setUpdateExisting(getUpdateExisting(state, existingObjects));
     setConfirmed(true);
     router.push("/dashboard");
   }
@@ -141,6 +163,7 @@ export function ReviewConfirm(): React.JSX.Element {
         {state.selectedTargets.includes("baseline") && state.operationMode === "create" && (
           <BaselineChangeReview tenantConfig={state.tenantConfig} selection={state.categorySelections?.baseline ?? state.baselineSelection} />
         )}
+        <ExistingObjectsReview state={state} value={existingObjects} onChange={setExistingObjects} />
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
             <p className="text-[11px] font-mono uppercase tracking-[0.24em] text-muted-foreground">Operation</p>
@@ -240,6 +263,8 @@ export function ReviewConfirm(): React.JSX.Element {
                 <p className="text-lg font-bold">{estimatedObjects} objects</p>
               </div>
             </div>
+            <AutopilotBrandingReview state={state} />
+            <WinGetVersionsReview state={state} />
           </div>
 
           <div className="space-y-6">
@@ -300,7 +325,7 @@ export function ReviewConfirm(): React.JSX.Element {
           </Button>
           <Button
             onClick={handleStart}
-            disabled={hasActiveExecution || (!acknowledged && !state.isPreview)}
+            disabled={isStartDisabled(state, existingObjects, hasActiveExecution, acknowledged)}
             className="flex-1"
           >
             {getActionButtonText(state.operationMode, state.isPreview)}

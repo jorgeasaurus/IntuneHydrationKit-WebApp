@@ -6,7 +6,11 @@
 import { HydrationTask } from "@/types/hydration";
 import { DeviceGroup } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
-import { createGroup, deleteGroupByName } from "@/lib/graph/groups";
+import { executeDeleteTask } from "../deleteResolver";
+import { requireTenantCache } from "../utils";
+import { buildGroupCreateBody, findExistingGroup } from "../existingObjects";
+import { updateExistingObject } from "../updateResolver";
+import { createGroup } from "@/lib/graph/groups";
 import { getCachedTemplates, GroupTemplate } from "@/lib/templates/loader";
 
 /**
@@ -16,6 +20,11 @@ export async function executeGroupTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   // Templates are loaded from the bundled JSON files before execution.
@@ -32,15 +41,10 @@ export async function executeGroupTask(
 
   if (mode === "create") {
     // Check if group already exists using pre-fetched cache (match with or without [IHD] prefix)
-    const targetName = template!.displayName.toLowerCase();
-    const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
-    const existingGroup = context.cachedIntuneGroups?.find((g) => {
-      const n = g.displayName.toLowerCase();
-      const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
-      return n === targetName || ns === targetNameStripped;
-    });
+    const existingGroup = findExistingGroup(requireTenantCache(context, "cachedIntuneGroups"), template.displayName);
 
     if (existingGroup) {
+      if (context.updateExisting) return updateExistingObject(task, context);
       return {
         task,
         success: true,
@@ -56,35 +60,7 @@ export async function executeGroupTask(
     }
 
     // Convert template to full DeviceGroup format if it's a simple template
-    let fullGroupTemplate: DeviceGroup = template as DeviceGroup;
-    if (!("@odata.type" in template)) {
-      const simpleTemplate = template as GroupTemplate;
-      const isStaticGroup = simpleTemplate.isStaticGroup === true || !simpleTemplate.membershipRule;
-
-      if (isStaticGroup) {
-        fullGroupTemplate = {
-          "@odata.type": "#microsoft.graph.group",
-          displayName: simpleTemplate.displayName,
-          description: simpleTemplate.description,
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
-          securityEnabled: true,
-        };
-      } else {
-        fullGroupTemplate = {
-          "@odata.type": "#microsoft.graph.group",
-          displayName: simpleTemplate.displayName,
-          description: simpleTemplate.description,
-          groupTypes: ["DynamicMembership"],
-          mailEnabled: false,
-          mailNickname: simpleTemplate.displayName.replace(/[^a-zA-Z0-9]/g, ""),
-          securityEnabled: true,
-          membershipRule: simpleTemplate.membershipRule,
-          membershipRuleProcessingState: "On",
-        };
-      }
-    }
+    const fullGroupTemplate = buildGroupCreateBody(template);
 
     const created = await createGroup(client, fullGroupTemplate);
 
@@ -99,34 +75,6 @@ export async function executeGroupTask(
       skipped: false,
       createdId: created.id,
     };
-  } else if (mode === "delete") {
-    // Check if group exists using pre-fetched cache (match with or without [IHD] prefix)
-    const targetName = template!.displayName.toLowerCase();
-    const targetNameStripped = targetName.startsWith("[ihd] ") ? targetName.slice(6) : targetName;
-    const existingGroup = context.cachedIntuneGroups?.find((g) => {
-      const n = g.displayName.toLowerCase();
-      const ns = n.startsWith("[ihd] ") ? n.slice(6) : n;
-      return n === targetName || ns === targetNameStripped;
-    });
-
-    if (!existingGroup) {
-      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    // Delete the group
-    try {
-      await deleteGroupByName(client, template.displayName);
-      return { task, success: true, skipped: false };
-    } catch (error) {
-      // Group not found or not created by hydration kit - skip
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      return { task, success: true, skipped: true, skipKind: "blocked", error: errorMessage };
-    }
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

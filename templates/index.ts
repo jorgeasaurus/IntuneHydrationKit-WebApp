@@ -13,6 +13,7 @@ import {
 export * from "./filterManifest";
 export * from "./groupManifest";
 export * from "./win32Apps";
+import { getWin32AppTemplates, WINGET_CATALOG_WIN32_APPS } from "./win32Apps";
 
 /**
  * Template metadata for UI display
@@ -46,13 +47,13 @@ export const TEMPLATE_METADATA = {
   appProtection: {
     displayName: "App Protection",
     description: "Mobile application management (MAM) policies",
-    count: 8,
+    count: 10,
     icon: "Smartphone",
   },
   win32Apps: {
     displayName: "Win32 Apps",
-    description: "WinGet applications packaged for Intune deployment",
-    count: 4,
+    description: `Windows applications and Autopilot scripts packaged for Intune deployment (${WINGET_CATALOG_WIN32_APPS.length} WinGet catalog apps are opt-in)`,
+    count: getWin32AppTemplates().length,
     icon: "Package",
   },
   enrollment: {
@@ -60,6 +61,12 @@ export const TEMPLATE_METADATA = {
     description: "Windows Autopilot, ESP, and Device Preparation profiles",
     count: 4,
     icon: "Download",
+  },
+  notification: {
+    displayName: "Notification Templates",
+    description: "Compliance notification message templates with localized messages",
+    count: 1,
+    icon: "Bell",
   },
   conditionalAccess: {
     displayName: "Conditional Access",
@@ -70,7 +77,7 @@ export const TEMPLATE_METADATA = {
   cisBaseline: {
     displayName: "CIS Intune Baselines",
     description: "CIS security benchmarks for Windows, macOS, iOS, Android, and browsers",
-    count: 717,
+    count: 728,
     icon: "ShieldAlert",
     hasSubcategories: true,
   },

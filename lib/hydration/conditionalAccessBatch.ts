@@ -144,3 +144,29 @@ export function getPrivatePreviewFeatureName(error: Pick<BatchResponseError, "in
 export function getPrivatePreviewSkipReason(featureName: string): string {
   return `Requires tenant authorization for Microsoft Graph private preview feature: ${featureName}`;
 }
+
+/** Graph refuses agent policies without this license (error 1267). */
+export const AGENT_LICENSE_SKIP_REASON = "Requires a Microsoft Agent 365 or Microsoft 365 E7 license";
+/** Graph retired the users condition that the agent users template sends (error 1342). */
+export const RETIRED_AGENT_CONDITION_SKIP_REASON =
+  "Microsoft Graph no longer accepts the 'AllAgentIdUsers' users condition that this template uses, so the policy cannot be created until the template is updated";
+
+const AGENT_LICENSE_PATTERN = /\b1267:|requires a Microsoft Agent 365 or Microsoft 365 E7 license/i;
+const RETIRED_AGENT_CONDITION_PATTERN = /\b1342:|'AllAgentIdUsers' in the users condition is no longer supported/i;
+
+/**
+ * Reason why the tenant cannot have a Conditional Access policy, or null when the error is
+ * a real failure. These refusals are a property of the tenant (license, preview
+ * authorization) or of the service, not of the run, so the task is blocked, not failed.
+ * Graph created nothing.
+ */
+export function getConditionalAccessBlockReason(
+  error: Pick<BatchResponseError, "innerMessage" | "message">
+): string | null {
+  const privatePreviewFeatureName = getPrivatePreviewFeatureName(error);
+  if (privatePreviewFeatureName) return getPrivatePreviewSkipReason(privatePreviewFeatureName);
+  const text = `${error.innerMessage ?? ""} ${error.message}`;
+  if (AGENT_LICENSE_PATTERN.test(text)) return AGENT_LICENSE_SKIP_REASON;
+  if (RETIRED_AGENT_CONDITION_PATTERN.test(text)) return RETIRED_AGENT_CONDITION_SKIP_REASON;
+  return null;
+}

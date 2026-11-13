@@ -1,31 +1,34 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  API_VERSION_MAP,
-  chunkArray,
   extractBatchError,
   getRetryAfterFromBatchResponse,
-  groupRequestsByVersion,
   isBatchResponseConflict,
+  isBatchResponseOutcomeUnknown,
   isBatchResponseRetryable,
   isBatchResponseSuccess,
-  processBatchResponses,
 } from "@/lib/graph/batch";
 
 describe("batch graph utilities", () => {
-  it("classifies response statuses and exposes the API version map", () => {
-    expect(API_VERSION_MAP.groups).toBe("v1.0");
-    expect(API_VERSION_MAP.conditionalAccess).toBe("v1.0");
-    expect(API_VERSION_MAP.filters).toBe("beta");
-
+  it("classifies response statuses", () => {
     expect(isBatchResponseSuccess(200)).toBe(true);
     expect(isBatchResponseSuccess(299)).toBe(true);
     expect(isBatchResponseSuccess(300)).toBe(false);
 
-    expect(isBatchResponseRetryable(429)).toBe(true);
-    expect(isBatchResponseRetryable(500)).toBe(true);
-    expect(isBatchResponseRetryable(599)).toBe(true);
-    expect(isBatchResponseRetryable(400)).toBe(false);
+    // Only responses that prove "not processed" can be sent again.
+    expect(isBatchResponseRetryable({ status: 429 })).toBe(true);
+    expect(isBatchResponseRetryable({ status: 503, headers: { "Retry-After": "2" } })).toBe(true);
+    expect(isBatchResponseRetryable({ status: 503 })).toBe(false);
+    expect(isBatchResponseRetryable({ status: 500 })).toBe(false);
+    expect(isBatchResponseRetryable({ status: 504 })).toBe(false);
+    expect(isBatchResponseRetryable({ status: 400 })).toBe(false);
+
+    expect(isBatchResponseOutcomeUnknown({ status: 500 })).toBe(true);
+    expect(isBatchResponseOutcomeUnknown({ status: 503 })).toBe(true);
+    expect(isBatchResponseOutcomeUnknown({ status: 599 })).toBe(true);
+    expect(isBatchResponseOutcomeUnknown({ status: 503, headers: { "retry-after": "2" } })).toBe(false);
+    expect(isBatchResponseOutcomeUnknown({ status: 429 })).toBe(false);
+    expect(isBatchResponseOutcomeUnknown({ status: 400 })).toBe(false);
 
     expect(isBatchResponseConflict(409)).toBe(true);
     expect(isBatchResponseConflict(404)).toBe(false);
@@ -107,66 +110,12 @@ describe("batch graph utilities", () => {
     expect(getRetryAfterFromBatchResponse({ "Retry-After": "5" })).toBe(5000);
     expect(getRetryAfterFromBatchResponse({ "retry-after": "7" })).toBe(7000);
     expect(getRetryAfterFromBatchResponse({ "Retry-After": "soon" })).toBeUndefined();
+    expect(getRetryAfterFromBatchResponse({ "RETRY-AFTER": "600" })).toBe(60000);
+    const inTenSeconds = new Date(Date.now() + 10000).toUTCString();
+    const fromDate = getRetryAfterFromBatchResponse({ "Retry-After": inTenSeconds });
+    expect(fromDate).toBeGreaterThan(8000);
+    expect(fromDate).toBeLessThanOrEqual(10000);
     expect(getRetryAfterFromBatchResponse()).toBeUndefined();
   });
 
-  it("separates successful, failed, and retryable batch responses", () => {
-    const result = processBatchResponses({
-      responses: [
-        { id: "success", status: 201 },
-        { id: "conflict", status: 409 },
-        { id: "retry-later", status: 429 },
-        { id: "server", status: 503 },
-        { id: "failed", status: 400 },
-      ],
-    });
-
-    expect(result.successful.map(({ id }) => id)).toEqual(["success", "conflict"]);
-    expect(result.retryable.map(({ id }) => id)).toEqual(["retry-later", "server"]);
-    expect(result.failed.map(({ id }) => id)).toEqual(["failed"]);
-  });
-
-  it("chunks arrays and groups requests by API version", () => {
-    expect(chunkArray(["a", "b", "c", "d", "e"], 2)).toEqual([
-      ["a", "b"],
-      ["c", "d"],
-      ["e"],
-    ]);
-    expect(chunkArray([], 3)).toEqual([]);
-
-    const grouped = groupRequestsByVersion([
-      {
-        id: "1",
-        method: "GET",
-        url: "/groups",
-        apiVersion: "v1.0",
-      },
-      {
-        id: "2",
-        method: "POST",
-        url: "/deviceManagement/assignmentFilters",
-        body: { displayName: "Windows" },
-        apiVersion: "beta",
-      },
-      {
-        id: "3",
-        method: "DELETE",
-        url: "/groups/1",
-        apiVersion: "v1.0",
-      },
-    ]);
-
-    expect(grouped.get("v1.0")).toEqual([
-      { id: "1", method: "GET", url: "/groups" },
-      { id: "3", method: "DELETE", url: "/groups/1" },
-    ]);
-    expect(grouped.get("beta")).toEqual([
-      {
-        id: "2",
-        method: "POST",
-        url: "/deviceManagement/assignmentFilters",
-        body: { displayName: "Windows" },
-      },
-    ]);
-  });
 });

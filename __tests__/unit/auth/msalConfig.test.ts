@@ -64,23 +64,28 @@ describe("msalConfig", () => {
     expect(module.loginRequest.scopes).toEqual(module.REQUIRED_SCOPES);
     expect(module.msalConfig.cache).toEqual({
       cacheLocation: "sessionStorage",
-      storeAuthStateInCookie: false,
     });
     expect(module.msalConfig.auth.authority).toBe("https://login.microsoftonline.com/common");
-    expect(module.msalConfig.auth.redirectUri).toBe("http://localhost:3000");
-    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe("http://localhost:3000");
+    expect(module.msalConfig.auth.redirectUri).toBe("http://localhost:3000/auth/redirect");
+    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(
+      "http://localhost:3000/auth/redirect"
+    );
   });
 
-  it("uses the initiating browser origin instead of a stale configured redirect", async () => {
+  it("sends every flow to the redirect bridge page on the initiating browser origin", async () => {
     vi.stubEnv(
       "NEXT_PUBLIC_MSAL_REDIRECT_URI",
       "https://www.intunehydrationkit.com"
     );
 
     const module = await importModule();
+    const bridgeUri = `${window.location.origin}/auth/redirect`;
 
-    expect(module.msalConfig.auth.redirectUri).toBe(window.location.origin);
-    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(window.location.origin);
+    expect(module.MSAL_REDIRECT_BRIDGE_PATH).toBe("/auth/redirect");
+    expect(module.redirectBridgeUri).toBe(bridgeUri);
+    // Popup sign-in, silent iframe renewal, and popup sign-out all need the bridge.
+    expect(module.msalConfig.auth.redirectUri).toBe(bridgeUri);
+    expect(module.msalConfig.auth.postLogoutRedirectUri).toBe(bridgeUri);
   });
 
   it("explains when the Entra client ID is missing", async () => {
@@ -134,6 +139,36 @@ describe("msalConfig", () => {
     expect(logSpy).toHaveBeenCalledWith("[MSAL] Instance initialized successfully");
 
     await module.initializeMsal();
+    expect(mocks.initialize).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares one initialization with msal-react, which calls instance.initialize()", async () => {
+    let resolveInitialize: (() => void) | undefined;
+    mocks.initialize.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        resolveInitialize = resolve;
+      })
+    );
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const module = await importModule();
+
+    // msal-react's MsalProvider effect runs before the app's own effect.
+    const providerCall = module.msalInstance.initialize();
+    const appCall = module.initializeMsal();
+
+    expect(mocks.initialize).toHaveBeenCalledTimes(1);
+    expect(appCall).toBe(providerCall);
+    resolveInitialize?.();
+    await Promise.all([providerCall, appCall]);
+  });
+
+  it("keeps an initialization failure for every caller", async () => {
+    const failure = new Error("crypto unavailable");
+    mocks.initialize.mockRejectedValueOnce(failure);
+    const module = await importModule();
+
+    await expect(module.msalInstance.initialize()).rejects.toBe(failure);
+    await expect(module.initializeMsal()).rejects.toBe(failure);
     expect(mocks.initialize).toHaveBeenCalledTimes(1);
   });
 });

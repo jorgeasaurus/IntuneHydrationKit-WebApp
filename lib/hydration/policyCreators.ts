@@ -6,17 +6,9 @@
 import { GraphClient } from "@/lib/graph/client";
 import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { cleanSettingsCatalogPolicy, cleanPolicyRecursively } from "./cleaners";
-import { containsSecretPlaceholders, escapeODataString, hasODataUnsafeChars } from "./utils";
+import { containsSecretPlaceholders } from "./utils";
 
 const CIS_METADATA_KEYS = ["_cisCategory", "_cisSubcategory", "_cisFilePath"] as const;
-
-function normalizePolicyLookupName(name: string | undefined | null): string {
-  if (!name) return "";
-  return name
-    .toLowerCase()
-    .replace(/\s+/g, " ")
-    .trim();
-}
 
 /**
  * Remove CIS-specific metadata fields from a policy object.
@@ -43,30 +35,6 @@ function normalizeToDisplayName(policy: Record<string, unknown>): void {
 function normalizeToName(policy: Record<string, unknown>): void {
   if (policy.displayName && !policy.name) {
     policy.name = policy.displayName;
-  }
-}
-
-/**
- * Check if a Settings Catalog policy exists by name
- */
-export async function settingsCatalogPolicyExists(
-  client: GraphClient,
-  displayName: string
-): Promise<boolean> {
-  // Names with brackets/special chars cause Graph API InternalServerError in $filter
-  if (hasODataUnsafeChars(displayName)) {
-    console.log(`[Settings Catalog] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
-    return false;
-  }
-  try {
-    const escapedName = escapeODataString(displayName);
-    const response = await client.get<{ value: Array<{ name: string }> }>(
-      `/deviceManagement/configurationPolicies?$filter=name eq '${encodeURIComponent(escapedName)}'&$select=id,name`
-    );
-    return response.value && response.value.length > 0;
-  } catch (error) {
-    console.error(`[Settings Catalog] Error checking if policy exists: ${displayName}`, error);
-    return false;
   }
 }
 
@@ -147,26 +115,6 @@ export async function createDriverUpdateProfile(
 
   console.warn(`[PolicyCreators] Created Driver Update Profile "${displayName}" but could not find ID`);
   return { id: "" };
-}
-
-export async function compliancePolicyExistsByName(
-  client: GraphClient,
-  displayName: string
-): Promise<boolean> {
-  if (hasODataUnsafeChars(displayName)) {
-    console.log(`[Compliance] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
-    return false;
-  }
-  try {
-    const escapedName = escapeODataString(displayName);
-    const response = await client.get<{ value: Array<{ displayName: string }> }>(
-      `/deviceManagement/deviceCompliancePolicies?$filter=displayName eq '${encodeURIComponent(escapedName)}'&$select=id,displayName`
-    );
-    return response.value && response.value.length > 0;
-  } catch (error) {
-    console.error(`[Compliance] Error checking if policy exists: ${displayName}`, error);
-    return false;
-  }
 }
 
 /**
@@ -254,27 +202,6 @@ export async function createCISGroupPolicyConfiguration(
   );
 }
 
-export async function groupPolicyConfigurationExists(
-  client: GraphClient,
-  displayName: string
-): Promise<boolean> {
-  if (hasODataUnsafeChars(displayName)) {
-    console.log(`[Group Policy Configuration] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
-    return false;
-  }
-
-  try {
-    const escapedName = escapeODataString(displayName);
-    const response = await client.get<{ value: Array<{ displayName: string }> }>(
-      `/deviceManagement/groupPolicyConfigurations?$filter=displayName eq '${encodeURIComponent(escapedName)}'&$select=id,displayName`
-    );
-    return response.value && response.value.length > 0;
-  } catch (error) {
-    console.error(`[Group Policy Configuration] Error checking if policy exists: ${displayName}`, error);
-    return false;
-  }
-}
-
 export function buildCISSecurityIntentPayload(
   policy: Record<string, unknown>
 ): Record<string, unknown> {
@@ -300,38 +227,6 @@ export async function createCISSecurityIntent(
     "/deviceManagement/intents",
     buildCISSecurityIntentPayload(policy)
   );
-}
-
-export async function securityIntentExists(
-  client: GraphClient,
-  displayName: string
-): Promise<boolean> {
-  if (hasODataUnsafeChars(displayName)) {
-    console.log(`[Security Intent] Using collection lookup for "${displayName}" (OData-unsafe chars)`);
-    try {
-      const intents = await client.getCollection<{ displayName?: string }>(
-        "/deviceManagement/intents?$select=id,displayName"
-      ) ?? [];
-      const normalizedDisplayName = normalizePolicyLookupName(displayName);
-      return intents.some(
-        (intent) => normalizePolicyLookupName(intent.displayName) === normalizedDisplayName
-      );
-    } catch (error) {
-      console.error(`[Security Intent] Error checking if policy exists: ${displayName}`, error);
-      return false;
-    }
-  }
-
-  try {
-    const escapedName = escapeODataString(displayName);
-    const response = await client.get<{ value: Array<{ displayName: string }> }>(
-      `/deviceManagement/intents?$filter=displayName eq '${escapedName}'&$select=id,displayName`
-    );
-    return response.value && response.value.length > 0;
-  } catch (error) {
-    console.error(`[Security Intent] Error checking if policy exists: ${displayName}`, error);
-    return false;
-  }
 }
 
 export async function createV2CompliancePolicy(
@@ -370,29 +265,6 @@ export async function createV2CompliancePolicy(
   return result;
 }
 
-/**
- * Check if a V2 Compliance policy exists by name
- */
-export async function v2CompliancePolicyExists(
-  client: GraphClient,
-  name: string
-): Promise<boolean> {
-  if (hasODataUnsafeChars(name)) {
-    console.log(`[V2 Compliance] Skipping API existence check for "${name}" (OData-unsafe chars)`);
-    return false;
-  }
-  try {
-    const escapedName = escapeODataString(name);
-    const response = await client.get<{ value: Array<{ name: string }> }>(
-      `/deviceManagement/compliancePolicies?$filter=name eq '${encodeURIComponent(escapedName)}'&$select=id,name`
-    );
-    return response.value && response.value.length > 0;
-  } catch (error) {
-    console.error(`[V2 Compliance] Error checking if policy exists: ${name}`, error);
-    return false;
-  }
-}
-
 export async function createCISDeviceConfiguration(
   client: GraphClient,
   policy: Record<string, unknown>
@@ -415,25 +287,3 @@ export async function createCISDeviceConfiguration(
   return result;
 }
 
-/**
- * Check if a device configuration exists by name
- */
-export async function deviceConfigurationExists(
-  client: GraphClient,
-  displayName: string
-): Promise<boolean> {
-  if (hasODataUnsafeChars(displayName)) {
-    console.log(`[Device Configuration] Skipping API existence check for "${displayName}" (OData-unsafe chars)`);
-    return false;
-  }
-  try {
-    const escapedName = escapeODataString(displayName);
-    const response = await client.get<{ value: Array<{ displayName: string }> }>(
-      `/deviceManagement/deviceConfigurations?$filter=displayName eq '${encodeURIComponent(escapedName)}'&$select=id,displayName`
-    );
-    return response.value && response.value.length > 0;
-  } catch (error) {
-    console.error(`[Device Configuration] Error checking if policy exists: ${displayName}`, error);
-    return false;
-  }
-}

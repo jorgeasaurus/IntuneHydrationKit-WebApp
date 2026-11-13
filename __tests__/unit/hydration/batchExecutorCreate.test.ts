@@ -124,7 +124,7 @@ describe("executeTasksInBatches", () => {
     vi.clearAllMocks();
   });
 
-  it("skips preview create for conditional access when the API fallback finds an existing policy", async () => {
+  it("skips preview create for conditional access when the tenant cache has an existing policy", async () => {
     const policyName = "[IHD] Require password change for high-risk users";
 
     mockConditionalAccessTemplate({
@@ -134,21 +134,11 @@ describe("executeTasksInBatches", () => {
       grantControls: { operator: "OR", builtInControls: ["mfa"] },
     });
     const task = createConditionalAccessTask("batch-preview-existing-ca", policyName);
-    const client = createBatchClient({
-      getCollection: vi.fn().mockImplementation((endpoint: string) => {
-        if (endpoint === CONDITIONAL_ACCESS_POLICIES_ENDPOINT) {
-          return Promise.resolve([
-            {
-              id: "ca-id",
-              displayName: policyName,
-              state: "disabled",
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      }),
+    const client = createBatchClient();
+    const context = createCreateContext(client, {
+      isPreview: true,
+      cachedConditionalAccessPolicies: [{ id: "ca-id", displayName: policyName }],
     });
-    const context = createCreateContext(client, { isPreview: true });
 
     const results = await executeTasksInBatches([task], context);
 
@@ -159,10 +149,11 @@ describe("executeTasksInBatches", () => {
       error: "Already exists",
     });
     expect(task.skipKind).toBe("noOp");
+    expect(client.getCollection).not.toHaveBeenCalled();
     expect(client.batch).not.toHaveBeenCalled();
   });
 
-  it("skips preview create for CIS security intents when the API fallback finds an existing policy", async () => {
+  it("skips preview create for CIS security intents when the tenant cache has an existing policy", async () => {
     const policyName = "[IHD] Baseline - MacOS - Firewall";
 
     mockGetCachedTemplates.mockImplementation((category?: string) => {
@@ -209,17 +200,7 @@ describe("executeTasksInBatches", () => {
       get: vi.fn(),
       post: vi.fn(),
       delete: vi.fn(),
-      getCollection: vi.fn().mockImplementation((endpoint: string) => {
-        if (endpoint === "/deviceManagement/intents?$select=id,displayName") {
-          return Promise.resolve([
-            {
-              id: "intent-id",
-              displayName: policyName,
-            },
-          ]);
-        }
-        return Promise.resolve([]);
-      }),
+      getCollection: vi.fn(),
       patch: vi.fn(),
       batch: vi.fn(),
     } as unknown as ExecutionContext["client"];
@@ -229,7 +210,7 @@ describe("executeTasksInBatches", () => {
       operationMode: "create",
       isPreview: true,
       stopOnFirstError: false,
-      cachedSecurityIntents: [],
+      cachedSecurityIntents: [{ id: "intent-id", displayName: policyName }],
     };
 
     const results = await executeTasksInBatches([task], context);
@@ -240,6 +221,7 @@ describe("executeTasksInBatches", () => {
       skipped: true,
       error: `SecurityIntent "${policyName}" already exists`,
     });
+    expect(client.getCollection).not.toHaveBeenCalled();
     expect(client.batch).not.toHaveBeenCalled();
   });
 
@@ -281,7 +263,7 @@ describe("executeTasksInBatches", () => {
       status: "pending",
     };
     const client = createBatchClient();
-    const context = createCreateContext(client);
+    const context = createCreateContext(client, { cachedSettingsCatalogPolicies: [] });
 
     await executeTasksInBatches([task], context);
 
@@ -293,6 +275,42 @@ describe("executeTasksInBatches", () => {
           }),
         }),
       ],
+      "beta"
+    );
+  });
+
+  it("resolves OpenIntuneBaseline batch templates by selected file path when names collide", async () => {
+    const policyName = "[IHD] Duplicate OIB Policy";
+    const template = (description: string, path: string) => ({
+      name: policyName,
+      displayName: policyName,
+      description,
+      platforms: "windows10",
+      technologies: "mdm",
+      _oibPolicyType: "SettingsCatalog",
+      _oibFilePath: path,
+      settings: [],
+    });
+    mockGetCachedTemplates.mockImplementation((category?: string) =>
+      category === "baseline"
+        ? [template("first", "WINDOWS/SettingsCatalog/a.json"), template("second", "WINDOWS/SettingsCatalog/b.json")]
+        : undefined
+    );
+
+    const task: HydrationTask = {
+      id: "batch-create-oib-path",
+      category: "baseline",
+      operation: "create",
+      itemName: policyName,
+      templatePath: "WINDOWS/SettingsCatalog/b.json",
+      status: "pending",
+    };
+    const client = createBatchClient();
+
+    await executeTasksInBatches([task], createCreateContext(client, { cachedSettingsCatalogPolicies: [] }));
+
+    expect(client.batch).toHaveBeenCalledWith(
+      [expect.objectContaining({ body: expect.objectContaining({ description: expect.stringContaining("second") }) })],
       "beta"
     );
   });
@@ -332,7 +350,7 @@ describe("executeTasksInBatches", () => {
     };
     const client = createBatchClient();
 
-    await executeTasksInBatches([task], createCreateContext(client, { tenantId }));
+    await executeTasksInBatches([task], createCreateContext(client, { tenantId, cachedSettingsCatalogPolicies: [] }));
 
     expect(client.batch).toHaveBeenCalledWith(
       [
@@ -352,7 +370,7 @@ describe("executeTasksInBatches", () => {
     );
   });
 
-  it("does not retry an entire create batch when the batch request itself fails", async () => {
+  it("does not send a create batch again when the batch request fails with an unknown outcome", async () => {
     const policyName = "[IHD] Require password change for high-risk users";
 
     mockConditionalAccessTemplate({
@@ -362,7 +380,7 @@ describe("executeTasksInBatches", () => {
       grantControls: { operator: "OR", builtInControls: ["mfa"] },
     });
     const task = createConditionalAccessTask("batch-create-http-failure", policyName);
-    const batchError = new Error("[503] Service unavailable");
+    const batchError = new TypeError("Failed to fetch");
     const client = createBatchClient({ batchError });
     const context = createCreateContext(client);
 
@@ -374,7 +392,7 @@ describe("executeTasksInBatches", () => {
     expect(results[0]).toMatchObject({
       success: false,
       skipped: false,
-      error: "[503] Service unavailable",
+      error: expect.stringMatching(/^Failed to fetch \(Outcome unknown/),
     });
   });
 
@@ -591,6 +609,49 @@ describe("executeTasksInBatches", () => {
         status: "skipped",
         error: "Requires tenant authorization for Microsoft Graph private preview feature: AccountRecovery",
       });
+      expect(onTaskComplete).toHaveBeenCalledWith(task);
+      expect(onTaskError).not.toHaveBeenCalled();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it.each([
+    [
+      "1267: Cannot create or update Conditional Access policies that target agents. This capability requires a Microsoft Agent 365 or Microsoft 365 E7 license. Upgrade your organization's license and try again.",
+      "Requires a Microsoft Agent 365 or Microsoft 365 E7 license",
+    ],
+    [
+      "1342: Targeting 'AllAgentIdUsers' in the users condition is no longer supported. Please use the agents includeAgentUsers condition to target all agent users.",
+      "Microsoft Graph no longer accepts the 'AllAgentIdUsers' users condition that this template uses, so the policy cannot be created until the template is updated",
+    ],
+  ])("reports a refused agent policy as blocked, not failed: %s", async (innerMessage, reason) => {
+    const policyName = "[IHD] Block all agent identities from accessing resources";
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    try {
+      mockConditionalAccessTemplate(accountRecoveryConditionalAccessTemplate(policyName));
+
+      const onTaskComplete = vi.fn();
+      const onTaskError = vi.fn();
+      const task = createConditionalAccessTask("batch-create-agent-policy", policyName);
+      const client = createBatchClient({
+        batchResult: {
+          responses: [
+            {
+              id: "req-0",
+              status: 400,
+              body: { error: { code: "BadRequest", message: "Bad request", innerError: { message: innerMessage } } },
+            },
+          ],
+        },
+      });
+      const context = createCreateContext(client, { onTaskComplete, onTaskError });
+
+      const results = await executeTasksInBatches([task], context);
+
+      expect(results).toEqual([expect.objectContaining({ success: false, skipped: true, skipKind: "blocked", error: reason })]);
+      expect(task).toMatchObject({ status: "skipped", skipKind: "blocked", error: reason });
       expect(onTaskComplete).toHaveBeenCalledWith(task);
       expect(onTaskError).not.toHaveBeenCalled();
     } finally {

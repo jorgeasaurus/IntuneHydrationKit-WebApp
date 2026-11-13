@@ -43,7 +43,8 @@ vi.mock('@/lib/graph/client', () => ({
 
 vi.mock('@/lib/hydration/engine', () => ({
   buildTaskQueueAsync: mockBuildTaskQueueAsync,
-  executeTasks: mockExecuteTasks,
+  // The real engine returns the execution results. The mocks here only change tasks.
+  executeTasks: async (...args: unknown[]) => (await mockExecuteTasks(...args)) ?? [],
   getEstimatedTaskCount: mockGetEstimatedTaskCount
 }))
 
@@ -60,6 +61,7 @@ vi.mock('@/lib/hydration/batchExecutor', () => ({
 }))
 
 import { useHydrationExecution, resetExecutionControlForTests } from '@/hooks/useHydrationExecution'
+import { getCreatedObjectLinks } from '@/lib/utils/portalLinks'
 
 function createPrerequisiteResult(): PrerequisiteCheckResult {
   return {
@@ -182,7 +184,8 @@ describe('useHydrationExecution', () => {
     wizardState = createWizardState()
     settings = {
       stopOnFirstError: false,
-      demoMode: false
+      demoMode: false,
+      notifyOnCompletion: false
     }
 
     mockUseWizardState.mockImplementation(() => ({ state: wizardState }))
@@ -301,7 +304,8 @@ describe('useHydrationExecution', () => {
         hasPremiumP2License: false,
         hasWindowsDriverUpdateLicense: true,
         shouldCancel: expect.any(Function),
-        shouldPause: expect.any(Function)
+        shouldPause: expect.any(Function),
+        onPauseWait: expect.any(Function)
       })
     )
     expect(mockCreateSummary).toHaveBeenCalledWith(
@@ -318,7 +322,8 @@ describe('useHydrationExecution', () => {
         sequentialTaskCount: 0
       },
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) }),
+      0
     )
 
     expect(result.current.tasks).toEqual([
@@ -370,8 +375,44 @@ describe('useHydrationExecution', () => {
       tasks,
       expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) }),
+      0
     )
+  })
+
+  it('shows the portal link of a created object as soon as its task completes', async () => {
+    const queuedTasks = [
+      createTask('group-1', 'groups', 'All Windows Devices'),
+      createTask('group-2', 'groups', 'All macOS Devices'),
+    ]
+    const secondTask = createDeferred<void>()
+    mockBuildTaskQueueAsync.mockResolvedValue(queuedTasks)
+    mockExecuteTasks.mockImplementation(async (tasks: HydrationTask[], context: ExecutionContext) => {
+      Object.assign(tasks[0], { status: 'success', createdObject: { id: 'group-object-id' } })
+      context.onTaskComplete?.(tasks[0])
+      await secondTask.promise
+      Object.assign(tasks[1], { status: 'success', createdObject: { id: 'group-object-2' } })
+      context.onTaskComplete?.(tasks[1])
+    })
+
+    const { result } = renderHook(() => useHydrationExecution())
+    let run!: Promise<void>
+    act(() => {
+      run = result.current.startExecution()
+    })
+
+    await waitFor(() => expect(result.current.tasks[0]?.createdObject).toEqual({ id: 'group-object-id' }))
+    expect(result.current.isCompleted).toBe(false)
+    expect(result.current.configuration?.cloudEnvironment).toBe('global')
+    const liveLinks = getCreatedObjectLinks(result.current.tasks, result.current.configuration?.cloudEnvironment, false)
+    expect(liveLinks.get('group-1')?.href).toContain('groupId/group-object-id')
+    expect(liveLinks.has('group-2')).toBe(false)
+
+    await act(async () => {
+      secondTask.resolve()
+      await run
+    })
+    expect(result.current.tasks[1]?.createdObject).toEqual({ id: 'group-object-2' })
   })
 
   it('ignores duplicate start requests while execution is already locked', async () => {
@@ -455,7 +496,8 @@ describe('useHydrationExecution', () => {
       [],
       expect.objectContaining({ batchRequestCount: 0, batchedTaskCount: 0, sequentialTaskCount: 0 }),
       'Contoso',
-      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) })
+      expect.objectContaining({ runId: expect.any(String), appVersion: packageJson.version, baselineVersion: '4.0', baselineSourceSha: expect.stringMatching(/^[a-f0-9]{40}$/) }),
+      0
     )
   })
 

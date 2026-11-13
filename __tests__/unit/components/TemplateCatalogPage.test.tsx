@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import { TemplateCatalogPage } from '@/components/templates/TemplateCatalogPage'
 
 const loadTemplateDocumentationCatalog = vi.fn()
@@ -11,9 +11,13 @@ vi.mock('@/components/Navigation', () => ({
   Navigation: () => <div data-testid="navigation" />,
 }))
 
+const toastSuccess = vi.fn()
+const toastError = vi.fn()
+
 vi.mock('sonner', () => ({
   toast: {
-    success: vi.fn(),
+    success: (...args: unknown[]) => toastSuccess(...args),
+    error: (...args: unknown[]) => toastError(...args),
   },
 }))
 
@@ -22,7 +26,9 @@ vi.mock('@/lib/templates/catalog', () => ({
     loadTemplateDocumentationCatalog(...args),
   loadTemplateDocumentationPayload: (...args: unknown[]) =>
     loadTemplateDocumentationPayload(...args),
-  getPlatformFilterOrder: (platforms: string[]) => platforms,
+  getTemplatePath: (item: { slug: string }) => `/templates/${item.slug}`,
+  getPlatformFilterOrder: (platforms: Array<string | undefined>) =>
+    Array.from(new Set(platforms.filter(Boolean))),
   TEMPLATE_DOCUMENTATION_CATEGORY_ORDER: [
     'groups',
     'win32Apps',
@@ -35,6 +41,8 @@ describe('TemplateCatalogPage', () => {
   beforeEach(() => {
     loadTemplateDocumentationCatalog.mockReset()
     loadTemplateDocumentationPayload.mockReset()
+    toastSuccess.mockReset()
+    toastError.mockReset()
   })
 
   it('renders catalog data, filters results, and expands raw JSON on demand', async () => {
@@ -143,17 +151,15 @@ describe('TemplateCatalogPage', () => {
 
     expect(await screen.findByText(/Inspect every payload before you import it/i)).toBeInTheDocument()
     expect(await screen.findByText(/\[IHD\] Intune - Windows Devices/i)).toBeInTheDocument()
-    screen
-      .getAllByRole('button', { name: /OpenIntuneBaseline payloads/i })
-      .forEach((button) => {
-        expect(button).not.toHaveTextContent(/\d+\s*\/\s*\d+/)
-      })
+    const baselineCard = screen.getByRole('button', { name: 'Show OpenIntuneBaseline templates' })
+    expect(baselineCard).toHaveAccessibleDescription('OpenIntuneBaseline payloads.')
+    expect(baselineCard).not.toHaveTextContent(/\d+\s*\/\s*\d+/)
     screen.getAllByRole('button', { name: /^All$/i }).forEach((button) => {
       expect(button).toHaveClass('bg-black')
       expect(button).not.toHaveClass('bg-primary')
     })
     expect(
-      screen.getByRole('button', { name: /CIS Baselines CIS benchmark/i })
+      screen.getByRole('button', { name: 'Show CIS Baselines templates' })
     ).toHaveClass('flex', 'items-start', 'justify-start')
 
     await user.type(screen.getByLabelText(/Search template catalog/i), 'Windows Devices')
@@ -218,5 +224,52 @@ describe('TemplateCatalogPage', () => {
     expect(detectionScript.parentElement).toHaveClass('space-y-4')
     expect(installScript.parentElement).toBe(detectionScript.parentElement)
     expect(uninstallScript.parentElement).toBe(detectionScript.parentElement)
+  })
+
+  it('shows each item type once and reports clipboard failures', async () => {
+    loadTemplateDocumentationCatalog.mockResolvedValue({
+      totalCount: 1,
+      categories: [
+        { id: 'groups', label: 'Groups', description: 'Entra groups.', count: 1 },
+      ],
+      items: [
+        {
+          id: 'groups:[IHD] All Windows Devices',
+          category: 'groups',
+          categoryLabel: 'Groups',
+          displayName: '[IHD] All Windows Devices',
+          description: 'All Windows devices.',
+          subcategory: 'Dynamic Group',
+          platform: 'Windows',
+          itemType: 'Dynamic Group',
+          payloadSource: { kind: 'inline', payload: { displayName: '[IHD] All Windows Devices' } },
+        },
+      ],
+    })
+    loadTemplateDocumentationPayload.mockResolvedValue({
+      displayName: '[IHD] All Windows Devices',
+    })
+    const writeText = vi.fn().mockRejectedValue(new Error('Clipboard blocked'))
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    })
+
+    render(<TemplateCatalogPage />)
+
+    const row = await screen.findByRole('button', { name: /\[IHD\] All Windows Devices/i })
+    expect(within(row).getAllByText('Dynamic Group')).toHaveLength(1)
+
+    await user.click(row)
+    await user.click(await screen.findByRole('button', { name: /^Copy$/ }))
+
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalledWith(
+        'Could not copy the template JSON. Select the JSON and copy it manually.'
+      )
+    })
+    expect(writeText).toHaveBeenCalledOnce()
+    expect(toastSuccess).not.toHaveBeenCalled()
   })
 })

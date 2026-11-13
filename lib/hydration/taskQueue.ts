@@ -21,17 +21,187 @@ import {
   fetchConditionalAccessPolicies,
   fetchAppProtectionPolicies,
   fetchEnrollmentProfiles,
+  fetchNotificationTemplates,
   fetchCISBaselinePolicies,
   fetchCISBaselinePoliciesByCategories,
   fetchBaselinePolicies,
   getCachedTemplates,
   cacheTemplates,
-  clearCategoryCache,
-  CISBaselinePolicy,
+  type TemplateLoadReport,
 } from "@/lib/templates/loader";
+
+type TemplateItem = { displayName: string } & Record<string, unknown>;
+type QueueOptions = Omit<BuildTaskQueueOptions, "selectedCategories" | "operationMode">;
+type TemplateLoad = (throwIfCancelled: () => void, report: TemplateLoadReport) => Promise<TemplateItem[]>;
+
+/**
+ * Copy the Autopilot Branding customization of the wizard to its create task. The executor
+ * validates it again and builds the package from it. A delete does not use it.
+ */
+function attachAutopilotBrandingCustomization(
+  tasks: HydrationTask[],
+  operationMode: OperationMode,
+  options?: QueueOptions,
+): HydrationTask[] {
+  const customization = options?.categorySelections?.win32Apps?.autopilotBranding;
+  if (operationMode !== "create" || !customization) return tasks;
+  return tasks.map((task) =>
+    task.category === "win32Apps" && task.itemName === Templates.AUTOPILOT_BRANDING_WIN32_APP.displayName
+      ? { ...task, autopilotBranding: customization }
+      : task,
+  );
+}
+
+/**
+ * Copy the pinned WinGet version of each Win32 app to its create task. The executor checks the
+ * version against the catalog and builds the package for it. A delete does not use it.
+ */
+function attachWinGetVersions(
+  tasks: HydrationTask[],
+  operationMode: OperationMode,
+  options?: QueueOptions,
+): HydrationTask[] {
+  const versions = options?.categorySelections?.win32Apps?.wingetVersions;
+  if (operationMode !== "create" || !versions) return tasks;
+  return tasks.map((task) => {
+    if (task.category !== "win32Apps") return task;
+    const template = Templates.getWin32AppTemplateByName(task.itemName);
+    const version = template ? versions[template.id] : undefined;
+    return version === undefined ? task : { ...task, wingetVersion: version };
+  });
+}
+
+/**
+ * The templates that a category queues when it has no selection. A create does not queue an
+ * opt-in Win32 app (a WinGet catalog app) unless the user selected it. A delete queues every
+ * template, so it can remove an opt-in app that an earlier run created.
+ */
+function getUnselectedDefaultTemplates(
+  category: TaskCategory,
+  operationMode: OperationMode,
+  templates: TemplateItem[],
+): TemplateItem[] {
+  if (category !== "win32Apps" || operationMode !== "create") return templates;
+  return templates.filter((template) => template.optIn !== true);
+}
 
 function getTaskDedupKey(task: HydrationTask): string {
   return task.templatePath || task.itemName;
+}
+
+/**
+ * Get the selected template keys for a category.
+ * Returns undefined when there is no selection object (all templates are queued).
+ * Returns an empty set for an explicit empty selection (no templates are queued).
+ */
+function getSelectedKeys(category: TaskCategory, options?: QueueOptions): Set<string> | undefined {
+  if (category === "baseline") {
+    const baselineSelection = options?.categorySelections?.baseline ?? options?.baselineSelection;
+    return baselineSelection ? new Set(baselineSelection.selectedPolicies) : undefined;
+  }
+
+  const selection = options?.categorySelections?.[category as keyof CategorySelections];
+  return selection && "selectedItems" in selection ? new Set(selection.selectedItems) : undefined;
+}
+
+/**
+ * Get the key that a selection uses to identify a template.
+ */
+function getTemplateSelectionKey(category: TaskCategory, template: TemplateItem): string {
+  if (category === "baseline") return template._oibFilePath as string;
+  if (category === "cisBaseline") return template._cisFilePath as string;
+  return template.displayName;
+}
+
+async function fetchAllGroups(throwIfCancelled: () => void, report: TemplateLoadReport): Promise<TemplateItem[]> {
+  const dynamicGroups = await fetchDynamicGroups(report);
+  throwIfCancelled();
+  const staticGroups = await fetchStaticGroups(report);
+  return [...dynamicGroups, ...staticGroups] as unknown as TemplateItem[];
+}
+
+async function fetchEnrollmentTemplates(_throwIfCancelled: () => void, report: TemplateLoadReport): Promise<TemplateItem[]> {
+  const profiles = (await fetchEnrollmentProfiles(report)) as Array<{ displayName?: string; name?: string }>;
+  return profiles.map((profile) => ({
+    ...profile,
+    displayName: profile.displayName || profile.name || "Unknown Profile",
+  }));
+}
+
+/**
+ * Get the cache key and loader for the complete template list of a category.
+ * The cached content depends only on the cache key, never on an item selection.
+ */
+function getTemplateSource(
+  category: TaskCategory,
+  selectedKeys: Set<string> | undefined,
+  options?: QueueOptions,
+): { cacheKey: string; load: TemplateLoad } {
+  const asItems =
+    <T>(load: (report: TemplateLoadReport) => Promise<T[]> | T[]): TemplateLoad =>
+    async (_throwIfCancelled, report) =>
+      (await load(report)) as unknown as TemplateItem[];
+
+  switch (category) {
+    case "groups":
+      return { cacheKey: category, load: fetchAllGroups };
+    case "filters":
+      return { cacheKey: category, load: asItems(fetchFilters) };
+    case "compliance":
+      return { cacheKey: category, load: asItems(fetchCompliancePolicies) };
+    case "conditionalAccess":
+      return { cacheKey: category, load: asItems(fetchConditionalAccessPolicies) };
+    case "appProtection":
+      return { cacheKey: category, load: asItems(fetchAppProtectionPolicies) };
+    case "win32Apps":
+      return { cacheKey: category, load: asItems(() => [...Templates.getWin32AppTemplates()]) };
+    case "enrollment":
+      return { cacheKey: category, load: fetchEnrollmentTemplates };
+    case "notification":
+      return { cacheKey: category, load: asItems(fetchNotificationTemplates) };
+    case "baseline":
+      return { cacheKey: category, load: asItems(fetchBaselinePolicies) };
+    case "cisBaseline": {
+      // A policy path selection needs every CIS policy. Without one, load only the selected sub-categories.
+      const cisCategories = options?.selectedCISCategories?.length ? options.selectedCISCategories : undefined;
+      if (selectedKeys || !cisCategories) {
+        return { cacheKey: category, load: asItems(fetchCISBaselinePolicies) };
+      }
+      return {
+        cacheKey: `${category}-${cisCategories.toSorted().join(",")}`,
+        load: asItems((report) => fetchCISBaselinePoliciesByCategories(cisCategories, report)),
+      };
+    }
+    default:
+      return { cacheKey: category, load: async () => [] };
+  }
+}
+
+function formatList(values: string[], limit = 5): string {
+  const shown = values.slice(0, limit).join(", ");
+  return values.length > limit ? `${shown} and ${values.length - limit} more` : shown;
+}
+
+/**
+ * Check an incomplete template load. Throws when a template this run needs is missing,
+ * so it is reported instead of silently dropped from the queue.
+ */
+function assertIncompleteLoadCoversSelection(
+  category: TaskCategory,
+  label: string,
+  templates: TemplateItem[],
+  selectedKeys: Set<string> | undefined,
+  failedFiles: string[],
+): void {
+  const loadedKeys = new Set(templates.map((template) => getTemplateSelectionKey(category, template)));
+  const missingKeys = selectedKeys ? [...selectedKeys].filter((key) => !loadedKeys.has(key)) : [];
+  if (selectedKeys && missingKeys.length === 0) return;
+
+  const missingDetail = selectedKeys ? ` Selected templates not loaded: ${formatList(missingKeys)}.` : "";
+  throw new Error(
+    `Could not load ${failedFiles.length} ${label} template file(s): ${formatList(failedFiles)}.${missingDetail} ` +
+      "Check your connection and start the run again.",
+  );
 }
 
 /**
@@ -41,7 +211,7 @@ function getTaskDedupKey(task: HydrationTask): string {
 export async function buildTaskQueueAsync(
   selectedCategories: TaskCategory[],
   operationMode: OperationMode,
-  options?: Omit<BuildTaskQueueOptions, "selectedCategories" | "operationMode">,
+  options?: QueueOptions,
 ): Promise<HydrationTask[]> {
   const emit = options?.onProgress;
   const throwIfCancelled = (): void => {
@@ -76,259 +246,60 @@ export async function buildTaskQueueAsync(
     console.log(`[Task Queue] Processing category: ${category}`);
     const label = getTaskCategoryLabel(category);
     emit?.(`[${categoryIndex + 1}/${selectedCategories.length}] Loading templates for ${label}...`);
-    let items: Array<{ displayName: string }> = [];
     const categorySelections = options?.categorySelections;
     const selectionKey = category as keyof CategorySelections;
     const selection = categorySelections?.[selectionKey];
-    const cisSelection = categorySelections?.cisBaseline;
-    const hasSelectedCISPolicyPaths =
-      category === "cisBaseline" && !!cisSelection?.selectedItems && cisSelection.selectedItems.length > 0;
-    const selectedCISCategories = options?.selectedCISCategories?.length ? options.selectedCISCategories : undefined;
+    const selectedKeys = getSelectedKeys(category, options);
 
-    const cacheKey =
-      category === "cisBaseline" && selectedCISCategories && !hasSelectedCISPolicyPaths
-        ? `${category}-${selectedCISCategories.toSorted().join(",")}`
-        : category;
-
-    // Clear cache if categorySelections has selections for this category
-    // This ensures we fetch fresh templates and don't use stale filtered cache
-    if (selection && "selectedItems" in selection && selection.selectedItems && selection.selectedItems.length > 0) {
-      console.log(`[Task Queue] Clearing cache for ${cacheKey} - specific items selected`);
-      clearCategoryCache(cacheKey);
-    }
-
-    // Try to get from cache first
-    const cached = getCachedTemplates(cacheKey);
-    if (cached && Array.isArray(cached)) {
-      console.log(`[Task Queue] Using ${cached.length} cached templates for ${cacheKey}`);
-      emit?.(`Using ${cached.length} cached templates for ${label}`, "info");
-      items = cached as Array<{ displayName: string }>;
+    let items: TemplateItem[] = [];
+    if (selectedKeys?.size === 0) {
+      emit?.(`No ${label.toLowerCase()} items are selected`, "info");
     } else {
-      console.log(`[Task Queue] Cache miss for ${cacheKey}, fetching fresh templates...`);
-      emit?.(`Fetching templates for ${label}...`);
-      // Fetch fresh templates
-      switch (category) {
-        case "groups":
-          {
-            console.log(`[Task Queue] Fetching dynamic and static groups...`);
-            emit?.("Fetching dynamic groups...");
-            const dynamicGroups = await loadTemplates(fetchDynamicGroups);
-            emit?.(`Found ${dynamicGroups.length} dynamic groups. Fetching static groups...`);
-            const staticGroups = await loadTemplates(fetchStaticGroups);
-            emit?.(`Found ${staticGroups.length} static groups`, "info");
-            let allGroups = [...dynamicGroups, ...staticGroups];
-
-            // Filter by selected items if categorySelections is provided
-            const groupSelection = options?.categorySelections?.groups;
-            if (groupSelection?.selectedItems && groupSelection.selectedItems.length > 0) {
-              const selectedSet = new Set(groupSelection.selectedItems);
-              allGroups = allGroups.filter((g) => selectedSet.has(g.displayName));
-              console.log(`[Task Queue] Filtered to ${allGroups.length} selected groups`);
-              emit?.(
-                `Filtered to ${allGroups.length} of ${dynamicGroups.length + staticGroups.length} groups based on selection`,
-                "info",
-              );
-            }
-
-            items = allGroups;
-            console.log(`[Task Queue] Using ${items.length} groups`);
-            cacheTemplates(category, items);
+      const source = getTemplateSource(category, selectedKeys, options);
+      // An incomplete list from an earlier failed load is never reused; it is reloaded instead.
+      const cached = getCachedTemplates(source.cacheKey, { completeOnly: true }) as TemplateItem[] | null;
+      let templates: TemplateItem[];
+      if (cached) {
+        emit?.(`Using ${cached.length} cached templates for ${label}`, "info");
+        templates = cached;
+      } else {
+        emit?.(`Fetching templates for ${label}...`);
+        const report: TemplateLoadReport = { failedFiles: [] };
+        templates = await loadTemplates(() => source.load(throwIfCancelled, report));
+        const complete = report.failedFiles.length === 0;
+        if (!complete) {
+          // A delete with a direct selection queues the selected tenant object names as they
+          // are, so it does not need the templates. CIS is the exception: its selection is a
+          // list of file paths that the templates map to display names.
+          const queuesSelectionDirectly =
+            operationMode === "delete" &&
+            category !== "cisBaseline" &&
+            !!selection &&
+            "selectedItems" in selection &&
+            !!selection.selectedItems?.length;
+          if (queuesSelectionDirectly) {
+            emit?.(
+              `${report.failedFiles.length} ${label.toLowerCase()} template file(s) failed to load; the selected items are queued by name`,
+              "warning",
+            );
+          } else {
+            assertIncompleteLoadCoversSelection(category, label, templates, selectedKeys, report.failedFiles);
+            emit?.(
+              `${report.failedFiles.length} ${label.toLowerCase()} template file(s) failed to load; every selected template loaded`,
+              "warning",
+            );
           }
-          break;
-        case "filters":
-          {
-            console.log(`[Task Queue] Fetching device filters...`);
-            emit?.("Fetching device filter templates...");
-            let filters = await loadTemplates(fetchFilters);
+        }
+        // Only the unfiltered template list is cached; the selection is applied per run. An incomplete
+        // list stays readable for this run's executors but is reloaded by the next run.
+        cacheTemplates(source.cacheKey, templates, { complete });
+      }
 
-            // Filter by selected items if categorySelections is provided
-            const filterSelection = options?.categorySelections?.filters;
-            if (filterSelection?.selectedItems && filterSelection.selectedItems.length > 0) {
-              const selectedSet = new Set(filterSelection.selectedItems);
-              const totalCount = filters.length;
-              filters = filters.filter((f) => selectedSet.has(f.displayName));
-              console.log(`[Task Queue] Filtered to ${filters.length} selected filters`);
-              emit?.(`Filtered to ${filters.length} of ${totalCount} device filters based on selection`, "info");
-            }
-
-            items = filters;
-            console.log(`[Task Queue] Using ${items.length} filters`);
-            cacheTemplates(category, items);
-          }
-          break;
-        case "compliance":
-          {
-            emit?.("Fetching compliance policy templates...");
-            let policies = await loadTemplates(fetchCompliancePolicies);
-
-            // Filter by selected items if categorySelections is provided
-            const complianceSelection = options?.categorySelections?.compliance;
-            if (complianceSelection?.selectedItems && complianceSelection.selectedItems.length > 0) {
-              const selectedSet = new Set(complianceSelection.selectedItems);
-              const totalCount = policies.length;
-              policies = policies.filter((p) => selectedSet.has(p.displayName));
-              console.log(`[Task Queue] Filtered to ${policies.length} selected compliance policies`);
-              emit?.(`Filtered to ${policies.length} of ${totalCount} compliance policies based on selection`, "info");
-            }
-
-            items = policies;
-            cacheTemplates(category, items);
-          }
-          break;
-        case "conditionalAccess":
-          {
-            emit?.("Fetching conditional access policy templates...");
-            let policies = await loadTemplates(fetchConditionalAccessPolicies);
-
-            // Filter by selected items if categorySelections is provided
-            const caSelection = options?.categorySelections?.conditionalAccess;
-            if (caSelection?.selectedItems && caSelection.selectedItems.length > 0) {
-              const selectedSet = new Set(caSelection.selectedItems);
-              const totalCount = policies.length;
-              policies = policies.filter((p) => selectedSet.has(p.displayName));
-              console.log(`[Task Queue] Filtered to ${policies.length} selected CA policies`);
-              emit?.(
-                `Filtered to ${policies.length} of ${totalCount} conditional access policies based on selection`,
-                "info",
-              );
-            }
-
-            items = policies;
-            cacheTemplates(category, items);
-          }
-          break;
-        case "appProtection":
-          {
-            emit?.("Fetching app protection policy templates...");
-            let policies = await loadTemplates(fetchAppProtectionPolicies);
-
-            // Filter by selected items if categorySelections is provided
-            const appSelection = options?.categorySelections?.appProtection;
-            if (appSelection?.selectedItems && appSelection.selectedItems.length > 0) {
-              const selectedSet = new Set(appSelection.selectedItems);
-              const totalCount = policies.length;
-              policies = policies.filter((p) => selectedSet.has(p.displayName));
-              console.log(`[Task Queue] Filtered to ${policies.length} selected app protection policies`);
-              emit?.(
-                `Filtered to ${policies.length} of ${totalCount} app protection policies based on selection`,
-                "info",
-              );
-            }
-
-            items = policies;
-            cacheTemplates(category, items);
-          }
-          break;
-        case "win32Apps":
-          {
-            const appSelection = options?.categorySelections?.win32Apps;
-            const templates = [...Templates.getWin32AppTemplates()];
-            const selectedAppNames = new Set(appSelection?.selectedItems);
-            items = selectedAppNames.size
-              ? templates.filter((template) => selectedAppNames.has(template.displayName))
-              : templates;
-            cacheTemplates(category, items);
-          }
-          break;
-        case "enrollment":
-          {
-            emit?.("Fetching enrollment profile templates...");
-            const rawProfiles = (await loadTemplates(fetchEnrollmentProfiles)) as Array<{
-              displayName?: string;
-              name?: string;
-            }>;
-            let profiles = rawProfiles.map((p) => ({
-              ...p,
-              displayName: p.displayName || p.name || "Unknown Profile",
-            }));
-
-            const enrollmentSelection = options?.categorySelections?.enrollment;
-            if (enrollmentSelection?.selectedItems && enrollmentSelection.selectedItems.length > 0) {
-              const selectedSet = new Set(enrollmentSelection.selectedItems);
-              const totalCount = profiles.length;
-              profiles = profiles.filter((p) => selectedSet.has(p.displayName));
-              console.log(`[Task Queue] Filtered to ${profiles.length} selected enrollment profiles`);
-              emit?.(`Filtered to ${profiles.length} of ${totalCount} enrollment profiles based on selection`, "info");
-            }
-
-            items = profiles;
-            cacheTemplates(category, items);
-          }
-          break;
-        case "baseline":
-          {
-            console.log(`[Task Queue] Fetching OpenIntuneBaseline policies...`);
-            emit?.("Fetching OpenIntuneBaseline policies from local templates...");
-            let baselinePolicies = await loadTemplates(fetchBaselinePolicies);
-            emit?.(`Found ${baselinePolicies.length} baseline policies`, "info");
-
-            // Filter by selected policies if baselineSelection is provided
-            const selectedPolicies = options?.baselineSelection?.selectedPolicies;
-            if (selectedPolicies && selectedPolicies.length > 0) {
-              const selectedPaths = new Set(selectedPolicies);
-              const totalCount = baselinePolicies.length;
-              baselinePolicies = baselinePolicies.filter((p) => selectedPaths.has(p._oibFilePath));
-              console.log(`[Task Queue] Filtered to ${baselinePolicies.length} selected baseline policies`);
-              emit?.(
-                `Filtered to ${baselinePolicies.length} of ${totalCount} baseline policies based on selection`,
-                "info",
-              );
-            }
-
-            items = baselinePolicies as Array<{ displayName: string }>;
-            console.log(`[Task Queue] Using ${items.length} OpenIntuneBaseline policies`);
-            // Debug: Log sample policy names to verify name field exists
-            if (baselinePolicies.length > 0) {
-              const sample = baselinePolicies.slice(0, 3).map((p) => ({ name: p.name, displayName: p.displayName }));
-              console.log(`[Task Queue] Sample baseline policies:`, sample);
-            }
-            cacheTemplates(category, baselinePolicies); // Cache the filtered policies
-            console.log(`[Task Queue] Cached ${baselinePolicies.length} baseline policies with key "${category}"`);
-            // Verify cache was set
-            const verifyCache = getCachedTemplates(category);
-            console.log(`[Task Queue] Cache verification: ${verifyCache?.length || 0} policies in cache`);
-          }
-          break;
-        case "cisBaseline":
-          {
-            console.log(`[Task Queue] Fetching CIS Intune Baselines...`);
-            let cisItems: CISBaselinePolicy[];
-
-            if (hasSelectedCISPolicyPaths) {
-              emit?.("Fetching all CIS Intune Baseline policies for selected policy paths...");
-              cisItems = await loadTemplates(fetchCISBaselinePolicies);
-              emit?.(`Found ${cisItems.length} CIS baseline policies`, "info");
-            } else if (selectedCISCategories) {
-              console.log(`[Task Queue] Fetching CIS baselines for selected categories:`, selectedCISCategories);
-              emit?.(`Fetching CIS baselines for ${selectedCISCategories.length} sub-categories...`);
-              cisItems = await loadTemplates(() => fetchCISBaselinePoliciesByCategories(selectedCISCategories));
-              emit?.(
-                `Found ${cisItems.length} CIS policies across ${selectedCISCategories.length} sub-categories`,
-                "info",
-              );
-            } else {
-              emit?.("Fetching all CIS Intune Baseline policies...");
-              // Fetch all if no specific categories selected
-              cisItems = await loadTemplates(fetchCISBaselinePolicies);
-              emit?.(`Found ${cisItems.length} CIS baseline policies`, "info");
-            }
-
-            // Filter by selected policy paths if categorySelections is provided (new approach)
-            if (cisSelection?.selectedItems && cisSelection.selectedItems.length > 0) {
-              const selectedPaths = new Set(cisSelection.selectedItems);
-              const totalCount = cisItems.length;
-              cisItems = cisItems.filter((p) => selectedPaths.has(p._cisFilePath));
-              console.log(`[Task Queue] Filtered to ${cisItems.length} selected CIS policies`);
-              emit?.(`Filtered to ${cisItems.length} of ${totalCount} CIS policies based on selection`, "info");
-            }
-
-            items = cisItems as Array<{ displayName: string }>;
-            console.log(`[Task Queue] Using ${items.length} CIS baseline policies`);
-            cacheTemplates(cacheKey, cisItems); // Cache the filtered policies
-          }
-          break;
-        default:
-          items = [];
+      items = selectedKeys
+        ? templates.filter((template) => selectedKeys.has(getTemplateSelectionKey(category, template)))
+        : getUnselectedDefaultTemplates(category, operationMode, templates);
+      if (selectedKeys) {
+        emit?.(`Filtered to ${items.length} of ${templates.length} ${label.toLowerCase()} based on selection`, "info");
       }
     }
 
@@ -344,10 +315,7 @@ export async function buildTaskQueueAsync(
       selection && "selectedItems" in selection && selection.selectedItems && selection.selectedItems.length > 0;
 
     // Special handling for baseline which uses baselineSelection instead of categorySelections
-    const hasBaselineSelections =
-      category === "baseline" &&
-      options?.baselineSelection?.selectedPolicies &&
-      options.baselineSelection.selectedPolicies.length > 0;
+    const hasBaselineSelections = category === "baseline" && selectedKeys !== undefined;
 
     if (operationMode === "delete" && hasDirectSelections) {
       console.log(
@@ -408,6 +376,7 @@ export async function buildTaskQueueAsync(
           category,
           operation: operationMode,
           itemName,
+          templatePath: itemRecord._oibFilePath as string | undefined,
           status: "pending",
         });
       }
@@ -439,7 +408,12 @@ export async function buildTaskQueueAsync(
           category,
           operation: operationMode,
           itemName,
-          templatePath: category === "cisBaseline" ? filePath : undefined,
+          templatePath:
+            category === "cisBaseline"
+              ? filePath
+              : category === "baseline"
+                ? (itemRecord._oibFilePath as string | undefined)
+                : undefined,
           status: "pending",
         });
       }
@@ -472,7 +446,11 @@ export async function buildTaskQueueAsync(
 
   emit?.(`Deduplication complete. ${deduplicatedTasks.length} tasks ready for execution`, "success");
   console.log(`[Task Queue] Task queue built successfully with ${deduplicatedTasks.length} total tasks`);
-  return deduplicatedTasks;
+  return attachWinGetVersions(
+    attachAutopilotBrandingCustomization(deduplicatedTasks, operationMode, options),
+    operationMode,
+    options,
+  );
 }
 
 /**
@@ -507,14 +485,14 @@ export function getEstimatedCategoryCount(category: TaskCategory, categorySelect
       if (selectionKey === "baseline" && "selectedPolicies" in selection) {
         return selection.selectedPolicies.length;
       }
-      // For other categories, use selectedItems
-      if ("selectedItems" in selection && selection.selectedItems.length > 0) {
+      // For other categories, use selectedItems. An explicit empty selection means no items.
+      if ("selectedItems" in selection) {
         return selection.selectedItems.length;
       }
     }
   }
 
-  // Fall back to metadata count if no selections
+  // Fall back to metadata count if there is no selection object
   const metadata = Templates.TEMPLATE_METADATA[category as keyof typeof Templates.TEMPLATE_METADATA];
   return metadata?.count || 0;
 }

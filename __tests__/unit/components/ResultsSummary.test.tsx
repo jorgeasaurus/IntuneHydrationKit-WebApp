@@ -97,7 +97,7 @@ describe('ResultsSummary', () => {
 
     const previewTitle = screen.getByText('Preview Mode')
     const previewDescription = screen.getByText(/Review the simulated outcomes below/i)
-    const previewAlert = previewTitle.closest('[role="alert"]')
+    const previewAlert = previewTitle.closest('[role="note"]')
     expect(previewAlert).toHaveClass('glass-panel', 'rounded-2xl', 'text-slate-50')
     expect(previewAlert).not.toHaveClass('bg-slate-950/95')
     expect(previewTitle).toHaveClass('text-white')
@@ -435,9 +435,9 @@ describe('ResultsSummary', () => {
     await user.click(screen.getByRole('button', { name: /json/i }))
     await user.click(screen.getByRole('button', { name: /csv/i }))
 
-    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false)
-    expect(generateJSONReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false)
-    expect(generateCSVReport).toHaveBeenCalledWith(tasks, 'completedWithIssues', false, summary)
+    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false, expect.any(Map))
+    expect(generateJSONReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false, expect.any(Map))
+    expect(generateCSVReport).toHaveBeenCalledWith(tasks, 'completedWithIssues', false, summary, expect.any(Map))
     expect(generateReportFilename).toHaveBeenCalledWith('create', 'md', false)
     expect(downloadReport).toHaveBeenNthCalledWith(1, '# report', 'create.md')
     expect(downloadReport).toHaveBeenNthCalledWith(2, '{"ok":true}', 'create.json')
@@ -450,7 +450,7 @@ describe('ResultsSummary', () => {
 
     await user.click(screen.getByRole('button', { name: /markdown/i }))
 
-    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', true)
+    expect(generateMarkdownReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', true, expect.any(Map))
     expect(generateReportFilename).toHaveBeenCalledWith('create', 'md', true)
   })
   it('places issues first and keeps unchanged tasks collapsed inside a mixed category', () => {
@@ -527,4 +527,24 @@ describe('ResultsSummary', () => {
     expect(screen.getByText('Needs attention').nextElementSibling).toHaveClass('text-red-200')
   })
 
+  it('shows created object links and passes them to the reports', async () => {
+    const user = userEvent.setup()
+    const link = {
+      href: 'https://entra.microsoft.com/#view/Microsoft_AAD_IAM/GroupDetailsMenuBlade/~/Overview/groupId/abc',
+      label: 'Open in Entra admin center',
+      accessibleName: 'Open in Entra admin center: All Windows Devices',
+      target: 'object' as const,
+    }
+    const portalLinks = new Map([['group-created', link]])
+    render(<SettingsProvider><ResultsSummary summary={summary} tasks={tasks} outcome="completedWithIssues" portalLinks={portalLinks} /></SettingsProvider>)
+
+    await user.click(screen.getByRole('button', { name: /Dynamic Groups/ }))
+    const anchor = screen.getByRole('link', { name: 'Open in Entra admin center: All Windows Devices' })
+    expect(anchor).toHaveAttribute('href', link.href)
+    expect(anchor).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(anchor).toHaveTextContent('Open in Entra admin center')
+
+    await user.click(screen.getByRole('button', { name: /JSON/ }))
+    expect(generateJSONReport).toHaveBeenCalledWith(summary, tasks, 'completedWithIssues', false, portalLinks)
+  })
 })

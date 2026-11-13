@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TaskCategory, OIBPlatformId, CategorySelections } from "@/types/hydration";
+import type { AutopilotBrandingCustomization } from "@/lib/win32/autopilotBrandingConfig";
 
 function getInitialSelectedItems(
   categorySelections?: CategorySelections
@@ -34,6 +35,38 @@ export function useTargetSelectionState(
   const [selectedCISPolicies, setSelectedCISPolicies] = useState<Set<string>>(
     () => new Set(categorySelections?.cisBaseline?.selectedItems || [])
   );
+  // Undefined: the Autopilot Branding app uses the kit configuration without change.
+  const [autopilotBranding, setAutopilotBranding] = useState<AutopilotBrandingCustomization | undefined>(
+    categorySelections?.win32Apps?.autopilotBranding
+  );
+  // Pinned WinGet versions by Win32 app template ID. An app that is not a key uses the latest version.
+  const [wingetVersions, setWinGetVersions] = useState<Record<string, string>>(
+    () => ({ ...categorySelections?.win32Apps?.wingetVersions })
+  );
+  const setWinGetVersion = (templateId: string, version: string | undefined) => {
+    setWinGetVersions(prev => {
+      const next = { ...prev };
+      if (version === undefined) delete next[templateId];
+      else next[templateId] = version;
+      return next;
+    });
+  };
+
+  // Async selection writers (category defaults, platform filters, Select All) check this
+  // generation after they await a catalog. A profile apply increments it, so a load that
+  // finishes late cannot replace the selection that the profile set.
+  const selectionGeneration = useRef(0);
+  const startSelectionUpdate = () => {
+    const generation = selectionGeneration.current;
+    return () => selectionGeneration.current === generation;
+  };
+  const invalidatePendingSelectionUpdates = () => {
+    selectionGeneration.current += 1;
+  };
+  // When the step unmounts, no pending async write may continue.
+  useEffect(() => () => {
+    selectionGeneration.current += 1;
+  }, []);
 
   const toggleItem = (category: TaskCategory, itemName: string) => {
     setSelectedItems(prev => {
@@ -106,10 +139,17 @@ export function useTargetSelectionState(
     expandedCISCategories,
     selectedCISPolicies,
     setSelectedCISPolicies,
+    autopilotBranding,
+    setAutopilotBranding,
+    wingetVersions,
+    setWinGetVersions,
+    setWinGetVersion,
     toggleItem,
     toggleCISPolicy,
     toggleCISCategoryExpanded,
     togglePlatformExpanded,
     removeTarget,
+    startSelectionUpdate,
+    invalidatePendingSelectionUpdates,
   };
 }

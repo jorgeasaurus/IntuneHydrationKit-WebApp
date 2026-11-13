@@ -31,6 +31,11 @@ test.describe("Landing Page", () => {
         errors.push(text);
       }
     });
+    // Production builds load Vercel Analytics from /_vercel/insights. Only the
+    // Vercel edge serves that path, so a local `next start` returns 404.
+    await page.route("**/_vercel/insights/**", (route) =>
+      route.fulfill({ contentType: "application/javascript", body: "" })
+    );
     await page.goto("/");
     await expect(
       page.getByRole("heading", { name: /intune hydration kit/i })
@@ -140,16 +145,17 @@ test.describe("Protected Routes", () => {
     page,
   }) => {
     await page.goto("/wizard");
-    await page.waitForURL("/");
-    expect(page.url()).toMatch(/\/$/);
+    // ProtectedRoute sends signed-out visitors to the landing page with a marker.
+    await page.waitForURL("/?signin=required");
+    expect(new URL(page.url()).pathname).toBe("/");
   });
 
   test("dashboard redirects to landing when unauthenticated", async ({
     page,
   }) => {
     await page.goto("/dashboard");
-    await page.waitForURL("/");
-    expect(page.url()).toMatch(/\/$/);
+    await page.waitForURL("/?signin=required");
+    expect(new URL(page.url()).pathname).toBe("/");
   });
 
 });
@@ -193,11 +199,13 @@ test.describe("Glass visual system", () => {
       "color",
       "rgb(255, 255, 255)"
     );
-    expect(
-      await page.evaluate(
-        (storageKey) => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
-        APP_SETTINGS_STORAGE_KEY
-      )
-    ).toEqual({ stopOnFirstError: false, demoMode: false });
+    const stored = await page.evaluate(
+      (storageKey) => JSON.parse(localStorage.getItem(storageKey) ?? "null"),
+      APP_SETTINGS_STORAGE_KEY
+    );
+    // The retired theme setting is dropped. Other settings keep their values; new settings
+    // may be added over time, so the stored object is not compared as a whole.
+    expect(stored).toMatchObject({ stopOnFirstError: false, demoMode: false });
+    expect(stored).not.toHaveProperty("theme");
   });
 });

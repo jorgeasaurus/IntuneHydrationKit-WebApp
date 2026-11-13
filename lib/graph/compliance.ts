@@ -3,7 +3,7 @@
  */
 
 import { GraphClient } from "./client";
-import { CompliancePolicy, DeletionResult } from "@/types/graph";
+import { CompliancePolicy } from "@/types/graph";
 import { HYDRATION_MARKER, hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 
 /**
@@ -84,18 +84,6 @@ async function getAllCompliancePolicies(
   client: GraphClient
 ): Promise<CompliancePolicy[]> {
   return client.getCollection<CompliancePolicy>("/deviceManagement/deviceCompliancePolicies");
-}
-
-/**
- * Get a compliance policy by ID
- */
-async function getCompliancePolicyById(
-  client: GraphClient,
-  policyId: string
-): Promise<CompliancePolicy> {
-  return client.get<CompliancePolicy>(
-    `/deviceManagement/deviceCompliancePolicies/${policyId}`
-  );
 }
 
 /**
@@ -214,62 +202,3 @@ export async function createCompliancePolicy(
   );
 }
 
-/**
- * Delete a compliance policy by ID
- * Only deletes if created by Intune Hydration Kit and has no active assignments
- */
-async function deleteCompliancePolicy(
-  client: GraphClient,
-  policyId: string
-): Promise<DeletionResult> {
-  const policy = await getCompliancePolicyById(client, policyId);
-
-  if (!hasHydrationMarker(policy.description)) {
-    throw new Error(
-      `Cannot delete policy "${policy.displayName}": Not created by Intune Hydration Kit`
-    );
-  }
-
-  // Check for active assignments - skip deletion if assigned
-  const assignments = await getCompliancePolicyAssignments(client, policyId);
-  if (assignments.length > 0) {
-    console.log(`[Compliance] Skipping deletion of "${policy.displayName}" - has ${assignments.length} active assignment(s)`);
-    return {
-      deleted: false,
-      skipped: true,
-      reason: `Policy has ${assignments.length} active assignment(s)`
-    };
-  }
-
-  await client.delete(`/deviceManagement/deviceCompliancePolicies/${policyId}`);
-  return { deleted: true, skipped: false };
-}
-
-/**
- * Delete a compliance policy by display name
- * Only deletes if created by Intune Hydration Kit and has no active assignments
- */
-export async function deleteCompliancePolicyByName(
-  client: GraphClient,
-  displayName: string
-): Promise<DeletionResult> {
-  const policy = await getCompliancePolicyByName(client, displayName);
-
-  if (!policy || !policy.id) {
-    throw new Error(`Compliance policy "${displayName}" not found`);
-  }
-
-  return deleteCompliancePolicy(client, policy.id);
-}
-
-/**
- * Get assignments for a compliance policy
- */
-async function getCompliancePolicyAssignments(
-  client: GraphClient,
-  policyId: string
-): Promise<unknown[]> {
-  return client.getCollection(
-    `/deviceManagement/deviceCompliancePolicies/${policyId}/assignments`
-  );
-}

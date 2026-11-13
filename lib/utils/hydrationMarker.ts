@@ -13,18 +13,76 @@ export const HYDRATION_MARKER = "Imported by Intune Hydration Kit";
 export const HYDRATION_MARKER_LEGACY = "Imported by Intune-Hydration-Kit";
 
 /**
- * Check if a string contains the hydration marker (supports both current and legacy formats)
- * Also checks for the [IHD] prefix in display names.
- * @param text The text to check (typically description or displayName)
- * @returns true if the text contains either marker variant or [IHD] prefix
+ * Check if a description contains the hydration marker (current or legacy text).
+ * Use this for every object type that has a description field. The [IHD] display
+ * name prefix is not a marker: an administrator can give any object that name.
+ * @param text The description to check
+ * @returns true if the text contains either marker variant
  */
 export function hasHydrationMarker(text: string | undefined | null): boolean {
   if (!text) return false;
+  return text.includes(HYDRATION_MARKER) || text.includes(HYDRATION_MARKER_LEGACY);
+}
+
+const CONDITIONAL_ACCESS_MARKER_SUFFIXES = [
+  " [intune hydration kit]",
+  ` [${HYDRATION_MARKER.toLowerCase()}]`,
+  ` [${HYDRATION_MARKER_LEGACY.toLowerCase()}]`,
+];
+
+/**
+ * Check if a Conditional Access policy display name carries the hydration marker.
+ * Conditional Access policies have no description field, so the kit marks them in
+ * the display name: the [IHD] prefix, a marker suffix, or the marker text.
+ * Use this rule only for Conditional Access policies.
+ */
+export function hasConditionalAccessHydrationMarker(displayName: string | undefined | null): boolean {
+  if (!displayName) return false;
+  const normalizedDisplayName = displayName.trim().toLowerCase();
   return (
-    text.includes(HYDRATION_MARKER) ||
-    text.includes(HYDRATION_MARKER_LEGACY) ||
-    text.startsWith(IMPORT_PREFIX)
+    hasHydrationMarker(displayName) ||
+    displayName.startsWith(IMPORT_PREFIX) ||
+    CONDITIONAL_ACCESS_MARKER_SUFFIXES.some((suffix) => normalizedDisplayName.endsWith(suffix))
   );
+}
+
+/**
+ * Check if a notification message template display name carries the hydration marker.
+ * Notification templates have no description field. The PowerShell module creates them
+ * as "[IHD] <template name>" and deletes only names in its own template set, so the
+ * marker is the [IHD] prefix together with a name from the kit's template set.
+ * An unprefixed name is not accepted, because it carries no marker.
+ * @param displayName The display name of the tenant object
+ * @param kitTemplateNames Display names of the kit templates, with the [IHD] prefix
+ */
+export function hasNotificationTemplateMarker(
+  displayName: string | undefined | null,
+  kitTemplateNames: readonly string[]
+): boolean {
+  if (!displayName?.startsWith(IMPORT_PREFIX)) return false;
+  const lowerName = displayName.toLowerCase();
+  return kitTemplateNames.some(
+    (name) => name.startsWith(IMPORT_PREFIX) && name.toLowerCase() === lowerName
+  );
+}
+
+/**
+ * Remove the Conditional Access marker prefix and suffix from a display name, for name matching.
+ */
+export function normalizeConditionalAccessPolicyName(displayName: string): string {
+  let normalized = displayName.trim().toLowerCase();
+  const importPrefix = IMPORT_PREFIX.toLowerCase();
+
+  if (normalized.startsWith(importPrefix)) {
+    normalized = normalized.slice(importPrefix.length);
+  }
+
+  const markerSuffix = CONDITIONAL_ACCESS_MARKER_SUFFIXES.find((suffix) => normalized.endsWith(suffix));
+  if (markerSuffix) {
+    normalized = normalized.slice(0, -markerSuffix.length);
+  }
+
+  return normalized.trim();
 }
 
 /**

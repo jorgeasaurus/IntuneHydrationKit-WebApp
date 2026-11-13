@@ -89,6 +89,21 @@ describe('HomeLanding', () => {
     expect(onContinue).toHaveBeenCalledTimes(1)
   })
 
+  it('answers the sovereign cloud FAQ with a link to the PowerShell module', async () => {
+    const user = userEvent.setup()
+    renderLanding()
+
+    expect(screen.getByText(/supports the Global commercial cloud only/i)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Does this work with government or sovereign clouds?' }))
+
+    expect(screen.getByText(/supports the Global \(commercial\) cloud only/i)).toBeInTheDocument()
+    const moduleLink = screen.getByRole('link', { name: 'View the PowerShell module on GitHub' })
+    expect(moduleLink).toHaveAttribute('href', 'https://github.com/jorgeasaurus/IntuneHydrationKit')
+    expect(moduleLink).toHaveAttribute('target', '_blank')
+    expect(moduleLink).toHaveAttribute('rel', 'noopener noreferrer')
+  })
+
   it('supports legacy media-query listeners for the desktop demo', () => {
     const addListener = vi.fn()
 

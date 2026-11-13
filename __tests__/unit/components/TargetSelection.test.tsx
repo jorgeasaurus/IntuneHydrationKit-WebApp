@@ -24,6 +24,7 @@ const fetchCompliancePoliciesMock = vi.fn()
 const fetchConditionalAccessPoliciesMock = vi.fn()
 const fetchAppProtectionPoliciesMock = vi.fn()
 const fetchEnrollmentProfilesMock = vi.fn()
+const fetchNotificationTemplatesMock = vi.fn()
 const fetchCISBaselineManifestMock = vi.fn()
 
 vi.mock('@/hooks/useWizardState', () => ({
@@ -43,6 +44,7 @@ vi.mock('@/lib/templates/loader', async () => {
     fetchConditionalAccessPolicies: (...args: unknown[]) => fetchConditionalAccessPoliciesMock(...args),
     fetchAppProtectionPolicies: (...args: unknown[]) => fetchAppProtectionPoliciesMock(...args),
     fetchEnrollmentProfiles: (...args: unknown[]) => fetchEnrollmentProfilesMock(...args),
+    fetchNotificationTemplates: (...args: unknown[]) => fetchNotificationTemplatesMock(...args),
     fetchCISBaselineManifest: (...args: unknown[]) => fetchCISBaselineManifestMock(...args),
   }
 })
@@ -212,6 +214,12 @@ describe('TargetSelection', () => {
     fetchEnrollmentProfilesMock.mockResolvedValue([
       { displayName: `${IMPORT_PREFIX}Windows Autopilot`, description: 'Windows enrollment profile' },
     ])
+    fetchNotificationTemplatesMock.mockResolvedValue([
+      {
+        displayName: `${IMPORT_PREFIX}First Alert`,
+        localizedMessages: [{ locale: 'en-US', subject: 'First Warning', messageTemplate: 'Body' }],
+      },
+    ])
     fetchOIBManifestMock.mockResolvedValue(createOIBManifest())
     fetchCISBaselineManifestMock.mockResolvedValue(createCISManifest())
 
@@ -290,7 +298,7 @@ describe('TargetSelection', () => {
     expect(screen.getByLabelText('CIS Intune Baselines')).toBeChecked()
     expect(screen.getByLabelText('App Protection')).not.toBeChecked()
 
-    expect(await screen.findByText('Total: 7 categories (10 items)')).toBeInTheDocument()
+    expect(await screen.findByText('Total: 7 categories (11 items)')).toBeInTheDocument()
 
     await user.click(within(getCategoryRegion('Select OpenIntuneBaseline Policies')).getByText('Windows'))
     expect(await screen.findByLabelText('Windows Baseline')).toBeChecked()
@@ -330,6 +338,22 @@ describe('TargetSelection', () => {
     })
     expect(setBaselineSelection).not.toHaveBeenCalled()
     expect(nextStep).toHaveBeenCalledTimes(1)
+  })
+
+  it('lists notification templates and persists their selection', async () => {
+    const user = userEvent.setup()
+
+    render(<TargetSelectionHarness />)
+
+    await user.click(screen.getByRole('button', { name: 'Select Notification Templates' }))
+    expect(await screen.findByText(`${IMPORT_PREFIX}First Alert`)).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+
+    expect(setSelectedTargets).toHaveBeenCalledWith(['notification'])
+    expect(setCategorySelections).toHaveBeenCalledWith({
+      notification: { selectedItems: [`${IMPORT_PREFIX}First Alert`] },
+    })
   })
 
   it('labels category icon buttons and exposes expansion state', async () => {
@@ -486,13 +510,13 @@ describe('TargetSelection', () => {
       expect(fetchCISBaselineManifestMock).toHaveBeenCalled()
     })
 
-    expect(screen.getByText('Total: 9 categories (17 items)')).toBeInTheDocument()
+    expect(screen.getByText('Total: 10 categories (19 items)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review Selection' })).toBeEnabled()
 
     await user.click(screen.getByRole('button', { name: 'Deselect All' }))
 
     await waitFor(() => {
-      expect(screen.queryByText('Total: 9 categories (17 items)')).not.toBeInTheDocument()
+      expect(screen.queryByText('Total: 10 categories (18 items)')).not.toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
     })
   })
@@ -510,6 +534,8 @@ describe('TargetSelection', () => {
 
     await user.click(screen.getByLabelText('Entra Groups'))
     expect(await screen.findByText('Loading entra groups...')).toBeInTheDocument()
+    // Continue must stay disabled while the item list loads, so an empty selection cannot be saved.
+    expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
 
     dynamicGroupsDeferred.resolve([])
 
@@ -540,6 +566,7 @@ describe('TargetSelection', () => {
 
     expect(await screen.findByText('Loading baseline policies…')).toBeInTheDocument()
     expect(await screen.findByText('Loading CIS policies…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review Selection' })).toBeDisabled()
 
     await act(async () => {
       baselineDeferred.resolve(createOIBManifest())
@@ -615,6 +642,12 @@ describe('TargetSelection', () => {
       throw new Error('Expected Windows baseline checkbox to be rendered')
     }
 
+    expect(within(baselineRegion).getByRole('checkbox', { name: 'Windows' })).toBe(windowsBaselineCheckbox)
+    expect(windowsBaselineCheckbox).toHaveAttribute('aria-checked', 'mixed')
+    const platformExpandButton = within(baselineRegion).getByRole('button', { name: /^Windows/ })
+    expect(platformExpandButton).toHaveAttribute('aria-expanded', 'true')
+    expect(platformExpandButton).toHaveAttribute('aria-controls', 'platform-panel-WINDOWS')
+
     await user.click(windowsBaselineCheckbox)
     expect(screen.getByLabelText('Windows Security Baseline')).toBeChecked()
     expect(screen.getByLabelText('Windows Defender Baseline')).toBeChecked()
@@ -688,7 +721,21 @@ describe('TargetSelection', () => {
       throw new Error('Expected Windows CIS category checkbox to be rendered')
     }
 
+    const namedCISCheckbox = screen.getByRole('checkbox', { name: 'Windows 11 Benchmarks' })
+    expect(namedCISCheckbox).toBe(windowsCISCategoryCheckbox)
+    expect(namedCISCheckbox).toHaveAttribute('aria-checked', 'mixed')
+    expect(namedCISCheckbox).toHaveAccessibleDescription('1 of 2 policies selected')
+
+    const cisExpandButton = within(cisRegion).getByRole('button', { name: /^Windows 11 Benchmarks/ })
+    expect(cisExpandButton).toHaveAttribute('aria-expanded', 'true')
+    const cisPanelId = cisExpandButton.getAttribute('aria-controls')
+    expect(cisPanelId).toBeTruthy()
+    expect(document.getElementById(cisPanelId ?? '')).toContainElement(
+      screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 1`)
+    )
+
     await user.click(windowsCISCategoryCheckbox)
+    expect(windowsCISCategoryCheckbox).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 1`)).toBeChecked()
     expect(screen.getByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark 2`)).toBeChecked()
 
@@ -809,5 +856,73 @@ describe('TargetSelection', () => {
     await user.click(within(getCategoryRegion('Select CIS Benchmark Policies')).getByText('macOS Benchmarks'))
     expect(await screen.findByLabelText(`${IMPORT_PREFIX}Windows CIS Benchmark`)).not.toBeChecked()
     expect(screen.getByLabelText(`${IMPORT_PREFIX}macOS CIS Benchmark`)).toBeChecked()
+  })
+
+  it('customizes the Autopilot Branding app and keeps the customization with its selection', async () => {
+    const user = userEvent.setup()
+    const autopilotBranding = 'Autopilot Branding (Cleanup) - [IHD]'
+
+    useWizardStateMock.mockReturnValue({
+      state: createState({
+        selectedTargets: ['win32Apps'],
+        categorySelections: { win32Apps: { selectedItems: [autopilotBranding, '7-Zip - [IHD]'] } },
+      }),
+      setSelectedTargets,
+      setSelectedCISCategories,
+      setBaselineSelection,
+      setCategorySelections,
+      nextStep,
+      previousStep,
+    })
+
+    render(<TargetSelectionHarness />)
+
+    const expand = screen.queryByRole('button', { name: 'Expand Win32 Apps' })
+    if (expand) await user.click(expand)
+    // Only the Autopilot Branding item has a Customize button.
+    expect(await screen.findAllByRole('button', { name: 'Customize Autopilot Branding' })).toHaveLength(1)
+    await user.click(screen.getByRole('button', { name: 'Customize Autopilot Branding' }))
+    const dialog = screen.getByRole('dialog')
+    await user.click(within(dialog).getByRole('checkbox', { name: /MSTeams/ }))
+    await user.click(within(dialog).getByRole('switch', { name: /Update Edge/ }))
+    await user.click(within(dialog).getByRole('button', { name: 'Save' }))
+    expect(screen.getByText('Customized')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    const selections = setCategorySelections.mock.calls[0][0]
+    expect(selections.win32Apps.selectedItems).toEqual([autopilotBranding, '7-Zip - [IHD]'])
+    expect(selections.win32Apps.autopilotBranding.removedApps).toContain('MSTeams')
+    expect(selections.win32Apps.autopilotBranding.enabledTasks).not.toContain('Update-ABEdge')
+  })
+
+  it('drops the customization when the Autopilot Branding app is not selected, and hides it in delete mode', async () => {
+    const user = userEvent.setup()
+    const customization = { removedApps: ['MSTeams'], enabledTasks: [] }
+
+    useWizardStateMock.mockReturnValue({
+      state: createState({
+        operationMode: 'delete',
+        selectedTargets: ['win32Apps'],
+        categorySelections: {
+          win32Apps: { selectedItems: ['7-Zip - [IHD]'], autopilotBranding: customization },
+        } as WizardState['categorySelections'],
+      }),
+      setSelectedTargets,
+      setSelectedCISCategories,
+      setBaselineSelection,
+      setCategorySelections,
+      nextStep,
+      previousStep,
+    })
+
+    render(<TargetSelectionHarness />)
+
+    const expand = screen.queryByRole('button', { name: 'Expand Win32 Apps' })
+    if (expand) await user.click(expand)
+    expect(await screen.findByLabelText('7-Zip - [IHD]')).toBeChecked()
+    expect(screen.queryByRole('button', { name: 'Customize Autopilot Branding' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Review Selection' }))
+    expect(setCategorySelections).toHaveBeenCalledWith({ win32Apps: { selectedItems: ['7-Zip - [IHD]'] } })
   })
 })

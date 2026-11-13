@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
+import type { TaskCategory } from "@/types/hydration";
 import {
   Activity,
   Box,
@@ -52,15 +53,43 @@ export type ConfigurationGroup = {
   items: Array<{ value: number | string; label: string }>;
 };
 
+/**
+ * Template counts for each catalog category on the landing page.
+ *
+ * These are literals so the landing bundle does not load template payloads or
+ * manifests. `__tests__/unit/landing/landingCounts.test.ts` loads the real
+ * catalog (`lib/templates/catalog.ts`, the source for /templates) and fails
+ * when a value drifts. Update these values when templates change.
+ */
+export const LANDING_TEMPLATE_COUNTS = {
+  groups: 67,
+  filters: 44,
+  compliance: 10,
+  appProtection: 10,
+  win32Apps: 20,
+  conditionalAccess: 20,
+  enrollment: 4,
+  notification: 1,
+  baseline: 102,
+  cisBaseline: 728,
+} as const satisfies Record<TaskCategory, number>;
+
+export const LANDING_TEMPLATE_TOTAL = Object.values(LANDING_TEMPLATE_COUNTS).reduce(
+  (total, count) => total + count,
+  0
+);
+
+const TEMPLATE_TOTAL_LABEL = LANDING_TEMPLATE_TOTAL.toLocaleString("en-US");
+
 export const HERO_STATS = [
-  { value: "927", label: "deployable objects" },
+  { value: TEMPLATE_TOTAL_LABEL, label: "deployable objects" },
   { value: "4", label: "guided stages" },
   { value: "3", label: "operation modes" },
   { value: "0", label: "enabled CA by default" },
 ] as const;
 
 export const MOBILE_RUN_STEPS = [
-  { label: "Scope", value: "927 objects" },
+  { label: "Scope", value: `${TEMPLATE_TOTAL_LABEL} objects` },
   { label: "Execute", value: "Preview ready" },
   { label: "Report", value: "Evidence export" },
 ] as const;
@@ -84,7 +113,7 @@ export const FEATURES: readonly FeatureItem[] = [
     icon: Cloud,
     title: "Commercial cloud console",
     description:
-      "The web app targets Global commercial tenants while the PowerShell module covers GCC High, DoD, Germany, and China.",
+      "The web app supports the Global commercial cloud only. Use the PowerShell module for sovereign clouds such as GCC High, DoD, and China 21Vianet.",
     signal: "Global web",
   },
   {
@@ -123,17 +152,18 @@ export const STEPS: readonly StepItem[] = [
   },
 ] as const;
 
+const counts = LANDING_TEMPLATE_COUNTS;
+
 export const CONFIGURATION_GROUPS: readonly ConfigurationGroup[] = [
   {
     icon: Layers,
-    title: "Configuration Profiles",
+    title: "Security Baselines",
     label: "Primary",
-    total: 805,
-    unit: "profiles",
+    total: counts.baseline + counts.cisBaseline,
+    unit: "policies",
     items: [
-      { value: 798, label: "Settings Catalog policies" },
-      { value: 3, label: "Driver Update profiles" },
-      { value: 3, label: "Update Rings" },
+      { value: counts.cisBaseline, label: "CIS benchmark policies" },
+      { value: counts.baseline, label: "OpenIntuneBaseline policies" },
       { value: "CIS + OIB", label: "baseline sources" },
     ],
   },
@@ -141,24 +171,30 @@ export const CONFIGURATION_GROUPS: readonly ConfigurationGroup[] = [
     icon: Shield,
     title: "Security Policies",
     label: "Control",
-    total: 46,
+    total:
+      counts.conditionalAccess +
+      counts.compliance +
+      counts.appProtection +
+      counts.notification,
     unit: "policies",
     items: [
-      { value: 20, label: "Conditional Access" },
-      { value: 16, label: "Compliance" },
-      { value: 10, label: "App Protection" },
+      { value: counts.conditionalAccess, label: "Conditional Access" },
+      { value: counts.compliance, label: "Compliance" },
+      { value: counts.appProtection, label: "App Protection" },
+      { value: counts.notification, label: "Compliance notification" },
     ],
   },
   {
     icon: Users,
-    title: "Groups & Targeting",
+    title: "Targeting & Onboarding",
     label: "Target",
-    total: 74,
+    total: counts.groups + counts.filters + counts.enrollment + counts.win32Apps,
     unit: "objects",
     items: [
-      { value: 47, label: "Device groups" },
-      { value: 24, label: "Assignment filters" },
-      { value: 3, label: "Enrollment profiles" },
+      { value: counts.groups, label: "Entra groups" },
+      { value: counts.filters, label: "Assignment filters" },
+      { value: counts.enrollment, label: "Enrollment profiles" },
+      { value: counts.win32Apps, label: "Win32 apps" },
     ],
   },
   {
@@ -254,9 +290,23 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     ),
   },
   {
-    question: "Does this work with government cloud environments?",
-    answer:
-      "Not in the web app yet. Use the IntuneHydrationKit PowerShell module for GCC High, DoD, Germany, and China.",
+    question: "Does this work with government or sovereign clouds?",
+    answer: (
+      <>
+        No. The web app supports the Global (commercial) cloud only. For US
+        Government (GCC High, DoD), China (21Vianet), and other sovereign
+        clouds, use the IntuneHydrationKit PowerShell module.{" "}
+        <a
+          href="https://github.com/jorgeasaurus/IntuneHydrationKit"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={FAQ_LINK_CLASS_NAME}
+        >
+          View the PowerShell module on GitHub
+        </a>
+        .
+      </>
+    ),
   },
   {
     question: "What happens if an object already exists?",

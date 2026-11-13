@@ -7,6 +7,7 @@ import {
   Check,
   CheckCircle2,
   CircleDashed,
+  ExternalLink,
   Eye,
   FileJson,
   FileSpreadsheet,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/hydration/reporter";
 import { cn } from "@/lib/utils";
 import { isExpectedNoOpSkip } from "@/lib/hydration/executionOutcome";
+import type { PortalLink } from "@/lib/utils/portalLinks";
 import type { HydrationSummary, HydrationTask, ReportableExecutionOutcome } from "@/types/hydration";
 
 interface ResultsSummaryProps {
@@ -38,7 +40,11 @@ interface ResultsSummaryProps {
   tasks: HydrationTask[];
   isPreview?: boolean;
   outcome: ReportableExecutionOutcome;
+  /** Admin portal links for created objects, keyed by task ID. Live session only. */
+  portalLinks?: ReadonlyMap<string, PortalLink>;
 }
+
+const NO_PORTAL_LINKS: ReadonlyMap<string, PortalLink> = new Map();
 
 type ResultOutcome =
   | "success"
@@ -177,7 +183,13 @@ function getOutcomeCount(tasks: HydrationTask[], outcome: ResultOutcome, isPrevi
   return tasks.filter((task) => getTaskOutcome(task, isPreview) === outcome).length;
 }
 
-export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: ResultsSummaryProps): React.JSX.Element {
+export function ResultsSummary({
+  summary,
+  tasks,
+  isPreview = false,
+  outcome,
+  portalLinks = NO_PORTAL_LINKS,
+}: ResultsSummaryProps): React.JSX.Element {
   const issueData = useMemo(() => {
     const categories = new Set<string>();
     let taskCount = 0;
@@ -210,10 +222,10 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
   function handleDownload(fileFormat: "md" | "json" | "csv"): void {
     const content =
       fileFormat === "md"
-        ? generateMarkdownReport(summary, tasks, outcome, isPreview)
+        ? generateMarkdownReport(summary, tasks, outcome, isPreview, portalLinks)
         : fileFormat === "json"
-          ? generateJSONReport(summary, tasks, outcome, isPreview)
-          : generateCSVReport(tasks, outcome, isPreview, summary);
+          ? generateJSONReport(summary, tasks, outcome, isPreview, portalLinks)
+          : generateCSVReport(tasks, outcome, isPreview, summary, portalLinks);
     downloadReport(content, generateReportFilename(summary.operationMode, fileFormat, isPreview));
   }
 
@@ -323,7 +335,7 @@ export function ResultsSummary({ summary, tasks, isPreview = false, outcome }: R
                   </AccordionTrigger>
 
                   <AccordionContent className="border-t border-white/10 px-3 pb-3 pt-3 sm:px-4 sm:pb-4">
-                    <ResultTaskRows tasks={shownTasks} isPreview={isPreview} />
+                    <ResultTaskRows tasks={shownTasks} isPreview={isPreview} portalLinks={portalLinks} />
 
                     {filteredTasks.length > TASK_PREVIEW_LIMIT && (
                       <Button
@@ -458,7 +470,7 @@ function ResultStatistics({
   const successRate =
     summary.stats.total > 0
       ? Math.round(
-          ((summary.stats.created + summary.stats.deleted) /
+          ((summary.stats.created + (summary.stats.updated ?? 0) + summary.stats.deleted) /
             summary.stats.total) *
             100,
         )
@@ -490,6 +502,12 @@ function ResultStatistics({
             : getOutcomeCount(tasks, "skipped", false)}
         </p>
       </div>
+      {summary.stats.updated !== undefined && (
+        <div>
+          <p className="text-xs text-slate-400">{isPreview ? "Would update" : "Updated"}</p>
+          <p className="mt-1 text-2xl font-semibold text-sky-200">{summary.stats.updated}</p>
+        </div>
+      )}
       <div>
         <p className="text-xs text-slate-400">Needs attention</p>
         <p className={cn("mt-1 text-2xl font-semibold", hasFailures ? "text-red-200" : "text-amber-200")}>
@@ -508,20 +526,28 @@ function ResultStatistics({
   );
 }
 
-function ResultTaskRows({ tasks, isPreview }: { tasks: HydrationTask[]; isPreview: boolean }): React.JSX.Element {
+function ResultTaskRows({
+  tasks,
+  isPreview,
+  portalLinks,
+}: {
+  tasks: HydrationTask[];
+  isPreview: boolean;
+  portalLinks: ReadonlyMap<string, PortalLink>;
+}): React.JSX.Element {
   const unchanged = tasks.filter((task) => isExpectedNoOpSkip(task) && task.drift?.status !== "different");
   const unchangedSet = new Set(unchanged);
   const changes = tasks.filter((task) => !unchangedSet.has(task));
   return (
     <div className="space-y-3">
       <ul className="space-y-1.5">
-        {changes.map((task) => <ResultTaskRow key={task.id} task={task} isPreview={isPreview} />)}
+        {changes.map((task) => <ResultTaskRow key={task.id} task={task} isPreview={isPreview} portalLink={portalLinks.get(task.id)} />)}
       </ul>
       {unchanged.length > 0 && (
         <details className="rounded-lg border border-slate-300/15 p-3 text-slate-300">
           <summary className="cursor-pointer text-sm">No change ({unchanged.length})</summary>
           <ul className="mt-3 space-y-1.5">
-            {unchanged.map((task) => <ResultTaskRow key={task.id} task={task} isPreview={isPreview} />)}
+            {unchanged.map((task) => <ResultTaskRow key={task.id} task={task} isPreview={isPreview} portalLink={portalLinks.get(task.id)} />)}
           </ul>
         </details>
       )}
@@ -529,7 +555,15 @@ function ResultTaskRows({ tasks, isPreview }: { tasks: HydrationTask[]; isPrevie
   );
 }
 
-function ResultTaskRow({ task, isPreview }: { task: HydrationTask; isPreview: boolean }): React.JSX.Element {
+function ResultTaskRow({
+  task,
+  isPreview,
+  portalLink,
+}: {
+  task: HydrationTask;
+  isPreview: boolean;
+  portalLink?: PortalLink;
+}): React.JSX.Element {
   const presentation = OUTCOME_STYLES[getTaskOutcome(task, isPreview)];
   return (
                           <li
@@ -545,6 +579,7 @@ function ResultTaskRow({ task, isPreview }: { task: HydrationTask; isPreview: bo
                                   {task.itemName}
                                 </p>
                                 <TaskDecisionEvidence task={task} />
+                                {portalLink && <CreatedObjectLink link={portalLink} />}
                               </div>
                               <span
                                 className={cn(
@@ -565,10 +600,33 @@ function TaskDecisionEvidence({ task }: { task: HydrationTask }): React.JSX.Elem
     <div className="mt-1 space-y-2 text-xs leading-5 text-slate-300">
       {existingMatch ? <p>Already exists · {task.match?.matchType} name match</p> : task.error && <p>{task.status === "failed" ? "Error" : "Reason"}: {task.error}</p>}
       {task.warning && <p>Warning: {task.warning}</p>}
+      {task.update && (
+        <div>
+          <p>{task.update.applied ? "Updated existing kit object" : "Would update existing kit object"} ({task.update.objectId}):</p>
+          <ul className="list-disc pl-4">
+            {task.update.differences.map((difference) => <li key={difference} className="break-all">{difference}</li>)}
+          </ul>
+        </div>
+      )}
       {task.drift && <DriftEvidence drift={task.drift} />}
       {task.match?.portalUrl && <a className="inline-block underline" href={task.match.portalUrl} target="_blank" rel="noreferrer">View matched object</a>}
       <TaskEvidenceDetails task={task} />
     </div>
+  );
+}
+
+function CreatedObjectLink({ link }: { link: PortalLink }): React.JSX.Element {
+  return (
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label={link.accessibleName}
+      className="mt-1 inline-flex items-center gap-1.5 rounded-sm text-xs font-medium text-sky-100 underline underline-offset-2 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+    >
+      <ExternalLink aria-hidden="true" className="size-3.5" />
+      {link.label}
+    </a>
   );
 }
 

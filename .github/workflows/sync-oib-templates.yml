@@ -5,6 +5,15 @@ on:
     # Every Monday at 08:00 UTC
     - cron: "0 8 * * 1"
   workflow_dispatch:
+  # Re-run when dev's version changes so an open sync PR is rebased onto the
+  # new dev version and re-bumped above it.
+  push:
+    branches: [dev]
+    paths: [package.json]
+
+concurrency:
+  group: sync-oib-templates
+  cancel-in-progress: false
 
 permissions:
   contents: write
@@ -17,12 +26,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: dev
           fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version-file: .nvmrc
 
       - name: Check for upstream updates
         id: check
@@ -62,6 +72,13 @@ jobs:
           echo "deleted=${DELETED}" >> "$GITHUB_OUTPUT"
           echo "total=${TOTAL}" >> "$GITHUB_OUTPUT"
 
+      - name: Bump website version
+        if: steps.check.outputs.status == 'update-available'
+        id: version
+        run: |
+          VERSION=$(npm version patch --no-git-tag-version)
+          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
       - name: Create Pull Request
         if: steps.check.outputs.status == 'update-available'
         uses: peter-evans/create-pull-request@v7
@@ -73,6 +90,7 @@ jobs:
             Upstream: SkipToTheEndpoint/OpenIntuneBaseline@${{ steps.sha.outputs.upstream_sha }}
             Files changed: ${{ steps.changes.outputs.total }} (added: ${{ steps.changes.outputs.added }}, modified: ${{ steps.changes.outputs.modified }}, deleted: ${{ steps.changes.outputs.deleted }})
           branch: chore/sync-oib-templates
+          base: dev
           delete-branch: true
           title: "chore: update OpenIntuneBaseline templates"
           labels: dependencies,automated
@@ -88,6 +106,8 @@ jobs:
             | Modified | ${{ steps.changes.outputs.modified }} |
             | Deleted | ${{ steps.changes.outputs.deleted }} |
             | **Total** | **${{ steps.changes.outputs.total }}** |
+
+            Website version bumped to `${{ steps.version.outputs.version }}`.
 
             ---
             *This PR was automatically created by the [Sync OpenIntuneBaseline Templates](${{ github.server_url }}/${{ github.repository }}/actions/workflows/sync-oib-templates.yml) workflow.*

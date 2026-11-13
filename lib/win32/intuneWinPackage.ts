@@ -1,3 +1,5 @@
+import { readStoredZipEntries } from "@/lib/win32/storedZip";
+
 export interface IntuneWinEncryptionInfo {
   encryptionKey: string;
   macKey: string;
@@ -16,48 +18,7 @@ export interface IntuneWinPackage {
   encryptionInfo: IntuneWinEncryptionInfo;
 }
 
-interface ZipEntry {
-  name: string;
-  content: Uint8Array<ArrayBuffer>;
-}
-
-const LOCAL_FILE_HEADER = 0x04034b50;
 const textDecoder = new TextDecoder();
-
-function readStoredZipEntries(packageBytes: ArrayBuffer): ZipEntry[] {
-  const view = new DataView(packageBytes);
-  const bytes = new Uint8Array(packageBytes);
-  const entries: ZipEntry[] = [];
-  let offset = 0;
-
-  while (offset + 30 <= view.byteLength && view.getUint32(offset, true) === LOCAL_FILE_HEADER) {
-    const flags = view.getUint16(offset + 6, true);
-    const compressionMethod = view.getUint16(offset + 8, true);
-    const compressedSize = view.getUint32(offset + 18, true);
-    const nameLength = view.getUint16(offset + 26, true);
-    const extraLength = view.getUint16(offset + 28, true);
-
-    if ((flags & 0x08) !== 0 || compressionMethod !== 0) {
-      throw new Error(
-        "The supplied .intunewin package must contain stored (uncompressed) ZIP entries without data descriptors."
-      );
-    }
-
-    const contentStart = offset + 30 + nameLength + extraLength;
-    const contentEnd = contentStart + compressedSize;
-    if (contentEnd > view.byteLength) {
-      throw new Error("The supplied .intunewin package is truncated.");
-    }
-
-    entries.push({
-      name: textDecoder.decode(bytes.subarray(offset + 30, offset + 30 + nameLength)),
-      content: bytes.subarray(contentStart, contentEnd),
-    });
-    offset = contentEnd;
-  }
-
-  return entries;
-}
 
 function requiredXmlValue(document: XMLDocument, tagName: string): string {
   const value = document.querySelector(tagName)?.textContent?.trim();

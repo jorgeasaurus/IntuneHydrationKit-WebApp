@@ -4,6 +4,7 @@ import { useWizardState } from "@/hooks/useWizardState";
 import { TEMPLATE_METADATA } from "@/templates";
 import {
   countSelectedPaths,
+  getDefaultSelectableItems,
   getBaselinePolicyPathsForPlatform,
   getCISPolicyPathsForCategory,
   getCISPolicyPathsForPlatforms,
@@ -16,6 +17,7 @@ import {
 import type { TargetSelectionViewModel } from "@/components/wizard/targetSelectionTypes";
 import { useTargetSelectionBulkActions } from "@/components/wizard/useTargetSelectionBulkActions";
 import { useTargetSelectionData } from "@/components/wizard/useTargetSelectionData";
+import { useScopeProfileSelection } from "@/components/wizard/useScopeProfileSelection";
 import { useTargetSelectionPersistence } from "@/components/wizard/useTargetSelectionPersistence";
 import { useTargetSelectionState } from "@/components/wizard/useTargetSelectionState";
 
@@ -44,14 +46,17 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     ensureBaselineManifest: data.ensureBaselineManifest,
     ensureCISManifest: data.ensureCISManifest,
     ensureAllCategoryItems: data.ensureAllCategoryItems,
+    startSelectionUpdate: selectionState.startSelectionUpdate,
   });
 
   const selectedPlatformFilters = bulkActions.selectedPlatformFilters;
   const normalizedSearch = searchQuery.toLowerCase().trim();
 
   const selectDefaultItemsForCategory = async (category: TaskCategory) => {
+    const isCurrent = selectionState.startSelectionUpdate();
     if (category === "cisBaseline") {
       const manifest = await data.ensureCISManifest();
+      if (!isCurrent()) return;
       if (manifest && selectionState.selectedCISPolicies.size === 0) {
         if (selectedPlatformFilters.size > 0) {
           const platforms = [...selectedPlatformFilters] as OSPlatformFilterId[];
@@ -63,7 +68,8 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       return;
     }
 
-    const items = await data.ensureCategoryItems(category);
+    const items = getDefaultSelectableItems(await data.ensureCategoryItems(category));
+    if (!isCurrent()) return;
     const currentSelection = selectionState.selectedItems[category];
     if (currentSelection && currentSelection.size > 0) {
       return;
@@ -138,6 +144,9 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       return;
     }
 
+    // The All button of a category is an explicit choice, so it selects opt-in items too
+    // (WinGet catalog apps). Only the default selection, the page Select All, and a platform
+    // filter leave them out.
     selectionState.setSelectedItems(prev => ({
       ...prev,
       [category]: new Set(items.map(i => i.displayName)),
@@ -259,16 +268,20 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     (sum, t) => sum + getSelectedCount(t.id),
     0
   );
+  // A category that is still loading has no final selection yet. Continue stays disabled until
+  // every selected category has loaded and has at least one selected item.
   const isValid = selectionState.targets.length > 0 &&
     selectionState.targets.every(t => {
-      if (t === "cisBaseline") return selectionState.selectedCISPolicies.size > 0 || data.cisLoading;
-      return (selectionState.selectedItems[t]?.size || 0) > 0 || data.loadingCategories.has(t);
+      if (t === "cisBaseline") return !data.cisLoading && selectionState.selectedCISPolicies.size > 0;
+      return !data.loadingCategories.has(t) && (selectionState.selectedItems[t]?.size || 0) > 0;
     });
 
-  const handleContinue = useTargetSelectionPersistence({
+  const persistSelection = useTargetSelectionPersistence({
     targets: selectionState.targets,
     selectedItems: selectionState.selectedItems,
     selectedCISPolicies: selectionState.selectedCISPolicies,
+    autopilotBranding: selectionState.autopilotBranding,
+    wingetVersions: selectionState.wingetVersions,
     cisManifest: data.cisManifest,
     setSelectedTargets: wizard.setSelectedTargets,
     setSelectedCISCategories: wizard.setSelectedCISCategories,
@@ -276,6 +289,27 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     setCategorySelections: wizard.setCategorySelections,
     nextStep: wizard.nextStep,
   });
+  const profileSelection = useScopeProfileSelection({
+    targets: selectionState.targets,
+    selectedItems: selectionState.selectedItems,
+    selectedCISPolicies: selectionState.selectedCISPolicies,
+    autopilotBranding: selectionState.autopilotBranding,
+    setAutopilotBranding: selectionState.setAutopilotBranding,
+    wingetVersions: selectionState.wingetVersions,
+    setWinGetVersions: selectionState.setWinGetVersions,
+    setTargets: selectionState.setTargets,
+    setSelectedItems: selectionState.setSelectedItems,
+    setSelectedCISPolicies: selectionState.setSelectedCISPolicies,
+    setExpandedCategories: data.setExpandedCategories,
+    startSelectionUpdate: selectionState.startSelectionUpdate,
+    invalidatePendingSelectionUpdates: selectionState.invalidatePendingSelectionUpdates,
+    ensureAllCategoryItems: data.ensureAllCategoryItems,
+    ensureBaselineManifest: data.ensureBaselineManifest,
+    ensureCISManifest: data.ensureCISManifest,
+  });
+  const handleContinue = () => {
+    if (isValid && !profileSelection.isApplying) persistSelection();
+  };
 
   return {
     search: {
@@ -301,6 +335,10 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       selectedCISPolicies: selectionState.selectedCISPolicies,
       totalSelectedCount,
       isValid,
+      autopilotBranding: selectionState.autopilotBranding,
+      canCustomizeAutopilotBranding: wizard.state.operationMode === "create",
+      wingetVersions: selectionState.wingetVersions,
+      canPinWinGetVersions: wizard.state.operationMode === "create",
       getSelectedCount,
       getTotalCount,
     },
@@ -332,10 +370,18 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       isPlatformFullySelected,
       isPlatformPartiallySelected,
       toggleItem: selectionState.toggleItem,
+      setAutopilotBranding: selectionState.setAutopilotBranding,
+      setWinGetVersion: selectionState.setWinGetVersion,
     },
     navigation: {
       previousStep: wizard.previousStep,
       continue: handleContinue,
+    },
+    profiles: {
+      canSave: isValid && !profileSelection.isApplying,
+      isApplying: profileSelection.isApplying,
+      getCurrentSelection: profileSelection.getCurrentSelection,
+      applySelection: profileSelection.applySelection,
     },
   };
 }

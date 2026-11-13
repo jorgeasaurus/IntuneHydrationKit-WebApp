@@ -1,0 +1,8 @@
+PackageIdentifier: Contoso.Tool
+PackageVersion: "2.0"
+InstallerType: exe
+Installers:
+- Architecture: riscv64
+  InstallerUrl: https://downloads.contoso.example/tool/2.0/tool.exe
+ManifestType: installer
+ManifestVersion: 1.10.0

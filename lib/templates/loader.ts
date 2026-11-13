@@ -8,6 +8,7 @@ import { HYDRATION_MARKER, IMPORT_PREFIX, addImportPrefix } from "@/lib/utils/hy
 import { DEVICE_FILTER_TEMPLATE_PATHS } from "@/templates/filterManifest";
 import { DYNAMIC_GROUP_TEMPLATE_PATHS } from "@/templates/groupManifest";
 import type { DeviceFilter } from "@/types/graph";
+import type { NotificationTemplate } from "@/lib/graph/notifications";
 
 const TEMPLATES_BASE_PATH = "/IntuneTemplates";
 
@@ -37,10 +38,23 @@ interface RawJsonTemplate extends Record<string, unknown> {
   platforms?: string;
 }
 
+/**
+ * Records the template files that could not be read during one load.
+ * Loaders still return what they could read; a non-empty `failedFiles` means that result is incomplete.
+ */
+export interface TemplateLoadReport {
+  failedFiles: string[];
+}
+
+function reportFailedFile(report: TemplateLoadReport | undefined, file: string): void {
+  report?.failedFiles.push(file);
+}
+
 interface JsonFileLoaderOptions {
   basePath?: string;
   fileLabel?: string;
   warn?: boolean;
+  report?: TemplateLoadReport;
 }
 
 async function loadJsonTemplateFiles<T>(
@@ -60,6 +74,7 @@ async function loadJsonTemplateFiles<T>(
         const message = `Failed to fetch ${fileLabel}: HTTP ${response.status} ${response.statusText}`;
         if (options.warn) console.warn(message);
         else console.error(message);
+        reportFailedFile(options.report, file);
         continue;
       }
 
@@ -68,17 +83,22 @@ async function loadJsonTemplateFiles<T>(
       const message = `Error loading ${fileLabel}:`;
       if (options.warn) console.warn(message, error);
       else console.error(message, error);
+      reportFailedFile(options.report, file);
     }
   }
 
   return templates;
 }
 
+/**
+ * Check the platform of a filter template. The value is sent to Graph as the template
+ * gives it: "androidForWork" (Android Enterprise) and "android" (device administrator)
+ * are different platforms, and a filter's platform cannot change after it is created.
+ */
 function normalizeFilterPlatform(platform: string): FilterTemplate["platform"] {
   switch (platform) {
-    case "androidForWork":
-      return "android";
     case "android":
+    case "androidForWork":
     case "iOS":
     case "macOS":
     case "windows10AndLater":
@@ -117,7 +137,7 @@ function getTemplateFileName(filePath: string): string {
 /**
  * Fetch dynamic groups from local templates
  */
-export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
+export async function fetchDynamicGroups(report?: TemplateLoadReport): Promise<GroupTemplate[]> {
   return loadJsonTemplateFiles(DYNAMIC_GROUP_TEMPLATE_PATHS, (data) =>
     Array.isArray(data.groups)
       ? data.groups.map((group) => ({
@@ -131,18 +151,21 @@ export async function fetchDynamicGroups(): Promise<GroupTemplate[]> {
               : `${group.description} ${HYDRATION_MARKER}`
             : HYDRATION_MARKER,
         }))
-      : []
+      : [],
+    { report }
   );
 }
 
 /**
  * Fetch static groups from local templates
  */
-export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
+export async function fetchStaticGroups(report?: TemplateLoadReport): Promise<GroupTemplate[]> {
+  const file = "StaticGroups/Static-Groups.json";
   try {
-    const response = await fetch(`${TEMPLATES_BASE_PATH}/StaticGroups/Static-Groups.json`);
+    const response = await fetch(`${TEMPLATES_BASE_PATH}/${file}`);
     if (!response.ok) {
       console.error(`Failed to fetch static groups: ${response.statusText}`);
+      reportFailedFile(report, file);
       return [];
     }
 
@@ -166,6 +189,7 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
     return [];
   } catch (error) {
     console.error("Error fetching static groups:", error);
+    reportFailedFile(report, file);
     return [];
   }
 }
@@ -173,7 +197,7 @@ export async function fetchStaticGroups(): Promise<GroupTemplate[]> {
 /**
  * Fetch device filters from local templates
  */
-export async function fetchFilters(): Promise<FilterTemplate[]> {
+export async function fetchFilters(report?: TemplateLoadReport): Promise<FilterTemplate[]> {
   return loadJsonTemplateFiles(DEVICE_FILTER_TEMPLATE_PATHS, (data) =>
     Array.isArray(data.filters)
       ? data.filters.map((filter) => ({
@@ -186,14 +210,15 @@ export async function fetchFilters(): Promise<FilterTemplate[]> {
             : HYDRATION_MARKER,
           platform: normalizeFilterPlatform(filter.platform),
         }))
-      : []
+      : [],
+    { report }
   );
 }
 
 /**
  * Fetch compliance policies from local templates
  */
-export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
+export async function fetchCompliancePolicies(report?: TemplateLoadReport): Promise<ComplianceTemplate[]> {
   const complianceFiles = [
     "Compliance/Android-Compliance-FullyManaged-Basic.json",
     "Compliance/Android-Compliance-FullyManaged-Strict.json",
@@ -222,13 +247,13 @@ export async function fetchCompliancePolicies(): Promise<ComplianceTemplate[]> {
     }
 
     return [];
-  });
+  }, { report });
 }
 
 /**
  * Fetch conditional access policies from local templates
  */
-export async function fetchConditionalAccessPolicies(): Promise<ConditionalAccessTemplate[]> {
+export async function fetchConditionalAccessPolicies(report?: TemplateLoadReport): Promise<ConditionalAccessTemplate[]> {
   // Get list of all CA policy files
   const caFiles = [
     "ConditionalAccess/Block access for unknown or unsupported device platform.json",
@@ -270,13 +295,13 @@ export async function fetchConditionalAccessPolicies(): Promise<ConditionalAcces
     }
 
     return [];
-  });
+  }, { report });
 }
 
 /**
  * Fetch app protection policies from local templates
  */
-export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplate[]> {
+export async function fetchAppProtectionPolicies(report?: TemplateLoadReport): Promise<AppProtectionTemplate[]> {
   const appProtectionFiles = [
     "AppProtection/Android-App-Protection.json",
     "AppProtection/iOS-App-Protection.json",
@@ -305,13 +330,13 @@ export async function fetchAppProtectionPolicies(): Promise<AppProtectionTemplat
     }
 
     return [];
-  });
+  }, { report });
 }
 
 /**
  * Fetch enrollment profiles from local templates
  */
-export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
+export async function fetchEnrollmentProfiles(report?: TemplateLoadReport): Promise<unknown[]> {
   const enrollmentFiles = [
     "Windows-Autopilot-Profile.json",
     "Windows-Self-Deploy-Autopilot-Profile.json",
@@ -336,6 +361,7 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
       basePath: `${TEMPLATES_BASE_PATH}/Enrollment`,
       fileLabel: "enrollment profile",
       warn: true,
+      report,
     }
   );
 }
@@ -343,7 +369,7 @@ export async function fetchEnrollmentProfiles(): Promise<unknown[]> {
 /**
  * Fetch notification templates from local templates
  */
-export async function fetchNotificationTemplates(): Promise<unknown[]> {
+export async function fetchNotificationTemplates(report?: TemplateLoadReport): Promise<NotificationTemplate[]> {
   const notificationFiles = [
     "Notifications/First-Warning.json",
   ];
@@ -353,13 +379,13 @@ export async function fetchNotificationTemplates(): Promise<unknown[]> {
       return [
         {
           ...data,
-          displayName: `${IMPORT_PREFIX}${data.displayName}`,
+          displayName: addImportPrefix(data.displayName),
         },
       ];
     }
 
     return [];
-  });
+  }, { report });
 }
 
 /**
@@ -530,20 +556,21 @@ export async function fetchOIBManifest(): Promise<OIBManifest | null> {
 /**
  * Fetch OpenIntuneBaseline policies from local templates
  */
-export async function fetchBaselinePolicies(): Promise<BaselinePolicy[]> {
+export async function fetchBaselinePolicies(report?: TemplateLoadReport): Promise<BaselinePolicy[]> {
   const allPolicies: BaselinePolicy[] = [];
 
   try {
     const manifest = await fetchOIBManifest();
     if (!manifest) {
       console.warn("OpenIntuneBaseline manifest not found. Run: node scripts/generate-oib-manifest.js");
+      reportFailedFile(report, "OpenIntuneBaseline/manifest.json");
       return [];
     }
 
     console.log(`[OIB Loader] Loading ${manifest.totalFiles} baseline policies...`);
 
     for (const file of manifest.files) {
-      const policy = await fetchBaselinePolicyByManifestFile(file);
+      const policy = await fetchBaselinePolicyByManifestFile(file, report);
       if (policy) {
         allPolicies.push(policy);
       }
@@ -552,16 +579,19 @@ export async function fetchBaselinePolicies(): Promise<BaselinePolicy[]> {
     console.log(`[OIB Loader] Loaded ${allPolicies.length} baseline policies`);
   } catch (error) {
     console.error("Error fetching OpenIntuneBaseline policies:", error);
+    reportFailedFile(report, "OpenIntuneBaseline");
   }
 
   return allPolicies;
 }
 
 export async function fetchBaselinePolicyByManifestFile(
-  file: OIBManifestFile
+  file: OIBManifestFile,
+  report?: TemplateLoadReport
 ): Promise<BaselinePolicy | null> {
   const policy = await fetchOIBFile(file.path);
   if (!policy || typeof policy !== "object") {
+    reportFailedFile(report, file.path);
     return null;
   }
 
@@ -569,6 +599,7 @@ export async function fetchBaselinePolicyByManifestFile(
 }
 
 const CIS_BASELINES_PATH = "/CISIntuneBaselines";
+const CIS_MANIFEST_FILE = "CISIntuneBaselines/manifest.json";
 
 /**
  * Fetch a single CIS baseline policy from local templates
@@ -660,12 +691,13 @@ export async function fetchCISBaselineManifest(): Promise<CISBaselineManifest | 
  * Build CISBaselinePolicy objects from manifest file entries by fetching and transforming each policy
  */
 async function loadCISPoliciesFromFiles(
-  files: CISBaselineManifestFile[]
+  files: CISBaselineManifestFile[],
+  report?: TemplateLoadReport
 ): Promise<CISBaselinePolicy[]> {
   const policies: CISBaselinePolicy[] = [];
 
   for (const file of files) {
-    const policy = await fetchCISBaselinePolicyByManifestFile(file);
+    const policy = await fetchCISBaselinePolicyByManifestFile(file, report);
     if (policy) {
       policies.push(policy);
     }
@@ -697,10 +729,12 @@ function transformCISPolicy(
 }
 
 export async function fetchCISBaselinePolicyByManifestFile(
-  file: CISBaselineManifestFile
+  file: CISBaselineManifestFile,
+  report?: TemplateLoadReport
 ): Promise<CISBaselinePolicy | null> {
   const policy = await fetchCISBaselineFile(file.path);
   if (!policy || typeof policy !== "object") {
+    reportFailedFile(report, file.path);
     return null;
   }
 
@@ -710,13 +744,17 @@ export async function fetchCISBaselinePolicyByManifestFile(
 /**
  * Fetch all CIS Intune Baseline policies from local templates
  */
-export async function fetchCISBaselinePolicies(): Promise<CISBaselinePolicy[]> {
+export async function fetchCISBaselinePolicies(report?: TemplateLoadReport): Promise<CISBaselinePolicy[]> {
   try {
     const manifest = await fetchCISBaselineManifest();
-    if (!manifest) return [];
-    return await loadCISPoliciesFromFiles(manifest.files);
+    if (!manifest) {
+      reportFailedFile(report, CIS_MANIFEST_FILE);
+      return [];
+    }
+    return await loadCISPoliciesFromFiles(manifest.files, report);
   } catch (error) {
     console.error("Error fetching CIS baseline policies:", error);
+    reportFailedFile(report, CIS_MANIFEST_FILE);
     return [];
   }
 }
@@ -725,11 +763,15 @@ export async function fetchCISBaselinePolicies(): Promise<CISBaselinePolicy[]> {
  * Fetch CIS Baseline policies filtered by selected category IDs
  */
 export async function fetchCISBaselinePoliciesByCategories(
-  selectedCategoryIds: string[]
+  selectedCategoryIds: string[],
+  report?: TemplateLoadReport
 ): Promise<CISBaselinePolicy[]> {
   try {
     const manifest = await fetchCISBaselineManifest();
-    if (!manifest) return [];
+    if (!manifest) {
+      reportFailedFile(report, CIS_MANIFEST_FILE);
+      return [];
+    }
 
     const selectedCategoryIdSet = new Set(selectedCategoryIds);
     const selectedFolders = manifest.categories.reduce<string[]>((folders, category) => {
@@ -744,26 +786,50 @@ export async function fetchCISBaselinePoliciesByCategories(
       selectedFolderSet.has(file.category)
     );
 
-    return await loadCISPoliciesFromFiles(filteredFiles);
+    return await loadCISPoliciesFromFiles(filteredFiles, report);
   } catch (error) {
     console.error("Error fetching CIS baseline policies:", error);
+    reportFailedFile(report, CIS_MANIFEST_FILE);
     return [];
   }
 }
 
 const TEMPLATE_CACHE_PREFIX = "intune-hydration-templates-";
 const templateCache = new Map<string, unknown[]>();
+// Keys whose cached list came from a load with failed files. Executors may still read them for the
+// current run, but the task queue must reload them instead of reusing them.
+const incompleteTemplateCacheKeys = new Set<string>();
 
-export function cacheTemplates(category: string, templates: unknown[]): void {
-  templateCache.set(`${TEMPLATE_CACHE_PREFIX}${category}`, templates);
+/**
+ * Cache a category's template list. Pass `complete: false` when some files failed to load.
+ */
+export function cacheTemplates(
+  category: string,
+  templates: unknown[],
+  options: { complete?: boolean } = {}
+): void {
+  const key = `${TEMPLATE_CACHE_PREFIX}${category}`;
+  templateCache.set(key, templates);
+  if (options.complete === false) incompleteTemplateCacheKeys.add(key);
+  else incompleteTemplateCacheKeys.delete(key);
 }
 
-export function getCachedTemplates(category: string): unknown[] | null {
-  return templateCache.get(`${TEMPLATE_CACHE_PREFIX}${category}`) ?? null;
+/**
+ * Read a cached template list. With `completeOnly`, an incomplete list is treated as not cached.
+ */
+export function getCachedTemplates(
+  category: string,
+  options: { completeOnly?: boolean } = {}
+): unknown[] | null {
+  const key = `${TEMPLATE_CACHE_PREFIX}${category}`;
+  if (options.completeOnly && incompleteTemplateCacheKeys.has(key)) return null;
+  return templateCache.get(key) ?? null;
 }
 
 export function clearCategoryCache(category: string): void {
-  templateCache.delete(`${TEMPLATE_CACHE_PREFIX}${category}`);
+  const key = `${TEMPLATE_CACHE_PREFIX}${category}`;
+  templateCache.delete(key);
+  incompleteTemplateCacheKeys.delete(key);
 }
 
 export function getAllTemplateCacheKeys(): string[] {

@@ -1,4 +1,4 @@
-import { z } from "zod";
+import { z } from "@/lib/utils/zod";
 import { TASK_CATEGORY_LABELS } from "@/lib/hydration/categoryLabels";
 import type { TaskCategory } from "@/types/hydration";
 

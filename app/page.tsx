@@ -5,7 +5,8 @@ import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { HomeLanding } from "@/components/landing/HomeLanding";
-import { signIn } from "@/lib/auth/authUtils";
+import { SignInRequiredNotice } from "@/components/landing/SignInRequiredNotice";
+import { isSignInReplaced, signIn } from "@/lib/auth/authUtils";
 import { useWizardState } from "@/hooks/useWizardState";
 import { resetHydrationFlow } from "@/lib/hydration/resetHydrationFlow";
 
@@ -20,6 +21,8 @@ export default function Home() {
       resetHydrationFlow(sessionStorage, resetWizard);
       router.push("/wizard");
     } catch (error) {
+      // A newer click replaced this attempt, and its popup is still open.
+      if (isSignInReplaced(error)) return;
       toast.error("Failed to sign in. Please try again.");
       console.error("Sign in error:", error);
     }
@@ -31,6 +34,9 @@ export default function Home() {
   };
 
   return (
-    <HomeLanding isAuthenticated={isAuthenticated} onSignInClick={handleSignInClick} onContinue={handleContinue} />
+    <>
+      <HomeLanding isAuthenticated={isAuthenticated} onSignInClick={handleSignInClick} onContinue={handleContinue} />
+      <SignInRequiredNotice isAuthenticated={isAuthenticated} onSignInClick={handleSignInClick} />
+    </>
   );
 }

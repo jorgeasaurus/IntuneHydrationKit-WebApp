@@ -3,6 +3,7 @@
 import { useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useIsAuthenticated, useMsal } from "@azure/msal-react";
+import { isLeavingForSignOut } from "@/lib/auth/sessionEvents";
 import { getExecutionState, resetExecutionSession, subscribeExecutionState } from "@/lib/hydration/executionStateStore";
 
 interface ExecutionRouteGuardProps {
@@ -46,6 +47,8 @@ export function ExecutionRouteGuard({ children }: ExecutionRouteGuardProps): Rea
   useEffect(() => {
     if (!isActive) return;
     const preventUnload = (event: BeforeUnloadEvent): void => {
+      // The app reloads itself after an inactivity sign-out; do not block that.
+      if (isLeavingForSignOut()) return;
       event.preventDefault();
       event.returnValue = true;
     };

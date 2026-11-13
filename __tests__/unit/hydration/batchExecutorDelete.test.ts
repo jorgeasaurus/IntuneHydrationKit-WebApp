@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  executeDeleteTasksInBatches,
   executeDeletesInParallel,
   isBatchableCategory,
 } from "@/lib/hydration/batchExecutor";
 import type { ExecutionContext } from "@/lib/hydration/types";
 import type { HydrationTask } from "@/types/hydration";
+import { serveCachedObjects } from "../../helpers/tenantObjectReads";
 
 describe("executeDeletesInParallel", () => {
   it("keeps Conditional Access batchable for create execution", () => {
@@ -97,7 +97,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -138,7 +138,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -159,7 +159,7 @@ describe("executeDeletesInParallel", () => {
 
     const client = {
       delete: vi.fn().mockResolvedValue(undefined),
-      get: vi.fn(),
+      get: vi.fn().mockResolvedValue({ value: [] }),
       post: vi.fn(),
       getCollection: vi.fn(),
       patch: vi.fn(),
@@ -181,7 +181,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -221,7 +221,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({
@@ -232,7 +232,7 @@ describe("executeDeletesInParallel", () => {
     expect(client.delete).not.toHaveBeenCalled();
   });
 
-  it("skips deletion when assignment lookup fails", async () => {
+  it("fails without deleting when assignment lookup fails", async () => {
     const task: HydrationTask = {
       id: "assigned-policy-read-failure",
       category: "baseline",
@@ -259,15 +259,64 @@ describe("executeDeletesInParallel", () => {
       }],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
+
+    expect(results).toEqual([expect.objectContaining({
+      success: false,
+      skipped: false,
+      error: expect.stringContaining("Graph unavailable"),
+    })]);
+    expect(task.status).toBe("failed");
+    expect(client.delete).not.toHaveBeenCalled();
+  });
+
+  it("skips a device filter that assignments use, and does not count it as a failure", async () => {
+    const task: HydrationTask = {
+      id: "filter-in-use",
+      category: "filters",
+      operation: "delete",
+      itemName: "[IHD] Windows - Parallels VMs",
+      status: "pending",
+    };
+    const inUse = Object.assign(
+      new Error('[400] { "Message": "5001:An assignment filter is associated with existing assignments. Delete all the assignments for the filter and try again." }'),
+      { status: 400 },
+    );
+    const onTaskError = vi.fn();
+    const onTaskComplete = vi.fn();
+    const client = {
+      delete: vi.fn().mockRejectedValue(inUse),
+      get: vi.fn(),
+      post: vi.fn(),
+      getCollection: vi.fn(),
+      patch: vi.fn(),
+    } as unknown as ExecutionContext["client"];
+    const context: ExecutionContext = {
+      client,
+      operationMode: "delete",
+      isPreview: false,
+      stopOnFirstError: false,
+      onTaskError,
+      onTaskComplete,
+      cachedFilters: [{
+        id: "filter-id",
+        displayName: "[IHD] Windows - Parallels VMs",
+        description: "Imported by Intune Hydration Kit",
+      }] as never,
+    };
+
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toEqual([expect.objectContaining({
       success: false,
       skipped: true,
-      error: "Could not verify active assignments - deletion skipped",
+      skipKind: "blocked",
+      error: expect.stringContaining("used by one or more assignments"),
     })]);
-    expect(task.skipKind).toBe("blocked");
-    expect(client.delete).not.toHaveBeenCalled();
+    expect(task).toMatchObject({ status: "skipped", skipKind: "blocked" });
+    expect(onTaskError).not.toHaveBeenCalled();
+    expect(onTaskComplete).toHaveBeenCalledWith(task);
+    expect(context.cachedFilters).toHaveLength(1);
   });
 
   it("deletes Linux compliance policies from the V2 compliance cache", async () => {
@@ -301,7 +350,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });
@@ -309,345 +358,6 @@ describe("executeDeletesInParallel", () => {
       "/deviceManagement/compliancePolicies/linux-compliance-id",
       "beta"
     );
-  });
-
-  it("skips batched baseline deletion when the matched policy still has assignments", async () => {
-    const task: HydrationTask = {
-      id: "baseline-settings-assigned",
-      category: "baseline",
-      operation: "delete",
-      itemName: "Network security LAN Manager authentication level",
-      status: "pending",
-    };
-
-    const client = {
-      delete: vi.fn(),
-      get: vi.fn().mockResolvedValue({ value: [{ id: "assignment-id" }] }),
-      post: vi.fn(),
-      getCollection: vi.fn(),
-      patch: vi.fn(),
-      batch: vi.fn(),
-    } as unknown as ExecutionContext["client"];
-
-    const context: ExecutionContext = {
-      client,
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedSettingsCatalogPolicies: [
-        {
-          id: "settings-policy-id",
-          name: "Network security: LAN Manager authentication level",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-    };
-
-    const results = await executeDeleteTasksInBatches([task], context);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        success: false,
-        skipped: true,
-        error: "Policy has 1 active assignment(s) - remove assignments before deleting",
-      }),
-    ]);
-    expect(task.skipKind).toBe("blocked");
-    expect(client.get).toHaveBeenCalledWith(
-      "/deviceManagement/configurationPolicies/settings-policy-id/assignments"
-    );
-    expect(client.batch).not.toHaveBeenCalled();
-  });
-
-  it("routes Conditional Access deletion to the sequential safety check", async () => {
-    const task: HydrationTask = {
-      id: "conditional-access-preview-delete",
-      category: "conditionalAccess",
-      operation: "delete",
-      itemName: "Require MFA",
-      status: "pending",
-    };
-
-    const client = {
-      delete: vi.fn(),
-      get: vi.fn(),
-      post: vi.fn(),
-      getCollection: vi.fn(),
-      patch: vi.fn(),
-      batch: vi.fn(),
-    } as unknown as ExecutionContext["client"];
-
-    const context: ExecutionContext = {
-      client,
-      operationMode: "delete",
-      isPreview: true,
-      stopOnFirstError: false,
-      cachedConditionalAccessPolicies: [
-        {
-          id: "ca-policy-id",
-          displayName: "Require MFA [Imported by Intune Hydration Kit]",
-        },
-      ],
-    };
-
-    const results = await executeDeleteTasksInBatches([task], context);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        success: false,
-        skipped: false,
-        error: "NEEDS_SEQUENTIAL_EXECUTION",
-      }),
-    ]);
-    expect(task.status).toBe("pending");
-    expect(client.batch).not.toHaveBeenCalled();
-  });
-
-  it("treats batched 404 delete responses as already deleted", async () => {
-    const task: HydrationTask = {
-      id: "group-delete-404",
-      category: "groups",
-      operation: "delete",
-      itemName: "[IHD] All Windows Devices",
-      status: "pending",
-    };
-
-    const client = {
-      delete: vi.fn(),
-      get: vi.fn(),
-      post: vi.fn(),
-      getCollection: vi.fn(),
-      patch: vi.fn(),
-      batch: vi.fn().mockResolvedValue({
-        responses: [{ id: "del-0", status: 404, headers: {} }],
-      }),
-    } as unknown as ExecutionContext["client"];
-
-    const context: ExecutionContext = {
-      client,
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedIntuneGroups: [
-        {
-          id: "group-id",
-          "@odata.type": "#microsoft.graph.group",
-          displayName: "[IHD] All Windows Devices",
-          description: "Imported by Intune Hydration Kit",
-          groupTypes: [],
-          mailEnabled: false,
-          mailNickname: "allwindowsdevices",
-          securityEnabled: true,
-        },
-      ],
-    };
-
-    const results = await executeDeleteTasksInBatches([task], context);
-
-    expect(results).toEqual([
-      expect.objectContaining({
-        success: false,
-        skipped: true,
-        error: "Already deleted",
-      }),
-    ]);
-    expect(task.skipKind).toBe("noOp");
-    expect(task.status).toBe("skipped");
-    expect(client.batch).toHaveBeenCalledWith(
-      [
-        expect.objectContaining({
-          id: "del-0",
-          method: "DELETE",
-          url: "/groups/group-id",
-        }),
-      ],
-      "v1.0"
-    );
-  });
-
-  it("deletes baseline resources across endpoint types in a single batch", async () => {
-    const tasks: HydrationTask[] = [
-      {
-        id: "baseline-v2-delete",
-        category: "baseline",
-        operation: "delete",
-        itemName: "[IHD] Baseline V2 Compliance",
-        status: "pending",
-      },
-      {
-        id: "baseline-v1-delete",
-        category: "baseline",
-        operation: "delete",
-        itemName: "[IHD] Baseline V1 Compliance",
-        status: "pending",
-      },
-      {
-        id: "baseline-device-config-delete",
-        category: "baseline",
-        operation: "delete",
-        itemName: "[IHD] Baseline Device Configuration",
-        status: "pending",
-      },
-      {
-        id: "baseline-group-policy-delete-batch",
-        category: "baseline",
-        operation: "delete",
-        itemName: "[IHD] Baseline Group Policy",
-        status: "pending",
-      },
-      {
-        id: "baseline-security-intent-delete-batch",
-        category: "baseline",
-        operation: "delete",
-        itemName: "[IHD] Baseline Security Intent",
-        status: "pending",
-      },
-      {
-        id: "baseline-driver-update-delete",
-        category: "baseline",
-        operation: "delete",
-        itemName: "[IHD] Baseline Driver Update",
-        status: "pending",
-      },
-    ];
-
-    const client = {
-      delete: vi.fn(),
-      get: vi.fn().mockResolvedValue({ value: [] }),
-      post: vi.fn(),
-      getCollection: vi.fn(),
-      patch: vi.fn(),
-      batch: vi.fn().mockResolvedValue({
-        responses: tasks.map((_, index) => ({
-          id: `del-${index}`,
-          status: 204,
-          headers: {},
-        })),
-      }),
-    } as unknown as ExecutionContext["client"];
-
-    const context: ExecutionContext = {
-      client,
-      operationMode: "delete",
-      isPreview: false,
-      stopOnFirstError: false,
-      cachedV2CompliancePolicies: [
-        {
-          id: "v2-compliance-id",
-          name: "[IHD] Baseline V2 Compliance",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-      cachedCompliancePolicies: [
-        {
-          id: "v1-compliance-id",
-          displayName: "[IHD] Baseline V1 Compliance",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-      cachedDeviceConfigurations: [
-        {
-          id: "device-config-id",
-          displayName: "[IHD] Baseline Device Configuration",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-      cachedGroupPolicyConfigurations: [
-        {
-          id: "group-policy-id",
-          displayName: "[IHD] Baseline Group Policy",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-      cachedSecurityIntents: [
-        {
-          id: "security-intent-id",
-          displayName: "[IHD] Baseline Security Intent",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-      cachedDriverUpdateProfiles: [
-        {
-          id: "driver-update-id",
-          displayName: "[IHD] Baseline Driver Update",
-          description: "Imported by Intune Hydration Kit",
-        },
-      ],
-      cachedAppProtectionPolicies: [
-        ],
-    };
-
-    const results = await executeDeleteTasksInBatches(tasks, context);
-
-    expect(results).toEqual(
-      tasks.map((task) =>
-        expect.objectContaining({
-          task,
-          success: true,
-          skipped: false,
-        })
-      )
-    );
-    expect(client.get).toHaveBeenCalledTimes(6);
-    expect(client.get).toHaveBeenCalledWith(
-      "/deviceManagement/compliancePolicies/v2-compliance-id/assignments"
-    );
-    expect(client.get).toHaveBeenCalledWith(
-      "/deviceManagement/deviceCompliancePolicies/v1-compliance-id/assignments"
-    );
-    expect(client.get).toHaveBeenCalledWith(
-      "/deviceManagement/deviceConfigurations/device-config-id/assignments"
-    );
-    expect(client.get).toHaveBeenCalledWith(
-      "/deviceManagement/groupPolicyConfigurations/group-policy-id/assignments"
-    );
-    expect(client.get).toHaveBeenCalledWith(
-      "/deviceManagement/intents/security-intent-id/assignments"
-    );
-    expect(client.get).toHaveBeenCalledWith(
-      "/deviceManagement/windowsDriverUpdateProfiles/driver-update-id/assignments"
-    );
-    expect(client.batch).toHaveBeenCalledWith(
-      [
-        expect.objectContaining({
-          id: "del-0",
-          method: "DELETE",
-          url: "/deviceManagement/compliancePolicies/v2-compliance-id",
-        }),
-        expect.objectContaining({
-          id: "del-1",
-          method: "DELETE",
-          url: "/deviceManagement/deviceCompliancePolicies/v1-compliance-id",
-        }),
-        expect.objectContaining({
-          id: "del-2",
-          method: "DELETE",
-          url: "/deviceManagement/deviceConfigurations/device-config-id",
-        }),
-        expect.objectContaining({
-          id: "del-3",
-          method: "DELETE",
-          url: "/deviceManagement/groupPolicyConfigurations/group-policy-id",
-        }),
-        expect.objectContaining({
-          id: "del-4",
-          method: "DELETE",
-          url: "/deviceManagement/intents/security-intent-id",
-        }),
-        expect.objectContaining({
-          id: "del-5",
-          method: "DELETE",
-          url: "/deviceManagement/windowsDriverUpdateProfiles/driver-update-id",
-        }),
-      ],
-      "beta"
-    );
-    expect(context.cachedV2CompliancePolicies).toEqual([]);
-    expect(context.cachedCompliancePolicies).toEqual([]);
-    expect(context.cachedDeviceConfigurations).toEqual([]);
-    expect(context.cachedGroupPolicyConfigurations).toEqual([]);
-    expect(context.cachedSecurityIntents).toEqual([]);
-    expect(context.cachedDriverUpdateProfiles).toEqual([]);
   });
 
   it("deletes iOS baseline app protection policies from the app protection cache", async () => {
@@ -661,7 +371,7 @@ describe("executeDeletesInParallel", () => {
 
     const client = {
       delete: vi.fn().mockResolvedValue(undefined),
-      get: vi.fn(),
+      get: vi.fn().mockResolvedValue({ value: [] }),
       post: vi.fn(),
       getCollection: vi.fn(),
       patch: vi.fn(),
@@ -683,7 +393,7 @@ describe("executeDeletesInParallel", () => {
       ],
     };
 
-    const results = await executeDeletesInParallel([task], context);
+    const results = await executeDeletesInParallel([task], serveCachedObjects(context));
 
     expect(results).toHaveLength(1);
     expect(results[0]).toMatchObject({ success: true, skipped: false });

@@ -5,6 +5,8 @@ import type {
   OSPlatformFilterId,
   Target,
 } from "@/components/wizard/targetSelectionModel";
+import type { DroppedProfileItem, ScopeSelection } from "@/lib/profiles/scopeProfiles";
+import type { AutopilotBrandingCustomization } from "@/lib/win32/autopilotBrandingConfig";
 
 export interface TargetSelectionSearchModel {
   query: string;
@@ -32,6 +34,14 @@ export interface TargetSelectionStateModel {
   selectedCISPolicies: Set<string>;
   totalSelectedCount: number;
   isValid: boolean;
+  /** Customization of the Autopilot Branding app, or undefined for the kit configuration. */
+  autopilotBranding: AutopilotBrandingCustomization | undefined;
+  /** True in create mode, where the Autopilot Branding app can be customized. */
+  canCustomizeAutopilotBranding: boolean;
+  /** Pinned WinGet versions by Win32 app template ID. An app that is not a key uses the latest version. */
+  wingetVersions: Record<string, string>;
+  /** True in create mode, where a WinGet app can be pinned to a version. */
+  canPinWinGetVersions: boolean;
   getSelectedCount: (category: TaskCategory) => number;
   getTotalCount: (category: TaskCategory) => number;
 }
@@ -61,11 +71,27 @@ export interface TargetSelectionActionsModel {
   isPlatformFullySelected: (platform: OIBPlatformId) => boolean;
   isPlatformPartiallySelected: (platform: OIBPlatformId) => boolean;
   toggleItem: (category: TaskCategory, itemName: string) => void;
+  setAutopilotBranding: (customization: AutopilotBrandingCustomization | undefined) => void;
+  /** Pin a WinGet app to a version, or undefined for the latest version. */
+  setWinGetVersion: (templateId: string, version: string | undefined) => void;
 }
 
 export interface TargetSelectionNavigationModel {
   previousStep: () => void;
   continue: () => void;
+}
+
+export interface TargetSelectionProfilesModel {
+  /** True when the current selection is complete and can be saved as a profile. */
+  canSave: boolean;
+  /** True while a profile apply loads catalogs. The selection must not change or leave the step. */
+  isApplying: boolean;
+  getCurrentSelection: () => ScopeSelection;
+  /**
+   * Replace the current selection. Returns the profile items that no longer exist, or null
+   * when a later apply replaced this one.
+   */
+  applySelection: (selection: ScopeSelection) => Promise<DroppedProfileItem[] | null>;
 }
 
 export interface TargetSelectionViewModel {
@@ -76,4 +102,5 @@ export interface TargetSelectionViewModel {
   expansion: TargetSelectionExpansionModel;
   actions: TargetSelectionActionsModel;
   navigation: TargetSelectionNavigationModel;
+  profiles: TargetSelectionProfilesModel;
 }

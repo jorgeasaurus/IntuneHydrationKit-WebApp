@@ -15,7 +15,8 @@ import {
   CISBaselineManifestFile,
   OIBManifestFile,
 } from "@/lib/templates/loader";
-import { getWin32AppTemplates } from "@/templates/win32Apps";
+import { IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
+import { getWin32AppTemplates, NOT_OFFERED_WINGET_APPS } from "@/templates/win32Apps";
 import type { Win32AppTemplate } from "@/templates/win32Apps";
 import { TaskCategory } from "@/types/hydration";
 
@@ -54,16 +55,21 @@ export type TemplateDocumentationPayloadSource =
 
 export interface TemplateDocumentationItem {
   id: string;
+  /** URL-safe, unique id of the detail page at /templates/{slug}. */
+  slug: string;
   category: TaskCategory;
   categoryLabel: string;
   displayName: string;
   description: string;
   subcategory?: string;
-  platform?: string;
+  platform?: TemplatePlatform;
   itemType: string;
   sourcePath?: string;
   payloadSource: TemplateDocumentationPayloadSource;
 }
+
+/** A catalog item before the catalog assigns its unique slug. */
+type TemplateDocumentationItemDraft = Omit<TemplateDocumentationItem, "slug">;
 
 export interface TemplateDocumentationCatalog {
   items: TemplateDocumentationItem[];
@@ -106,7 +112,9 @@ const CATEGORY_METADATA: Record<
   },
   win32Apps: {
     label: "Win32 Apps",
-    description: "Packaged Windows applications that install through Intune.",
+    description:
+      "Packaged Windows applications that install through Intune. WinGet catalog apps are opt-in. " +
+      `Not offered, because the newest catalog version has no machine-scope x64 installer: ${NOT_OFFERED_WINGET_APPS.map((app) => app.displayName).join(", ")}.`,
   },
   conditionalAccess: {
     label: "Conditional Access",
@@ -130,20 +138,37 @@ const CATEGORY_METADATA: Record<
   },
 };
 
-const PLATFORM_ORDER = [
+/**
+ * Canonical platform labels for the /templates Platform filter, in display
+ * order. Every catalog item has one of these values or no platform.
+ */
+export const TEMPLATE_PLATFORMS = [
   "Windows",
   "macOS",
   "iOS/iPadOS",
   "Android",
   "Linux",
   "Identity",
-  "Cross-platform",
-];
+] as const;
 
-const OIB_PLATFORM_LABELS: Record<string, string> = {
+export type TemplatePlatform = (typeof TEMPLATE_PLATFORMS)[number];
+
+/** Graph device filter platform values mapped to canonical labels. */
+const FILTER_PLATFORM_LABELS: Record<string, TemplatePlatform> = {
+  android: "Android",
+  androidForWork: "Android",
+  iOS: "iOS/iPadOS",
+  macOS: "macOS",
+  windows10AndLater: "Windows",
+};
+
+/**
+ * OIB manifest platform folders mapped to canonical labels. BYOD holds
+ * Android and iOS app protection, so its platform comes from the file name.
+ */
+const OIB_PLATFORM_LABELS: Record<string, TemplatePlatform> = {
   WINDOWS: "Windows",
   MACOS: "macOS",
-  BYOD: "BYOD (Bring Your Own Device)",
   WINDOWS365: "Windows",
 };
 
@@ -190,7 +215,7 @@ function createItemId(category: TaskCategory, seed: string): string {
   return `${category}:${seed}`;
 }
 
-function sortItems(items: TemplateDocumentationItem[]): TemplateDocumentationItem[] {
+function sortItems(items: TemplateDocumentationItemDraft[]): TemplateDocumentationItemDraft[] {
   return items.toSorted((left, right) => {
     const categoryDiff =
       TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.indexOf(left.category) -
@@ -215,7 +240,7 @@ function getCategorySummary(
   };
 }
 
-function detectPlatform(value: string): string | undefined {
+function detectPlatform(value: string): TemplatePlatform | undefined {
   const normalized = value.toLowerCase();
 
   if (
@@ -259,7 +284,9 @@ function detectPlatform(value: string): string | undefined {
   return undefined;
 }
 
-function pickPlatform(...values: Array<string | undefined>): string | undefined {
+function pickPlatform(
+  ...values: Array<string | undefined>
+): TemplatePlatform | undefined {
   const detected =
     values
       .map((value) => (value ? detectPlatform(value) : undefined))
@@ -313,11 +340,11 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     fetchCISBaselineManifest(),
   ]);
 
-  const oibPlatformLabels = Object.fromEntries(
+  const oibSourceLabels: Record<string, string> = Object.fromEntries(
     (oibManifest?.platforms ?? []).map((platform) => [platform.id, platform.name])
   );
 
-  const groupItems: TemplateDocumentationItem[] = [
+  const groupItems: TemplateDocumentationItemDraft[] = [
     ...dynamicGroups.map((group) => ({
       id: createItemId("groups", group.displayName),
       category: "groups" as const,
@@ -348,7 +375,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     })),
   ];
 
-  const filterItems: TemplateDocumentationItem[] = filters.map((filter) => ({
+  const filterItems: TemplateDocumentationItemDraft[] = filters.map((filter) => ({
     id: createItemId("filters", filter.displayName),
     category: "filters",
     categoryLabel: CATEGORY_METADATA.filters.label,
@@ -357,12 +384,14 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       filter.description,
       "Device assignment filter imported by Intune Hydration Kit."
     ),
-    platform: filter.platform,
+    platform:
+      FILTER_PLATFORM_LABELS[filter.platform] ??
+      pickPlatform(filter.platform, filter.displayName),
     itemType: "Assignment Filter",
     payloadSource: inlinePayloadSource(filter),
   }));
 
-  const complianceItems: TemplateDocumentationItem[] = compliancePolicies.map((policy) => ({
+  const complianceItems: TemplateDocumentationItemDraft[] = compliancePolicies.map((policy) => ({
     id: createItemId("compliance", policy.displayName),
     category: "compliance",
     categoryLabel: CATEGORY_METADATA.compliance.label,
@@ -376,7 +405,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     payloadSource: inlinePayloadSource(policy),
   }));
 
-  const conditionalAccessItems: TemplateDocumentationItem[] =
+  const conditionalAccessItems: TemplateDocumentationItemDraft[] =
     conditionalAccessPolicies.map((policy) => ({
       id: createItemId("conditionalAccess", policy.displayName),
       category: "conditionalAccess",
@@ -390,7 +419,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       payloadSource: inlinePayloadSource(policy),
     }));
 
-  const appProtectionItems: TemplateDocumentationItem[] =
+  const appProtectionItems: TemplateDocumentationItemDraft[] =
     appProtectionPolicies.map((policy) => ({
       id: createItemId("appProtection", policy.displayName),
       category: "appProtection",
@@ -405,7 +434,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       payloadSource: inlinePayloadSource(policy),
     }));
 
-  const enrollmentItems: TemplateDocumentationItem[] = (
+  const enrollmentItems: TemplateDocumentationItemDraft[] = (
     enrollmentProfiles as Array<Record<string, unknown>>
   ).map((profile) => {
     const displayName =
@@ -428,7 +457,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     };
   });
 
-  const notificationItems: TemplateDocumentationItem[] = (
+  const notificationItems: TemplateDocumentationItemDraft[] = (
     notificationTemplates as Array<Record<string, unknown>>
   ).map((template) => {
     const displayName =
@@ -445,7 +474,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     };
   });
 
-  const win32AppItems: TemplateDocumentationItem[] = getWin32AppTemplates().map((app) => ({
+  const win32AppItems: TemplateDocumentationItemDraft[] = getWin32AppTemplates().map((app) => ({
     id: createItemId("win32Apps", app.id),
     category: "win32Apps",
     categoryLabel: CATEGORY_METADATA.win32Apps.label,
@@ -454,24 +483,22 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
       app.description,
       "Packaged Windows application imported by Intune Hydration Kit."
     ),
-    subcategory: "WinGet Package",
+    subcategory: app.catalogSubcategory ?? "WinGet Package",
     platform: "Windows",
     itemType: "Windows app (Win32)",
     sourcePath: app.packageUrl,
     payloadSource: win32PayloadSource(app),
   }));
 
-  const baselineItems: TemplateDocumentationItem[] = (oibManifest?.files ?? []).map((file) => ({
+  const baselineItems: TemplateDocumentationItemDraft[] = (oibManifest?.files ?? []).map((file) => ({
     id: createItemId("baseline", file.path),
     category: "baseline",
     categoryLabel: CATEGORY_METADATA.baseline.label,
     displayName: file.displayName,
     description: `${file.policyType} template from the bundled OpenIntuneBaseline catalog.`,
-    subcategory: file.platform,
+    subcategory: oibSourceLabels[file.platform] ?? file.platform,
     platform:
-      oibPlatformLabels[file.platform] ??
-      OIB_PLATFORM_LABELS[file.platform] ??
-      pickPlatform(file.platform, file.displayName),
+      OIB_PLATFORM_LABELS[file.platform] ?? pickPlatform(file.displayName),
     itemType: file.policyType,
     sourcePath: file.path,
     payloadSource: oibPayloadSource(file),
@@ -484,7 +511,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ])
   );
 
-  const cisItems: TemplateDocumentationItem[] = (cisManifest?.files ?? []).map((file) => ({
+  const cisItems: TemplateDocumentationItemDraft[] = (cisManifest?.files ?? []).map((file) => ({
     id: createItemId("cisBaseline", file.path),
     category: "cisBaseline",
     categoryLabel: CATEGORY_METADATA.cisBaseline.label,
@@ -499,7 +526,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     payloadSource: cisPayloadSource(file),
   }));
 
-  const items = sortItems([
+  const items = assignTemplateSlugs(sortItems([
     ...groupItems,
     ...filterItems,
     ...complianceItems,
@@ -510,7 +537,7 @@ export async function loadTemplateDocumentationCatalog(): Promise<TemplateDocume
     ...notificationItems,
     ...baselineItems,
     ...cisItems,
-  ]);
+  ]));
 
   const categories = TEMPLATE_DOCUMENTATION_CATEGORY_ORDER.map((category) =>
     getCategorySummary(
@@ -538,6 +565,21 @@ export async function loadTemplateDocumentationPayload(
       return fetchCISBaselinePolicyByManifestFile(item.payloadSource.file);
     case "win32": {
       const template = item.payloadSource.template;
+      // A WinGet catalog app has no committed scripts: its scripts are generated (latest version).
+      if (!template.detectionScriptUrl || !template.installScriptUrl) {
+        if (!template.winget) {
+          throw new Error(`${template.displayName} has no scripts.`);
+        }
+        // Loaded on demand: the script text is large and only this payload needs it.
+        const { getWinGetScripts } = await import("@/lib/win32/wingetScripts");
+        const scripts = getWinGetScripts(template.winget);
+        return {
+          ...template,
+          detectionScriptContent: scripts.detection,
+          installScriptContent: scripts.install,
+          uninstallScriptContent: scripts.uninstall,
+        };
+      }
       const [
         detectionScriptContent,
         installScriptContent,
@@ -545,7 +587,9 @@ export async function loadTemplateDocumentationPayload(
       ] = await Promise.all([
         fetchScriptContent(template.detectionScriptUrl, "Win32 detection script"),
         fetchScriptContent(template.installScriptUrl, "Win32 install script"),
-        fetchScriptContent(template.uninstallScriptUrl, "Win32 uninstall script"),
+        template.uninstallScriptUrl
+          ? fetchScriptContent(template.uninstallScriptUrl, "Win32 uninstall script")
+          : Promise.resolve(template.uninstallCommandLine),
       ]);
 
       return {
@@ -560,23 +604,104 @@ export async function loadTemplateDocumentationPayload(
   }
 }
 
-export function getPlatformFilterOrder(platforms: string[]): string[] {
-  return platforms.toSorted((left, right) => {
-    const leftIndex = PLATFORM_ORDER.indexOf(left);
-    const rightIndex = PLATFORM_ORDER.indexOf(right);
+function toSlugPart(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
 
-    if (leftIndex === -1 && rightIndex === -1) {
-      return left.localeCompare(right);
-    }
+/**
+ * Returns the base slug for a catalog item. The slug comes from the item id
+ * (category and display name or manifest path). It removes the "[IHD] " import
+ * prefix and the ".json" extension, so the URL stays short and readable.
+ */
+export function getTemplateBaseSlug(item: Pick<TemplateDocumentationItem, "id" | "category">): string {
+  const seed = item.id
+    .slice(item.category.length + 1)
+    .replace(IMPORT_PREFIX, "")
+    .replace(/\.json$/i, "");
+  const category = item.category.replace(/([a-z0-9])([A-Z])/g, "$1-$2");
 
-    if (leftIndex === -1) {
-      return 1;
-    }
+  return `${toSlugPart(category)}--${toSlugPart(seed)}`;
+}
 
-    if (rightIndex === -1) {
-      return -1;
-    }
+/** Returns a short, stable hash of a value (32-bit FNV-1a in base 36). */
+function hashSlugSeed(value: string): string {
+  let hash = 0x811c9dc5;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 0x01000193);
+  }
 
-    return leftIndex - rightIndex;
+  return (hash >>> 0).toString(36);
+}
+
+/**
+ * Gives each item its detail page slug. Items that share a base slug (for
+ * example, file names that differ only in spaces) all get a hash of their id
+ * added, so no item depends on the order of the others.
+ */
+function assignTemplateSlugs(items: TemplateDocumentationItemDraft[]): TemplateDocumentationItem[] {
+  const baseSlugs = items.map(getTemplateBaseSlug);
+  const counts = new Map<string, number>();
+  baseSlugs.forEach((slug) => counts.set(slug, (counts.get(slug) ?? 0) + 1));
+
+  return items.map((item, index) => {
+    const baseSlug = baseSlugs[index];
+    const slug =
+      (counts.get(baseSlug) ?? 0) > 1 ? `${baseSlug}-${hashSlugSeed(item.id)}` : baseSlug;
+    return { ...item, slug };
   });
+}
+
+/** Returns the catalog item that has the slug, or undefined. */
+export function findTemplateBySlug(
+  items: readonly TemplateDocumentationItem[],
+  slug: string
+): TemplateDocumentationItem | undefined {
+  return items.find((item) => item.slug === slug);
+}
+
+/** Returns the site path of the detail page for a catalog item. */
+export function getTemplatePath(item: Pick<TemplateDocumentationItem, "slug">): string {
+  return `/templates/${item.slug}`;
+}
+
+/** Returns the origin of a catalog item: OpenIntuneBaseline, CIS, or the kit itself. */
+export function getTemplateSourceLabel(item: Pick<TemplateDocumentationItem, "payloadSource">): string {
+  switch (item.payloadSource.kind) {
+    case "oib":
+      return "OpenIntuneBaseline";
+    case "cis":
+      return "CIS Intune Benchmarks";
+    default:
+      return "Intune Hydration Kit";
+  }
+}
+
+/** Returns the path of the bundled file in the repository, when the catalog knows it. */
+export function getTemplateFilePath(
+  item: Pick<TemplateDocumentationItem, "payloadSource" | "sourcePath">
+): string | undefined {
+  switch (item.payloadSource.kind) {
+    case "oib":
+      return `public/IntuneTemplates/OpenIntuneBaseline/${item.payloadSource.file.path}`;
+    case "cis":
+      return `public/CISIntuneBaselines/${item.payloadSource.file.path}`;
+    case "win32":
+      return `public${item.payloadSource.template.packageUrl}`;
+    default:
+      return item.sourcePath;
+  }
+}
+
+/** Returns the canonical platforms present in the list, in display order. */
+export function getPlatformFilterOrder(
+  platforms: ReadonlyArray<TemplatePlatform | undefined>
+): TemplatePlatform[] {
+  const present = new Set(platforms);
+  return TEMPLATE_PLATFORMS.filter((platform) => present.has(platform));
 }

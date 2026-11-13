@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { MotionConfig } from "framer-motion";
 import {
   CheckCircle2,
   ChevronRight,
@@ -25,7 +26,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { AppreciateButton } from "@/components/landing/AppreciateButton";
 import { Navigation } from "@/components/Navigation";
 import { WebAppDemo } from "@/components/WebAppDemo";
 import {
@@ -443,7 +443,7 @@ function ConfigurationsSection() {
             </h2>
             <p className="text-base leading-7 text-muted-foreground">
               The app groups the template catalog by what admins actually need
-              to reason about: profiles, policy controls, targeting, and run
+              to reason about: baselines, policy controls, targeting, and run
               customization.
             </p>
           </div>
@@ -589,8 +589,7 @@ function FinalCta({
 function Footer() {
   return (
     <footer className="border-t py-8">
-      <div className="container mx-auto space-y-6 px-4 sm:px-6">
-        <AppreciateButton />
+      <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 md:flex-row">
           <div className="flex items-center gap-4">
             <span className="text-sm text-muted-foreground" suppressHydrationWarning>
@@ -641,26 +640,28 @@ export function HomeLanding({
   onContinue,
 }: HomeLandingProps) {
   return (
-    <div className="landing-shell landing-glass-shell relative min-h-screen">
-      <div className="relative z-10">
-        <Navigation />
-        <Hero
-          isAuthenticated={isAuthenticated}
-          onSignInClick={onSignInClick}
-          onContinue={onContinue}
-        />
-        <FeaturesSection />
-        <WorkflowSection />
-        <ConfigurationsSection />
-        <PermissionsSection />
-        <FaqSection />
-        <FinalCta
-          isAuthenticated={isAuthenticated}
-          onSignInClick={onSignInClick}
-          onContinue={onContinue}
-        />
-        <Footer />
+    <MotionConfig reducedMotion="user">
+      <div className="landing-shell landing-glass-shell relative min-h-screen">
+        <div className="relative z-10">
+          <Navigation />
+          <Hero
+            isAuthenticated={isAuthenticated}
+            onSignInClick={onSignInClick}
+            onContinue={onContinue}
+          />
+          <FeaturesSection />
+          <WorkflowSection />
+          <ConfigurationsSection />
+          <PermissionsSection />
+          <FaqSection />
+          <FinalCta
+            isAuthenticated={isAuthenticated}
+            onSignInClick={onSignInClick}
+            onContinue={onContinue}
+          />
+          <Footer />
+        </div>
       </div>
-    </div>
+    </MotionConfig>
   );
 }

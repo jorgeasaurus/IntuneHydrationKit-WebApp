@@ -4,12 +4,14 @@ import {
   Ban,
   Check,
   Circle,
+  ExternalLink,
   Loader2,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HydrationTask, TaskStatus } from "@/types/hydration";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
+import type { PortalLink } from "@/lib/utils/portalLinks";
 
 const STATUS_CONFIG: Record<
   TaskStatus,
@@ -66,77 +68,118 @@ function formatDuration(task: HydrationTask): string | null {
   return `${Math.round((task.endTime.getTime() - task.startTime.getTime()) / 1000)}s`;
 }
 
-function TaskRowComponent({ task }: { task: HydrationTask }): React.JSX.Element {
-  const status = STATUS_CONFIG[task.status];
+interface TaskRowProps {
+  task: HydrationTask;
+  /** Clamp the content so the row fits its fixed windowed slot. */
+  fixedHeight?: boolean;
+  /** Admin portal link for an object that this task created. */
+  portalLink?: PortalLink;
+}
+
+/** One task card. The caller supplies the list item wrapper. */
+/** Status label: an update of an existing object says "Updated", or "Would update" in preview. */
+function getStatusLabel(task: HydrationTask): string {
+  if (task.status === "success" && task.update) return task.update.applied ? "Updated" : "Would update";
+  return STATUS_CONFIG[task.status].label;
+}
+
+function getUpdateDetail(task: HydrationTask): string | undefined {
+  return task.update ? `Settings changed to match the template: ${task.update.differences.join("; ")}` : undefined;
+}
+
+function TaskRowComponent({ task, fixedHeight = false, portalLink }: TaskRowProps): React.JSX.Element {
+  const status = { ...STATUS_CONFIG[task.status], label: getStatusLabel(task) };
   const duration = formatDuration(task);
-  const detail = task.error ?? task.warning;
+  const detail = task.error ?? task.warning ?? getUpdateDetail(task);
   const DetailIcon = task.status === "failed" ? X : AlertCircle;
 
   return (
-    <li>
-      <article
-        aria-label={`${task.itemName}: ${status.label}`}
+    <article
+      aria-label={`${task.itemName}: ${status.label}`}
+      className={cn(
+        "group relative grid grid-cols-[auto_minmax(0,1fr)] gap-3 overflow-hidden rounded-xl border bg-slate-950/55 px-3 py-3",
+        "transition-[border-color,background-color,transform] duration-200 hover:-translate-y-px hover:border-white/20 hover:bg-slate-950/75",
+        fixedHeight && "h-full",
+        status.rowClassName
+      )}
+    >
+      <span
+        aria-hidden="true"
         className={cn(
-          "group relative grid grid-cols-[auto_minmax(0,1fr)] gap-3 overflow-hidden rounded-xl border bg-slate-950/55 px-3 py-3",
-          "transition-[border-color,background-color,transform] duration-200 hover:-translate-y-px hover:border-white/20 hover:bg-slate-950/75",
-          status.rowClassName
+          "mt-0.5 flex size-6 items-center justify-center rounded-md border border-white/10 bg-black/25",
+          status.iconClassName
         )}
       >
-        <span
-          aria-hidden="true"
-          className={cn(
-            "mt-0.5 flex size-6 items-center justify-center rounded-md border border-white/10 bg-black/25",
-            status.iconClassName
-          )}
-        >
-          <status.Icon className="size-3.5" />
-        </span>
+        <status.Icon className="size-3.5" />
+      </span>
 
-        <div className="min-w-0">
-          <div className="flex items-start gap-3">
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium leading-5 text-slate-50">
-                {task.itemName}
-              </p>
-              <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[10px] uppercase tracking-[0.12em] text-slate-400">
-                <span>{getTaskCategoryLabel(task.category)}</span>
-                <span aria-hidden="true" className="text-slate-600">/</span>
-                <span>{task.operation}</span>
-                {duration && (
-                  <>
-                    <span aria-hidden="true" className="text-slate-600">/</span>
-                    <span>Duration {duration}</span>
-                  </>
-                )}
-              </div>
+      <div className="min-w-0">
+        <div className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium leading-5 text-slate-50">
+              {task.itemName}
+            </p>
+            <div
+              className={cn(
+                "mt-1 flex items-center gap-x-2 gap-y-1 font-mono text-[10px] uppercase tracking-[0.12em] text-slate-400",
+                fixedHeight ? "flex-nowrap overflow-hidden whitespace-nowrap" : "flex-wrap"
+              )}
+            >
+              <span>{getTaskCategoryLabel(task.category)}</span>
+              <span aria-hidden="true" className="text-slate-600">/</span>
+              <span>{task.operation}</span>
+              {duration && (
+                <>
+                  <span aria-hidden="true" className="text-slate-600">/</span>
+                  <span>Duration {duration}</span>
+                </>
+              )}
             </div>
+          </div>
 
+          <div className="flex shrink-0 items-center gap-1.5">
+            {portalLink && (
+              // An icon-size link keeps the row height fixed for the windowed list.
+              <a
+                href={portalLink.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={portalLink.accessibleName}
+                title={portalLink.label}
+                className="flex size-6 items-center justify-center rounded-md border border-sky-300/25 bg-sky-300/10 text-sky-100 transition-colors hover:border-sky-200/60 hover:bg-sky-300/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200"
+              >
+                <ExternalLink aria-hidden="true" className="size-3.5" />
+              </a>
+            )}
             <span
               className={cn(
-                "inline-flex shrink-0 items-center rounded-full border px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em]",
+                "inline-flex items-center rounded-full border px-2 py-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em]",
                 status.badgeClassName
               )}
             >
               {status.label}
             </span>
           </div>
-
-          {detail && (
-            <div
-              className={cn(
-                "mt-2 flex items-start gap-2 rounded-lg border px-2.5 py-2 text-xs leading-5",
-                task.status === "failed"
-                  ? "border-red-300/20 bg-red-950/55 text-red-100"
-                  : "border-amber-300/15 bg-amber-950/35 text-amber-100"
-              )}
-            >
-              <DetailIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
-              <span>{detail}</span>
-            </div>
-          )}
         </div>
-      </article>
-    </li>
+
+        {detail && (
+          <div
+            className={cn(
+              "mt-2 flex items-start gap-2 rounded-lg border px-2.5 py-2 text-xs leading-5",
+              task.status === "failed"
+                ? "border-red-300/20 bg-red-950/55 text-red-100"
+                : "border-amber-300/15 bg-amber-950/35 text-amber-100"
+            )}
+          >
+            <DetailIcon aria-hidden="true" className="mt-0.5 size-3.5 shrink-0" />
+            {/* A clamped detail keeps its full text in the tooltip and the accessibility tree. */}
+            <span className={fixedHeight ? "line-clamp-2" : undefined} title={fixedHeight ? detail : undefined}>
+              {detail}
+            </span>
+          </div>
+        )}
+      </div>
+    </article>
   );
 }
 

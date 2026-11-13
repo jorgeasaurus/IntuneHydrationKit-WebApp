@@ -3,8 +3,11 @@
  */
 
 import { PrerequisiteCheckResult } from "./prerequisites";
+import type { AutopilotBrandingCustomization } from "@/lib/win32/autopilotBrandingConfig";
 
-export type CloudEnvironment = "global";
+export const CLOUD_ENVIRONMENTS = ["global"] as const;
+
+export type CloudEnvironment = (typeof CLOUD_ENVIRONMENTS)[number];
 
 export const OPERATION_MODES = ["create", "delete"] as const;
 
@@ -75,6 +78,25 @@ export interface TaskDriftEvidence {
   reason?: string;
 }
 
+/**
+ * Update of an existing kit object in a create run with "Update existing kit objects".
+ * A task with this evidence and status "success" updated the object (applied: true), or
+ * would update it in preview (applied: false).
+ */
+export interface TaskUpdateEvidence {
+  objectId: string;
+  applied: boolean;
+  /** Readable per-setting differences that the update changes. */
+  differences: string[];
+}
+
+/** The object that a successful live create made. The admin portal link uses it. */
+export interface TaskCreatedObject {
+  id: string;
+  /** OpenIntuneBaseline policy type (`_oibPolicyType`). Baseline tasks only. */
+  policyType?: string;
+}
+
 export interface RunProvenance {
   runId: string;
   appVersion: string;
@@ -90,6 +112,18 @@ interface HydrationTaskBase {
   templatePath?: string;
   match?: TaskMatchEvidence;
   drift?: TaskDriftEvidence;
+  update?: TaskUpdateEvidence;
+  createdObject?: TaskCreatedObject;
+  /**
+   * Create tasks of the Autopilot Branding app only: the user customization of its configuration.
+   * A retry or resume copies it, so the new run uploads a package with the same configuration.
+   */
+  autopilotBranding?: AutopilotBrandingCustomization;
+  /**
+   * Create tasks of a WinGet Win32 app only: the pinned WinGet version. Absent means the latest
+   * version. A retry or resume copies it, so the new run pins the same version.
+   */
+  wingetVersion?: string;
   error?: string;
   warning?: string;
   startTime?: Date;
@@ -144,10 +178,15 @@ export interface HydrationSummary {
   operationMode: OperationMode;
   startTime: Date;
   endTime: Date;
+  /** Active run time in milliseconds: the time from start to end without paused time. */
   duration: number;
+  /** Time in milliseconds that the engine waited while the run was paused. Absent when 0. */
+  pausedDuration?: number;
   stats: {
     total: number;
     created: number;
+    /** Existing kit objects updated (or would update in preview). Absent when 0. */
+    updated?: number;
     deleted: number;
     skipped: number;
     failed: number;
@@ -191,6 +230,8 @@ export interface TenantConfig {
 export interface AppSettings {
   stopOnFirstError: boolean;
   demoMode: boolean;
+  /** Show a browser notification when a run finishes while the tab is hidden. */
+  notifyOnCompletion: boolean;
 }
 
 /**
@@ -233,6 +274,17 @@ export interface CategorySelection {
 }
 
 /**
+ * Selection of the Win32 apps category. The Autopilot Branding app can have a customization,
+ * and a WinGet app can have a pinned version.
+ */
+export interface Win32AppsSelection extends CategorySelection {
+  /** Absent when the user did not customize the app (the prebuilt package is used). */
+  autopilotBranding?: AutopilotBrandingCustomization;
+  /** Pinned WinGet versions by app template ID. An app that is not in the record uses the latest version. */
+  wingetVersions?: Record<string, string>;
+}
+
+/**
  * All category selections tracked in wizard state
  */
 export interface CategorySelections {
@@ -241,8 +293,9 @@ export interface CategorySelections {
   compliance?: CategorySelection;
   conditionalAccess?: CategorySelection;
   appProtection?: CategorySelection;
-  win32Apps?: CategorySelection;
+  win32Apps?: Win32AppsSelection;
   enrollment?: CategorySelection;
+  notification?: CategorySelection;
   baseline?: BaselineSelection;
   cisBaseline?: CategorySelection;
 }
@@ -257,5 +310,10 @@ export interface WizardState {
   categorySelections?: CategorySelections;
   baselineSelection?: BaselineSelection; // Keep for backwards compatibility
   confirmed: boolean;
+  /**
+   * Create runs only: update existing kit objects that differ from the template.
+   * Set by the review step when the run starts, never by a saved selection.
+   */
+  updateExisting?: boolean;
   prerequisiteResult?: PrerequisiteCheckResult;
 }

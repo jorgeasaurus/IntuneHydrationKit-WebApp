@@ -1,7 +1,7 @@
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Navigation } from '@/components/Navigation'
 import {
   beginExecution,
@@ -42,6 +42,7 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/lib/auth/authUtils', () => ({
   signIn: (...args: unknown[]) => signIn(...args),
+  isSignInReplaced: (error: unknown) => error instanceof Error && error.message === 'replaced',
 }))
 
 vi.mock('sonner', () => ({
@@ -143,5 +144,70 @@ describe('Navigation', () => {
     expect(consoleError).toHaveBeenCalledWith('Sign in error:', expect.any(Error))
 
     consoleError.mockRestore()
+  })
+
+  it('shows no error when a newer sign-in click replaced the attempt', async () => {
+    const user = userEvent.setup()
+    useIsAuthenticated.mockReturnValue(false)
+    signIn.mockRejectedValue(new Error('replaced'))
+
+    render(<Navigation />)
+
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(signIn).toHaveBeenCalled())
+    expect(toastError).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
+  })
+
+  it('offers the section links in an accessible menu below the desktop breakpoint', async () => {
+    const user = userEvent.setup()
+    useIsAuthenticated.mockReturnValue(false)
+    usePathname.mockReturnValue('/templates')
+
+    render(<Navigation />)
+
+    const menuButton = screen.getByRole('button', { name: 'Open navigation menu' })
+    expect(menuButton).toHaveClass('lg:hidden')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+
+    await user.click(menuButton)
+
+    const menu = await screen.findByRole('dialog', { name: 'Menu' })
+    const links = within(menu).getAllByRole('link')
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Features', '/#features'],
+      ['Configurations', '/#what-gets-deployed'],
+      ['FAQs', '/#faq'],
+      ['Template Docs', '/templates'],
+    ])
+
+    await user.click(within(menu).getByRole('link', { name: 'FAQs' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+    await waitFor(() => {
+      expect(push).toHaveBeenCalledWith('/#faq')
+    })
+  })
+  it('leaves modified clicks on menu links to the browser', async () => {
+    const user = userEvent.setup()
+    useIsAuthenticated.mockReturnValue(false)
+    usePathname.mockReturnValue('/templates')
+    push.mockClear()
+
+    render(<Navigation />)
+    await user.click(screen.getByRole('button', { name: 'Open navigation menu' }))
+    const menu = await screen.findByRole('dialog', { name: 'Menu' })
+    const link = within(menu).getByRole('link', { name: 'FAQs' })
+
+    for (const modifier of [{ metaKey: true }, { ctrlKey: true }, { shiftKey: true }]) {
+      // fireEvent returns false when a handler called preventDefault.
+      expect(fireEvent.click(link, modifier)).toBe(true)
+    }
+
+    expect(screen.getByRole('dialog', { name: 'Menu' })).toBeInTheDocument()
+    expect(push).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,4 @@
-/* oxlint-disable react-doctor/no-giant-component -- tenant readiness UI keeps auth, prerequisite status, and cloud selection in one step. */
+/* oxlint-disable react-doctor/no-giant-component -- tenant readiness UI keeps auth, prerequisite status, and the fixed cloud statement in one step. */
 "use client";
 
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
@@ -30,7 +30,8 @@ import {
   type PrerequisiteTraceItem,
 } from "@/components/wizard/PrerequisiteTrace";
 
-const CLOUD_ENVIRONMENT_LABEL = "Global (Commercial)";
+const CLOUD_ENVIRONMENT_LABEL = "Global (commercial) cloud";
+const POWERSHELL_MODULE_URL = "https://github.com/jorgeasaurus/IntuneHydrationKit";
 
 const subscribeToUserLocale = () => () => {};
 const getUserLocale = () => navigator.language;
@@ -257,7 +258,7 @@ function TenantValidationNotices({
           )}
 
           {prerequisiteStatus === "error" && prerequisiteResult && (
-            <Alert className="border-red-500/30 bg-red-500/10">
+            <Alert role="alert" className="border-red-500/30 bg-red-500/10">
               <XCircle className="size-4 text-red-600 dark:text-red-400" />
               <AlertTitle className="text-red-800 dark:text-red-200">
                 Prerequisite check failed
@@ -514,7 +515,18 @@ export function TenantConfig(): React.JSX.Element {
               {CLOUD_ENVIRONMENT_LABEL}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Authentication and Graph routing inherit the environment chosen at sign-in.
+              The web app does not support sovereign clouds (GCC High, DoD, or China 21Vianet).
+              For these clouds,{" "}
+              <a
+                href={POWERSHELL_MODULE_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-hydrate underline-offset-4 hover:underline"
+              >
+                use the IntuneHydrationKit PowerShell module on GitHub{" "}
+                <span className="sr-only">(opens in a new tab)</span>
+              </a>
+              .
             </p>
           </div>
 

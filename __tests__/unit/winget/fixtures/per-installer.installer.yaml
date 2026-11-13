@@ -1,0 +1,14 @@
+PackageIdentifier: Contoso.Tool
+PackageVersion: 1.2.3.4
+Installers:
+- Architecture: x64
+  InstallerType: zip
+  NestedInstallerType: portable
+  InstallerUrl: https://downloads.contoso.example/tool/1.2.3.4/tool.zip
+  ReleaseDate: 2025-01-02
+- Architecture: neutral
+  InstallerType: msix
+  InstallerUrl: https://downloads.contoso.example/tool/1.2.3.4/tool.msixbundle
+  ReleaseDate: 2025-01-05
+ManifestType: installer
+ManifestVersion: 1.10.0

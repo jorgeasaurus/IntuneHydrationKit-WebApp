@@ -25,6 +25,10 @@ interface ExecutionControlsProps {
   outcome: ExecutionOutcome | null;
   startTime: Date;
   endTime?: Date | null;
+  /** Total time of closed engine pause waits, in milliseconds. */
+  pausedMs?: number;
+  /** Start of the open engine pause wait, or null. */
+  pauseStartedAt?: Date | null;
   batchProgress?: BatchProgress | null;
   onPause?: () => void;
   onResume?: () => void;
@@ -46,6 +50,49 @@ function formatDuration(ms: number): string {
   }
 }
 
+/**
+ * Elapsed run time without paused time. The execution layer records the time that
+ * the engine really waited while paused (`pausedMs` for closed waits, `pauseStartedAt`
+ * for an open wait), so the value is the same after a remount or a page refresh.
+ * A pause that the engine has not reached yet (the current task still runs) is
+ * active time.
+ */
+function useActiveElapsedTime(
+  startTime: Date,
+  endTime: Date | null,
+  isCompleted: boolean,
+  pausedMs: number,
+  pauseStartedAt: Date | null,
+): number {
+  // The clock keeps the paused total of its last tick. When a pause wait closes,
+  // `pausedMs` grows before the next tick, and the stale clock would show a lower value.
+  const [clock, setClock] = useState(() => ({ now: Date.now(), pausedMs }));
+  const isTicking = !isCompleted && pauseStartedAt === null;
+
+  // Tick every second while the engine is active. The first tick comes at once,
+  // so the clock is current again when a pause wait ends.
+  useEffect(() => {
+    if (!isTicking) return;
+
+    const tick = () => setClock({ now: Date.now(), pausedMs });
+    const firstTick = setTimeout(tick, 0);
+    const interval = setInterval(tick, 1000);
+    return () => {
+      clearTimeout(firstTick);
+      clearInterval(interval);
+    };
+  }, [isTicking, pausedMs]);
+
+  const start = startTime.getTime();
+  if (isCompleted && endTime) {
+    return Math.max(0, endTime.getTime() - start - pausedMs);
+  }
+  if (pauseStartedAt) {
+    return Math.max(0, pauseStartedAt.getTime() - start - pausedMs);
+  }
+  return Math.max(0, clock.now - start - clock.pausedMs);
+}
+
 export function ExecutionControls({
   tasks,
   isPaused,
@@ -54,6 +101,8 @@ export function ExecutionControls({
   outcome,
   startTime,
   endTime,
+  pausedMs = 0,
+  pauseStartedAt = null,
   batchProgress,
   onPause,
   onResume,
@@ -150,10 +199,11 @@ export function ExecutionControls({
 
         <ExecutionTiming
           tasks={tasks}
-          isPaused={isPaused}
           isCompleted={isCompleted}
           startTime={startTime}
           endTime={endTime}
+          pausedMs={pausedMs}
+          pauseStartedAt={pauseStartedAt}
         />
 
         <ExecutionActions
@@ -194,26 +244,22 @@ function ExecutionDescription({
 
 function ExecutionTiming({
   tasks,
-  isPaused,
   isCompleted,
   startTime,
   endTime,
+  pausedMs,
+  pauseStartedAt,
 }: Pick<
   ExecutionControlsProps,
-  "tasks" | "isPaused" | "isCompleted" | "startTime" | "endTime"
->): React.JSX.Element {
-  const [elapsedTime, setElapsedTime] = useState(0);
-
-  // Update elapsed time every second
-  useEffect(() => {
-    if (isCompleted || isPaused) return;
-
-    const interval = setInterval(() => {
-      setElapsedTime(Date.now() - startTime.getTime());
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [startTime, isCompleted, isPaused]);
+  "tasks" | "isCompleted" | "startTime" | "endTime"
+> & { pausedMs: number; pauseStartedAt: Date | null }): React.JSX.Element {
+  const displayedElapsedTime = useActiveElapsedTime(
+    startTime,
+    endTime ?? null,
+    isCompleted,
+    pausedMs,
+    pauseStartedAt,
+  );
 
   const totalTasks = tasks.length;
   const completedTasks = tasks.filter(
@@ -221,14 +267,11 @@ function ExecutionTiming({
       t.status === "success" || t.status === "failed" || t.status === "skipped",
   ).length;
 
-  // Calculate estimated time remaining
-  const avgTimePerTask = completedTasks > 0 ? elapsedTime / completedTasks : 0;
+  // Estimate the remaining time from active (not paused) time only.
+  const avgTimePerTask =
+    completedTasks > 0 ? displayedElapsedTime / completedTasks : 0;
   const remainingTasks = totalTasks - completedTasks;
   const estimatedTimeRemaining = avgTimePerTask * remainingTasks;
-  const displayedElapsedTime =
-    isCompleted && endTime
-      ? Math.max(0, endTime.getTime() - startTime.getTime())
-      : elapsedTime;
 
   return (
     <>

@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { GraphClient } from "@/lib/graph/client";
 import {
   createEnrollmentProfile,
-  deleteEnrollmentProfileByName,
   enrollmentProfileExists,
+  findEnrollmentProfileForDelete,
   getEnrollmentProfileName,
   getEnrollmentProfileType,
 } from "@/lib/graph/enrollment";
@@ -157,178 +157,6 @@ describe("lib/graph/enrollment", () => {
     await expect(enrollmentProfileExists(client, autopilotProfile)).resolves.toBe(false);
   });
 
-  it("rejects deleting autopilot profiles that do not have the hydration marker", async () => {
-    const get = vi.fn().mockResolvedValue({
-      displayName: "Unsafe Autopilot Profile",
-      description: "Manually created",
-    });
-    const getCollection = vi.fn().mockResolvedValue([
-      makeAutopilotProfile({
-        id: "unsafe-id",
-        displayName: "Unsafe Autopilot Profile",
-      }),
-    ]);
-    const del = vi.fn();
-    const client = { get, getCollection, delete: del } as unknown as GraphClient;
-
-    await expect(
-      deleteEnrollmentProfileByName(client, "Unsafe Autopilot Profile", "autopilot")
-    ).rejects.toThrow(
-      'Cannot delete profile "Unsafe Autopilot Profile": Not created by Intune Hydration Kit'
-    );
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  it("rejects deleting ESP configurations that still have assignments", async () => {
-    const get = vi.fn().mockResolvedValue({
-      displayName: "Assigned ESP",
-      description: HYDRATION_MARKER,
-    });
-    const getCollection = vi
-      .fn()
-      .mockResolvedValueOnce([makeEspProfile({ displayName: "Assigned ESP" })])
-      .mockResolvedValueOnce([{ id: "assignment-1" }]);
-    const del = vi.fn();
-    const client = { get, getCollection, delete: del } as unknown as GraphClient;
-
-    await expect(
-      deleteEnrollmentProfileByName(client, "Assigned ESP", "esp")
-    ).rejects.toThrow(
-      'Cannot delete ESP configuration "Assigned ESP": Has 1 assignment(s). Remove all assignments before deleting.'
-    );
-    expect(del).not.toHaveBeenCalled();
-  });
-
-  it("deletes device preparation profiles when the hydration marker is present in the name", async () => {
-    const getCollection = vi
-      .fn()
-      .mockResolvedValueOnce([
-        {
-          id: "device-prep-id",
-          name: "[IHD] - Windows Autopilot device preparation - User Driven",
-          description: "Manually documented",
-        },
-      ])
-      .mockResolvedValueOnce([]);
-    const del = vi.fn().mockResolvedValue(undefined);
-    const client = { getCollection, delete: del } as unknown as GraphClient;
-
-    await deleteEnrollmentProfileByName(
-      client,
-      "[IHD] Windows Autopilot device preparation - User Driven",
-      "devicePreparation"
-    );
-
-    expect(del).toHaveBeenCalledWith("/deviceManagement/configurationPolicies/device-prep-id");
-  });
-
-  it("deletes enrollment profiles by normalized name", async () => {
-    const getCollection = vi
-      .fn()
-      .mockResolvedValueOnce([
-        makeAutopilotProfile({
-          id: "autopilot-id",
-          displayName: "[IHD] - Default Autopilot Deployment Profile",
-        }),
-      ])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([
-        makeEspProfile({
-          id: "esp-id",
-          displayName: "[IHD] - Intune Default Enrollment Status Page",
-        }),
-      ])
-      .mockResolvedValueOnce([]);
-    const get = vi
-      .fn()
-      .mockResolvedValueOnce({
-        displayName: "[IHD] Default Autopilot Deployment Profile",
-        description: HYDRATION_MARKER,
-      })
-      .mockResolvedValueOnce({
-        displayName: "[IHD] Intune Default Enrollment Status Page",
-        description: HYDRATION_MARKER,
-      });
-    const del = vi.fn().mockResolvedValue(undefined);
-    const client = { getCollection, get, delete: del } as unknown as GraphClient;
-
-    await deleteEnrollmentProfileByName(
-      client,
-      "[IHD] Default Autopilot Deployment Profile",
-      "autopilot"
-    );
-    await deleteEnrollmentProfileByName(
-      client,
-      "[IHD] Intune Default Enrollment Status Page",
-      "esp"
-    );
-
-    expect(del).toHaveBeenNthCalledWith(
-      1,
-      "/deviceManagement/windowsAutopilotDeploymentProfiles/autopilot-id"
-    );
-    expect(del).toHaveBeenNthCalledWith(
-      2,
-      "/deviceManagement/deviceEnrollmentConfigurations/esp-id"
-    );
-  });
-
-  it("throws helpful errors when named autopilot or ESP profiles are missing", async () => {
-    const client = {
-      getCollection: vi.fn().mockResolvedValue([]),
-    } as unknown as GraphClient;
-
-    await expect(
-      deleteEnrollmentProfileByName(
-        client,
-        "[IHD] Missing Autopilot Profile",
-        "autopilot"
-      )
-    ).rejects.toThrow('Autopilot profile "[IHD] Missing Autopilot Profile" not found');
-    await expect(
-      deleteEnrollmentProfileByName(client, "[IHD] Missing ESP", "esp")
-    ).rejects.toThrow('ESP configuration "[IHD] Missing ESP" not found');
-  });
-
-  it("guards device preparation deletes for missing or assigned policies", async () => {
-    const missingClient = {
-      getCollection: vi.fn().mockResolvedValue([]),
-      delete: vi.fn(),
-    } as unknown as GraphClient;
-
-    await expect(
-      deleteEnrollmentProfileByName(
-        missingClient,
-        "[IHD] Missing Device Prep",
-        "devicePreparation"
-      )
-    ).rejects.toThrow('Device Preparation policy "[IHD] Missing Device Prep" not found');
-
-    const assignedClient = {
-      getCollection: vi
-        .fn()
-        .mockResolvedValueOnce([
-          {
-            id: "device-prep-id",
-            name: "[IHD] Windows Autopilot device preparation - User Driven",
-            description: HYDRATION_MARKER,
-          },
-        ])
-        .mockResolvedValueOnce([{ id: "assignment-1" }]),
-      delete: vi.fn(),
-    } as unknown as GraphClient;
-
-    await expect(
-      deleteEnrollmentProfileByName(
-        assignedClient,
-        "[IHD] Windows Autopilot device preparation - User Driven",
-        "devicePreparation"
-      )
-    ).rejects.toThrow(
-      'Cannot delete Device Preparation policy "[IHD] Windows Autopilot device preparation - User Driven": Has 1 assignment(s). Remove all assignments before deleting.'
-    );
-  });
-
   it("returns false when device preparation lookup fails", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const client = {
@@ -345,5 +173,63 @@ describe("lib/graph/enrollment", () => {
       "[DevicePreparation] Error checking if policy exists: Broken policy",
       expect.any(Error)
     );
+  });
+
+  it("finds enrollment objects for delete by normalized name", async () => {
+    const getCollection = vi.fn(async (url: string) => {
+      if (url === "/deviceManagement/windowsAutopilotDeploymentProfiles") return [makeAutopilotProfile()];
+      if (url === "/deviceManagement/deviceEnrollmentConfigurations") {
+        return [makeEspProfile({ displayName: "[IHD] - Intune Default Enrollment Status Page" })];
+      }
+      return [
+        { id: "settings-id", name: "[IHD] Device prep", description: HYDRATION_MARKER, technologies: "mdm" },
+        { id: "prep-id", name: "[IHD] Device prep", description: HYDRATION_MARKER, technologies: "enrollment" },
+      ];
+    });
+    const client = { getCollection } as unknown as GraphClient;
+
+    await expect(findEnrollmentProfileForDelete(client, "[IHD] Default Autopilot Deployment Profile")).resolves.toMatchObject({
+      id: "autopilot-id",
+      basePath: "/deviceManagement/windowsAutopilotDeploymentProfiles",
+    });
+    await expect(findEnrollmentProfileForDelete(client, "[IHD] Intune Default Enrollment Status Page")).resolves.toMatchObject({
+      id: "esp-id",
+      basePath: "/deviceManagement/deviceEnrollmentConfigurations",
+    });
+    // Only Settings Catalog policies with the enrollment technology are Device Preparation policies
+    await expect(findEnrollmentProfileForDelete(client, "[IHD] Device prep")).resolves.toMatchObject({
+      id: "prep-id",
+      basePath: "/deviceManagement/configurationPolicies",
+    });
+    await expect(findEnrollmentProfileForDelete(client, "[IHD] Missing")).resolves.toBeNull();
+    expect(getCollection).toHaveBeenCalledWith("/deviceManagement/configurationPolicies?$select=id,name,description,technologies");
+  });
+
+  it("searches only the collection of the given profile type", async () => {
+    const sameName = "[IHD] Windows Enrollment";
+    const getCollection = vi.fn(async (url: string) => {
+      if (url === "/deviceManagement/windowsAutopilotDeploymentProfiles") {
+        return [makeAutopilotProfile({ displayName: sameName })];
+      }
+      if (url === "/deviceManagement/deviceEnrollmentConfigurations") return [makeEspProfile({ displayName: sameName })];
+      return [];
+    });
+    const client = { getCollection } as unknown as GraphClient;
+
+    await expect(findEnrollmentProfileForDelete(client, sameName, "esp")).resolves.toMatchObject({
+      id: "esp-id",
+      basePath: "/deviceManagement/deviceEnrollmentConfigurations",
+    });
+    expect(getCollection).toHaveBeenCalledTimes(1);
+    // Without a type, a name that matches two object types is not resolved.
+    await expect(findEnrollmentProfileForDelete(client, sameName)).rejects.toThrow(/more than one enrollment object/);
+  });
+
+  it("does not hide read errors during the delete lookup", async () => {
+    const client = {
+      getCollection: vi.fn().mockRejectedValue(new Error("[403] Forbidden")),
+    } as unknown as GraphClient;
+
+    await expect(findEnrollmentProfileForDelete(client, "[IHD] Any")).rejects.toThrow("[403] Forbidden");
   });
 });

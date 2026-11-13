@@ -12,6 +12,12 @@ import {
 import { formatFileTimestamp } from "@/lib/utils/dateFormat";
 import { getTaskEvidenceOutcome, type TaskEvidenceOutcome } from "@/lib/hydration/executionOutcome";
 import { getTaskCategoryLabel } from "@/lib/hydration/categoryLabels";
+import type { PortalLink } from "@/lib/utils/portalLinks";
+
+/** Admin portal links for created objects, keyed by task ID. */
+type PortalLinks = ReadonlyMap<string, PortalLink>;
+
+const NO_PORTAL_LINKS: PortalLinks = new Map();
 
 const TASK_OUTCOME_LABELS: Record<TaskEvidenceOutcome, string> = {
   pending: "Pending",
@@ -34,16 +40,25 @@ function formatUtcDateTime(date: Date): string {
 }
 
 function getExportStats(summary: HydrationSummary, isPreview: boolean) {
+  const updated = summary.stats.updated ?? 0;
   return {
     ...summary.stats,
     created: isPreview ? 0 : summary.stats.created,
+    updated: isPreview ? 0 : updated,
     deleted: isPreview ? 0 : summary.stats.deleted,
     wouldCreate: isPreview ? summary.stats.created : 0,
+    wouldUpdate: isPreview ? updated : 0,
     wouldDelete: isPreview ? summary.stats.deleted : 0,
   };
 }
 
+/** True when a successful task updated an existing kit object (or would, in preview). */
+export function isUpdateTask(task: HydrationTask): boolean {
+  return task.status === "success" && task.operation === "create" && task.update !== undefined;
+}
+
 function getReportOutcome(task: HydrationTask, isPreview: boolean): string {
+  if (isUpdateTask(task)) return isPreview ? "wouldUpdate" : "updated";
   if (isPreview && task.status === "success") {
     return task.operation === "create" ? "wouldCreate" : "wouldDelete";
   }
@@ -51,13 +66,14 @@ function getReportOutcome(task: HydrationTask, isPreview: boolean): string {
 }
 
 function getReportOutcomeLabel(task: HydrationTask, isPreview: boolean): string {
+  if (isUpdateTask(task)) return isPreview ? "Would update" : "Updated";
   if (isPreview && task.status === "success") {
     return task.operation === "create" ? "Would create" : "Would delete";
   }
   return TASK_OUTCOME_LABELS[getTaskEvidenceOutcome(task)];
 }
 
-function getTaskMarkdown(task: HydrationTask, isPreview: boolean): string {
+function getTaskMarkdown(task: HydrationTask, isPreview: boolean, portalLink: PortalLink | undefined): string {
   const lines = [
     `${getTaskStatusIcon(task.status)} ${task.itemName}`,
     `   - Outcome: ${getReportOutcomeLabel(task, isPreview)}`,
@@ -67,6 +83,15 @@ function getTaskMarkdown(task: HydrationTask, isPreview: boolean): string {
   if (task.match) {
     lines.push(`   - Matched object: ${task.match.name} (${task.match.id})`, `   - Match: ${task.match.matchType}`);
     if (task.match.portalUrl) lines.push(`   - Portal: ${task.match.portalUrl}`);
+  }
+  if (portalLink) {
+    lines.push(portalLink.target === "object"
+      ? `   - Created object in portal: ${portalLink.href}`
+      : `   - Portal list (${portalLink.label}): ${portalLink.href}`);
+  }
+  if (task.update) {
+    lines.push(`   - Updated object: ${task.update.objectId}`);
+    for (const difference of task.update.differences) lines.push(`   - Updated setting: ${difference}`);
   }
   if (task.drift) {
     lines.push(`   - Configuration comparison: ${task.drift.status}`);
@@ -85,6 +110,7 @@ export function generateMarkdownReport(
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
+  portalLinks: PortalLinks = NO_PORTAL_LINKS,
 ): string {
   const stats = getExportStats(summary, isPreview);
   const provenance = summary.provenance;
@@ -97,7 +123,7 @@ export function generateMarkdownReport(
 **Started**: ${formatUtcDateTime(summary.startTime)} UTC
 **Completed**: ${formatUtcDateTime(summary.endTime)} UTC
 **Exported**: ${formatUtcDateTime(new Date())} UTC
-**Duration**: ${formatDuration(summary.duration)}
+**Duration**: ${formatDuration(summary.duration)}${summary.pausedDuration ? ` (active time; paused for ${formatDuration(summary.pausedDuration)})` : ""}
 **Run ID**: ${provenance?.runId ?? "Not recorded"}
 **App version**: ${provenance?.appVersion ?? "Not recorded"}
 **Baseline version**: ${provenance?.baselineVersion ?? "Not recorded"}
@@ -110,7 +136,7 @@ export function generateMarkdownReport(
 - **Deleted**: ${stats.deleted}
 - **Would Create**: ${stats.wouldCreate}
 - **Would Delete**: ${stats.wouldDelete}
-- **Skipped**: ${stats.skipped}
+${summary.stats.updated ? `- **Updated**: ${stats.updated}\n- **Would Update**: ${stats.wouldUpdate}\n` : ""}- **Skipped**: ${stats.skipped}
 - **Failed**: ${stats.failed}
 `;
   if (summary.batchStats) {
@@ -133,7 +159,7 @@ Sequential checks include skipped tasks. A batch fallback can count in both path
   markdown += "## Task Details\n\n";
   for (const [category, categoryTasks] of Object.entries(groupTasksByCategory(tasks))) {
     markdown += `### ${getTaskCategoryLabel(category)}\n\n`;
-    markdown += categoryTasks.map((task) => getTaskMarkdown(task, isPreview)).join("") + "\n";
+    markdown += categoryTasks.map((task) => getTaskMarkdown(task, isPreview, portalLinks.get(task.id))).join("") + "\n";
   }
   for (const [label, entries] of [["Warnings", summary.warnings], ["Errors", summary.errors]] as const) {
     if (entries.length === 0) continue;
@@ -152,6 +178,7 @@ export function generateJSONReport(
   tasks: HydrationTask[],
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
+  portalLinks: PortalLinks = NO_PORTAL_LINKS,
 ): string {
   return JSON.stringify({
     outcome,
@@ -169,6 +196,8 @@ export function generateJSONReport(
       warning: task.warning,
       match: task.match,
       drift: task.drift,
+      update: task.update,
+      portalLink: getJSONPortalLink(portalLinks.get(task.id)),
       startTime: task.startTime?.toISOString(),
       endTime: task.endTime?.toISOString(),
       duration: task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : null,
@@ -177,7 +206,12 @@ export function generateJSONReport(
   }, null, 2);
 }
 
-function escapeCSVField(value: string | number): string {
+function getJSONPortalLink(link: PortalLink | undefined) {
+  return link ? { url: link.href, target: link.target, label: link.label } : undefined;
+}
+
+/** Quote a CSV field and neutralize spreadsheet formula prefixes. */
+export function escapeCSVField(value: string | number): string {
   let text = String(value);
   if (/^\s*[=+\-@\t\r]/.test(text)) text = `'${text}`;
   return `"${text.replace(/"/g, '\"\"')}"`;
@@ -189,13 +223,15 @@ export function generateCSVReport(
   outcome: ReportableExecutionOutcome,
   isPreview: boolean,
   summary?: HydrationSummary,
+  portalLinks: PortalLinks = NO_PORTAL_LINKS,
 ): string {
   const headers = [
     "Category", "Item Name", "Operation", "Execution Mode", "Run Outcome", "Status", "Outcome",
     "Error", "Reason", "Warning", "Start Time (UTC)", "End Time (UTC)", "Duration (ms)",
     "Matched Object ID", "Matched Object Name", "Match Type", "Portal URL", "Configuration Comparison",
-    "Differences", "Comparison Reason", "Tenant ID", "Run ID", "App Version", "Baseline Version", "Baseline Source SHA",
-    "Run Start (UTC)", "Run End (UTC)", "Exported (UTC)", "Created", "Deleted", "Would Create", "Would Delete",
+    "Differences", "Comparison Reason", "Updated Settings", "Tenant ID", "Run ID", "App Version", "Baseline Version",
+    "Baseline Source SHA", "Run Start (UTC)", "Run End (UTC)", "Exported (UTC)", "Created", "Deleted", "Would Create",
+    "Would Delete", "Updated", "Would Update", "Created Object Portal URL",
   ];
   const stats = summary ? getExportStats(summary, isPreview) : null;
   const provenance = summary?.provenance;
@@ -204,6 +240,7 @@ export function generateCSVReport(
     provenance?.baselineVersion ?? "", provenance?.baselineSourceSha ?? "",
     summary ? formatUtcDateTime(summary.startTime) : "", summary ? formatUtcDateTime(summary.endTime) : "",
     formatUtcDateTime(new Date()), stats?.created ?? "", stats?.deleted ?? "", stats?.wouldCreate ?? "", stats?.wouldDelete ?? "",
+    stats?.updated ?? "", stats?.wouldUpdate ?? "",
   ];
   const taskRows = tasks.map((task) => [
     task.category, task.itemName, task.operation, isPreview ? "preview" : "live", outcome,
@@ -213,12 +250,19 @@ export function generateCSVReport(
     task.startTime && task.endTime ? task.endTime.getTime() - task.startTime.getTime() : "",
     task.match?.id ?? "", task.match?.name ?? "", task.match?.matchType ?? "", task.match?.portalUrl ?? "",
     task.drift?.status ?? "", task.drift?.differences.join("; ") ?? "", task.drift?.reason ?? "",
+    task.update?.differences.join("; ") ?? "",
     ...runValues,
+    getCSVPortalUrl(portalLinks.get(task.id)),
   ]);
   if (taskRows.length === 0) {
-    taskRows.push(["", "", "", isPreview ? "preview" : "live", outcome, ...Array<string>(15).fill(""), ...runValues]);
+    taskRows.push(["", "", "", isPreview ? "preview" : "live", outcome, ...Array<string>(16).fill(""), ...runValues, ""]);
   }
   return [headers, ...taskRows].map((row) => row.map(escapeCSVField).join(",")).join("\n");
+}
+
+/** The CSV column holds per-object links only. A list link does not identify the object. */
+function getCSVPortalUrl(link: PortalLink | undefined): string {
+  return link?.target === "object" ? link.href : "";
 }
 
 /**
@@ -233,10 +277,14 @@ export function createSummary(
   batchStats?: BatchExecutionStats,
   tenantName?: string,
   provenance?: HydrationSummary["provenance"],
+  pausedMs = 0,
 ): HydrationSummary {
+  const updated = tasks.filter(isUpdateTask).length;
   const stats = {
     total: tasks.length,
-    created: tasks.filter((t) => t.status === "success" && t.operation === "create").length,
+    created: tasks.filter((t) => t.status === "success" && t.operation === "create" && !isUpdateTask(t)).length,
+    // Added only when a task updated an object, so summaries of earlier runs still match their tasks.
+    ...(updated > 0 ? { updated } : {}),
     deleted: tasks.filter((t) => t.status === "success" && t.operation === "delete").length,
     skipped: tasks.filter((t) => t.status === "skipped").length,
     failed: tasks.filter((t) => t.status === "failed").length,
@@ -294,7 +342,8 @@ export function createSummary(
     operationMode,
     startTime,
     endTime,
-    duration: endTime.getTime() - startTime.getTime(),
+    duration: Math.max(0, endTime.getTime() - startTime.getTime() - pausedMs),
+    ...(pausedMs > 0 ? { pausedDuration: pausedMs } : {}),
     stats,
     categoryBreakdown,
     errors,
@@ -308,6 +357,7 @@ export function summaryMatchesExecution(
   summary: HydrationSummary,
   source: Pick<HydrationSummary, "tenantId" | "tenantName" | "operationMode" | "startTime" | "endTime" | "provenance"> & {
     tasks: HydrationTask[];
+    pausedMs?: number;
   },
 ): boolean {
   const expected = createSummary(
@@ -319,6 +369,7 @@ export function summaryMatchesExecution(
     summary.batchStats,
     source.tenantName,
     source.provenance ?? summary.provenance,
+    source.pausedMs ?? 0,
   );
   return JSON.stringify(toCanonicalValue(summary)) === JSON.stringify(toCanonicalValue(expected));
 }

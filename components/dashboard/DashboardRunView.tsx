@@ -1,19 +1,31 @@
-import { AlertTriangle, RotateCcw } from "lucide-react";
+"use client";
+
+import { useMemo, useState, type ReactNode } from "react";
+import Link from "next/link";
+import { AlertTriangle, GitCompare, History, RotateCcw, Settings2 } from "lucide-react";
 import { AppNavigation } from "@/components/AppNavigation";
 import { SensitiveData } from "@/components/SensitiveData";
+import { SettingsModal } from "@/components/SettingsModal";
 import { ActivityLog } from "@/components/dashboard/ActivityLog";
+import { CompletionNotificationToggle } from "@/components/dashboard/CompletionNotificationToggle";
 import { ExecutionControls } from "@/components/dashboard/ExecutionControls";
 import { ProgressBar } from "@/components/dashboard/ProgressBar";
 import { ResultsSummary } from "@/components/dashboard/ResultsSummary";
 import { RunNotices } from "@/components/dashboard/RunNotices";
 import { RunOverview } from "@/components/dashboard/RunOverview";
+import { RunStatusAnnouncer } from "@/components/dashboard/RunStatusAnnouncer";
 import { TaskList } from "@/components/dashboard/TaskList";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { useRunCompletionNotification } from "@/hooks/useRunCompletionNotification";
+import { useRunWakeLock } from "@/hooks/useRunWakeLock";
+import { useSettings } from "@/hooks/useSettings";
+import { getCreatedObjectLinks, type PortalLink } from "@/lib/utils/portalLinks";
 import type { ActivityMessage } from "@/lib/hydration/types";
 import type { ExecutionState } from "@/lib/hydration/executionStateStore";
 import type {
   BatchProgress,
+  CloudEnvironment,
   ExecutionOutcome,
   HydrationSummary,
   HydrationTask,
@@ -28,10 +40,14 @@ interface DashboardRunViewProps {
   activityLog: ActivityMessage[];
   startTime: Date | null;
   endTime: Date | null;
+  pausedMs: number;
+  pauseStartedAt: Date | null;
   operationMode: OperationMode;
   isPreview: boolean;
   tenantName?: string;
   tenantId?: string;
+  /** Cloud of the run. Without it, no admin portal links show. */
+  cloudEnvironment?: CloudEnvironment;
   selectedObjectCount: number;
   phase: ExecutionState["phase"];
   batchProgress: BatchProgress | null;
@@ -40,14 +56,22 @@ interface DashboardRunViewProps {
   onCancel?: () => void;
   onDownloadLog: () => void;
   onStartNewHydration: () => void;
+  /** True when the run stopped before a terminal state (for example after a refresh). */
+  isInterrupted?: boolean;
+  /** Notice that shows above the run, for example for an interrupted run. */
+  notice?: ReactNode;
+  /** Actions that continue from a completed run. */
+  rerunActions?: ReactNode;
 }
 
 function getOperationText(
   operationMode: OperationMode,
   isPreview: boolean,
   isCompleted: boolean,
+  isInterrupted: boolean,
 ): string {
   const operation = operationMode === "delete" ? "Delete" : "Create";
+  if (isInterrupted) return `${operation} ${isPreview ? "preview" : "run"} interrupted`;
   if (isPreview) {
     return isCompleted
       ? `${operation} preview completed`
@@ -66,10 +90,13 @@ export function DashboardRunView({
   activityLog,
   startTime,
   endTime,
+  pausedMs,
+  pauseStartedAt,
   operationMode,
   isPreview,
   tenantName,
   tenantId,
+  cloudEnvironment,
   selectedObjectCount,
   phase,
   batchProgress,
@@ -78,6 +105,9 @@ export function DashboardRunView({
   onCancel,
   onDownloadLog,
   onStartNewHydration,
+  isInterrupted = false,
+  notice,
+  rerunActions,
 }: DashboardRunViewProps): React.JSX.Element {
   const isBuildingQueue = phase === "building";
   const isPaused = phase === "paused";
@@ -93,11 +123,19 @@ export function DashboardRunView({
     (task) => task.status === "success",
   ).length;
   const controlsStartTime = startTime ?? (isCompleted ? endTime : null);
+  const portalLinks = useMemo(
+    () => getCreatedObjectLinks(tasks, cloudEnvironment, isPreview),
+    [cloudEnvironment, isPreview, tasks],
+  );
+  const { settings } = useSettings();
+  useRunWakeLock();
+  useRunCompletionNotification(settings.notifyOnCompletion);
 
   return (
     <div className="relative z-10 min-h-screen">
       <RunNavigation
         isCompleted={isCompleted}
+        isInterrupted={isInterrupted}
         operationMode={operationMode}
         isPreview={isPreview}
         tenantName={tenantName}
@@ -114,21 +152,30 @@ export function DashboardRunView({
           totalTaskCount={tasks.length}
           successTaskCount={successTaskCount}
           isBuildingQueue={isBuildingQueue}
-          isCompleted={isCompleted}
+          isCompleted={isCompleted && !isInterrupted}
           outcome={outcome}
         />
 
-        <RunNotices
+        {notice}
+
+        <RunStatusAnnouncer
+          tasks={tasks}
           isCompleted={isCompleted}
-          summary={summary}
           outcome={outcome}
-          fatalError={fatalError}
-          successTaskCount={successTaskCount}
-          isPreview={isPreview}
-          operationMode={operationMode}
-          isBuildingQueue={isBuildingQueue}
-          taskCount={tasks.length}
+          announceOutcome={Boolean(summary) && outcome !== "failed"}
         />
+
+        {!isInterrupted && (
+          <RunNotices
+            isCompleted={isCompleted}
+            summary={summary}
+            fatalError={fatalError}
+            isPreview={isPreview}
+            operationMode={operationMode}
+            isBuildingQueue={isBuildingQueue}
+            taskCount={tasks.length}
+          />
+        )}
 
         {!isCompleted && tasks.length > 0 && (
           <ProgressBar
@@ -138,7 +185,7 @@ export function DashboardRunView({
           />
         )}
 
-        {controlsStartTime && (
+        {controlsStartTime && !isInterrupted && (
           <ExecutionControls
             tasks={tasks}
             isPaused={isPaused}
@@ -147,6 +194,8 @@ export function DashboardRunView({
             outcome={outcome}
             startTime={controlsStartTime}
             endTime={endTime}
+            pausedMs={pausedMs}
+            pauseStartedAt={pauseStartedAt}
             batchProgress={batchProgress}
             onPause={onPause}
             onResume={onResume}
@@ -155,7 +204,11 @@ export function DashboardRunView({
           />
         )}
 
+        {!isCompleted && <CompletionNotificationToggle />}
+
         <ActivityLog messages={activityLog} />
+
+        {isCompleted && rerunActions}
 
         <RunResults
           isCompleted={isCompleted}
@@ -164,6 +217,7 @@ export function DashboardRunView({
           tasks={tasks}
           isPreview={isPreview}
           operationMode={operationMode}
+          portalLinks={portalLinks}
         />
       </main>
     </div>
@@ -172,6 +226,7 @@ export function DashboardRunView({
 
 function RunNavigation({
   isCompleted,
+  isInterrupted,
   operationMode,
   isPreview,
   tenantName,
@@ -184,8 +239,11 @@ function RunNavigation({
   | "tenantName"
   | "tenantId"
   | "onStartNewHydration"
-> & { isCompleted: boolean }): React.JSX.Element {
+> & { isCompleted: boolean; isInterrupted: boolean }): React.JSX.Element {
+  const [showSettings, setShowSettings] = useState(false);
+
   return (
+    <>
     <AppNavigation
       brandHref={isCompleted ? "/" : null}
       eyebrow={
@@ -196,7 +254,7 @@ function RunNavigation({
       title="Hydration Dashboard"
       description={
         <>
-          {getOperationText(operationMode, isPreview, isCompleted)} in{" "}
+          {getOperationText(operationMode, isPreview, isCompleted, isInterrupted)} in{" "}
           <SensitiveData
             value={tenantName || tenantId}
             fallback="the selected tenant"
@@ -204,18 +262,50 @@ function RunNavigation({
         </>
       }
       actions={
-        isCompleted ? (
+        <>
           <Button
             variant="outline"
-            onClick={onStartNewHydration}
-            className="nav-action size-9 px-0 sm:w-auto sm:px-4"
+            onClick={() => setShowSettings(true)}
+            className="nav-action size-9 px-0 lg:w-auto lg:px-3"
           >
-            <RotateCcw className="size-4 sm:mr-2" />
-            <span className="sr-only sm:not-sr-only">Start New Hydration</span>
+            <Settings2 aria-hidden="true" className="size-4 lg:mr-2" />
+            <span className="sr-only lg:not-sr-only">Settings</span>
           </Button>
-        ) : null
+          {isCompleted && (
+            <>
+            <Button variant="outline" asChild className="nav-action size-9 px-0 lg:w-auto lg:px-3">
+              <Link href="/drift">
+                <GitCompare aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Drift Scan</span>
+              </Link>
+            </Button>
+            <Button variant="outline" asChild className="nav-action size-9 px-0 lg:w-auto lg:px-3">
+              <Link href="/history">
+                <History aria-hidden="true" className="size-4 lg:mr-2" />
+                <span className="sr-only lg:not-sr-only">Run history</span>
+              </Link>
+            </Button>
+            </>
+          )}
+          {isCompleted && (
+            <Button
+              variant="outline"
+              onClick={onStartNewHydration}
+              className="nav-action size-9 px-0 lg:w-auto lg:px-4"
+            >
+              <RotateCcw className="size-4 lg:mr-2" />
+              <span className="sr-only lg:not-sr-only">Start New Hydration</span>
+            </Button>
+          )}
+        </>
       }
     />
+    <SettingsModal
+      key={showSettings ? "settings-open" : "settings-closed"}
+      open={showSettings}
+      onOpenChange={setShowSettings}
+    />
+    </>
   );
 }
 
@@ -226,10 +316,11 @@ function RunResults({
   tasks,
   isPreview,
   operationMode,
+  portalLinks,
 }: Pick<
   DashboardRunViewProps,
   "summary" | "outcome" | "tasks" | "isPreview" | "operationMode"
-> & { isCompleted: boolean }): React.JSX.Element {
+> & { isCompleted: boolean; portalLinks: ReadonlyMap<string, PortalLink> }): React.JSX.Element {
   return (
     <>
       {isCompleted && summary && outcome && outcome !== "failed" && (
@@ -251,13 +342,14 @@ function RunResults({
             tasks={tasks}
             isPreview={isPreview}
             outcome={outcome}
+            portalLinks={portalLinks}
           />
         </div>
       )}
       {isCompleted && !summary && tasks.length > 0 && (
-        <TaskList tasks={tasks} />
+        <TaskList tasks={tasks} portalLinks={portalLinks} />
       )}
-      {!isCompleted && <TaskList tasks={tasks} />}
+      {!isCompleted && <TaskList tasks={tasks} portalLinks={portalLinks} />}
     </>
   );
 }

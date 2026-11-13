@@ -11,23 +11,29 @@
  *
  * Implementation is split across modular files:
  * - ./types.ts - ExecutionContext, ExecutionResult, CISPolicyType
- * - ./utils.ts - sleep, escapeODataString, utility functions
+ * - ./utils.ts - sleep, tenant cache access, name matching, utility functions
  * - ./cleaners.ts - Policy cleaning functions
- * - ./policyCreators.ts - Graph API create/exists functions
+ * - ./policyCreators.ts - Graph API create functions
  * - ./policyDetection.ts - Policy type detection
+ * - ./deleteResolver.ts - Delete target resolution and safety checks (all delete paths)
  * - ./taskExecutors/ - Category-specific task executors
  * - ./taskQueue.ts - Task queue building functions
  */
 
-import { HydrationTask } from "@/types/hydration";
+import { HydrationTask, TaskCategory } from "@/types/hydration";
+import type { GraphClient } from "@/lib/graph/client";
 import { getIntuneGroups } from "@/lib/graph/groups";
 import { getAllFilters } from "@/lib/graph/filters";
 import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
+import { getAllNotificationTemplates } from "@/lib/graph/notifications";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
+import { recordCreatedObject } from "./createdObject";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
-import { sleep, sleepWithExecutionControl, waitWhilePaused } from "./utils";
-import { ExecutionContext, ExecutionResult, ActivityMessage } from "./types";
+import { getLicenseSkipReason, sleep, sleepWithExecutionControl, waitWhilePaused, TENANT_CACHE_LABELS } from "./utils";
+import { ExecutionContext, ExecutionResult, ActivityMessage, TenantCacheKey } from "./types";
+import { pauseActiveExecution } from "./executionStateStore";
+import { RUN_CANCELLED_MESSAGE, isRunCancelledError } from "@/lib/utils/retry";
 import { executeGroupTask } from "./taskExecutors/groupTask";
 import { executeFilterTask } from "./taskExecutors/filterTask";
 import { executeComplianceTask } from "./taskExecutors/complianceTask";
@@ -35,11 +41,68 @@ import { executeConditionalAccessTask } from "./taskExecutors/conditionalAccessT
 import { executeAppProtectionTask } from "./taskExecutors/appProtectionTask";
 import { executeWin32AppTask } from "./taskExecutors/win32AppTask";
 import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
+import { executeNotificationTask } from "./taskExecutors/notificationTask";
 import { markTaskSkipped } from "./taskTransitions";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
+import { getExistingSkipReason } from "./updateResolver";
 
 const TASK_DELAY_MS = 2000;
+
+/**
+ * Tenant caches to prefetch, with the task categories that need each cache.
+ */
+export const TENANT_CACHE_PREFETCHES: Array<{
+  key: TenantCacheKey;
+  categories: TaskCategory[];
+  load: (client: GraphClient) => Promise<unknown[]>;
+}> = [
+  { key: "cachedIntuneGroups", categories: ["groups"], load: getIntuneGroups },
+  { key: "cachedFilters", categories: ["filters"], load: getAllFilters },
+  // Baseline tasks can include App Protection policies (for example Android/iOS BYOD)
+  { key: "cachedAppProtectionPolicies", categories: ["appProtection", "baseline"], load: getAllAppProtectionPolicies },
+  {
+    key: "cachedConditionalAccessPolicies",
+    categories: ["conditionalAccess"],
+    load: (client) => client.getCollection("/identity/conditionalAccess/policies?$select=id,displayName,state"),
+  },
+  { key: "cachedNotificationTemplates", categories: ["notification"], load: getAllNotificationTemplates },
+  {
+    key: "cachedCompliancePolicies",
+    categories: ["compliance", "baseline", "cisBaseline"],
+    load: (client) => client.getCollection("/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description"),
+  },
+  {
+    key: "cachedSettingsCatalogPolicies",
+    categories: ["baseline", "cisBaseline"],
+    load: (client) => client.getCollection("/deviceManagement/configurationPolicies?$select=id,name,description"),
+  },
+  {
+    key: "cachedV2CompliancePolicies",
+    categories: ["compliance", "baseline", "cisBaseline"],
+    load: (client) => client.getCollection("/deviceManagement/compliancePolicies?$select=id,name,description"),
+  },
+  {
+    key: "cachedDriverUpdateProfiles",
+    categories: ["baseline", "cisBaseline"],
+    load: (client) => client.getCollection("/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description"),
+  },
+  {
+    key: "cachedDeviceConfigurations",
+    categories: ["baseline", "cisBaseline"],
+    load: (client) => client.getCollection("/deviceManagement/deviceConfigurations?$select=id,displayName,description"),
+  },
+  {
+    key: "cachedGroupPolicyConfigurations",
+    categories: ["baseline", "cisBaseline"],
+    load: (client) => client.getCollection("/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description"),
+  },
+  {
+    key: "cachedSecurityIntents",
+    categories: ["baseline", "cisBaseline"],
+    load: (client) => client.getCollection("/deviceManagement/intents?$select=id,displayName,description"),
+  },
+];
 
 /**
  * Helper to emit status updates to UI
@@ -68,6 +131,78 @@ function markTaskCancelled(
   task.endTime = cancelledAt;
   markTaskSkipped(task, "cancelled", "Cancelled by user");
   results.push({ task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled by user" });
+}
+
+/** Status message when the sign-in session is lost during a run. */
+export const SESSION_EXPIRED_MESSAGE = "Session expired — click Resume to sign in again and continue.";
+
+/**
+ * Pause the run after the sign-in session was lost, and wait for the user.
+ * The in-flight tasks go back to "pending" and are not marked failed. Resume is a user
+ * click, so the sign-in popup is allowed then. Each lost session needs a new Resume,
+ * so a run that cannot get a token does not loop.
+ */
+async function pauseForSignIn(
+  error: Error,
+  tasks: HydrationTask[],
+  context: ExecutionContext
+): Promise<"retry" | "stop" | "cancelled"> {
+  if (context.shouldCancel?.()) return "cancelled";
+
+  pauseActiveExecution();
+  if (!context.shouldPause?.()) {
+    // The run cannot pause (no pause control), so the request fails as before.
+    console.warn("[Execute Tasks] Sign-in session lost and the run cannot pause:", error.message);
+    return "stop";
+  }
+
+  const inFlight = tasks.filter((task) => task.status === "running");
+  for (const task of inFlight) {
+    task.status = "pending";
+    context.onTaskStart?.(task);
+  }
+  console.warn("[Execute Tasks] Sign-in session lost - run paused:", error.message);
+  emitStatus(context, SESSION_EXPIRED_MESSAGE, "warning", "control");
+
+  if ((await waitWhilePaused(context)) === "cancelled") return "cancelled";
+
+  for (const task of inFlight) {
+    if (task.status !== "pending") continue;
+    task.status = "running";
+    context.onTaskStart?.(task);
+  }
+  emitStatus(context, "Resumed. Signing in again and sending the request...", "info", "control");
+  return "retry";
+}
+
+/**
+ * Attach the run controls to the Graph client: retry waits that act on cancel and
+ * pause, and the sign-in recovery. Returns the function that removes them.
+ */
+function attachRunControls(tasks: HydrationTask[], context: ExecutionContext): () => void {
+  const { client } = context;
+  // Test doubles of the client do not always have the method.
+  if (typeof client.setExecutionControls !== "function") return () => undefined;
+
+  // Parallel requests that lose the session at the same time share one pause.
+  let recovery: Promise<"retry" | "stop" | "cancelled"> | null = null;
+  client.setExecutionControls({
+    wait: (ms) => sleepWithExecutionControl(ms, context),
+    onAuthSessionLost: (error) => {
+      recovery ??= pauseForSignIn(error, tasks, context).finally(() => {
+        recovery = null;
+      });
+      return recovery;
+    },
+  });
+  return () => client.setExecutionControls(undefined);
+}
+
+function cancelledResult(task: HydrationTask, context: ExecutionContext): ExecutionResult {
+  task.endTime = new Date();
+  markTaskSkipped(task, "cancelled", RUN_CANCELLED_MESSAGE);
+  context.onTaskComplete?.(task);
+  return { task, success: false, skipped: true, skipKind: "cancelled", error: RUN_CANCELLED_MESSAGE };
 }
 
 function cancelRemainingTasks(
@@ -127,16 +262,11 @@ async function executeTask(
   try {
     let result: ExecutionResult;
 
-    // Check for Windows Driver Update license requirement
-    const isDriverUpdateProfile = task.itemName.toLowerCase().includes("wufb drivers") ||
-      task.itemName.toLowerCase().includes("driver update");
-
-    if (isDriverUpdateProfile && context.hasWindowsDriverUpdateLicense === false) {
-      markTaskSkipped(
-        task,
-        "blocked",
-        "No Windows Driver Update license (Windows E3/E5, Microsoft 365 E3/E5, etc.)"
-      );
+    // The same license check as the batch path. Create only: a delete task goes to the
+    // delete resolver, so that existing kit objects can be removed after a license change.
+    const licenseSkipReason = getLicenseSkipReason(task, context);
+    if (licenseSkipReason) {
+      markTaskSkipped(task, "blocked", licenseSkipReason);
       task.endTime = new Date();
       context.onTaskComplete?.(task);
       return {
@@ -175,6 +305,9 @@ async function executeTask(
       case "enrollment":
         result = await executeEnrollmentTask(task, context);
         break;
+      case "notification":
+        result = await executeNotificationTask(task, context);
+        break;
       default:
         result = {
           task,
@@ -184,11 +317,18 @@ async function executeTask(
         };
     }
 
+    // An executor that catches errors returns the cancel error as a failure.
+    if (!result.success && !result.skipped && result.error === RUN_CANCELLED_MESSAGE && context.shouldCancel?.()) {
+      return cancelledResult(task, context);
+    }
+
     // Update task with result
     if (result.skipped) {
+      result.error = getExistingSkipReason(task, result.error, context);
       markTaskSkipped(task, result.skipKind, result.error);
     } else {
       task.status = result.success ? "success" : "failed";
+      recordCreatedObject(task, result.createdId, context);
     }
     task.error = result.error;
     task.warning = result.warning;
@@ -202,6 +342,9 @@ async function executeTask(
 
     return result;
   } catch (error) {
+    if (isRunCancelledError(error)) {
+      return cancelledResult(task, context);
+    }
     const errorMessage = error instanceof Error ? error.message : "Unknown error";
     task.status = "failed";
     task.error = errorMessage;
@@ -269,6 +412,18 @@ export async function executeTasks(
   tasks: HydrationTask[],
   context: ExecutionContext
 ): Promise<ExecutionResult[]> {
+  const detachRunControls = attachRunControls(tasks, context);
+  try {
+    return await runTasks(tasks, context);
+  } finally {
+    detachRunControls();
+  }
+}
+
+async function runTasks(
+  tasks: HydrationTask[],
+  context: ExecutionContext
+): Promise<ExecutionResult[]> {
   const results: ExecutionResult[] = [];
   const stopForExecutionControl = async (): Promise<boolean> => {
     if ((await waitWhilePaused(context)) !== "cancelled") return false;
@@ -285,228 +440,37 @@ export async function executeTasks(
   emitStatus(context, `Checking tenant for existing resources (${tasks.length} items selected)...`, "info", "prefetch");
   if (await stopForExecutionControl()) return results;
 
-  // Pre-fetch "Intune - " groups if any group tasks exist
-  const hasGroupTasks = tasks.some((task) => task.category === "groups");
-  if (hasGroupTasks && !context.cachedIntuneGroups) {
-    emitStatus(context, "Querying existing groups from tenant...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all 'Intune - ' groups...");
-    try {
-      context.cachedIntuneGroups = await getIntuneGroups(context.client);
-      emitStatus(context, `Found ${context.cachedIntuneGroups.length} existing groups`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedIntuneGroups.length} 'Intune - ' groups`);
-    } catch (error) {
-      emitStatus(context, "Failed to query groups - will check individually", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch groups:", error);
-      // Continue execution - individual tasks will handle errors
-      context.cachedIntuneGroups = [];
-    }
-  }
-
-  // Pre-fetch all filters if any filter tasks exist
-  if (await stopForExecutionControl()) return results;
-  const hasFilterTasks = tasks.some((task) => task.category === "filters");
-  if (hasFilterTasks && !context.cachedFilters) {
-    emitStatus(context, "Querying existing device filters...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all device filters...");
-    try {
-      context.cachedFilters = await getAllFilters(context.client);
-      emitStatus(context, `Found ${context.cachedFilters.length} existing device filters`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedFilters.length} device filters`);
-    } catch (error) {
-      emitStatus(context, "Failed to query filters - will check individually", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch filters:", error);
-      // Continue execution - individual tasks will handle errors
-      context.cachedFilters = [];
-    }
-  }
-
-  // Pre-fetch App Protection policies if any appProtection or baseline tasks exist
-  if (await stopForExecutionControl()) return results;
-  // Baseline tasks can include AppProtection policies (e.g., Android/iOS BYOD)
-  const hasAppProtectionTasks = tasks.some((task) => task.category === "appProtection");
-  const hasBaselineTasks = tasks.some((task) => task.category === "baseline");
-  if ((hasAppProtectionTasks || hasBaselineTasks) && !context.cachedAppProtectionPolicies) {
-    emitStatus(context, "Querying existing App Protection policies...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all App Protection policies...");
-    try {
-      context.cachedAppProtectionPolicies = await getAllAppProtectionPolicies(context.client);
-      emitStatus(context, `Found ${context.cachedAppProtectionPolicies.length} App Protection policies`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedAppProtectionPolicies.length} App Protection policies`);
-    } catch (error) {
-      emitStatus(context, "Failed to query App Protection policies", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch App Protection policies:", error);
-      // Continue execution - individual tasks will handle errors
-      context.cachedAppProtectionPolicies = [];
-    }
-  }
-
-  // Pre-fetch Conditional Access policies for DELETE mode or CREATE mode with batching
-  if (await stopForExecutionControl()) return results;
-  const hasConditionalAccessTasks = tasks.some((task) => task.category === "conditionalAccess");
-  if (hasConditionalAccessTasks && !context.cachedConditionalAccessPolicies) {
-    emitStatus(context, "Querying existing Conditional Access policies...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all Conditional Access policies...");
-    try {
-      context.cachedConditionalAccessPolicies = await context.client.getCollection<{ id: string; displayName: string; state: string }>(
-        `/identity/conditionalAccess/policies?$select=id,displayName,state`
-      );
-      emitStatus(context, `Found ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedConditionalAccessPolicies.length} Conditional Access policies`);
-    } catch (error) {
-      emitStatus(context, "Failed to query Conditional Access policies", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch Conditional Access policies:", error);
-      context.cachedConditionalAccessPolicies = [];
-    }
-  }
-
-  // Pre-fetch Compliance policies for batch mode (CREATE or DELETE)
-  if (await stopForExecutionControl()) return results;
-  // This enables duplicate detection and prevents creating duplicates in batch mode
-  // Also pre-fetch for DELETE mode with baseline tasks since OIB Compliance policies use V1 Compliance endpoint
-  const hasComplianceTasks = tasks.some((task) => task.category === "compliance");
-  const hasCISTasks = tasks.some((task) => task.category === "cisBaseline");
+  // Pre-fetch every tenant cache that a selected category needs, in every mode.
+  // Create-mode existence checks use only these caches. When a prefetch fails, the
+  // cache stays unset and the reason is recorded, so tasks that need it fail
+  // instead of creating objects without a duplicate check.
+  const taskCategories = new Set(tasks.map((task) => task.category));
   const batchConfig = getBatchConfig();
+  const hasBaselineTasks = taskCategories.has("baseline");
 
-  const needsV1ComplianceCache =
-    (hasComplianceTasks && batchConfig.enableBatching) ||
-    ((hasBaselineTasks || hasCISTasks) && (context.operationMode === "delete" || context.isPreview));
-
-  if (needsV1ComplianceCache && !context.cachedCompliancePolicies) {
-    emitStatus(context, "Querying existing Compliance policies...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all V1 Compliance policies (deviceCompliancePolicies)...");
-    try {
-      context.cachedCompliancePolicies = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
-        `/deviceManagement/deviceCompliancePolicies?$select=id,displayName,description`
-      );
-      emitStatus(context, `Found ${context.cachedCompliancePolicies.length} Compliance policies`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedCompliancePolicies.length} V1 Compliance policies`);
-    } catch (error) {
-      emitStatus(context, "Failed to query Compliance policies", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch V1 Compliance policies:", error);
-      context.cachedCompliancePolicies = [];
+  for (const prefetch of TENANT_CACHE_PREFETCHES) {
+    if (await stopForExecutionControl()) return results;
+    if (context[prefetch.key] || !prefetch.categories.some((category) => taskCategories.has(category))) {
+      continue;
     }
-  }
 
-  // Pre-fetch Settings Catalog policies for DELETE mode, CREATE mode with batching, or PREVIEW mode (baseline and CIS tasks)
-  if (await stopForExecutionControl()) return results;
-  // This avoids calling getCollection for every single operation and enables duplicate detection in batch mode
-  const needsSettingsCatalogCache =
-    ((context.operationMode === "delete" || context.isPreview) && (hasBaselineTasks || hasCISTasks)) ||
-    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
-
-  if (needsSettingsCatalogCache && !context.cachedSettingsCatalogPolicies) {
-    emitStatus(context, "Querying existing Settings Catalog policies...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all Settings Catalog policies for duplicate detection...");
+    const label = TENANT_CACHE_LABELS[prefetch.key];
+    emitStatus(context, `Querying existing ${label}...`, "progress", "prefetch");
     try {
-      context.cachedSettingsCatalogPolicies = await context.client.getCollection<{ id: string; name: string; description?: string }>(
-        `/deviceManagement/configurationPolicies?$select=id,name,description`
-      );
-      emitStatus(context, `Found ${context.cachedSettingsCatalogPolicies.length} Settings Catalog policies`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedSettingsCatalogPolicies.length} Settings Catalog policies`);
+      const items = await prefetch.load(context.client);
+      (context as Record<TenantCacheKey, unknown[] | undefined>)[prefetch.key] = items;
+      emitStatus(context, `Found ${items.length} existing ${label}`, "success", "prefetch");
     } catch (error) {
-      emitStatus(context, "Failed to query Settings Catalog policies", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch Settings Catalog policies:", error);
-      context.cachedSettingsCatalogPolicies = [];
-    }
-  }
-
-  // Pre-fetch V2 Compliance policies for DELETE/PREVIEW mode.
-  if (await stopForExecutionControl()) return results;
-  // Used by OIB/CIS compliance deletes and Linux compliance templates.
-  const needsV2ComplianceCache =
-    ((context.operationMode === "delete" || context.isPreview) &&
-      (hasComplianceTasks || hasBaselineTasks || hasCISTasks)) ||
-    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
-
-  if (needsV2ComplianceCache && !context.cachedV2CompliancePolicies) {
-    emitStatus(context, "Querying V2 Compliance policies...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all V2 Compliance policies for delete operations...");
-    try {
-      context.cachedV2CompliancePolicies = await context.client.getCollection<{ id: string; name: string; description?: string }>(
-        `/deviceManagement/compliancePolicies?$select=id,name,description`
+      if (isRunCancelledError(error) && (await stopForExecutionControl())) return results;
+      const reason = error instanceof Error ? error.message : String(error);
+      context.prefetchErrors = { ...context.prefetchErrors, [prefetch.key]: reason };
+      emitStatus(
+        context,
+        `Failed to query existing ${label}: ${reason}. Tasks that need this list will fail and will not create objects.`,
+        "error",
+        "prefetch"
       );
-      emitStatus(context, `Found ${context.cachedV2CompliancePolicies.length} V2 Compliance policies`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedV2CompliancePolicies.length} V2 Compliance policies`);
-    } catch (error) {
-      emitStatus(context, "Failed to query V2 Compliance policies", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch V2 Compliance policies:", error);
-      context.cachedV2CompliancePolicies = [];
-    }
-  }
-
-  // Pre-fetch Driver Update Profiles and Device Configurations for baseline/CIS tasks
-  if (await stopForExecutionControl()) return results;
-  const needsBaselinePolicyCaches =
-    ((context.operationMode === "delete" || context.isPreview) && (hasBaselineTasks || hasCISTasks)) ||
-    (context.operationMode === "create" && batchConfig.enableBatching && (hasBaselineTasks || hasCISTasks));
-
-  if (needsBaselinePolicyCaches && !context.cachedDriverUpdateProfiles) {
-    emitStatus(context, "Querying Driver Update profiles...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all Driver Update Profiles...");
-    try {
-      const response = await context.client.get<{ value: Array<{ id: string; displayName: string; description?: string }> }>(
-        `/deviceManagement/windowsDriverUpdateProfiles?$select=id,displayName,description`
-      );
-      context.cachedDriverUpdateProfiles = response.value || [];
-      emitStatus(context, `Found ${context.cachedDriverUpdateProfiles.length} Driver Update profiles`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedDriverUpdateProfiles.length} Driver Update Profiles`);
-    } catch (error) {
-      emitStatus(context, "Failed to query Driver Update profiles", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch Driver Update Profiles:", error);
-      context.cachedDriverUpdateProfiles = [];
-    }
-  }
-
-  // Pre-fetch Device Configurations (Health Monitoring, etc.) - same condition as Driver Update above
-  if (await stopForExecutionControl()) return results;
-  if (needsBaselinePolicyCaches && !context.cachedDeviceConfigurations) {
-    emitStatus(context, "Querying Device Configurations...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all Device Configurations...");
-    try {
-      context.cachedDeviceConfigurations = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
-        `/deviceManagement/deviceConfigurations?$select=id,displayName,description`
-      );
-      emitStatus(context, `Found ${context.cachedDeviceConfigurations.length} Device Configurations`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedDeviceConfigurations.length} Device Configurations`);
-    } catch (error) {
-      emitStatus(context, "Failed to query Device Configurations", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch Device Configurations:", error);
-      context.cachedDeviceConfigurations = [];
-    }
-  }
-
-  // Pre-fetch Group Policy Configurations (Administrative Templates / ADMX) for baseline/CIS delete paths
-  if (await stopForExecutionControl()) return results;
-  if (needsBaselinePolicyCaches && !context.cachedGroupPolicyConfigurations) {
-    emitStatus(context, "Querying Administrative Templates...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all Group Policy Configurations...");
-    try {
-      context.cachedGroupPolicyConfigurations = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
-        `/deviceManagement/groupPolicyConfigurations?$select=id,displayName,description`
-      );
-      emitStatus(context, `Found ${context.cachedGroupPolicyConfigurations.length} Administrative Templates`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedGroupPolicyConfigurations.length} Group Policy Configurations`);
-    } catch (error) {
-      emitStatus(context, "Failed to query Administrative Templates", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch Group Policy Configurations:", error);
-      context.cachedGroupPolicyConfigurations = [];
-    }
-  }
-
-  if (await stopForExecutionControl()) return results;
-  if (needsBaselinePolicyCaches && !context.cachedSecurityIntents) {
-    emitStatus(context, "Querying Endpoint Security profiles...", "progress", "prefetch");
-    console.log("[Execute Tasks] Pre-fetching all Security Intents...");
-    try {
-      context.cachedSecurityIntents = await context.client.getCollection<{ id: string; displayName?: string; description?: string }>(
-        `/deviceManagement/intents?$select=id,displayName,description`
-      );
-      emitStatus(context, `Found ${context.cachedSecurityIntents.length} Endpoint Security profiles`, "success", "prefetch");
-      console.log(`[Execute Tasks] Pre-fetched ${context.cachedSecurityIntents.length} Security Intents`);
-    } catch (error) {
-      emitStatus(context, "Failed to query Endpoint Security profiles", "warning", "prefetch");
-      console.error("[Execute Tasks] Failed to pre-fetch Security Intents:", error);
-      context.cachedSecurityIntents = [];
+      console.error(`[Execute Tasks] Failed to pre-fetch ${label}:`, error);
     }
   }
 

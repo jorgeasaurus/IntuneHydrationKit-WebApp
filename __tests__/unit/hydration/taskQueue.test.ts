@@ -9,12 +9,12 @@ const {
   mockFetchConditionalAccessPolicies,
   mockFetchAppProtectionPolicies,
   mockFetchEnrollmentProfiles,
+  mockFetchNotificationTemplates,
   mockFetchCISBaselinePolicies,
   mockFetchCISBaselinePoliciesByCategories,
   mockFetchBaselinePolicies,
   mockGetCachedTemplates,
   mockCacheTemplates,
-  mockClearCategoryCache,
 } = vi.hoisted(() => ({
   mockGetWin32AppTemplates: vi.fn(),
   mockFetchDynamicGroups: vi.fn(),
@@ -24,12 +24,12 @@ const {
   mockFetchConditionalAccessPolicies: vi.fn(),
   mockFetchAppProtectionPolicies: vi.fn(),
   mockFetchEnrollmentProfiles: vi.fn(),
+  mockFetchNotificationTemplates: vi.fn(),
   mockFetchCISBaselinePolicies: vi.fn(),
   mockFetchCISBaselinePoliciesByCategories: vi.fn(),
   mockFetchBaselinePolicies: vi.fn(),
   mockGetCachedTemplates: vi.fn(),
   mockCacheTemplates: vi.fn(),
-  mockClearCategoryCache: vi.fn(),
 }));
 
 vi.mock("@/templates", () => ({
@@ -41,6 +41,7 @@ vi.mock("@/templates", () => ({
     appProtection: { count: 8 },
     enrollment: { count: 4 },
     conditionalAccess: { count: 20 },
+    notification: { count: 1 },
     cisBaseline: { count: 717 },
   },
   getWin32AppTemplates: mockGetWin32AppTemplates,
@@ -54,12 +55,12 @@ vi.mock("@/lib/templates/loader", () => ({
   fetchConditionalAccessPolicies: mockFetchConditionalAccessPolicies,
   fetchAppProtectionPolicies: mockFetchAppProtectionPolicies,
   fetchEnrollmentProfiles: mockFetchEnrollmentProfiles,
+  fetchNotificationTemplates: mockFetchNotificationTemplates,
   fetchCISBaselinePolicies: mockFetchCISBaselinePolicies,
   fetchCISBaselinePoliciesByCategories: mockFetchCISBaselinePoliciesByCategories,
   fetchBaselinePolicies: mockFetchBaselinePolicies,
   getCachedTemplates: mockGetCachedTemplates,
   cacheTemplates: mockCacheTemplates,
-  clearCategoryCache: mockClearCategoryCache,
 }));
 
 import {
@@ -85,6 +86,7 @@ describe("taskQueue", () => {
     mockFetchConditionalAccessPolicies.mockResolvedValue([]);
     mockFetchAppProtectionPolicies.mockResolvedValue([]);
     mockFetchEnrollmentProfiles.mockResolvedValue([]);
+    mockFetchNotificationTemplates.mockResolvedValue([]);
     mockFetchCISBaselinePolicies.mockResolvedValue([]);
     mockFetchCISBaselinePoliciesByCategories.mockResolvedValue([]);
     mockFetchBaselinePolicies.mockResolvedValue([]);
@@ -159,11 +161,11 @@ describe("taskQueue", () => {
       },
     });
 
-    expect(mockClearCategoryCache).toHaveBeenCalledWith("groups");
     expect(mockCacheTemplates).toHaveBeenCalledWith("groups", [
+      { displayName: "Dynamic Group A" },
       { displayName: "Dynamic Group B" },
       { displayName: "Static Group A" },
-    ]);
+    ], { complete: true });
     expect(tasks.map((task) => task.itemName)).toEqual([
       "Dynamic Group B",
       "Static Group A",
@@ -277,9 +279,41 @@ describe("taskQueue", () => {
   });
 
   it("returns zero for categories without metadata or explicit selections", () => {
-    const count = getEstimatedCategoryCount("notification" as never);
+    const count = getEstimatedCategoryCount("unknownCategory" as never);
 
     expect(count).toBe(0);
+  });
+
+  it("counts notification templates from metadata and from an explicit selection", () => {
+    expect(getEstimatedCategoryCount("notification")).toBe(1);
+    expect(getEstimatedCategoryCount("notification", { notification: { selectedItems: [] } })).toBe(0);
+    expect(getEstimatedTaskCount(["notification", "conditionalAccess"])).toBe(21);
+  });
+
+  it("queues notification create tasks from the loaded templates", async () => {
+    mockFetchNotificationTemplates.mockResolvedValue([
+      { displayName: "[IHD] First Alert", localizedMessages: [] },
+    ]);
+
+    const tasks = await buildTaskQueueAsync(["notification"], "create");
+
+    expect(mockFetchNotificationTemplates).toHaveBeenCalledTimes(1);
+    expect(mockCacheTemplates).toHaveBeenCalledWith("notification", expect.any(Array), { complete: true });
+    expect(tasks).toEqual([
+      expect.objectContaining({ category: "notification", operation: "create", itemName: "[IHD] First Alert" }),
+    ]);
+  });
+
+  it("queues notification delete tasks from the selected names", async () => {
+    mockFetchNotificationTemplates.mockResolvedValue([{ displayName: "[IHD] First Alert" }]);
+
+    const tasks = await buildTaskQueueAsync(["notification"], "delete", {
+      categorySelections: { notification: { selectedItems: ["[IHD] First Alert"] } },
+    });
+
+    expect(tasks).toEqual([
+      expect.objectContaining({ category: "notification", operation: "delete", itemName: "[IHD] First Alert" }),
+    ]);
   });
 
   it("maps selected CIS delete paths back to display names when building async delete tasks", async () => {
@@ -307,7 +341,7 @@ describe("taskQueue", () => {
 
     expect(mockFetchCISBaselinePolicies).toHaveBeenCalledTimes(1);
     expect(mockFetchCISBaselinePoliciesByCategories).not.toHaveBeenCalled();
-    expect(mockClearCategoryCache).toHaveBeenCalledWith("cisBaseline");
+    expect(mockCacheTemplates).toHaveBeenCalledWith("cisBaseline", expect.any(Array), { complete: true });
     expect(tasks).toHaveLength(2);
     expect(tasks.map((task) => task.itemName)).toEqual([
       "Known CIS Policy",

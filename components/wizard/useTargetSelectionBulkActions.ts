@@ -5,6 +5,7 @@ import {
   baselineFileMatchesPlatform,
   cisFileMatchesPlatform,
   getBaselinePolicyPathsForPlatforms,
+  getDefaultSelectableItems,
   getBaselinePolicyPathsMatchingSearch,
   getCISPolicyPathsForPlatforms,
   getCISPolicyPathsMatchingSearch,
@@ -34,6 +35,8 @@ interface UseTargetSelectionBulkActionsOptions {
   ensureBaselineManifest: () => Promise<OIBManifest | null>;
   ensureCISManifest: () => Promise<CISBaselineManifest | null>;
   ensureAllCategoryItems: (categories: TaskCategory[]) => Promise<Record<string, CategoryItem[]>>;
+  /** Start an async selection change. The check is false when a profile apply replaced the selection. */
+  startSelectionUpdate: () => () => boolean;
 }
 
 export function useTargetSelectionBulkActions({
@@ -52,10 +55,12 @@ export function useTargetSelectionBulkActions({
   ensureBaselineManifest,
   ensureCISManifest,
   ensureAllCategoryItems,
+  startSelectionUpdate,
 }: UseTargetSelectionBulkActionsOptions) {
   const [selectedPlatformFilters, setSelectedPlatformFilters] = useState<Set<string>>(new Set());
 
   const handleSelectAll = async () => {
+    const isCurrent = startSelectionUpdate();
     const search = searchQuery.toLowerCase().trim();
     const hasPlatformFilters = selectedPlatformFilters.size > 0;
 
@@ -114,7 +119,7 @@ export function useTargetSelectionBulkActions({
       );
 
       for (const [category, items] of categoryEntries) {
-        const matchingItems = items.filter(item =>
+        const matchingItems = getDefaultSelectableItems(items).filter(item =>
           platforms.some(platform => platformMatchesItem(platform, item, category))
         );
 
@@ -138,6 +143,7 @@ export function useTargetSelectionBulkActions({
       const cis = allPlatformCategories.has("cisBaseline")
         ? cisManifest || await ensureCISManifest()
         : cisManifest;
+      if (!isCurrent()) return;
       if (cis && allPlatformCategories.has("cisBaseline")) {
         const matchingCIS = getCISPolicyPathsForPlatforms(cis.files, platforms);
         if (matchingCIS.length > 0) {
@@ -157,13 +163,16 @@ export function useTargetSelectionBulkActions({
     setExpandedCategories(new Set(allTargetIds));
 
     const categoryItemsToSelect = await ensureAllCategoryItems(allTargetIds);
+    if (!isCurrent()) return;
     const newSelected: Record<string, Set<string>> = {};
     for (const [cat, items] of Object.entries(categoryItemsToSelect)) {
-      newSelected[cat] = new Set(items.map(i => i.displayName));
+      // Opt-in items (WinGet catalog apps) are not part of Select All.
+      newSelected[cat] = new Set(getDefaultSelectableItems(items).map(i => i.displayName));
     }
     setSelectedItems(prev => ({ ...prev, ...newSelected }));
 
     const manifest = baselineManifest || await ensureBaselineManifest();
+    if (!isCurrent()) return;
     if (manifest) {
       setSelectedItems(prev => ({
         ...prev,
@@ -172,6 +181,7 @@ export function useTargetSelectionBulkActions({
     }
 
     const cis = cisLoading ? cisManifest : cisManifest || await ensureCISManifest();
+    if (!isCurrent()) return;
     if (cis) {
       setSelectedCISPolicies(new Set(cis.files.map(f => f.path)));
     }
@@ -216,6 +226,7 @@ export function useTargetSelectionBulkActions({
   };
 
   const togglePlatformFilter = async (platformId: OSPlatformFilterId) => {
+    const isCurrent = startSelectionUpdate();
     const isCurrentlySelected = selectedPlatformFilters.has(platformId);
     setSelectedPlatformFilters(prev => {
       const next = new Set(prev);
@@ -253,12 +264,13 @@ export function useTargetSelectionBulkActions({
       const loadedCISManifest = platformCategorySet.has("cisBaseline")
         ? cisManifest || await ensureCISManifest()
         : cisManifest;
+      if (!isCurrent()) return;
 
       for (const category of platformCategories) {
         if (category === "baseline" || category === "cisBaseline") continue;
 
         const items = allCategoryItems[category] || [];
-        const matchingItems = items.filter(item => platformMatchesItem(platformId, item, category));
+        const matchingItems = getDefaultSelectableItems(items).filter(item => platformMatchesItem(platformId, item, category));
         if (matchingItems.length > 0) {
           if (!targetSet.has(category)) {
             categoriesToEnable.push(category);

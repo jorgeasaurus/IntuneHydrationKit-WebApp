@@ -39,7 +39,7 @@
     "users": {
       "excludeUsers": [],
       "includeUsers": [
-        "AllAgentIdUsers"
+        "None"
       ],
       "includeRoles": [],
       "excludeGuestsOrExternalUsers": null,
@@ -47,6 +47,13 @@
       "includeGuestsOrExternalUsers": null,
       "excludeGroups": [],
       "excludeRoles": []
+    },
+    "agents": {
+      "includeAgentUsers": [
+        "All"
+      ],
+      "excludeAgentUsers": [],
+      "agentFilter": null
     },
     "devices": null
   },

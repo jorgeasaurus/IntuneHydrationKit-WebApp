@@ -3,7 +3,6 @@ import type { GraphClient } from "@/lib/graph/client";
 import {
   compliancePolicyExists,
   createCompliancePolicy,
-  deleteCompliancePolicyByName,
 } from "@/lib/graph/compliance";
 import { HYDRATION_MARKER } from "@/lib/utils/hydrationMarker";
 import type { CompliancePolicy } from "@/types/graph";
@@ -168,37 +167,4 @@ describe("graph/compliance", () => {
     ).rejects.toThrow('Custom Compliance policy "Windows 11 - Security Baseline" missing rules');
   });
 
-  it("deletes only hydration-marked unassigned compliance policies and supports deletion by name", async () => {
-    vi.spyOn(console, "log").mockImplementation(() => undefined);
-    const get = vi
-      .fn()
-      .mockResolvedValueOnce(makePolicy({ id: "safe", displayName: "Safe Policy" }))
-      .mockResolvedValueOnce(makePolicy({ id: "assigned", displayName: "Assigned Policy" }))
-      .mockResolvedValueOnce(makePolicy({ id: "unsafe", displayName: "Unsafe Policy", description: "Manual" }));
-    const getCollection = vi
-      .fn()
-      .mockResolvedValueOnce([makePolicy({ id: "safe", displayName: "Safe Policy" })])
-      .mockResolvedValueOnce([])
-      .mockResolvedValueOnce([makePolicy({ id: "assigned", displayName: "Assigned Policy" })])
-      .mockResolvedValueOnce([{ id: "assignment-1" }])
-      .mockResolvedValueOnce([makePolicy({ id: "unsafe", displayName: "Unsafe Policy", description: "Manual" })])
-      .mockResolvedValueOnce([]);
-    const del = vi.fn().mockResolvedValue(undefined);
-    const client = { get, getCollection, delete: del } as unknown as GraphClient;
-
-    await expect(deleteCompliancePolicyByName(client, "Safe Policy")).resolves.toEqual({ deleted: true, skipped: false });
-    await expect(deleteCompliancePolicyByName(client, "Assigned Policy")).resolves.toEqual({
-      deleted: false,
-      skipped: true,
-      reason: "Policy has 1 active assignment(s)",
-    });
-    await expect(deleteCompliancePolicyByName(client, "Unsafe Policy")).rejects.toThrow(
-      'Cannot delete policy "Unsafe Policy": Not created by Intune Hydration Kit'
-    );
-    await expect(deleteCompliancePolicyByName(client, "Missing Policy")).rejects.toThrow(
-      'Compliance policy "Missing Policy" not found'
-    );
-
-    expect(del).toHaveBeenCalledWith("/deviceManagement/deviceCompliancePolicies/safe");
-  });
 });

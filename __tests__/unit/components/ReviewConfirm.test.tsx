@@ -14,6 +14,8 @@ import {
 } from '@/lib/hydration/executionStateStore'
 
 const setConfirmed = vi.fn()
+const setUpdateExisting = vi.fn()
+const runConflictCheck = vi.fn()
 const previousStep = vi.fn()
 const push = vi.fn()
 const getEstimatedTaskCount = vi.fn()
@@ -27,6 +29,12 @@ vi.mock('next/navigation', () => ({
 vi.mock('@/hooks/useWizardState', () => ({
   useWizardState: () => useWizardState()
 }))
+
+vi.mock('@/lib/hydration/drift/scan', () => ({
+  runConflictCheck: (...args: unknown[]) => runConflictCheck(...args)
+}))
+
+vi.mock('@/lib/graph/client', () => ({ createGraphClient: () => ({}) }))
 
 vi.mock('@/lib/hydration/engine', () => ({
   getEstimatedTaskCount: (...args: unknown[]) => getEstimatedTaskCount(...args),
@@ -84,8 +92,69 @@ describe('ReviewConfirm', () => {
     useWizardState.mockReturnValue({
       state: createState(),
       setConfirmed,
+      setUpdateExisting,
       previousStep
     })
+  })
+
+  it('lists the apps that a customized Autopilot Branding app removes and the tasks that run', () => {
+    useWizardState.mockReturnValue({
+      state: createState({
+        selectedTargets: ['win32Apps'],
+        categorySelections: {
+          win32Apps: {
+            selectedItems: ['Autopilot Branding (Cleanup) - [IHD]'],
+            autopilotBranding: { removedApps: ['Clipchamp.Clipchamp', '9NHT9RB2F4HD'], enabledTasks: ['Hide-ABWidgets'] },
+          },
+        },
+      }),
+      setConfirmed,
+      setUpdateExisting,
+      previousStep
+    })
+
+    renderReviewConfirm()
+
+    const section = screen.getByRole('region', { name: 'Autopilot Branding (customized)' })
+    expect(section).toHaveTextContent('Apps to remove (2)')
+    expect(section).toHaveTextContent('Clipchamp (Clipchamp.Clipchamp)')
+    expect(section).toHaveTextContent('Microsoft Copilot (9NHT9RB2F4HD)')
+    expect(section).toHaveTextContent('Tasks that run (2)')
+    expect(section).toHaveTextContent('Hide-ABWidgets')
+    expect(section).toHaveTextContent('Remove-ABProvisionedApps')
+    expect(section).not.toHaveTextContent('Update-ABEdge')
+    expect(section).toHaveTextContent('Create skips an app that already exists.')
+  })
+
+  it('shows no Autopilot Branding section without a customization or in delete mode', () => {
+    const categorySelections = {
+      win32Apps: {
+        selectedItems: ['Autopilot Branding (Cleanup) - [IHD]'],
+        autopilotBranding: { removedApps: ['MSTeams' as const], enabledTasks: [] },
+      },
+    }
+    useWizardState.mockReturnValue({
+      state: createState({ operationMode: 'delete', selectedTargets: ['win32Apps'], categorySelections }),
+      setConfirmed,
+      setUpdateExisting,
+      previousStep
+    })
+    const { unmount } = render(
+      <SettingsProvider>
+        <ReviewConfirm />
+      </SettingsProvider>
+    )
+    expect(screen.queryByRole('region', { name: 'Autopilot Branding (customized)' })).not.toBeInTheDocument()
+    unmount()
+
+    useWizardState.mockReturnValue({
+      state: createState({ selectedTargets: ['win32Apps'], categorySelections: { win32Apps: { selectedItems: [] } } }),
+      setConfirmed,
+      setUpdateExisting,
+      previousStep
+    })
+    renderReviewConfirm()
+    expect(screen.queryByRole('region', { name: 'Autopilot Branding (customized)' })).not.toBeInTheDocument()
   })
 
   it('blurs the tenant identity in the execution brief when Demo Mode is on', () => {
@@ -129,6 +198,7 @@ describe('ReviewConfirm', () => {
         })
       }),
       setConfirmed,
+      setUpdateExisting,
       previousStep
     })
 
@@ -189,5 +259,60 @@ describe('ReviewConfirm', () => {
     expect(screen.getByRole('status')).toHaveTextContent('The previous run is stopping')
     expect(screen.getByRole('status')).not.toHaveTextContent('Return to the dashboard')
     expect(screen.getByRole('button', { name: 'Preview Create' })).toBeDisabled()
+  })
+
+  it('starts with "Skip existing" and does not update existing objects by default', async () => {
+    const user = userEvent.setup()
+    renderReviewConfirm()
+
+    expect(screen.getByRole('radio', { name: 'Skip existing (default)' })).toBeChecked()
+    expect(screen.getByRole('radio', { name: 'Update existing kit objects to match the template' })).not.toBeChecked()
+
+    await user.click(screen.getByRole('button', { name: 'Preview Create' }))
+    expect(setUpdateExisting).toHaveBeenCalledWith(false)
+    expect(setConfirmed).toHaveBeenCalledWith(true)
+  })
+
+  it('needs its own confirmation of the update count before a live run can update objects', async () => {
+    const user = userEvent.setup()
+    useWizardState.mockReturnValue({
+      state: createState({ isPreview: false }),
+      setConfirmed,
+      setUpdateExisting,
+      previousStep
+    })
+    const differs = {
+      status: 'differs',
+      reason: '1 setting differs.',
+      differences: [{ path: 'membershipRule', template: '"a"', tenant: '"b"' }]
+    }
+    runConflictCheck.mockResolvedValue({
+      checked: 3,
+      conflicts: [
+        { taskId: 't1', category: 'groups', itemName: 'Kit group', existingId: 'g1', existingName: 'Kit group', marker: 'present', comparison: differs },
+        { taskId: 't2', category: 'groups', itemName: 'Admin group', existingId: 'g2', existingName: 'Admin group', marker: 'missing', comparison: differs },
+        { taskId: 't3', category: 'compliance', itemName: 'Policy', existingId: 'p1', existingName: 'Policy', marker: 'present', comparison: differs }
+      ],
+      unchecked: []
+    })
+    renderReviewConfirm()
+
+    await user.click(screen.getByRole('checkbox', { name: /i understand this run will modify my intune tenant/i }))
+    const startButton = screen.getByRole('button', { name: 'Start Hydration' })
+    expect(startButton).toBeEnabled()
+
+    await user.click(screen.getByRole('radio', { name: 'Update existing kit objects to match the template' }))
+    expect(startButton).toBeDisabled()
+    expect(screen.getByText('Run the existing-objects check to count the objects that would be updated.')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Check existing objects' }))
+    // Only the kit-marked group can be updated: no marker and unsupported types are not counted.
+    const confirmation = await screen.findByRole('checkbox', { name: 'I confirm the update of 1 existing kit object(s) to match the template' })
+    expect(startButton).toBeDisabled()
+
+    await user.click(confirmation)
+    expect(startButton).toBeEnabled()
+    await user.click(startButton)
+    expect(setUpdateExisting).toHaveBeenCalledWith(true)
   })
 })

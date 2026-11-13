@@ -190,18 +190,29 @@ export async function recordBaselineMatch(
     ...(policyType === "SettingsCatalog" ? { portalUrl: settingsCatalogPortalUrl(existing.id, template) } : {}),
   };
   task.drift = { status: "notChecked", differences: [], reason: "Settings comparison is not available for this policy type." };
-  const endpoint = getBaselineEndpoint(policyType);
-  if (!endpoint) return;
+  if (!getBaselineEndpoint(policyType)) return;
   try {
-    const path = `${endpoint}/${encodeURIComponent(existing.id)}`;
-    const expansion = policyType === "CompliancePolicies" || policyType === "V1Compliance"
-      ? "?$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)" : "";
-    const actual = await client.get<Record<string, unknown>>(`${path}${expansion}`);
-    if (policyType === "SettingsCatalog") {
-      actual.settings = await client.getCollection(`${path}/settings`);
-    }
+    const actual = await readBaselinePolicy(client, policyType, existing.id);
     task.drift = compareBaselinePayloads(template, actual, policyType);
   } catch {
     task.drift = { status: "notChecked", differences: [], reason: "Graph settings could not be read. The existing policy was not changed." };
   }
+}
+
+/**
+ * Read a policy of a supported baseline type by ID with its owned settings: the
+ * Settings Catalog settings collection, or the compliance scheduled actions. GET only.
+ * Throws when the type has no read endpoint or the read fails.
+ */
+export async function readBaselinePolicy(client: GraphClient, policyType: string, id: string): Promise<Record<string, unknown>> {
+  const endpoint = getBaselineEndpoint(policyType);
+  if (!endpoint) throw new Error(`No read endpoint for policy type ${policyType}`);
+  const path = `${endpoint}/${encodeURIComponent(id)}`;
+  const expansion = policyType === "CompliancePolicies" || policyType === "V1Compliance"
+    ? "?$expand=scheduledActionsForRule($expand=scheduledActionConfigurations)" : "";
+  const actual = await client.get<Record<string, unknown>>(`${path}${expansion}`);
+  if (policyType === "SettingsCatalog") {
+    actual.settings = await client.getCollection(`${path}/settings`);
+  }
+  return actual;
 }

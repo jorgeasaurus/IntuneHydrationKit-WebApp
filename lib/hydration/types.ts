@@ -12,6 +12,7 @@ import {
 } from "@/types/graph";
 import { BaselinePolicy } from "@/lib/templates/loader";
 import type { Win32LobApp } from "@/lib/graph/win32Apps";
+import type { TenantNotificationTemplate } from "@/lib/graph/notifications";
 
 export const ACTIVITY_MESSAGE_TYPES = [
   "info",
@@ -45,6 +46,8 @@ export interface ExecutionContext {
   operationMode: OperationMode;
   isPreview: boolean;
   stopOnFirstError: boolean;
+  /** Create runs only: update existing kit objects that differ from the template (updateResolver.ts). */
+  updateExisting?: boolean;
   onSequentialTask?: (task: HydrationTask) => void;
   onTaskStart?: (task: HydrationTask) => void;
   onTaskComplete?: (task: HydrationTask) => void;
@@ -54,6 +57,8 @@ export interface ExecutionContext {
   onStatusUpdate?: (message: ActivityMessage) => void;
   shouldCancel?: () => boolean;
   shouldPause?: () => boolean;
+  /** Reports the start (true) and end (false) of a real engine wait while paused. */
+  onPauseWait?: (waiting: boolean) => void;
   // Pre-fetched data caches to avoid repeated API calls
   cachedAppProtectionPolicies?: TenantAppProtectionPolicy[];
   cachedIntuneGroups?: DeviceGroup[];
@@ -67,8 +72,10 @@ export interface ExecutionContext {
   cachedV2CompliancePolicies?: Array<{ id: string; name: string; description?: string }>;
   // Cached compliance policies for delete operations (legacy V1 compliance)
   cachedCompliancePolicies?: Array<{ id: string; displayName?: string; description?: string }>;
-  // Cached conditional access policies for delete operations
-  cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; description?: string }>;
+  // Cached conditional access policies. Delete reads the state again before it deletes a policy.
+  cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; state?: string }>;
+  // Cached notification message templates. They have no description; the marker is in the display name.
+  cachedNotificationTemplates?: TenantNotificationTemplate[];
   // Cached device configurations for delete operations (Health Monitoring, etc.)
   cachedDeviceConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached group policy configurations for delete operations (Administrative Templates / ADMX)
@@ -77,11 +84,33 @@ export interface ExecutionContext {
   cachedSecurityIntents?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached baseline templates for batch creation (passed directly to avoid cache issues)
   cachedBaselineTemplates?: BaselinePolicy[];
+  /**
+   * Reasons why a tenant cache prefetch failed. A failed cache stays unset, so a task
+   * that needs it fails instead of creating an object without a duplicate check.
+   */
+  prefetchErrors?: Partial<Record<TenantCacheKey, string>>;
   // License flags for conditional skipping
   hasConditionalAccessLicense?: boolean;
   hasPremiumP2License?: boolean;
   hasWindowsDriverUpdateLicense?: boolean;
 }
+
+/**
+ * Execution context fields that hold existing tenant objects, used for existence checks.
+ */
+export type TenantCacheKey =
+  | "cachedIntuneGroups"
+  | "cachedFilters"
+  | "cachedAppProtectionPolicies"
+  | "cachedConditionalAccessPolicies"
+  | "cachedNotificationTemplates"
+  | "cachedCompliancePolicies"
+  | "cachedV2CompliancePolicies"
+  | "cachedSettingsCatalogPolicies"
+  | "cachedDeviceConfigurations"
+  | "cachedDriverUpdateProfiles"
+  | "cachedGroupPolicyConfigurations"
+  | "cachedSecurityIntents";
 
 /**
  * Task execution result

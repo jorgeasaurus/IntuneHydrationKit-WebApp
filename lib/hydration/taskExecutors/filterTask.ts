@@ -6,8 +6,11 @@
 import { HydrationTask } from "@/types/hydration";
 import { DeviceFilter } from "@/types/graph";
 import { ExecutionContext, ExecutionResult } from "../types";
+import { executeDeleteTask } from "../deleteResolver";
+import { requireTenantCache } from "../utils";
+import { buildFilterCreateBody, findExistingFilter } from "../existingObjects";
+import { updateExistingObject } from "../updateResolver";
 import { createFilter } from "@/lib/graph/filters";
-import { hasHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { getCachedTemplates, FilterTemplate } from "@/lib/templates/loader";
 
 /**
@@ -17,6 +20,11 @@ export async function executeFilterTask(
   task: HydrationTask,
   context: ExecutionContext
 ): Promise<ExecutionResult> {
+  // Delete uses the shared resolver, so the sequential and parallel paths give the same outcome.
+  if (context.operationMode === "delete") {
+    return executeDeleteTask(task, context);
+  }
+
   const { client, operationMode: mode, isPreview } = context;
 
   // Templates are loaded from the bundled JSON files before execution.
@@ -33,11 +41,10 @@ export async function executeFilterTask(
     }
 
     // Check if filter already exists using pre-fetched cache
-    const existingFilter = context.cachedFilters?.find(
-      (f) => f.displayName.toLowerCase() === template!.displayName.toLowerCase()
-    );
+    const existingFilter = findExistingFilter(requireTenantCache(context, "cachedFilters"), template.displayName);
 
     if (existingFilter) {
+      if (context.updateExisting) return updateExistingObject(task, context);
       return {
         task,
         success: true,
@@ -53,17 +60,7 @@ export async function executeFilterTask(
     }
 
     // Convert template to full DeviceFilter format if it's a simple template
-    let fullFilterTemplate: DeviceFilter = template as DeviceFilter;
-    if (!("@odata.type" in template)) {
-      const simpleTemplate = template as FilterTemplate;
-      fullFilterTemplate = {
-        "@odata.type": "#microsoft.graph.deviceAndAppManagementAssignmentFilter",
-        displayName: simpleTemplate.displayName,
-        description: simpleTemplate.description,
-        platform: simpleTemplate.platform as "android" | "iOS" | "macOS" | "windows10AndLater",
-        rule: simpleTemplate.rule,
-      };
-    }
+    const fullFilterTemplate = buildFilterCreateBody(template);
 
     const created = await createFilter(client, fullFilterTemplate);
 
@@ -78,39 +75,6 @@ export async function executeFilterTask(
       skipped: false,
       createdId: created.id,
     };
-  } else if (mode === "delete") {
-    const targetName = template?.displayName ?? task.itemName;
-
-    // Check if filter exists in tenant using pre-fetched cache
-    const existingFilter = context.cachedFilters?.find(
-      (f) => f.displayName.toLowerCase() === targetName.toLowerCase()
-    );
-
-    if (!existingFilter) {
-      return { task, success: true, skipped: true, skipKind: "noOp", error: "Not found in tenant" };
-    }
-
-    // Check if it was created by the hydration kit
-    if (!hasHydrationMarker(existingFilter.description)) {
-      return { task, success: true, skipped: true, skipKind: "blocked", error: "Not created by Hydration Kit" };
-    }
-
-    // Preview mode - would delete
-    if (isPreview) {
-      return { task, success: true, skipped: false };
-    }
-
-    await client.delete(`/deviceManagement/assignmentFilters/${existingFilter.id}`);
-
-    // Remove from cache
-    if (context.cachedFilters) {
-      const index = context.cachedFilters.findIndex((f) => f.id === existingFilter.id);
-      if (index !== -1) {
-        context.cachedFilters.splice(index, 1);
-      }
-    }
-
-    return { task, success: true, skipped: false };
   }
 
   return { task, success: false, skipped: false, error: "Invalid operation mode" };

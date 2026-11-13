@@ -122,7 +122,7 @@ describe('TenantConfig', () => {
     const validationTrace = screen.getByRole('list', { name: 'Tenant validation trace' })
     expect(within(validationTrace).getAllByRole('listitem')).toHaveLength(4)
     expect(within(validationTrace).getByText('Risk-based CA supported')).toBeInTheDocument()
-    expect(screen.getByRole('alert')).toHaveClass('bg-emerald-500/18', 'text-emerald-50')
+    expect(screen.getByRole('note')).toHaveClass('bg-emerald-500/18', 'text-emerald-50')
     expect(screen.getByText(/Validation passed/i)).toHaveClass('text-emerald-100')
     expect(screen.getByText(/Last checked at .* UTC/)).toBeInTheDocument()
     await waitFor(() => {
@@ -257,6 +257,7 @@ describe('TenantConfig', () => {
     render(<TenantConfigHarness />)
 
     expect(await screen.findByText('Prerequisite check failed')).toBeInTheDocument()
+    expect(screen.getByRole('alert')).toHaveTextContent('Prerequisite check failed')
     expect(screen.getByText('Graph connectivity failed')).toBeInTheDocument()
 
     await waitFor(() => {
@@ -312,6 +313,24 @@ describe('TenantConfig', () => {
         'The active account changed. Return to tenant configuration and confirm the active account before continuing.'
       )
     ).toBeInTheDocument()
+  })
+
+  it('states the Global cloud as fixed text and links sovereign clouds to the PowerShell module', async () => {
+    validatePrerequisites.mockRejectedValue(new Error('Graph connectivity failed'))
+
+    render(<TenantConfigHarness />)
+
+    expect(await screen.findByText('Global (commercial) cloud')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument()
+    expect(screen.getByText(/does not support sovereign clouds/i)).toBeInTheDocument()
+
+    const moduleLink = screen.getByRole('link', {
+      name: 'use the IntuneHydrationKit PowerShell module on GitHub (opens in a new tab)',
+    })
+    expect(moduleLink).toHaveAttribute('href', 'https://github.com/jorgeasaurus/IntuneHydrationKit')
+    expect(moduleLink).toHaveAttribute('target', '_blank')
+    expect(moduleLink).toHaveAttribute('rel', 'noopener noreferrer')
   })
 
   it('keeps the operator identity constrained inside its summary card', async () => {

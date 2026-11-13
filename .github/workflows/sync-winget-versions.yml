@@ -1,0 +1,107 @@
+name: Sync WinGet Version Catalog
+
+on:
+  schedule:
+    # Every day at 06:00 UTC
+    - cron: "0 6 * * *"
+  # An open sync PR is rebuilt on the current dev, with a new version bump,
+  # at the next daily run or a manual run.
+  workflow_dispatch:
+
+concurrency:
+  group: sync-winget-versions
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: dev
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Sync catalog
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: node scripts/sync-winget-versions.js
+
+      - name: Check for changes
+        id: check
+        run: |
+          if [ -z "$(git status --porcelain -- public/winget-versions.json)" ]; then
+            echo "status=current" >> "$GITHUB_OUTPUT"
+          else
+            echo "status=changed" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Validate catalog
+        if: steps.check.outputs.status == 'changed'
+        run: npx vitest run __tests__/unit/winget/committedCatalog.test.ts
+
+      - name: Summarize catalog
+        if: steps.check.outputs.status == 'changed'
+        id: summary
+        run: |
+          node -e '
+            const c = require("./public/winget-versions.json");
+            const versions = c.apps.reduce((n, a) => n + a.versions.length, 0);
+            console.log(`apps=${c.apps.length}`);
+            console.log(`versions=${versions}`);
+          ' >> "$GITHUB_OUTPUT"
+
+      - name: Bump website version
+        if: steps.check.outputs.status == 'changed'
+        id: version
+        run: |
+          VERSION=$(npm version patch --no-git-tag-version)
+          echo "version=${VERSION#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Create Pull Request
+        if: steps.check.outputs.status == 'changed'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: |
+            chore: sync WinGet version catalog
+
+            Upstream: microsoft/winget-pkgs (master)
+            Apps: ${{ steps.summary.outputs.apps }}, versions: ${{ steps.summary.outputs.versions }}
+          branch: chore/sync-winget-versions
+          base: dev
+          delete-branch: true
+          title: "chore: update WinGet version catalog"
+          labels: dependencies,automated
+          body: |
+            ## WinGet Version Catalog Sync
+
+            The version catalog (`public/winget-versions.json`) changed in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs).
+
+            | Item | Count |
+            |------|-------|
+            | Apps | ${{ steps.summary.outputs.apps }} |
+            | Versions | ${{ steps.summary.outputs.versions }} |
+
+            The catalog passed the loader validation (`__tests__/unit/winget/committedCatalog.test.ts`).
+
+            Website version bumped to `${{ steps.version.outputs.version }}`.
+
+            ---
+            *This PR was automatically created by the [Sync WinGet Version Catalog](${{ github.server_url }}/${{ github.repository }}/actions/workflows/sync-winget-versions.yml) workflow.*
+            *Review the diff for versions that were added or removed.*

@@ -5,9 +5,10 @@ import {
   HYDRATION_MARKER_LEGACY,
 } from "@/lib/utils/hydrationMarker";
 import { IntuneWinPackage } from "@/lib/win32/intuneWinPackage";
-import { Win32AppTemplate } from "@/templates/win32Apps";
+import { KIT_TEMPLATE_ID_NOTE, Win32AppTemplate } from "@/templates/win32Apps";
 import { getAccessToken } from "@/lib/auth/authUtils";
 import { utf8ToBase64 } from "@/lib/utils/base64";
+import { isAuthSessionError, isRunCancelledError } from "@/lib/utils/retry";
 
 export interface Win32LobApp {
   "@odata.type"?: string;
@@ -41,6 +42,11 @@ interface ContentFile {
 const APPS_ENDPOINT = "/deviceAppManagement/mobileApps";
 const POLL_INTERVAL_MS = 2000;
 const UPLOAD_TIMEOUT_MS = 180000;
+/** Error code that /api/win32-upload returns when Azure rejects the signed upload URL. */
+const AZURE_STORAGE_AUTHORIZATION_FAILED_CODE = "azureStorageAuthorizationFailed";
+
+/** Azure Storage rejected the signed upload URL. Intune can issue a renewed URL. */
+class AzureUploadAuthorizationError extends Error {}
 
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
@@ -131,14 +137,19 @@ async function uploadToAzureStorage(
     method: "POST",
     headers: {
       Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/octet-stream",
       "x-intune-content-file-endpoint": contentFileEndpoint,
       "x-intune-upload-url": uploadUri,
     },
     body: content,
   });
   if (!response.ok) {
-    const details = await response.json().catch(() => null) as { error?: string } | null;
-    throw new Error(details?.error || `Azure Storage upload failed: ${response.status} ${response.statusText}`);
+    const details = await response.json().catch(() => null) as { error?: string; code?: string } | null;
+    const message = details?.error || `Azure Storage upload failed: ${response.status} ${response.statusText}`;
+    if (details?.code === AZURE_STORAGE_AUTHORIZATION_FAILED_CODE) {
+      throw new AzureUploadAuthorizationError(message);
+    }
+    throw new Error(message);
   }
 }
 
@@ -154,13 +165,12 @@ async function uploadWithRenewal(
       await uploadToAzureStorage(currentUploadUri, contentFileEndpoint, content);
       return;
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      const isAuthorizationFailure = /AuthenticationFailed|\b403\b|authori[sz]ed/i.test(message);
-      if (!isAuthorizationFailure || attempt === 3) {
+      if (!(error instanceof AzureUploadAuthorizationError) || attempt === 3) {
         throw error;
       }
 
-      await client.post(`${contentFileEndpoint}/renewUpload`, {}, "beta");
+      // A repeated renewUpload only asks Intune for a new signed URL again, so it is safe to retry.
+      await client.postAction(`${contentFileEndpoint}/renewUpload`, {}, "beta");
       const renewedTarget = await waitForUploadState(
         client,
         contentFileEndpoint,
@@ -174,11 +184,58 @@ async function uploadWithRenewal(
   }
 }
 
+/** Upload states that show that Intune accepted a commit request for the file. */
+const COMMIT_ACCEPTED_STATES = new Set(["commitFilePending", "commitFileSuccess"]);
+
+/**
+ * Commit the uploaded content file. The commit is retried with the normal retry policy.
+ * When the commit still fails, for example because a retry arrived after Intune accepted
+ * an earlier attempt whose response was lost, the file is read again. When its upload
+ * state shows an accepted commit, the commit is treated as done. Otherwise the error
+ * of the commit is thrown.
+ */
+async function commitContentFile(
+  client: GraphClient,
+  contentFileEndpoint: string,
+  fileEncryptionInfo: unknown
+): Promise<void> {
+  try {
+    await client.postAction(`${contentFileEndpoint}/commit`, { fileEncryptionInfo }, "beta");
+  } catch (error) {
+    if (isRunCancelledError(error) || isAuthSessionError(error)) throw error;
+    const uploadState = await client
+      .get<ContentFile>(contentFileEndpoint, "beta")
+      .then((file) => file.uploadState)
+      .catch((readError: unknown) => {
+        if (isRunCancelledError(readError)) throw readError;
+        return undefined;
+      });
+    if (uploadState && COMMIT_ACCEPTED_STATES.has(uploadState)) {
+      console.warn(
+        `[Win32] Commit request failed, but the file upload state is ${uploadState} - treating the commit as accepted`
+      );
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function getWin32LobApps(client: GraphClient): Promise<Win32LobApp[]> {
   return client.getCollection<Win32LobApp>(
     `${APPS_ENDPOINT}?$filter=isof('microsoft.graph.win32LobApp')&$select=id,displayName,description,notes`,
     "beta"
   );
+}
+
+/** On an error of createWin32AppFromPackage: the app that it created and that can still be in the tenant. */
+export interface IncompleteWin32App {
+  incompleteAppId: string;
+}
+
+/** ID of the app that a failed create made and that can still be in the tenant, or null. */
+export function getIncompleteWin32AppId(error: unknown): string | null {
+  const id = (error as Partial<IncompleteWin32App> | null)?.incompleteAppId;
+  return typeof id === "string" && id.length > 0 ? id : null;
 }
 
 export async function createWin32AppFromPackage(
@@ -220,11 +277,7 @@ export async function createWin32AppFromPackage(
       uploadTarget.azureStorageUri,
       packageFile.encryptedContent
     );
-    await client.post(
-      `${contentFileEndpoint}/commit`,
-      { fileEncryptionInfo: packageFile.encryptionInfo },
-      "beta"
-    );
+    await commitContentFile(client, contentFileEndpoint, packageFile.encryptionInfo);
     await waitForUploadState(client, contentFileEndpoint, "commitFileSuccess");
     await client.patch(
       `${APPS_ENDPOINT}/${app.id}`,
@@ -233,8 +286,33 @@ export async function createWin32AppFromPackage(
     );
     return app;
   } catch (error) {
-    await client.delete(`${APPS_ENDPOINT}/${app.id}`, "beta").catch(() => undefined);
-    throw error;
+    const removed = await client.delete(`${APPS_ENDPOINT}/${app.id}`, "beta").then(
+      () => true,
+      () => false
+    );
+    // The caller gets the app ID, so a later create in this session looks for the app by ID
+    // and does not make a second app. This is also done after a DELETE that reported success:
+    // the Graph client reports a 404 as success, and a 404 on a new app can be a visibility
+    // delay, not proof that the app is gone.
+    const incomplete: IncompleteWin32App = { incompleteAppId: app.id };
+    // A cancelled run stays a cancelled run: the engine reads the type of this error.
+    if (error instanceof Error && (removed || isRunCancelledError(error))) {
+      throw Object.assign(error, incomplete);
+    }
+    if (removed) throw error;
+    // A later create skips the app as "Already exists", so the error must say that it is there.
+    const message = error instanceof Error ? error.message : String(error);
+    const status = (error as { status?: unknown } | null)?.status;
+    throw Object.assign(
+      new Error(
+        `${message} The incomplete app "${app.displayName ?? template.displayName}" could not be removed. ` +
+          "Delete it in Intune or with Delete mode before you create it again.",
+        { cause: error }
+      ),
+      incomplete,
+      // Callers classify the failure by the status of the first error.
+      typeof status === "number" ? { status } : {}
+    );
   }
 }
 
@@ -247,10 +325,14 @@ export function isOwnedWin32App(app: Win32LobApp): boolean {
   const hasFullHydrationMarker = fields.some((field) =>
     hydrationMarkers.some((marker) => field.includes(marker))
   );
-  const hasWinGetMarker = fields.some(
-    (field) => field.includes("imported from winget") || field.includes("wingetpackageidentifier:")
+  // The second marker is in the notes: WinGet apps carry the WinGet lines, other kit apps the template ID line.
+  const hasKitAppMarker = fields.some(
+    (field) =>
+      field.includes("imported from winget") ||
+      field.includes("wingetpackageidentifier:") ||
+      field.includes(KIT_TEMPLATE_ID_NOTE.toLowerCase())
   );
-  return hasFullHydrationMarker && hasWinGetMarker;
+  return hasFullHydrationMarker && hasKitAppMarker;
 }
 
 export function getWin32AppDisplayNameVariants(displayName: string): string[] {

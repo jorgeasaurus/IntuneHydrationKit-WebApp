@@ -12,6 +12,7 @@ type ExecutionHookState = ReturnType<typeof useHydrationExecution>
 
 const push = vi.fn()
 const startExecution = vi.fn().mockResolvedValue(undefined)
+const startRerun = vi.fn().mockResolvedValue(undefined)
 const useWizardStateMock = vi.fn()
 const useHydrationExecutionMock = vi.fn()
 const resetWizard = vi.fn()
@@ -96,12 +97,15 @@ function createExecutionState(overrides: Partial<ExecutionHookState> = {}): Exec
     isBuildingQueue: false,
     startTime: null,
     endTime: null,
+    pausedMs: 0,
+    pauseStartedAt: null,
     summary: null,
     outcome: null,
     fatalError: null,
     batchProgress: null,
     activityLog: [],
     startExecution,
+    startRerun,
     pause: vi.fn(),
     resume: vi.fn(),
     cancel: vi.fn(),
@@ -133,13 +137,21 @@ describe('DashboardPage', () => {
     useHydrationExecutionMock.mockReturnValue(createExecutionState())
   })
 
+  it('opens settings from the dashboard header', () => {
+    renderPage()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }))
+
+    expect(screen.getByRole('dialog', { name: 'Settings' })).toBeInTheDocument()
+  })
+
   it('renders the preview notice as a high-contrast glass surface', () => {
     useWizardStateMock.mockReturnValue(createWizardState(true))
 
     renderPage()
 
     const previewTitle = screen.getByText('Preview Mode')
-    const previewNotice = previewTitle.closest('[role="alert"]')
+    const previewNotice = previewTitle.closest('[role="note"]')
 
     expect(previewNotice).toHaveClass('glass-panel', 'rounded-2xl', 'text-slate-50')
     expect(previewNotice).not.toHaveClass('bg-blue-500/10')
@@ -150,8 +162,9 @@ describe('DashboardPage', () => {
   it('renders live delete mode with a filled high-contrast warning banner', () => {
     renderPage()
 
-    const warning = screen.getByRole('alert')
+    const warning = screen.getByRole('note')
 
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
     expect(screen.getByText('Delete Mode Active')).toBeInTheDocument()
     expect(warning).toHaveClass('bg-slate-950/90')
     expect(warning).toHaveClass('text-slate-50')
@@ -252,7 +265,7 @@ describe('DashboardPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Dynamic Groups/ }))
     expect(screen.getByText('All Windows Devices')).toBeInTheDocument()
     expect(screen.getByText('Hydration run completed')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('1 succeeded')
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Run finished: 1 succeeded.'))
     await waitFor(() => expect(readExecutionRecord(sessionStorage)?.outcome).toBe('succeeded'))
 
     expect(screen.getByText('Run complete')).toBeInTheDocument()
@@ -285,6 +298,117 @@ describe('DashboardPage', () => {
     expect(stoppedAlert).toHaveClass('border-red-300/35')
     expect(screen.getAllByText('Run failed')[1]).toHaveClass('text-red-100')
     expect(screen.getByText('Graph session expired.')).toBeInTheDocument()
+  })
+
+  describe('created object links', () => {
+    const startTime = new Date('2026-08-17T01:00:00.000Z')
+    const endTime = new Date('2026-08-17T01:00:02.000Z')
+    const linkName = 'Open in Entra admin center: All Windows Devices'
+    const createConfiguration = {
+      ...runConfiguration,
+      operationMode: 'create' as const,
+      cloudEnvironment: 'global' as const
+    }
+    const createdTask = {
+      id: 'group-1',
+      category: 'groups',
+      operation: 'create',
+      itemName: 'All Windows Devices',
+      status: 'success',
+      createdObject: { id: 'group-object-id' },
+      startTime,
+      endTime
+    } satisfies HydrationTask
+    const createSummary = {
+      tenantId: 'tenant-id',
+      tenantName: 'Delete Test Tenant',
+      operationMode: 'create',
+      startTime,
+      endTime,
+      duration: 2000,
+      stats: { total: 1, created: 1, deleted: 0, skipped: 0, failed: 0 },
+      categoryBreakdown: { groups: { total: 1, success: 1, skipped: 0, failed: 0 } },
+      errors: [],
+      warnings: []
+    } satisfies HydrationSummary
+
+    function expectGroupLink(): void {
+      const links = screen.getAllByRole('link', { name: linkName })
+      expect(links.length).toBeGreaterThan(0)
+      links.forEach((link) => expect(link).toHaveAttribute('href', expect.stringContaining('groupId/group-object-id')))
+    }
+
+    it('shows the link while the run is still in progress', () => {
+      useHydrationExecutionMock.mockReturnValue(
+        createExecutionState({
+          tasks: [
+            createdTask,
+            { id: 'group-2', category: 'groups', operation: 'create', itemName: 'All macOS Devices', status: 'running' }
+          ],
+          configuration: createConfiguration,
+          phase: 'running',
+          isRunning: true,
+          startTime
+        })
+      )
+
+      renderPage()
+
+      expect(screen.getByRole('link', { name: linkName })).toHaveAttribute(
+        'href',
+        'https://entra.microsoft.com/#view/Microsoft_AAD_IAM/GroupDetailsMenuBlade/~/Overview/groupId/group-object-id'
+      )
+      expect(screen.getAllByRole('link', { name: /Open in/ })).toHaveLength(1)
+    })
+
+    it('keeps the link after a refresh restores the saved run', async () => {
+      useHydrationExecutionMock.mockReturnValue(
+        createExecutionState({
+          tasks: [createdTask],
+          configuration: createConfiguration,
+          phase: 'completed',
+          isCompleted: true,
+          startTime,
+          endTime,
+          summary: createSummary,
+          outcome: 'succeeded'
+        })
+      )
+      const live = renderPage()
+      await waitFor(() => expect(readExecutionRecord(sessionStorage)?.tasks[0].createdObject).toEqual({ id: 'group-object-id' }))
+      expect(readExecutionRecord(sessionStorage)?.cloudEnvironment).toBe('global')
+      live.unmount()
+
+      // A page refresh: the in-memory run and the wizard state are gone. Only the saved record stays.
+      useHydrationExecutionMock.mockReturnValue(createExecutionState())
+      useWizardStateMock.mockReturnValue({
+        state: { ...createWizardState().state, confirmed: false, tenantConfig: undefined },
+        resetWizard
+      })
+      renderPage()
+
+      await waitFor(() => expect(screen.getByText('Run complete')).toBeInTheDocument())
+      fireEvent.click(screen.getByRole('button', { name: /Dynamic Groups/ }))
+      expectGroupLink()
+    })
+
+    it('shows no link for a preview run', () => {
+      useWizardStateMock.mockReturnValue(createWizardState(true))
+      useHydrationExecutionMock.mockReturnValue(
+        createExecutionState({
+          tasks: [createdTask],
+          configuration: { ...createConfiguration, isPreview: true },
+          phase: 'running',
+          isRunning: true,
+          startTime
+        })
+      )
+
+      renderPage()
+
+      expect(screen.getByText('All Windows Devices')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /Open in/ })).not.toBeInTheDocument()
+    })
   })
 
   it('restores the completed dashboard after a refresh', async () => {
@@ -358,6 +482,70 @@ describe('DashboardPage', () => {
     expect(startExecution).not.toHaveBeenCalled()
     expect(push).not.toHaveBeenCalledWith('/wizard')
     getItemSpy.mockRestore()
+  })
+
+  it('keeps the active duration of a paused run after a refresh', async () => {
+    getActiveAccount.mockImplementation(() => ({
+      tenantId: 'tenant-id',
+      homeAccountId: 'home-tenant-id'
+    }))
+    const startTime = new Date('2026-08-17T01:00:00.000Z')
+    const endTime = new Date('2026-08-17T01:01:10.000Z')
+    const tasks = [
+      {
+        id: 'group-1',
+        category: 'groups' as const,
+        operation: 'delete' as const,
+        itemName: 'Paused Group',
+        status: 'success' as const,
+        startTime,
+        endTime
+      }
+    ] satisfies HydrationTask[]
+    const summary = {
+      tenantId: 'tenant-id',
+      tenantName: 'Delete Test Tenant',
+      operationMode: 'delete' as const,
+      startTime,
+      endTime,
+      duration: 10_000,
+      pausedDuration: 60_000,
+      stats: { total: 1, created: 0, deleted: 1, skipped: 0, failed: 0 },
+      categoryBreakdown: {
+        groups: { total: 1, success: 1, skipped: 0, failed: 0 }
+      },
+      errors: [],
+      warnings: []
+    } satisfies HydrationSummary
+    useHydrationExecutionMock.mockReturnValue(
+      createExecutionState({
+        tasks,
+        configuration: runConfiguration,
+        phase: 'completed',
+        isCompleted: true,
+        startTime,
+        endTime,
+        pausedMs: 60_000,
+        summary,
+        outcome: 'succeeded'
+      })
+    )
+
+    const { unmount } = renderPage()
+    await waitFor(() => expect(readExecutionRecord(sessionStorage)?.pausedMs).toBe(60_000))
+    expect(screen.getByText('Elapsed Time').nextElementSibling).toHaveTextContent('10s')
+    unmount()
+
+    // After a refresh the execution store is empty, and the dashboard reads the record.
+    useHydrationExecutionMock.mockReturnValue(createExecutionState())
+    const wizard = createWizardState()
+    wizard.state.confirmed = false
+    useWizardStateMock.mockReturnValue(wizard)
+    renderPage()
+
+    await waitFor(() => expect(screen.getByText('Run complete')).toBeInTheDocument())
+    expect(screen.getByText('Elapsed Time').nextElementSibling).toHaveTextContent(/^10s$/)
+    expect(startExecution).not.toHaveBeenCalled()
   })
 
   it('waits for the authenticated account before checking a stored run', async () => {

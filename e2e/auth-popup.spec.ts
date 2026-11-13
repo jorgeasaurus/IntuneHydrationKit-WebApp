@@ -16,8 +16,9 @@ test.describe("Sign-in", () => {
     const popup = await popupPromise;
 
     await popup.waitForURL(/login\.microsoftonline\.com/, { timeout: 30_000 });
+    // MSAL 5 completes every flow on the blank redirect page (MSAL_REDIRECT_BRIDGE_PATH).
     expect(new URL(popup.url()).searchParams.get("redirect_uri")).toBe(
-      new URL(page.url()).origin
+      `${new URL(page.url()).origin}/auth/redirect`
     );
   });
 });
