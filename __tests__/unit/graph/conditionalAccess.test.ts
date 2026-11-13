@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -70,6 +72,36 @@ describe("conditionalAccess graph helpers", () => {
 
     expect(stablePlan.apiVersion).toBe("v1.0");
     expect(betaPlan.apiVersion).toBe("beta");
+  });
+
+  it("sends the agent users template to beta with the agents condition, not the retired users value", () => {
+    const template = JSON.parse(
+      readFileSync(
+        path.join(process.cwd(), "public/IntuneTemplates/ConditionalAccess/Block all agent users from accessing resources.json"),
+        "utf8"
+      )
+    ) as Record<string, unknown>;
+
+    const plan = buildConditionalAccessCreatePlan({ ...template, displayName: "[IHD] Block all agent users from accessing resources" });
+    const conditions = plan.payload.conditions as { users: { includeUsers: string[] }; agents: Record<string, unknown> };
+
+    expect(plan.apiVersion).toBe("beta");
+    expect(plan.payload.state).toBe("disabled");
+    // Graph error 1342: 'AllAgentIdUsers' in the users condition is no longer supported.
+    expect(JSON.stringify(plan.payload)).not.toContain("AllAgentIdUsers");
+    expect(conditions.users.includeUsers).toEqual(["None"]);
+    expect(conditions.agents).toEqual({ includeAgentUsers: ["All"], excludeAgentUsers: [] });
+  });
+
+  it.each([
+    ["Block all agent identities from accessing resources.json"],
+    ["Block high risk agent identities from accessing resources.json"],
+  ])("sends %s to beta, because v1.0 has no agent conditions", (file) => {
+    const template = JSON.parse(
+      readFileSync(path.join(process.cwd(), "public/IntuneTemplates/ConditionalAccess", file), "utf8")
+    ) as Record<string, unknown>;
+
+    expect(buildConditionalAccessCreatePlan({ ...template, displayName: "[IHD] Agent policy" }).apiVersion).toBe("beta");
   });
 
   it("strips exported Graph response metadata from create plans", () => {

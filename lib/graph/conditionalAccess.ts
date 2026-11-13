@@ -79,6 +79,29 @@ function normalizeConditionalAccessPolicyForCreate(
   return normalizeCreateValue(policy) as Record<string, unknown>;
 }
 
+function isNonEmptyArray(value: unknown): boolean {
+  return Array.isArray(value) && value.length > 0;
+}
+
+/**
+ * True when the policy uses a condition for agents. The Graph v1.0 schema has none of
+ * these: `agents` (agent users), the agent identity lists of `clientApplications`, and
+ * `agentIdRiskLevels` are in the beta schema only.
+ */
+function targetsAgents(conditions: Record<string, unknown> | undefined): boolean {
+  const agents = asRecord(conditions?.agents);
+  const clientApplications = asRecord(conditions?.clientApplications);
+  return (
+    isNonEmptyArray(agents?.includeAgentUsers) ||
+    isNonEmptyArray(agents?.excludeAgentUsers) ||
+    asRecord(agents?.agentFilter) !== undefined ||
+    isNonEmptyArray(clientApplications?.includeAgentIdServicePrincipals) ||
+    isNonEmptyArray(clientApplications?.excludeAgentIdServicePrincipals) ||
+    asRecord(clientApplications?.agentIdServicePrincipalFilter) !== undefined ||
+    (conditions?.agentIdRiskLevels !== undefined && conditions.agentIdRiskLevels !== null)
+  );
+}
+
 function conditionalAccessCreateRequiresBetaGraph(
   policy: Record<string, unknown>
 ): boolean {
@@ -88,7 +111,8 @@ function conditionalAccessCreateRequiresBetaGraph(
 
   return (
     stringArrayIncludesAny(grantControls?.builtInControls, BETA_ONLY_GRANT_CONTROLS) ||
-    stringArrayIncludesAny(applications?.includeUserActions, BETA_ONLY_USER_ACTIONS)
+    stringArrayIncludesAny(applications?.includeUserActions, BETA_ONLY_USER_ACTIONS) ||
+    targetsAgents(conditions)
   );
 }
 
