@@ -5,6 +5,7 @@ import { useIsAuthenticated } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { HomeLanding } from "@/components/landing/HomeLanding";
+import { SignInRequiredNotice } from "@/components/landing/SignInRequiredNotice";
 import { isSignInReplaced, signIn } from "@/lib/auth/authUtils";
 import { useWizardState } from "@/hooks/useWizardState";
 import { resetHydrationFlow } from "@/lib/hydration/resetHydrationFlow";
@@ -33,6 +34,9 @@ export default function Home() {
   };
 
   return (
-    <HomeLanding isAuthenticated={isAuthenticated} onSignInClick={handleSignInClick} onContinue={handleContinue} />
+    <>
+      <HomeLanding isAuthenticated={isAuthenticated} onSignInClick={handleSignInClick} onContinue={handleContinue} />
+      <SignInRequiredNotice isAuthenticated={isAuthenticated} onSignInClick={handleSignInClick} />
+    </>
   );
 }

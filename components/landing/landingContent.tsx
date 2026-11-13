@@ -113,7 +113,7 @@ export const FEATURES: readonly FeatureItem[] = [
     icon: Cloud,
     title: "Commercial cloud console",
     description:
-      "The web app targets Global commercial tenants while the PowerShell module covers GCC High, DoD, Germany, and China.",
+      "The web app supports the Global commercial cloud only. Use the PowerShell module for sovereign clouds such as GCC High, DoD, and China 21Vianet.",
     signal: "Global web",
   },
   {
@@ -290,9 +290,23 @@ export const FAQ_ITEMS: readonly FaqItem[] = [
     ),
   },
   {
-    question: "Does this work with government cloud environments?",
-    answer:
-      "Not in the web app yet. Use the IntuneHydrationKit PowerShell module for GCC High, DoD, Germany, and China.",
+    question: "Does this work with government or sovereign clouds?",
+    answer: (
+      <>
+        No. The web app supports the Global (commercial) cloud only. For US
+        Government (GCC High, DoD), China (21Vianet), and other sovereign
+        clouds, use the IntuneHydrationKit PowerShell module.{" "}
+        <a
+          href="https://github.com/jorgeasaurus/IntuneHydrationKit"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={FAQ_LINK_CLASS_NAME}
+        >
+          View the PowerShell module on GitHub
+        </a>
+        .
+      </>
+    ),
   },
   {
     question: "What happens if an object already exists?",

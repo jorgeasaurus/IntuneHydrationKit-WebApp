@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useMsal } from "@azure/msal-react";
 import { useRouter } from "next/navigation";
 import { useHydrationExecution } from "@/hooks/useHydrationExecution";
+import { useRunHistoryRecorder } from "@/hooks/useRunHistoryRecorder";
 import { useWizardState } from "@/hooks/useWizardState";
 import {
   clearHydrationSession,
@@ -12,7 +13,7 @@ import {
   type ExecutionRecord,
 } from "@/lib/hydration/executionRecord";
 import { getEstimatedTaskCount } from "@/lib/hydration/engine";
-import type { ExecutionOutcome, HydrationSummary, HydrationTask, OperationMode, WizardState } from "@/types/hydration";
+import type { CloudEnvironment, ExecutionOutcome, HydrationSummary, HydrationTask, OperationMode, WizardState } from "@/types/hydration";
 import type { ExecutionState } from "@/lib/hydration/executionStateStore";
 import type { ActivityMessage } from "@/lib/hydration/types";
 
@@ -20,6 +21,8 @@ interface DashboardRun {
   tenantId?: string;
   homeAccountId?: string;
   tenantName?: string;
+  /** Cloud of the run. Without it, the dashboard shows no admin portal links. */
+  cloudEnvironment?: CloudEnvironment;
   operationMode: OperationMode;
   isPreview: boolean;
   tasks: HydrationTask[];
@@ -40,6 +43,7 @@ function getLiveDashboardRun(execution: ExecutionState, state: WizardState): Das
     tenantId: execution.configuration?.tenantId ?? state.tenantConfig?.tenantId,
     homeAccountId: execution.configuration?.homeAccountId ?? state.tenantConfig?.homeAccountId,
     tenantName: execution.configuration?.tenantName ?? state.tenantConfig?.tenantName,
+    cloudEnvironment: execution.configuration?.cloudEnvironment ?? state.tenantConfig?.cloudEnvironment,
     operationMode: execution.configuration?.operationMode ?? state.operationMode ?? "create",
     isPreview: execution.configuration?.isPreview ?? state.isPreview,
     tasks: execution.tasks,
@@ -94,6 +98,7 @@ export function useDashboardRun() {
     startExecution,
     reset,
   } = execution;
+  useRunHistoryRecorder(execution, restoredRecord);
 
   useEffect(() => {
     if (!activeHomeAccountId || !activeTenantId) return;
@@ -132,6 +137,7 @@ export function useDashboardRun() {
       tenantId: configuration.tenantId,
       homeAccountId: configuration.homeAccountId,
       tenantName: configuration.tenantName,
+      cloudEnvironment: configuration.cloudEnvironment,
       operationMode: configuration.operationMode,
       isPreview: configuration.isPreview,
       selectedObjectCount: configuration.selectedObjectCount,

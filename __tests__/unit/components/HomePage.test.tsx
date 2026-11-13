@@ -19,7 +19,8 @@ vi.mock('@azure/msal-react', () => ({
 }))
 
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push })
+  useRouter: () => ({ push }),
+  useSearchParams: () => new URLSearchParams()
 }))
 
 vi.mock('@/hooks/useWizardState', () => ({

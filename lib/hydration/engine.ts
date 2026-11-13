@@ -25,8 +25,10 @@ import type { GraphClient } from "@/lib/graph/client";
 import { getIntuneGroups } from "@/lib/graph/groups";
 import { getAllFilters } from "@/lib/graph/filters";
 import { getAllAppProtectionPolicies } from "@/lib/graph/appProtection";
+import { getAllNotificationTemplates } from "@/lib/graph/notifications";
 import { getCachedTemplates, BaselinePolicy } from "@/lib/templates/loader";
 import { getBatchConfig } from "@/lib/config/batchConfig";
+import { recordCreatedObject } from "./createdObject";
 import { executeTasksInBatches, executeDeletesInParallel, isBatchableCategory } from "./batchExecutor";
 import { getLicenseSkipReason, sleep, sleepWithExecutionControl, waitWhilePaused, TENANT_CACHE_LABELS } from "./utils";
 import { ExecutionContext, ExecutionResult, ActivityMessage, TenantCacheKey } from "./types";
@@ -39,16 +41,18 @@ import { executeConditionalAccessTask } from "./taskExecutors/conditionalAccessT
 import { executeAppProtectionTask } from "./taskExecutors/appProtectionTask";
 import { executeWin32AppTask } from "./taskExecutors/win32AppTask";
 import { executeEnrollmentTask } from "./taskExecutors/enrollmentTask";
+import { executeNotificationTask } from "./taskExecutors/notificationTask";
 import { markTaskSkipped } from "./taskTransitions";
 import { executeBaselineTask } from "./taskExecutors/baselineTask";
 import { executeCISBaselineTask } from "./taskExecutors/cisBaselineTask";
+import { getExistingSkipReason } from "./updateResolver";
 
 const TASK_DELAY_MS = 2000;
 
 /**
  * Tenant caches to prefetch, with the task categories that need each cache.
  */
-const TENANT_CACHE_PREFETCHES: Array<{
+export const TENANT_CACHE_PREFETCHES: Array<{
   key: TenantCacheKey;
   categories: TaskCategory[];
   load: (client: GraphClient) => Promise<unknown[]>;
@@ -62,6 +66,7 @@ const TENANT_CACHE_PREFETCHES: Array<{
     categories: ["conditionalAccess"],
     load: (client) => client.getCollection("/identity/conditionalAccess/policies?$select=id,displayName,state"),
   },
+  { key: "cachedNotificationTemplates", categories: ["notification"], load: getAllNotificationTemplates },
   {
     key: "cachedCompliancePolicies",
     categories: ["compliance", "baseline", "cisBaseline"],
@@ -300,6 +305,9 @@ async function executeTask(
       case "enrollment":
         result = await executeEnrollmentTask(task, context);
         break;
+      case "notification":
+        result = await executeNotificationTask(task, context);
+        break;
       default:
         result = {
           task,
@@ -316,9 +324,11 @@ async function executeTask(
 
     // Update task with result
     if (result.skipped) {
+      result.error = getExistingSkipReason(task, result.error, context);
       markTaskSkipped(task, result.skipKind, result.error);
     } else {
       task.status = result.success ? "success" : "failed";
+      recordCreatedObject(task, result.createdId, context);
     }
     task.error = result.error;
     task.warning = result.warning;

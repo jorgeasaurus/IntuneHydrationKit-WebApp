@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { TaskCategory, OIBPlatformId, CategorySelections } from "@/types/hydration";
 
 function getInitialSelectedItems(
@@ -34,6 +34,22 @@ export function useTargetSelectionState(
   const [selectedCISPolicies, setSelectedCISPolicies] = useState<Set<string>>(
     () => new Set(categorySelections?.cisBaseline?.selectedItems || [])
   );
+
+  // Async selection writers (category defaults, platform filters, Select All) check this
+  // generation after they await a catalog. A profile apply increments it, so a load that
+  // finishes late cannot replace the selection that the profile set.
+  const selectionGeneration = useRef(0);
+  const startSelectionUpdate = () => {
+    const generation = selectionGeneration.current;
+    return () => selectionGeneration.current === generation;
+  };
+  const invalidatePendingSelectionUpdates = () => {
+    selectionGeneration.current += 1;
+  };
+  // When the step unmounts, no pending async write may continue.
+  useEffect(() => () => {
+    selectionGeneration.current += 1;
+  }, []);
 
   const toggleItem = (category: TaskCategory, itemName: string) => {
     setSelectedItems(prev => {
@@ -111,5 +127,7 @@ export function useTargetSelectionState(
     toggleCISCategoryExpanded,
     togglePlatformExpanded,
     removeTarget,
+    startSelectionUpdate,
+    invalidatePendingSelectionUpdates,
   };
 }

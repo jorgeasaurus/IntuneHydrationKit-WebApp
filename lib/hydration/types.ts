@@ -12,6 +12,7 @@ import {
 } from "@/types/graph";
 import { BaselinePolicy } from "@/lib/templates/loader";
 import type { Win32LobApp } from "@/lib/graph/win32Apps";
+import type { TenantNotificationTemplate } from "@/lib/graph/notifications";
 
 export const ACTIVITY_MESSAGE_TYPES = [
   "info",
@@ -45,6 +46,8 @@ export interface ExecutionContext {
   operationMode: OperationMode;
   isPreview: boolean;
   stopOnFirstError: boolean;
+  /** Create runs only: update existing kit objects that differ from the template (updateResolver.ts). */
+  updateExisting?: boolean;
   onSequentialTask?: (task: HydrationTask) => void;
   onTaskStart?: (task: HydrationTask) => void;
   onTaskComplete?: (task: HydrationTask) => void;
@@ -71,6 +74,8 @@ export interface ExecutionContext {
   cachedCompliancePolicies?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached conditional access policies. Delete reads the state again before it deletes a policy.
   cachedConditionalAccessPolicies?: Array<{ id: string; displayName?: string; state?: string }>;
+  // Cached notification message templates. They have no description; the marker is in the display name.
+  cachedNotificationTemplates?: TenantNotificationTemplate[];
   // Cached device configurations for delete operations (Health Monitoring, etc.)
   cachedDeviceConfigurations?: Array<{ id: string; displayName?: string; description?: string }>;
   // Cached group policy configurations for delete operations (Administrative Templates / ADMX)
@@ -98,6 +103,7 @@ export type TenantCacheKey =
   | "cachedFilters"
   | "cachedAppProtectionPolicies"
   | "cachedConditionalAccessPolicies"
+  | "cachedNotificationTemplates"
   | "cachedCompliancePolicies"
   | "cachedV2CompliancePolicies"
   | "cachedSettingsCatalogPolicies"
