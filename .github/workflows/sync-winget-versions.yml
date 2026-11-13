@@ -4,12 +4,9 @@ on:
   schedule:
     # Every day at 06:00 UTC
     - cron: "0 6 * * *"
+  # An open sync PR is rebuilt on the current dev, with a new version bump,
+  # at the next daily run or a manual run.
   workflow_dispatch:
-  # Re-run when dev's version changes so an open sync PR is rebased onto the
-  # new dev version and re-bumped above it.
-  push:
-    branches: [dev]
-    paths: [package.json]
 
 concurrency:
   group: sync-winget-versions
