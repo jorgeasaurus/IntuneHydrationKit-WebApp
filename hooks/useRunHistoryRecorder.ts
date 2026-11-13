@@ -12,7 +12,7 @@ import {
   type FinishedRun,
   type RunHistoryWriteResult,
 } from "@/lib/history/runHistory";
-import type { ExecutionRecord } from "@/lib/hydration/executionRecord";
+import { isExecutionCheckpoint, type ExecutionRecord } from "@/lib/hydration/executionRecord";
 import type { ExecutionState } from "@/lib/hydration/executionStateStore";
 
 type LiveRun = Pick<
@@ -58,7 +58,9 @@ function getLiveFinishedRun(live: LiveRun): FinishedRun | null {
   };
 }
 
-function getRestoredFinishedRun(record: ExecutionRecord): FinishedRun {
+/** An interrupted run (a checkpoint) has not finished, so it is not a history entry. */
+function getRestoredFinishedRun(record: ExecutionRecord): FinishedRun | null {
+  if (isExecutionCheckpoint(record)) return null;
   return {
     configuration: {
       tenantId: record.tenantId,

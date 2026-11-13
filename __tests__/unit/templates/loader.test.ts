@@ -260,7 +260,7 @@ describe("template loader", () => {
       {
         displayName: "[IHD] Android Corporate",
         description: "Android filter Imported by Intune Hydration Kit",
-        platform: "android",
+        platform: "androidForWork",
         rule: '(device.osVersion -contains "14")',
       },
       {

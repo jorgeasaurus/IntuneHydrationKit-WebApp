@@ -297,6 +297,6 @@ describe("updated stats and reports", () => {
     expect(old.summary?.stats).not.toHaveProperty("updated");
     writeExecutionRecord(sessionStorage, old);
     expect(readExecutionRecord(sessionStorage)?.summary?.stats).toEqual({ total: 1, created: 1, deleted: 0, skipped: 0, failed: 0 });
-    expect(summaryMatchesExecution(old.summary!, { ...old, startTime: start, tasks: old.tasks })).toBe(true);
+    expect(summaryMatchesExecution(old.summary!, { ...old, startTime: start, endTime: end, tasks: old.tasks })).toBe(true);
   });
 });
