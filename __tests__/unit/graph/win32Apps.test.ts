@@ -400,6 +400,25 @@ describe("createWin32AppFromPackage", () => {
     expect(client.patch).not.toHaveBeenCalled();
   });
 
+  it("says that the incomplete app is still in the tenant when it cannot be removed", async () => {
+    const failure = Object.assign(new Error("[503] content version unavailable"), { status: 503 });
+    const postNoRetry = vi.fn().mockResolvedValueOnce({ id: "app-id" }).mockRejectedValueOnce(failure);
+    const deleteApp = vi.fn().mockRejectedValue(new Error("delete failed"));
+    const client = { postNoRetry, postAction: vi.fn(), delete: deleteApp };
+
+    const error = await createWin32AppFromPackage(
+      client as never,
+      SEVEN_ZIP_WIN32_APP,
+      packageFile(),
+      "detected"
+    ).catch((caught: unknown) => caught as Error & { status?: number });
+
+    expect(error.message).toContain("[503] content version unavailable");
+    expect(error.message).toContain(`The incomplete app "${SEVEN_ZIP_WIN32_APP.displayName}" could not be removed`);
+    expect(error.status).toBe(503);
+    expect(deleteApp).toHaveBeenCalledWith("/deviceAppManagement/mobileApps/app-id", "beta");
+  });
+
   it("removes the uncommitted app when content publishing fails", async () => {
     const postNoRetry = vi
       .fn()

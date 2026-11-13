@@ -275,8 +275,24 @@ export async function createWin32AppFromPackage(
     );
     return app;
   } catch (error) {
-    await client.delete(`${APPS_ENDPOINT}/${app.id}`, "beta").catch(() => undefined);
-    throw error;
+    const removed = await client.delete(`${APPS_ENDPOINT}/${app.id}`, "beta").then(
+      () => true,
+      () => false
+    );
+    if (removed) throw error;
+    // The app is in the tenant without content. A later create skips it as "Already exists",
+    // so the error must say that it is there.
+    const message = error instanceof Error ? error.message : String(error);
+    const status = (error as { status?: unknown } | null)?.status;
+    throw Object.assign(
+      new Error(
+        `${message} The incomplete app "${app.displayName ?? template.displayName}" could not be removed. ` +
+          "Delete it in Intune or with Delete mode before you create it again.",
+        { cause: error }
+      ),
+      // Callers classify the failure by the status of the first error.
+      typeof status === "number" ? { status } : {}
+    );
   }
 }
 

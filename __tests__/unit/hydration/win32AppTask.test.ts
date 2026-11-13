@@ -47,6 +47,16 @@ const createContext = (isPreview = false): ExecutionContext => ({
   stopOnFirstError: false,
 });
 
+/** Answer a read of one app by ID from the given apps, and 404 for any other app. */
+function serveApps(context: ExecutionContext, apps: Array<{ id: string }>): void {
+  vi.mocked(context.client.get).mockImplementation(async (url: string) => {
+    if (url.endsWith("/assignments")) return { value: [] };
+    const app = apps.find((candidate) => url.endsWith(`/mobileApps/${candidate.id}`));
+    if (app) return app;
+    throw Object.assign(new Error("Resource not found"), { status: 404 });
+  });
+}
+
 describe("executeWin32AppTask", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -191,7 +201,7 @@ describe("executeWin32AppTask", () => {
   });
 
   it("deletes every owned current or legacy name match", async () => {
-    mockGetWin32LobApps.mockResolvedValue([
+    const tenantApps = [
       {
         id: "current-app",
         displayName: "7-Zip - [IHD]",
@@ -209,8 +219,10 @@ describe("executeWin32AppTask", () => {
         displayName: "7-Zip",
         description: "Managed elsewhere",
       },
-    ]);
+    ];
+    mockGetWin32LobApps.mockResolvedValue(tenantApps);
     const context = createContext();
+    serveApps(context, tenantApps);
     const deleteTask = { ...task, operation: "delete" as const };
 
     const result = await executeWin32AppTask(deleteTask, context);
@@ -272,13 +284,14 @@ describe("executeWin32AppTask", () => {
   });
 
   it("ignores a legacy candidate that disappears before its ownership check", async () => {
+    const currentApp = {
+      id: "current-app",
+      displayName: "7-Zip - [IHD]",
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    };
     mockGetWin32LobApps.mockResolvedValue([
-      {
-        id: "current-app",
-        displayName: "7-Zip - [IHD]",
-        description: "Imported by Intune Hydration Kit",
-        notes: "Imported from WinGet",
-      },
+      currentApp,
       {
         id: "missing-legacy-app",
         displayName: "[IHD] 7-Zip",
@@ -287,10 +300,7 @@ describe("executeWin32AppTask", () => {
       },
     ]);
     const context = createContext();
-    vi.mocked(context.client.get).mockImplementation(async (url: string) => {
-      if (url.endsWith("/assignments")) return { value: [] };
-      throw Object.assign(new Error("Resource not found"), { status: 404 });
-    });
+    serveApps(context, [currentApp]);
 
     await expect(executeWin32AppTask(
       { ...task, operation: "delete" },
@@ -315,14 +325,15 @@ describe("executeWin32AppTask", () => {
       },
     }));
     const context = createContext();
+    const newApp = {
+      id: "newly-visible-app",
+      displayName: "7-Zip - [IHD]",
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    };
+    serveApps(context, [newApp]);
     vi.mocked(context.client.get)
-      .mockRejectedValueOnce(Object.assign(new Error("Resource not found"), { status: 404 }))
-      .mockResolvedValueOnce({
-        id: "newly-visible-app",
-        displayName: "7-Zip - [IHD]",
-        description: "Imported by Intune Hydration Kit",
-        notes: "Imported from WinGet",
-      });
+      .mockRejectedValueOnce(Object.assign(new Error("Resource not found"), { status: 404 }));
 
     const resultPromise = executeWin32AppTask(
       { ...task, operation: "delete" },
@@ -331,9 +342,10 @@ describe("executeWin32AppTask", () => {
     await vi.advanceTimersByTimeAsync(2000);
     const result = await resultPromise;
 
-    expect(mockGetWin32LobApps).toHaveBeenCalledTimes(1);
-    // Two reads of the recent app, then one assignment read
-    expect(context.client.get).toHaveBeenCalledTimes(3);
+    // The retry reads the collection again: the first answer is from before the wait.
+    expect(mockGetWin32LobApps).toHaveBeenCalledTimes(2);
+    // Two reads of the recent app, one assignment read, then the read before the DELETE
+    expect(context.client.get).toHaveBeenCalledTimes(4);
     expect(context.client.delete).toHaveBeenCalledWith(
       "/deviceAppManagement/mobileApps/newly-visible-app",
       "beta"
@@ -383,5 +395,67 @@ describe("executeWin32AppTask", () => {
       "beta"
     );
     expect(result).toMatchObject({ success: true, skipped: false });
+  });
+
+  it("does not delete an app whose kit marker is gone when it is read again", async () => {
+    const listed = {
+      id: "current-app",
+      displayName: "7-Zip - [IHD]",
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    };
+    mockGetWin32LobApps.mockResolvedValue([listed]);
+    const context = createContext();
+    serveApps(context, [{ ...listed, description: "Now managed by hand", notes: "" }]);
+
+    const result = await executeWin32AppTask({ ...task, operation: "delete" }, context);
+
+    expect(context.client.delete).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ success: false, skipped: true, skipKind: "blocked" });
+  });
+
+  it("does not delete any app when one of them cannot be read again", async () => {
+    const listed = {
+      id: "current-app",
+      displayName: "7-Zip - [IHD]",
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    };
+    mockGetWin32LobApps.mockResolvedValue([listed]);
+    const context = createContext();
+    vi.mocked(context.client.get).mockImplementation(async (url: string) => {
+      if (url.endsWith("/assignments")) return { value: [] };
+      throw Object.assign(new Error("Service unavailable"), { status: 503 });
+    });
+
+    const result = await executeWin32AppTask({ ...task, operation: "delete" }, context);
+
+    expect(context.client.delete).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ success: false, skipped: false });
+    expect(result.error).toMatch(/Safety checks did not complete/);
+  });
+
+  it("waits for an app that this session created before it creates the app again", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("fetch", vi.fn());
+    mockGetWin32LobApps.mockResolvedValue([]);
+    sessionStorage.setItem("intune-hydration-recent-win32-apps", JSON.stringify({
+      "7-zip - [ihd]": { id: "new-app", displayName: "7-Zip - [IHD]", createdAt: Date.now() },
+    }));
+    const context = createContext();
+    serveApps(context, [{
+      id: "new-app",
+      displayName: "7-Zip - [IHD]",
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    }]);
+    vi.mocked(context.client.get)
+      .mockRejectedValueOnce(Object.assign(new Error("Resource not found"), { status: 404 }));
+
+    const resultPromise = executeWin32AppTask(task, context);
+    await vi.advanceTimersByTimeAsync(2000);
+
+    await expect(resultPromise).resolves.toMatchObject({ success: true, skipped: true, error: "Already exists" });
+    expect(mockCreateWin32AppFromPackage).not.toHaveBeenCalled();
   });
 });

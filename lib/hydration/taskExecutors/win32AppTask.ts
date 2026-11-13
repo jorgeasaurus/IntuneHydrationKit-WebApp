@@ -57,6 +57,11 @@ function isRecentWin32App(value: unknown): value is RecentWin32App {
   );
 }
 
+function isNotFoundError(error: unknown): boolean {
+  const graphError = error as { status?: number; code?: string } | null;
+  return graphError?.status === 404 || graphError?.code?.toLowerCase() === "resourcenotfound";
+}
+
 function sleep(milliseconds: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, milliseconds));
 }
@@ -104,16 +109,24 @@ function forgetRecentWin32App(displayName: string): void {
   writeRecentWin32Apps(apps);
 }
 
+interface RecentOwnedAppResult {
+  app: Win32LobApp | null;
+  /** True when this session created the app a short time ago, but Graph does not return it (yet). */
+  notVisible: boolean;
+}
+
+const NO_RECENT_APP: RecentOwnedAppResult = { app: null, notVisible: false };
+
 async function getRecentOwnedApp(
   displayName: string,
   context: ExecutionContext
-): Promise<Win32LobApp | null> {
+): Promise<RecentOwnedAppResult> {
   const recent = readRecentWin32Apps()[displayName.toLowerCase()];
-  if (!recent) return null;
+  if (!recent) return NO_RECENT_APP;
 
   if (Date.now() - recent.createdAt > RECENT_WIN32_APP_TTL_MS) {
     forgetRecentWin32App(displayName);
-    return null;
+    return NO_RECENT_APP;
   }
 
   try {
@@ -123,18 +136,17 @@ async function getRecentOwnedApp(
     );
     const displayNameVariants = new Set(getWin32AppDisplayNameVariants(displayName));
     if (displayNameVariants.has(app.displayName.toLowerCase()) && isOwnedWin32App(app)) {
-      return app;
+      return { app, notVisible: false };
     }
   } catch (error) {
-    const graphError = error as { status?: number; code?: string };
-    if (graphError.status === 404 || graphError.code?.toLowerCase() === "resourcenotfound") {
+    if (isNotFoundError(error)) {
       // Keep a recent creation hint because Intune may not expose the new app immediately.
-      return null;
+      return { app: null, notVisible: true };
     }
   }
 
   forgetRecentWin32App(displayName);
-  return null;
+  return NO_RECENT_APP;
 }
 
 async function fetchSuppliedPackage(packageUrl: string): Promise<Blob> {
@@ -269,11 +281,17 @@ function fetchTemplateDetectionScript(url: string): Promise<string> {
   return fetchTextAsset(url, "Win32 detection script");
 }
 
+interface MatchingAppsResult {
+  apps: Win32LobApp[];
+  /** True when an app that this session created is in no Graph answer yet. */
+  recentAppNotVisible: boolean;
+}
+
 async function getMatchingApps(
   template: Win32AppTemplate,
   context: ExecutionContext
-): Promise<Win32LobApp[]> {
-  const recentApp = await getRecentOwnedApp(template.displayName, context);
+): Promise<MatchingAppsResult> {
+  const recent = await getRecentOwnedApp(template.displayName, context);
   const displayNameVariants = new Set(getWin32AppDisplayNameVariants(template.displayName));
   if (!context.cachedWin32LobApps) {
     context.cachedWin32LobApps = await getWin32LobApps(context.client);
@@ -282,17 +300,39 @@ async function getMatchingApps(
     displayNameVariants.has(app.displayName.toLowerCase())
   );
 
+  const recentApp = recent.app;
   if (recentApp && !matchingApps.some((app) => app.id === recentApp.id)) {
     matchingApps.unshift(recentApp);
   }
-  return matchingApps;
+  return { apps: matchingApps, recentAppNotVisible: recent.notVisible && matchingApps.length === 0 };
+}
+
+/**
+ * Apps that a create must not duplicate.
+ *
+ * When this session created the app a short time ago and Graph does not return it yet, a new
+ * POST would make a second app. So the lookup waits and reads Graph again before the create
+ * continues. After the last wait the app counts as deleted.
+ */
+async function getCreateConflicts(
+  template: Win32AppTemplate,
+  context: ExecutionContext
+): Promise<Win32LobApp[]> {
+  let result = await getMatchingApps(template, context);
+  for (const delay of DELETE_VISIBILITY_RETRY_DELAYS_MS) {
+    if (!result.recentAppNotVisible) break;
+    await sleep(delay);
+    context.cachedWin32LobApps = undefined;
+    result = await getMatchingApps(template, context);
+  }
+  return result.apps;
 }
 
 async function getOwnedMatchingApps(
   template: Win32AppTemplate,
   context: ExecutionContext
 ): Promise<OwnedMatchingAppsResult> {
-  const matchingApps = await getMatchingApps(template, context);
+  const { apps: matchingApps } = await getMatchingApps(template, context);
   const ownershipResults = await Promise.all(matchingApps.map(async (app) => {
     if (isOwnedWin32App(app)) return app;
     if (!template.legacyOwnership) return null;
@@ -304,10 +344,7 @@ async function getOwnedMatchingApps(
       );
       return isLegacyOwnedWin32App(appDetails, template) ? appDetails : null;
     } catch (error) {
-      const graphError = error as { status?: number; code?: string };
-      if (graphError.status === 404 || graphError.code?.toLowerCase() === "resourcenotfound") {
-        return null;
-      }
+      if (isNotFoundError(error)) return null;
       throw error;
     }
   }));
@@ -327,6 +364,8 @@ async function getDeleteCandidates(
   for (const delay of DELETE_VISIBILITY_RETRY_DELAYS_MS) {
     if (result.apps.length > 0) break;
     await sleep(delay);
+    // Read the collection again: the cached one is from before the wait.
+    context.cachedWin32LobApps = undefined;
     result = await getOwnedMatchingApps(template, context);
     hasNameMatch ||= result.hasNameMatch;
   }
@@ -346,7 +385,7 @@ export async function executeWin32AppTask(
   const deleteCandidates = task.operation === "delete"
     ? await getDeleteCandidates(template, context)
     : null;
-  const existingApps = deleteCandidates?.apps ?? await getMatchingApps(template, context);
+  const existingApps = deleteCandidates?.apps ?? await getCreateConflicts(template, context);
 
   if (task.operation === "create") {
     let createPlan: CreatePlan;
@@ -431,7 +470,39 @@ export async function executeWin32AppTask(
     return { task, success: true, skipped: false };
   }
 
-  await existingApps.reduce(
+  // Fail closed: read each app again immediately before the DELETE. The match can be from a
+  // prefetch before a pause, and the kit marker can be gone since then. Delete no app when
+  // one of them is not a kit app any more or cannot be read.
+  const appsToDelete: Win32LobApp[] = [];
+  for (const existingApp of existingApps) {
+    let currentApp: Win32LobApp;
+    try {
+      currentApp = await context.client.get<Win32LobApp>(
+        `/deviceAppManagement/mobileApps/${existingApp.id}`,
+        "beta"
+      );
+    } catch (error) {
+      if (isRunCancelledError(error)) throw error;
+      // The app is gone already.
+      if (isNotFoundError(error)) continue;
+      const message = error instanceof Error ? error.message : String(error);
+      return deleteResolutionResult(
+        task,
+        { action: "fail", reason: `Safety checks did not complete, so the app was not deleted: ${message}` },
+        context.isPreview
+      );
+    }
+    if (!isOwnedWin32App(currentApp) && !isLegacyOwnedWin32App(currentApp, template)) {
+      return deleteResolutionResult(
+        task,
+        { action: "skip", skipKind: "blocked", reason: DELETE_REASONS.noMarker },
+        context.isPreview
+      );
+    }
+    appsToDelete.push(existingApp);
+  }
+
+  await appsToDelete.reduce(
     (previousDelete, existingApp) => previousDelete.then(() =>
       context.client.delete(`/deviceAppManagement/mobileApps/${existingApp.id}`, "beta")
     ),
