@@ -90,11 +90,15 @@ async function loadJsonTemplateFiles<T>(
   return templates;
 }
 
+/**
+ * Check the platform of a filter template. The value is sent to Graph as the template
+ * gives it: "androidForWork" (Android Enterprise) and "android" (device administrator)
+ * are different platforms, and a filter's platform cannot change after it is created.
+ */
 function normalizeFilterPlatform(platform: string): FilterTemplate["platform"] {
   switch (platform) {
-    case "androidForWork":
-      return "android";
     case "android":
+    case "androidForWork":
     case "iOS":
     case "macOS":
     case "windows10AndLater":

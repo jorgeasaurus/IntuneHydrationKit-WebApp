@@ -37,7 +37,8 @@ export interface DeviceFilter {
   id?: string;
   displayName: string;
   description: string;
-  platform: "android" | "iOS" | "macOS" | "windows10AndLater";
+  /** Graph devicePlatformType. "androidForWork" is Android Enterprise; "android" is device administrator. */
+  platform: "android" | "androidForWork" | "iOS" | "macOS" | "windows10AndLater";
   rule: string;
   roleScopeTags?: string[];
 }
