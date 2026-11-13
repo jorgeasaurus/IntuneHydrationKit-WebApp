@@ -35,6 +35,19 @@ const redirectUri =
   process.env.NEXT_PUBLIC_MSAL_REDIRECT_URI ||
   "http://localhost:3000";
 
+/**
+ * Path of the blank page (app/auth/redirect/route.ts) where silent token renewal ends.
+ * The URI `<origin>/auth/redirect` must be registered as an SPA redirect URI in Entra ID.
+ */
+export const MSAL_SILENT_REDIRECT_PATH = "/auth/redirect";
+
+/**
+ * Redirect URI for silent requests (acquireTokenSilent, ssoSilent).
+ * When MSAL falls back to a hidden iframe, the iframe ends on this blank page and not on
+ * the full app. Popup sign-in and sign-out keep the origin redirect URI.
+ */
+export const silentRedirectUri = new URL(MSAL_SILENT_REDIRECT_PATH, redirectUri).href;
+
 export const msalConfig: Configuration = {
   auth: {
     clientId: process.env.NEXT_PUBLIC_MSAL_CLIENT_ID || "",
