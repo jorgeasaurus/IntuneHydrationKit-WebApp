@@ -439,6 +439,20 @@ describe("createWin32AppFromPackage", () => {
     expect(getIncompleteWin32AppId(error)).toBe("app-id");
   });
 
+  it("reports the app ID after a cleanup that succeeded, because a DELETE 404 is reported as success", async () => {
+    const failure = new Error("content version unavailable");
+    const postNoRetry = vi.fn().mockResolvedValueOnce({ id: "app-id" }).mockRejectedValueOnce(failure);
+    const client = { postNoRetry, postAction: vi.fn(), delete: vi.fn().mockResolvedValue(undefined) };
+
+    const error = await createWin32AppFromPackage(client as never, SEVEN_ZIP_WIN32_APP, packageFile(), "detected").then(
+      () => { throw new Error("The create did not fail."); },
+      (caught: unknown) => caught
+    );
+
+    expect(error).toBe(failure);
+    expect(getIncompleteWin32AppId(error)).toBe("app-id");
+  });
+
   it("removes the uncommitted app when content publishing fails", async () => {
     const postNoRetry = vi
       .fn()
