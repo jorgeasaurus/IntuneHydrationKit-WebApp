@@ -5,6 +5,7 @@ import { summaryMatchesExecution } from "@/lib/hydration/reporter";
 import { ACTIVITY_MESSAGE_TYPES } from "@/lib/hydration/types";
 import { runLicensesSchema, runScopeSchema } from "@/lib/hydration/runScope";
 import { autopilotBrandingCustomizationSchema } from "@/lib/win32/autopilotBrandingConfig";
+import { winGetVersionChoiceSchema } from "@/lib/winget/versionCatalog";
 import {
   CLOUD_ENVIRONMENTS,
   OPERATION_MODES,
@@ -53,6 +54,8 @@ const taskBaseShape = {
   // Strict: a record with a customization that the schema cannot read exactly is not restored,
   // so a retry can never upload a package with other choices than the first attempt.
   autopilotBranding: autopilotBrandingCustomizationSchema.optional(),
+  // Strict for the same reason: a retry pins the same WinGet version as the first attempt.
+  wingetVersion: winGetVersionChoiceSchema.optional(),
   error: z.string().optional(),
   warning: z.string().optional(),
   startTime: dateSchema.optional(),

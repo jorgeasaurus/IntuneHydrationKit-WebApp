@@ -18,6 +18,12 @@ import {
   type AutopilotBrandingCustomization,
 } from "@/lib/win32/autopilotBrandingConfig";
 import { fetchCustomizedAutopilotBrandingPackage } from "@/lib/win32/autopilotBrandingPackage";
+import { getWinGetVersionTemplate } from "@/lib/win32/wingetVersionTemplate";
+import {
+  fetchWinGetVersionCatalog,
+  resolvePinnedVersion,
+  winGetVersionChoiceSchema,
+} from "@/lib/winget/versionCatalog";
 import { bytesToBase64 } from "@/lib/utils/base64";
 import { DELETE_REASONS, deleteResolutionResult, readAssignmentCount } from "../deleteResolver";
 import { isRunCancelledError } from "@/lib/utils/retry";
@@ -167,24 +173,100 @@ async function fetchOptionalIcon(iconUrl: string | undefined): Promise<string | 
   }
 }
 
-interface CreatePlan {
-  template: Win32AppTemplate;
-  /** Present when the package is built in the browser for a customized configuration. */
-  customization?: AutopilotBrandingCustomization;
+type CreatePlan =
+  /** The prebuilt package of the template. */
+  | { kind: "prebuilt"; template: Win32AppTemplate; packageUrl: string; detectionScriptUrl: string }
+  /** A package built in the browser for a customized Autopilot Branding configuration. */
+  | { kind: "autopilotBranding"; template: Win32AppTemplate; customization: AutopilotBrandingCustomization }
+  /** A package built in the browser from generated WinGet scripts. `version` undefined is latest. */
+  | { kind: "winget"; template: Win32AppTemplate; version: string | undefined };
+
+function prebuiltPlan(template: Win32AppTemplate): CreatePlan {
+  if (!template.packageUrl || !template.detectionScriptUrl) {
+    throw new Error(`${template.displayName} has no prebuilt package.`);
+  }
+  return {
+    kind: "prebuilt",
+    template,
+    packageUrl: template.packageUrl,
+    detectionScriptUrl: template.detectionScriptUrl,
+  };
 }
 
 /**
- * The template and package source of a create task. A task without a customization, or with
- * the default choices, uses the prebuilt package. Throws when the customization is not valid.
+ * The template and package source of a create task. A starter WinGet app without a pinned
+ * version, and an Autopilot Branding app without a customization or with the default choices,
+ * use the prebuilt package. Throws when a choice on the task is not valid.
  */
 function getCreatePlan(template: Win32AppTemplate, task: HydrationTask): CreatePlan {
-  if (task.autopilotBranding === undefined) return { template };
-  if (template.id !== AUTOPILOT_BRANDING_WIN32_APP.id) {
-    throw new Error("Only the Autopilot Branding app can have a configuration customization.");
+  if (task.autopilotBranding !== undefined && task.wingetVersion !== undefined) {
+    throw new Error("A Win32 app task cannot have both a configuration customization and a WinGet version.");
   }
-  const customization = parseAutopilotBrandingCustomization(task.autopilotBranding);
-  if (isDefaultAutopilotBrandingCustomization(customization)) return { template };
-  return { template: getCustomizedAutopilotBrandingTemplate(customization), customization };
+  if (task.autopilotBranding !== undefined) {
+    if (template.id !== AUTOPILOT_BRANDING_WIN32_APP.id) {
+      throw new Error("Only the Autopilot Branding app can have a configuration customization.");
+    }
+    const customization = parseAutopilotBrandingCustomization(task.autopilotBranding);
+    if (isDefaultAutopilotBrandingCustomization(customization)) return prebuiltPlan(template);
+    return {
+      kind: "autopilotBranding",
+      template: getCustomizedAutopilotBrandingTemplate(customization),
+      customization,
+    };
+  }
+  if (task.wingetVersion !== undefined) {
+    if (!template.winget) {
+      throw new Error(`${template.displayName} is not a WinGet app, so it cannot have a WinGet version.`);
+    }
+    const parsed = winGetVersionChoiceSchema.safeParse(task.wingetVersion);
+    if (!parsed.success) {
+      throw new Error(`The WinGet version of ${template.displayName} is not valid, so the app was not created.`);
+    }
+    return { kind: "winget", template: getWinGetVersionTemplate(template, parsed.data), version: parsed.data };
+  }
+  if (template.packageUrl) return prebuiltPlan(template);
+  if (template.winget) return { kind: "winget", template, version: undefined };
+  throw new Error(`${template.displayName} has no package.`);
+}
+
+/** A pinned version must be a version of the app in the catalog that the kit can pin. */
+async function assertPinnedVersionInCatalog(plan: CreatePlan): Promise<void> {
+  if (plan.kind !== "winget" || plan.version === undefined) return;
+  const catalog = await fetchWinGetVersionCatalog();
+  resolvePinnedVersion(catalog, plan.template.packageIdentifier, plan.version);
+}
+
+interface CreatePackage {
+  packageFile: Blob | ArrayBuffer;
+  detectionScript: string;
+}
+
+/**
+ * The package and the detection script of a create plan. The prebuilt package and the Autopilot
+ * Branding package use the committed detection script of the template.
+ */
+async function getCreatePackage(plan: CreatePlan, template: Win32AppTemplate): Promise<CreatePackage> {
+  switch (plan.kind) {
+    case "prebuilt": {
+      const packageFile = await fetchSuppliedPackage(plan.packageUrl);
+      return { packageFile, detectionScript: await fetchTemplateDetectionScript(plan.detectionScriptUrl) };
+    }
+    case "autopilotBranding": {
+      if (!template.detectionScriptUrl) throw new Error(`${template.displayName} has no detection script.`);
+      const packageFile = await fetchCustomizedAutopilotBrandingPackage(plan.customization);
+      return { packageFile, detectionScript: await fetchTemplateDetectionScript(template.detectionScriptUrl) };
+    }
+    case "winget": {
+      // Loaded on demand: the script generator is large and only a WinGet build needs it.
+      const { buildWinGetPackage } = await import("@/lib/win32/wingetPackage");
+      const build = await buildWinGetPackage(plan.template, plan.version);
+      return { packageFile: build.packageBytes.buffer, detectionScript: build.detectionScript };
+    }
+  }
+}
+
+function fetchTemplateDetectionScript(url: string): Promise<string> {
+  return fetchTextAsset(url, "Win32 detection script");
 }
 
 async function getMatchingApps(
@@ -270,8 +352,11 @@ export async function executeWin32AppTask(
     let createPlan: CreatePlan;
     try {
       createPlan = getCreatePlan(template, task);
+      await assertPinnedVersionInCatalog(createPlan);
     } catch (error) {
-      // Fail closed: nothing is fetched, built, or uploaded.
+      // A cancelled run is not an invalid choice. The engine marks the task cancelled.
+      if (isRunCancelledError(error)) throw error;
+      // Fail closed: no package is fetched, built, or uploaded.
       return { task, success: false, skipped: false, error: error instanceof Error ? error.message : String(error) };
     }
     if (existingApps.length > 0) {
@@ -282,16 +367,14 @@ export async function executeWin32AppTask(
     }
 
     const createTemplate = createPlan.template;
-    const suppliedPackage = createPlan.customization
-      ? await fetchCustomizedAutopilotBrandingPackage(createPlan.customization)
-      : await fetchSuppliedPackage(template.packageUrl);
-    const packageFile = await readIntuneWinPackage(suppliedPackage);
+    const createPackage = await getCreatePackage(createPlan, template);
+    const packageFile = await readIntuneWinPackage(createPackage.packageFile);
     if (packageFile.setupFile !== template.setupFilePath) {
       throw new Error(
         `The supplied Intune package setup file is ${packageFile.setupFile}; expected ${template.setupFilePath}.`
       );
     }
-    const detectionScript = await fetchTextAsset(template.detectionScriptUrl, "Win32 detection script");
+    const detectionScript = createPackage.detectionScript;
     const iconBase64 = await fetchOptionalIcon(template.iconUrl);
     const app = await createWin32AppFromPackage(
       context.client,

@@ -91,7 +91,7 @@ describe("executeWin32AppTask", () => {
     });
   });
 
-  it.each(getWin32AppTemplates())("loads, publishes, and deletes the $displayName package", async (template) => {
+  it.each(getWin32AppTemplates().filter((template) => template.packageUrl))("loads, publishes, and deletes the $displayName package", async (template) => {
     const packageBlob = new Blob(["package"]);
     const iconBytes = new Uint8Array([1, 2, 3]);
     const parsedPackage = {

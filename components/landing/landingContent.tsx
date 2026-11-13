@@ -66,7 +66,7 @@ export const LANDING_TEMPLATE_COUNTS = {
   filters: 44,
   compliance: 10,
   appProtection: 10,
-  win32Apps: 5,
+  win32Apps: 20,
   conditionalAccess: 20,
   enrollment: 4,
   notification: 1,

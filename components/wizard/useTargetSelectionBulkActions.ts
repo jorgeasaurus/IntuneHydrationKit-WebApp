@@ -5,6 +5,7 @@ import {
   baselineFileMatchesPlatform,
   cisFileMatchesPlatform,
   getBaselinePolicyPathsForPlatforms,
+  getDefaultSelectableItems,
   getBaselinePolicyPathsMatchingSearch,
   getCISPolicyPathsForPlatforms,
   getCISPolicyPathsMatchingSearch,
@@ -118,7 +119,7 @@ export function useTargetSelectionBulkActions({
       );
 
       for (const [category, items] of categoryEntries) {
-        const matchingItems = items.filter(item =>
+        const matchingItems = getDefaultSelectableItems(items).filter(item =>
           platforms.some(platform => platformMatchesItem(platform, item, category))
         );
 
@@ -165,7 +166,8 @@ export function useTargetSelectionBulkActions({
     if (!isCurrent()) return;
     const newSelected: Record<string, Set<string>> = {};
     for (const [cat, items] of Object.entries(categoryItemsToSelect)) {
-      newSelected[cat] = new Set(items.map(i => i.displayName));
+      // Opt-in items (WinGet catalog apps) are not part of Select All.
+      newSelected[cat] = new Set(getDefaultSelectableItems(items).map(i => i.displayName));
     }
     setSelectedItems(prev => ({ ...prev, ...newSelected }));
 
@@ -268,7 +270,7 @@ export function useTargetSelectionBulkActions({
         if (category === "baseline" || category === "cisBaseline") continue;
 
         const items = allCategoryItems[category] || [];
-        const matchingItems = items.filter(item => platformMatchesItem(platformId, item, category));
+        const matchingItems = getDefaultSelectableItems(items).filter(item => platformMatchesItem(platformId, item, category));
         if (matchingItems.length > 0) {
           if (!targetSet.has(category)) {
             categoriesToEnable.push(category);

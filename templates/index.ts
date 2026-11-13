@@ -13,6 +13,7 @@ import {
 export * from "./filterManifest";
 export * from "./groupManifest";
 export * from "./win32Apps";
+import { getWin32AppTemplates, WINGET_CATALOG_WIN32_APPS } from "./win32Apps";
 
 /**
  * Template metadata for UI display
@@ -51,8 +52,8 @@ export const TEMPLATE_METADATA = {
   },
   win32Apps: {
     displayName: "Win32 Apps",
-    description: "Windows applications and Autopilot scripts packaged for Intune deployment",
-    count: 5,
+    description: `Windows applications and Autopilot scripts packaged for Intune deployment (${WINGET_CATALOG_WIN32_APPS.length} WinGet catalog apps are opt-in)`,
+    count: getWin32AppTemplates().length,
     icon: "Package",
   },
   enrollment: {

@@ -11,6 +11,7 @@ import {
   type WizardState,
 } from "@/types/hydration";
 import { autopilotBrandingCustomizationSchema } from "@/lib/win32/autopilotBrandingConfig";
+import { winGetVersionSelectionSchema } from "@/lib/winget/versionCatalog";
 
 /**
  * The wizard scope of a run. A preview keeps it, so that "Run this for real" can build the
@@ -67,6 +68,7 @@ const categorySelectionSchema = z.strictObject({
 const win32AppsSelectionSchema = z.strictObject({
   selectedItems: z.array(z.string()),
   autopilotBranding: autopilotBrandingCustomizationSchema.optional(),
+  wingetVersions: winGetVersionSelectionSchema.optional(),
 } satisfies ShapeFor<Win32AppsSelection>);
 
 const categorySelectionsShape = {

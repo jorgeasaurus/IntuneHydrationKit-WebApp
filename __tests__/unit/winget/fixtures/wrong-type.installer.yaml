@@ -1,0 +1,6 @@
+PackageIdentifier: Contoso.Tool
+PackageVersion: "2.0"
+PackageLocale: en-US
+Publisher: Contoso
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0

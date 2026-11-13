@@ -1,0 +1,19 @@
+# Root-level InstallerType, Scope and ReleaseDate apply to every installer.
+PackageIdentifier: Contoso.Tool
+PackageVersion: "24.10"
+InstallerType: wix
+Scope: machine
+ReleaseDate: 2026-03-14
+Installers:
+- Architecture: x64
+  InstallerUrl: https://downloads.contoso.example/tool/24.10/tool-x64.msi
+  InstallerSha256: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+- Architecture: arm64
+  InstallerUrl: https://downloads.contoso.example/tool/24.10/tool-arm64.msi
+  InstallerSha256: BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+- Architecture: x86
+  Scope: user
+  InstallerType: EXE
+  InstallerUrl: https://downloads.contoso.example/tool/24.10/tool-x86.exe
+ManifestType: installer
+ManifestVersion: 1.10.0

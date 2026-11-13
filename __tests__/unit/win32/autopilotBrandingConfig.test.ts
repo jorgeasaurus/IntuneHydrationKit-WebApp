@@ -19,9 +19,9 @@ import {
 } from "@/lib/win32/autopilotBrandingConfig";
 import {
   AUTOPILOT_BRANDING_CONFIGURATION_ENTRY,
-  MAX_WIN32_UPLOAD_BYTES,
   buildAutopilotBrandingPackage,
 } from "@/lib/win32/autopilotBrandingPackage";
+import { MAX_WIN32_UPLOAD_BYTES } from "@/lib/win32/intuneWinWriter";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
 import { readStoredZipEntries } from "@/lib/win32/storedZip";
 import { AUTOPILOT_BRANDING_WIN32_APP, KIT_TEMPLATE_ID_NOTE } from "@/templates/win32Apps";

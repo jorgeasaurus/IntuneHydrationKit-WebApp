@@ -18,6 +18,8 @@
 import { bytesToBase64 } from "@/lib/utils/base64";
 import { writeStoredZip } from "@/lib/win32/storedZip";
 
+/** The largest package that /api/win32-upload accepts. */
+export const MAX_WIN32_UPLOAD_BYTES = 4 * 1024 * 1024;
 export const INTUNEWIN_CONTENT_ENTRY = "IntuneWinPackage/Contents/IntunePackage.intunewin";
 export const INTUNEWIN_DETECTION_ENTRY = "IntuneWinPackage/Metadata/Detection.xml";
 const ENCRYPTED_FILE_NAME = "IntunePackage.intunewin";

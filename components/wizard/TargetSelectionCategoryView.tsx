@@ -6,7 +6,9 @@ import type { TargetSelectionViewModel } from "@/components/wizard/targetSelecti
 import type { MouseEvent } from "react";
 import { IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
-import { AUTOPILOT_BRANDING_WIN32_APP } from "@/templates/win32Apps";
+import { AUTOPILOT_BRANDING_WIN32_APP, getWin32AppTemplateByName } from "@/templates/win32Apps";
+import { WinGetCatalogNotes, WinGetVersionPicker } from "@/components/wizard/WinGetVersionPicker";
+import { useWinGetVersionCatalog } from "@/components/wizard/winGetVersionChoices";
 import { AutopilotBrandingCustomizeControl } from "@/components/wizard/AutopilotBrandingCustomizeDialog";
 import {
   baselineFileMatchesSearch,
@@ -467,6 +469,8 @@ function GenericCategoryPanel({
   const { normalized } = model.search;
   const { selectAllInCategory, deselectAllInCategory, toggleItem } = model.actions;
   const filteredItems = filterItemsBySearch(items, normalized);
+  const showsWinGetVersions = target.id === "win32Apps" && model.selection.canPinWinGetVersions;
+  const winGetCatalog = useWinGetVersionCatalog(showsWinGetVersions);
 
   return (
     <div className="border border-t-0 rounded-b-md p-4 bg-muted/30 space-y-3">
@@ -503,6 +507,13 @@ function GenericCategoryPanel({
                 {item.subtype && (
                   <span className="text-xs text-muted-foreground shrink-0">{item.subtype}</span>
                 )}
+                {showsWinGetVersions && selected.has(item.displayName) && (
+                  <WinGetItemVersionPicker
+                    itemName={item.displayName}
+                    model={model}
+                    catalog={winGetCatalog.catalog}
+                  />
+                )}
                 {target.id === "win32Apps" &&
                   item.displayName === AUTOPILOT_BRANDING_WIN32_APP.displayName &&
                   model.selection.canCustomizeAutopilotBranding && (
@@ -521,10 +532,34 @@ function GenericCategoryPanel({
         <p className="text-sm text-muted-foreground">No items available.</p>
       )}
 
+      {showsWinGetVersions && <WinGetCatalogNotes catalogError={winGetCatalog.error} />}
+
       {selected.size === 0 && !isLoading && items.length > 0 && (
         <p className="text-sm text-destructive">Please select at least one {target.label.toLowerCase().replace(/s$/, "")}</p>
       )}
     </div>
+  );
+}
+
+/** Version picker of a selected WinGet app. Nothing shows for an app that is not a WinGet app. */
+function WinGetItemVersionPicker({
+  itemName,
+  model,
+  catalog,
+}: {
+  itemName: string;
+  model: TargetSelectionViewModel;
+  catalog: ReturnType<typeof useWinGetVersionCatalog>["catalog"];
+}) {
+  const template = getWin32AppTemplateByName(itemName);
+  if (!template?.winget) return null;
+  return (
+    <WinGetVersionPicker
+      template={template}
+      value={model.selection.wingetVersions[template.id]}
+      onChange={(version) => model.actions.setWinGetVersion(template.id, version)}
+      catalog={catalog}
+    />
   );
 }
 
