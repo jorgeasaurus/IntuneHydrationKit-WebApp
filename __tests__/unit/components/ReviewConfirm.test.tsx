@@ -97,6 +97,66 @@ describe('ReviewConfirm', () => {
     })
   })
 
+  it('lists the apps that a customized Autopilot Branding app removes and the tasks that run', () => {
+    useWizardState.mockReturnValue({
+      state: createState({
+        selectedTargets: ['win32Apps'],
+        categorySelections: {
+          win32Apps: {
+            selectedItems: ['Autopilot Branding (Cleanup) - [IHD]'],
+            autopilotBranding: { removedApps: ['Clipchamp.Clipchamp', '9NHT9RB2F4HD'], enabledTasks: ['Hide-ABWidgets'] },
+          },
+        },
+      }),
+      setConfirmed,
+      setUpdateExisting,
+      previousStep
+    })
+
+    renderReviewConfirm()
+
+    const section = screen.getByRole('region', { name: 'Autopilot Branding (customized)' })
+    expect(section).toHaveTextContent('Apps to remove (2)')
+    expect(section).toHaveTextContent('Clipchamp (Clipchamp.Clipchamp)')
+    expect(section).toHaveTextContent('9NHT9RB2F4HD')
+    expect(section).toHaveTextContent('Tasks that run (2)')
+    expect(section).toHaveTextContent('Hide-ABWidgets')
+    expect(section).toHaveTextContent('Remove-ABProvisionedApps')
+    expect(section).not.toHaveTextContent('Update-ABEdge')
+    expect(section).toHaveTextContent('Create skips an app that already exists.')
+  })
+
+  it('shows no Autopilot Branding section without a customization or in delete mode', () => {
+    const categorySelections = {
+      win32Apps: {
+        selectedItems: ['Autopilot Branding (Cleanup) - [IHD]'],
+        autopilotBranding: { removedApps: ['MSTeams' as const], enabledTasks: [] },
+      },
+    }
+    useWizardState.mockReturnValue({
+      state: createState({ operationMode: 'delete', selectedTargets: ['win32Apps'], categorySelections }),
+      setConfirmed,
+      setUpdateExisting,
+      previousStep
+    })
+    const { unmount } = render(
+      <SettingsProvider>
+        <ReviewConfirm />
+      </SettingsProvider>
+    )
+    expect(screen.queryByRole('region', { name: 'Autopilot Branding (customized)' })).not.toBeInTheDocument()
+    unmount()
+
+    useWizardState.mockReturnValue({
+      state: createState({ selectedTargets: ['win32Apps'], categorySelections: { win32Apps: { selectedItems: [] } } }),
+      setConfirmed,
+      setUpdateExisting,
+      previousStep
+    })
+    renderReviewConfirm()
+    expect(screen.queryByRole('region', { name: 'Autopilot Branding (customized)' })).not.toBeInTheDocument()
+  })
+
   it('blurs the tenant identity in the execution brief when Demo Mode is on', () => {
     localStorage.setItem('app-settings:v1', JSON.stringify({ stopOnFirstError: false, demoMode: true }))
 

@@ -6,6 +6,7 @@ import type {
   Target,
 } from "@/components/wizard/targetSelectionModel";
 import type { DroppedProfileItem, ScopeSelection } from "@/lib/profiles/scopeProfiles";
+import type { AutopilotBrandingCustomization } from "@/lib/win32/autopilotBrandingConfig";
 
 export interface TargetSelectionSearchModel {
   query: string;
@@ -33,6 +34,10 @@ export interface TargetSelectionStateModel {
   selectedCISPolicies: Set<string>;
   totalSelectedCount: number;
   isValid: boolean;
+  /** Customization of the Autopilot Branding app, or undefined for the kit configuration. */
+  autopilotBranding: AutopilotBrandingCustomization | undefined;
+  /** True in create mode, where the Autopilot Branding app can be customized. */
+  canCustomizeAutopilotBranding: boolean;
   getSelectedCount: (category: TaskCategory) => number;
   getTotalCount: (category: TaskCategory) => number;
 }
@@ -62,6 +67,7 @@ export interface TargetSelectionActionsModel {
   isPlatformFullySelected: (platform: OIBPlatformId) => boolean;
   isPlatformPartiallySelected: (platform: OIBPlatformId) => boolean;
   toggleItem: (category: TaskCategory, itemName: string) => void;
+  setAutopilotBranding: (customization: AutopilotBrandingCustomization | undefined) => void;
 }
 
 export interface TargetSelectionNavigationModel {

@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { isOwnedWin32App } from "@/lib/graph/win32Apps";
 import { addHydrationMarker } from "@/lib/utils/hydrationMarker";
 import { readIntuneWinPackage } from "@/lib/win32/intuneWinPackage";
+import { readStoredZipEntries } from "@/lib/win32/storedZip";
 import { AUTOPILOT_BRANDING_VERSION, AUTOPILOT_BRANDING_WIN32_APP as template } from "@/templates/win32Apps";
 
 const ROOT = join(process.cwd(), "public/win32-apps");
@@ -77,6 +78,45 @@ describe("Autopilot Branding template", () => {
     expect(bytes.byteLength).toBeLessThan(4 * 1024 * 1024);
   });
 
+  it("ships the unencrypted package content as one stored ZIP file for customized packages", () => {
+    const bytes = readFileSync(join(ROOT, "autopilot-branding/content.zip"));
+    const entries = readStoredZipEntries(
+      bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer,
+      "content.zip"
+    );
+    const names = entries.map((entry) => entry.name);
+    const text = (name: string) => new TextDecoder().decode(entries.find((entry) => entry.name === name)!.content);
+
+    expect(names).toEqual(expect.arrayContaining([
+      "AutopilotBranding.json",
+      "AutopilotBranding.ps1",
+      "AutopilotBranding/AutopilotBranding.psd1",
+      "LICENSE-AutopilotBranding.txt",
+    ]));
+    // The module, the runner, the configuration, and the license only: no asset files and no template folder.
+    expect(names.every((name) =>
+      ["AutopilotBranding.json", "AutopilotBranding.ps1", "LICENSE-AutopilotBranding.txt"].includes(name) ||
+      name.startsWith("AutopilotBranding/")
+    )).toBe(true);
+    expect(names.some((name) => name.startsWith("Assets/") || name.includes("/Template/"))).toBe(false);
+    expect(text("AutopilotBranding.ps1")).toBe(readFileSync(join(ROOT, "autopilot-branding/AutopilotBranding.ps1"), "utf8"));
+    expect(text("LICENSE-AutopilotBranding.txt")).toBe(
+      readFileSync(join(ROOT, "autopilot-branding/LICENSE-AutopilotBranding.txt"), "utf8")
+    );
+    // The packaged configuration is the committed one, with the file parameters of disabled tasks cleared.
+    const packaged = JSON.parse(text("AutopilotBranding.json")) as BrandingConfiguration;
+    expect(Object.keys(packaged.Tasks)).toEqual(Object.keys(configuration.Tasks));
+    for (const [name, task] of Object.entries(packaged.Tasks)) {
+      expect(task.Enabled, name).toBe(configuration.Tasks[name].Enabled);
+      for (const [parameter, value] of Object.entries(task.Parameters)) {
+        const committed = configuration.Tasks[name].Parameters[parameter];
+        const cleared = value === "" && String(committed).startsWith("Assets/");
+        expect(cleared ? committed : value, `${name} ${parameter}`).toEqual(committed);
+      }
+    }
+    expect(bytes.byteLength).toBeLessThan(1024 * 1024);
+  });
+
   it("uses the commands and tag file that AutopilotBranding documents", () => {
     const tagFile = "Microsoft\\AutopilotBranding\\AutopilotBranding.ps1.tag";
     expect(template.installCommandLine).toBe("powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\\AutopilotBranding.ps1");
@@ -91,6 +131,7 @@ describe("Autopilot Branding template", () => {
       "AutopilotBranding.ps1",
       "Detect-AutopilotBranding.ps1",
       "LICENSE-AutopilotBranding.txt",
+      "content.zip",
     ]);
     const license = readFileSync(join(ROOT, "autopilot-branding/LICENSE-AutopilotBranding.txt"), "utf8");
     expect(license).toContain("MIT License");

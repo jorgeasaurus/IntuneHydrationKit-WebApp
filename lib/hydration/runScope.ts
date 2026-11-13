@@ -7,8 +7,10 @@ import {
   type CISCategoryId,
   type OIBPlatformId,
   type TaskCategory,
+  type Win32AppsSelection,
   type WizardState,
 } from "@/types/hydration";
+import { autopilotBrandingCustomizationSchema } from "@/lib/win32/autopilotBrandingConfig";
 
 /**
  * The wizard scope of a run. A preview keeps it, so that "Run this for real" can build the
@@ -62,6 +64,10 @@ const baselineSelectionSchema = z.strictObject({
 const categorySelectionSchema = z.strictObject({
   selectedItems: z.array(z.string()),
 } satisfies ShapeFor<CategorySelection>);
+const win32AppsSelectionSchema = z.strictObject({
+  selectedItems: z.array(z.string()),
+  autopilotBranding: autopilotBrandingCustomizationSchema.optional(),
+} satisfies ShapeFor<Win32AppsSelection>);
 
 const categorySelectionsShape = {
   groups: categorySelectionSchema.optional(),
@@ -69,7 +75,7 @@ const categorySelectionsShape = {
   compliance: categorySelectionSchema.optional(),
   conditionalAccess: categorySelectionSchema.optional(),
   appProtection: categorySelectionSchema.optional(),
-  win32Apps: categorySelectionSchema.optional(),
+  win32Apps: win32AppsSelectionSchema.optional(),
   enrollment: categorySelectionSchema.optional(),
   notification: categorySelectionSchema.optional(),
   baseline: baselineSelectionSchema.optional(),

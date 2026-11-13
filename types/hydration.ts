@@ -3,6 +3,7 @@
  */
 
 import { PrerequisiteCheckResult } from "./prerequisites";
+import type { AutopilotBrandingCustomization } from "@/lib/win32/autopilotBrandingConfig";
 
 export const CLOUD_ENVIRONMENTS = ["global"] as const;
 
@@ -113,6 +114,11 @@ interface HydrationTaskBase {
   drift?: TaskDriftEvidence;
   update?: TaskUpdateEvidence;
   createdObject?: TaskCreatedObject;
+  /**
+   * Create tasks of the Autopilot Branding app only: the user customization of its configuration.
+   * A retry or resume copies it, so the new run uploads a package with the same configuration.
+   */
+  autopilotBranding?: AutopilotBrandingCustomization;
   error?: string;
   warning?: string;
   startTime?: Date;
@@ -263,6 +269,14 @@ export interface CategorySelection {
 }
 
 /**
+ * Selection of the Win32 apps category. The Autopilot Branding app can have a customization.
+ */
+export interface Win32AppsSelection extends CategorySelection {
+  /** Absent when the user did not customize the app (the prebuilt package is used). */
+  autopilotBranding?: AutopilotBrandingCustomization;
+}
+
+/**
  * All category selections tracked in wizard state
  */
 export interface CategorySelections {
@@ -271,7 +285,7 @@ export interface CategorySelections {
   compliance?: CategorySelection;
   conditionalAccess?: CategorySelection;
   appProtection?: CategorySelection;
-  win32Apps?: CategorySelection;
+  win32Apps?: Win32AppsSelection;
   enrollment?: CategorySelection;
   notification?: CategorySelection;
   baseline?: BaselineSelection;
