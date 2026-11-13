@@ -1,4 +1,5 @@
 import type { ActivityMessage } from "@/lib/hydration/types";
+import type { RunLicenses, RunScope } from "@/lib/hydration/runScope";
 import type {
   BatchProgress,
   CloudEnvironment,
@@ -17,6 +18,10 @@ export interface ExecutionRunConfiguration {
   operationMode: OperationMode;
   isPreview: boolean;
   selectedObjectCount: number;
+  /** Wizard scope of the run. Only wizard runs and "Run this for real" runs have it. */
+  scope?: RunScope;
+  /** Pre-flight license results. Runs that continue this run use them again. */
+  licenses?: RunLicenses;
 }
 
 export interface ExecutionState {

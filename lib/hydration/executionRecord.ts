@@ -3,6 +3,7 @@ import { EXECUTION_RECORD_STORAGE_KEY } from "@/lib/storageKeys";
 import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { summaryMatchesExecution } from "@/lib/hydration/reporter";
 import { ACTIVITY_MESSAGE_TYPES } from "@/lib/hydration/types";
+import { runLicensesSchema, runScopeSchema } from "@/lib/hydration/runScope";
 import {
   CLOUD_ENVIRONMENTS,
   OPERATION_MODES,
@@ -132,110 +133,146 @@ const recordBase = z.strictObject({
   tasks: z.array(taskSchema),
   activityLog: z.array(activityMessageSchema),
   startTime: dateSchema.nullable(),
-  endTime: dateSchema,
   /** Paused time of the run. Records saved before this field was added do not have it. */
   pausedMs: z.number().nonnegative().optional(),
+  /** Wizard scope of the run, for "Run this for real". Older records do not have it. */
+  // A stored scope that the schema cannot read exactly is dropped, so the run stays readable
+  // but "Run this for real" is not offered from it (fail closed).
+  scope: runScopeSchema.optional().catch(undefined),
+  /** Pre-flight license results of the run. Older records do not have it. */
+  licenses: runLicensesSchema.optional(),
 });
 
 const reportableRecordSchema = recordBase.extend({
+  endTime: dateSchema,
   outcome: z.enum(REPORTABLE_EXECUTION_OUTCOMES),
   summary: summarySchema,
   fatalError: z.null(),
 });
 
 const failedRecordSchema = recordBase.extend({
+  endTime: dateSchema,
   outcome: z.literal("failed"),
   summary: z.null(),
   fatalError: z.string().min(1),
 });
 
-const executionRecordSchema = z.union([reportableRecordSchema, failedRecordSchema]).superRefine((record, context) => {
-  if (
-    record.summary &&
-    (record.summary.tenantId !== record.tenantId || record.summary.operationMode !== record.operationMode)
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: "Summary identity does not match the execution record.",
-      path: ["summary"],
-    });
-  }
-  if (record.tasks.some((task) => task.operation !== record.operationMode)) {
-    context.addIssue({
-      code: "custom",
-      message: "Task operation does not match the execution record.",
-      path: ["tasks"],
-    });
-  }
-  if (
-    record.tasks.some(
-      (task) => task.createdObject && (record.isPreview || task.operation !== "create" || task.status !== "success"),
-    )
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: "Only successful live create tasks can have a created object.",
-      path: ["tasks"],
-    });
-  }
-  if (record.tasks.some((task) => task.status === "pending" || task.status === "running")) {
-    context.addIssue({
-      code: "custom",
-      message: "Terminal execution records cannot contain unfinished tasks.",
-      path: ["tasks"],
-    });
-  }
-  const outcomeMatchesTasks =
-    record.outcome === "failed" ||
-    deriveExecutionOutcome(record.tasks) === record.outcome ||
-    (record.outcome === "cancelled" && record.tasks.length === 0);
-  if (!outcomeMatchesTasks) {
-    context.addIssue({
-      code: "custom",
-      message: "Outcome does not match the terminal task states.",
-      path: ["outcome"],
-    });
-  }
-  if (
-    record.pausedMs &&
-    (record.startTime === null || record.pausedMs > record.endTime.getTime() - record.startTime.getTime())
-  ) {
-    context.addIssue({
-      code: "custom",
-      message: "Paused time is longer than the run.",
-      path: ["pausedMs"],
-    });
-  }
-  if (record.summary) {
-    const summaryMatches =
-      record.startTime !== null &&
-      summaryMatchesExecution(record.summary, {
-        tenantId: record.tenantId,
-        tenantName: record.tenantName,
-        operationMode: record.operationMode,
-        startTime: record.startTime,
-        endTime: record.endTime,
-        tasks: record.tasks,
-        pausedMs: record.pausedMs,
-      });
-    const batchStats = record.summary.batchStats;
-    const batchStatsMatch =
-      !batchStats ||
-      (batchStats.batchedTaskCount <= record.tasks.length &&
-        batchStats.sequentialTaskCount <= record.tasks.length &&
-        (batchStats.batchRequestCount > 0 || batchStats.batchedTaskCount === 0) &&
-        (!record.isPreview || (batchStats.batchRequestCount === 0 && batchStats.batchedTaskCount === 0)));
-    if (!summaryMatches || !batchStatsMatch) {
+/**
+ * Progress of a run that has not reached a terminal state. The dashboard writes it during
+ * the run. When the page loads and no run is active in memory, a checkpoint record means
+ * that the run was interrupted (for example by a refresh or a closed tab).
+ */
+const checkpointRecordSchema = recordBase.extend({
+  endTime: z.null(),
+  outcome: z.null(),
+  summary: z.null(),
+  fatalError: z.null(),
+  /** Time of the last checkpoint write. */
+  checkpointAt: dateSchema,
+});
+
+const executionRecordSchema = z
+  .union([reportableRecordSchema, failedRecordSchema, checkpointRecordSchema])
+  .superRefine((record, context) => {
+    if (
+      record.summary &&
+      (record.summary.tenantId !== record.tenantId || record.summary.operationMode !== record.operationMode)
+    ) {
       context.addIssue({
         code: "custom",
-        message: "Summary does not match the execution record.",
+        message: "Summary identity does not match the execution record.",
         path: ["summary"],
       });
     }
-  }
-});
+    if (record.tasks.some((task) => task.operation !== record.operationMode)) {
+      context.addIssue({
+        code: "custom",
+        message: "Task operation does not match the execution record.",
+        path: ["tasks"],
+      });
+    }
+    if (
+      record.tasks.some(
+        (task) => task.createdObject && (record.isPreview || task.operation !== "create" || task.status !== "success"),
+      )
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Only successful live create tasks can have a created object.",
+        path: ["tasks"],
+      });
+    }
+    const isCheckpoint = record.outcome === null;
+    if (!isCheckpoint && record.tasks.some((task) => task.status === "pending" || task.status === "running")) {
+      context.addIssue({
+        code: "custom",
+        message: "Terminal execution records cannot contain unfinished tasks.",
+        path: ["tasks"],
+      });
+    }
+    const outcomeMatchesTasks =
+      isCheckpoint ||
+      record.outcome === "failed" ||
+      deriveExecutionOutcome(record.tasks) === record.outcome ||
+      (record.outcome === "cancelled" && record.tasks.length === 0);
+    if (!outcomeMatchesTasks) {
+      context.addIssue({
+        code: "custom",
+        message: "Outcome does not match the terminal task states.",
+        path: ["outcome"],
+      });
+    }
+    const lastKnownTime = record.endTime ?? (isCheckpoint ? record.checkpointAt : null);
+    if (
+      record.pausedMs &&
+      (record.startTime === null ||
+        lastKnownTime === null ||
+        record.pausedMs > lastKnownTime.getTime() - record.startTime.getTime())
+    ) {
+      context.addIssue({
+        code: "custom",
+        message: "Paused time is longer than the run.",
+        path: ["pausedMs"],
+      });
+    }
+    if (record.summary) {
+      const summaryMatches =
+        record.startTime !== null &&
+        record.endTime !== null &&
+        summaryMatchesExecution(record.summary, {
+          tenantId: record.tenantId,
+          tenantName: record.tenantName,
+          operationMode: record.operationMode,
+          startTime: record.startTime,
+          endTime: record.endTime,
+          tasks: record.tasks,
+          pausedMs: record.pausedMs,
+        });
+      const batchStats = record.summary.batchStats;
+      const batchStatsMatch =
+        !batchStats ||
+        (batchStats.batchedTaskCount <= record.tasks.length &&
+          batchStats.sequentialTaskCount <= record.tasks.length &&
+          (batchStats.batchRequestCount > 0 || batchStats.batchedTaskCount === 0) &&
+          (!record.isPreview || (batchStats.batchRequestCount === 0 && batchStats.batchedTaskCount === 0)));
+      if (!summaryMatches || !batchStatsMatch) {
+        context.addIssue({
+          code: "custom",
+          message: "Summary does not match the execution record.",
+          path: ["summary"],
+        });
+      }
+    }
+  });
 
 export type ExecutionRecord = z.infer<typeof executionRecordSchema>;
+export type ExecutionCheckpointRecord = Extract<ExecutionRecord, { outcome: null }>;
+export type TerminalExecutionRecord = Exclude<ExecutionRecord, ExecutionCheckpointRecord>;
+
+/** True when the record is a checkpoint of a run that did not reach a terminal state. */
+export function isExecutionCheckpoint(record: ExecutionRecord): record is ExecutionCheckpointRecord {
+  return record.outcome === null;
+}
 
 export function readExecutionRecord(storage: Storage): ExecutionRecord | null {
   const value = storage.getItem(EXECUTION_RECORD_STORAGE_KEY);
