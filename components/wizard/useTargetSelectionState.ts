@@ -39,6 +39,18 @@ export function useTargetSelectionState(
   const [autopilotBranding, setAutopilotBranding] = useState<AutopilotBrandingCustomization | undefined>(
     categorySelections?.win32Apps?.autopilotBranding
   );
+  // Pinned WinGet versions by Win32 app template ID. An app that is not a key uses the latest version.
+  const [wingetVersions, setWinGetVersions] = useState<Record<string, string>>(
+    () => ({ ...categorySelections?.win32Apps?.wingetVersions })
+  );
+  const setWinGetVersion = (templateId: string, version: string | undefined) => {
+    setWinGetVersions(prev => {
+      const next = { ...prev };
+      if (version === undefined) delete next[templateId];
+      else next[templateId] = version;
+      return next;
+    });
+  };
 
   // Async selection writers (category defaults, platform filters, Select All) check this
   // generation after they await a catalog. A profile apply increments it, so a load that
@@ -129,6 +141,9 @@ export function useTargetSelectionState(
     setSelectedCISPolicies,
     autopilotBranding,
     setAutopilotBranding,
+    wingetVersions,
+    setWinGetVersions,
+    setWinGetVersion,
     toggleItem,
     toggleCISPolicy,
     toggleCISCategoryExpanded,

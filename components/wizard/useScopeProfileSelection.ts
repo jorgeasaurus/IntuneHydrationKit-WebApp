@@ -18,6 +18,8 @@ interface ScopeProfileSelectionOptions {
   selectedCISPolicies: Set<string>;
   autopilotBranding: AutopilotBrandingCustomization | undefined;
   setAutopilotBranding: Dispatch<SetStateAction<AutopilotBrandingCustomization | undefined>>;
+  wingetVersions: Record<string, string>;
+  setWinGetVersions: Dispatch<SetStateAction<Record<string, string>>>;
   setTargets: Dispatch<SetStateAction<TaskCategory[]>>;
   setSelectedItems: Dispatch<SetStateAction<Record<string, Set<string>>>>;
   setSelectedCISPolicies: Dispatch<SetStateAction<Set<string>>>;
@@ -63,6 +65,7 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
       targets: [...options.targets],
       items,
       ...(options.autopilotBranding ? { autopilotBranding: options.autopilotBranding } : {}),
+      ...(Object.keys(options.wingetVersions).length > 0 ? { wingetVersions: options.wingetVersions } : {}),
     };
   };
 
@@ -119,6 +122,8 @@ export function useScopeProfileSelection(options: ScopeProfileSelectionOptions) 
     options.setSelectedCISPolicies(new Set(resolved.selection.items.cisBaseline ?? []));
     // A profile without a customization gives the kit configuration.
     options.setAutopilotBranding(resolved.selection.autopilotBranding);
+    // A profile without pinned versions gives the latest version of every app.
+    options.setWinGetVersions({ ...resolved.selection.wingetVersions });
     options.setExpandedCategories(new Set(targets));
     return resolved.dropped;
   };

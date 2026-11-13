@@ -81,6 +81,7 @@ async function fetchCategoryData(category: TaskCategory): Promise<CategoryItem[]
         displayName: app.displayName,
         description: `${app.publisher} ${app.version}`,
         subtype: "Windows",
+        ...(app.optIn ? { optIn: true } : {}),
       }));
     default:
       return [];

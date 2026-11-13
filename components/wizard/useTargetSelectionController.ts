@@ -4,6 +4,7 @@ import { useWizardState } from "@/hooks/useWizardState";
 import { TEMPLATE_METADATA } from "@/templates";
 import {
   countSelectedPaths,
+  getDefaultSelectableItems,
   getBaselinePolicyPathsForPlatform,
   getCISPolicyPathsForCategory,
   getCISPolicyPathsForPlatforms,
@@ -67,7 +68,7 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       return;
     }
 
-    const items = await data.ensureCategoryItems(category);
+    const items = getDefaultSelectableItems(await data.ensureCategoryItems(category));
     if (!isCurrent()) return;
     const currentSelection = selectionState.selectedItems[category];
     if (currentSelection && currentSelection.size > 0) {
@@ -143,9 +144,10 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       return;
     }
 
+    // Without a search, opt-in items (WinGet catalog apps) are not selected.
     selectionState.setSelectedItems(prev => ({
       ...prev,
-      [category]: new Set(items.map(i => i.displayName)),
+      [category]: new Set(getDefaultSelectableItems(items).map(i => i.displayName)),
     }));
   };
 
@@ -277,6 +279,7 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     selectedItems: selectionState.selectedItems,
     selectedCISPolicies: selectionState.selectedCISPolicies,
     autopilotBranding: selectionState.autopilotBranding,
+    wingetVersions: selectionState.wingetVersions,
     cisManifest: data.cisManifest,
     setSelectedTargets: wizard.setSelectedTargets,
     setSelectedCISCategories: wizard.setSelectedCISCategories,
@@ -290,6 +293,8 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
     selectedCISPolicies: selectionState.selectedCISPolicies,
     autopilotBranding: selectionState.autopilotBranding,
     setAutopilotBranding: selectionState.setAutopilotBranding,
+    wingetVersions: selectionState.wingetVersions,
+    setWinGetVersions: selectionState.setWinGetVersions,
     setTargets: selectionState.setTargets,
     setSelectedItems: selectionState.setSelectedItems,
     setSelectedCISPolicies: selectionState.setSelectedCISPolicies,
@@ -330,6 +335,8 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       isValid,
       autopilotBranding: selectionState.autopilotBranding,
       canCustomizeAutopilotBranding: wizard.state.operationMode === "create",
+      wingetVersions: selectionState.wingetVersions,
+      canPinWinGetVersions: wizard.state.operationMode === "create",
       getSelectedCount,
       getTotalCount,
     },
@@ -362,6 +369,7 @@ export function useTargetSelectionController(): TargetSelectionViewModel {
       isPlatformPartiallySelected,
       toggleItem: selectionState.toggleItem,
       setAutopilotBranding: selectionState.setAutopilotBranding,
+      setWinGetVersion: selectionState.setWinGetVersion,
     },
     navigation: {
       previousStep: wizard.previousStep,

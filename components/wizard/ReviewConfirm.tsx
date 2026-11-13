@@ -14,6 +14,7 @@ import { BaselineChangeReview } from "@/components/wizard/BaselineChangeReview";
 import { ExecutionApprovalCard } from "@/components/wizard/ExecutionApprovalCard";
 import { ExistingObjectsReview } from "@/components/wizard/ConflictSummary";
 import { AutopilotBrandingReview } from "@/components/wizard/AutopilotBrandingReview";
+import { WinGetVersionsReview } from "@/components/wizard/WinGetVersionsReview";
 import {
   INITIAL_EXISTING_OBJECTS_STATE,
   getUpdateExisting,
@@ -263,6 +264,7 @@ export function ReviewConfirm(): React.JSX.Element {
               </div>
             </div>
             <AutopilotBrandingReview state={state} />
+            <WinGetVersionsReview state={state} />
           </div>
 
           <div className="space-y-6">

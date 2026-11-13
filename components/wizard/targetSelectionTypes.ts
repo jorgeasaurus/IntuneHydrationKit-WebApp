@@ -38,6 +38,10 @@ export interface TargetSelectionStateModel {
   autopilotBranding: AutopilotBrandingCustomization | undefined;
   /** True in create mode, where the Autopilot Branding app can be customized. */
   canCustomizeAutopilotBranding: boolean;
+  /** Pinned WinGet versions by Win32 app template ID. An app that is not a key uses the latest version. */
+  wingetVersions: Record<string, string>;
+  /** True in create mode, where a WinGet app can be pinned to a version. */
+  canPinWinGetVersions: boolean;
   getSelectedCount: (category: TaskCategory) => number;
   getTotalCount: (category: TaskCategory) => number;
 }
@@ -68,6 +72,8 @@ export interface TargetSelectionActionsModel {
   isPlatformPartiallySelected: (platform: OIBPlatformId) => boolean;
   toggleItem: (category: TaskCategory, itemName: string) => void;
   setAutopilotBranding: (customization: AutopilotBrandingCustomization | undefined) => void;
+  /** Pin a WinGet app to a version, or undefined for the latest version. */
+  setWinGetVersion: (templateId: string, version: string | undefined) => void;
 }
 
 export interface TargetSelectionNavigationModel {

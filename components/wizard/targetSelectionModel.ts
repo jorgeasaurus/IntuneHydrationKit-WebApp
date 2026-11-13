@@ -19,6 +19,16 @@ export interface CategoryItem {
   displayName: string;
   description?: string;
   subtype?: string;
+  /**
+   * True for an item that a default selection, Select All, or a platform filter does not select
+   * (the WinGet catalog Win32 apps). The user selects it one at a time or with a search.
+   */
+  optIn?: boolean;
+}
+
+/** The items that a default selection, Select All, or a platform filter selects. */
+export function getDefaultSelectableItems(items: CategoryItem[]): CategoryItem[] {
+  return items.filter((item) => !item.optIn);
 }
 
 export const TARGETS: Target[] = Object.entries(TEMPLATE_METADATA).map(([key, meta]) => ({
