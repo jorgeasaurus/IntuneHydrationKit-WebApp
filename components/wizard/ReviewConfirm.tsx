@@ -13,6 +13,7 @@ import { SensitiveData } from "@/components/SensitiveData";
 import { BaselineChangeReview } from "@/components/wizard/BaselineChangeReview";
 import { ExecutionApprovalCard } from "@/components/wizard/ExecutionApprovalCard";
 import { ExistingObjectsReview } from "@/components/wizard/ConflictSummary";
+import { AutopilotBrandingReview } from "@/components/wizard/AutopilotBrandingReview";
 import {
   INITIAL_EXISTING_OBJECTS_STATE,
   getUpdateExisting,
@@ -261,6 +262,7 @@ export function ReviewConfirm(): React.JSX.Element {
                 <p className="text-lg font-bold">{estimatedObjects} objects</p>
               </div>
             </div>
+            <AutopilotBrandingReview state={state} />
           </div>
 
           <div className="space-y-6">

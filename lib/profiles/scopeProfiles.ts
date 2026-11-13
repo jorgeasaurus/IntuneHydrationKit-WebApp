@@ -5,9 +5,17 @@
  * A profile holds the selection only: the selected categories and the selected item names
  * (or template paths) per category. It holds no tenant ID, tenant name, account, operation
  * mode, or run confirmation. Thus profiles are device presets, and sign-out does not clear them.
+ * It can also hold the Autopilot Branding customization (the apps to remove and the cleanup tasks),
+ * which is app configuration, not tenant data.
  */
 import { z } from "@/lib/utils/zod";
 import { SCOPE_PROFILES_STORAGE_KEY } from "@/lib/storageKeys";
+import {
+  autopilotBrandingCustomizationSchema,
+  normalizeAutopilotBrandingCustomization,
+  type AutopilotBrandingCustomization,
+} from "@/lib/win32/autopilotBrandingConfig";
+import { AUTOPILOT_BRANDING_WIN32_APP } from "@/templates/win32Apps";
 
 export const MAX_PROFILES = 50;
 export const MAX_PROFILE_NAME_LENGTH = 80;
@@ -22,6 +30,8 @@ export interface ScopeSelection {
   targets: string[];
   /** Selected item names per category. "baseline" and "cisBaseline" hold template paths. */
   items: Record<string, string[]>;
+  /** Customization of the Autopilot Branding app. Kept only while that app is selected. */
+  autopilotBranding?: AutopilotBrandingCustomization;
 }
 
 export interface ScopeProfile {
@@ -43,6 +53,7 @@ const categoryKeySchema = z.string().regex(/^[A-Za-z0-9]{1,40}$/);
 const selectionSchema = z.strictObject({
   targets: z.array(categoryKeySchema).max(40),
   items: z.record(categoryKeySchema, itemListSchema),
+  autopilotBranding: autopilotBrandingCustomizationSchema.optional(),
 });
 
 const profileSchema = z.strictObject({
@@ -110,7 +121,14 @@ function sortUnique(values: Iterable<string>): string[] {
   return [...new Set(values)].sort((a, b) => a.localeCompare(b));
 }
 
-/** Copy a selection into the stored form: only selected categories, sorted, without duplicates. */
+function hasAutopilotBranding(targets: readonly string[], items: Record<string, string[]>): boolean {
+  return targets.includes("win32Apps") && (items.win32Apps ?? []).includes(AUTOPILOT_BRANDING_WIN32_APP.displayName);
+}
+
+/**
+ * Copy a selection into the stored form: only selected categories, sorted, without duplicates.
+ * The Autopilot Branding customization is kept only while that app is selected.
+ */
 export function normalizeSelection(selection: ScopeSelection): ScopeSelection {
   const targets = [...new Set(selection.targets)];
   const items: Record<string, string[]> = {};
@@ -118,7 +136,9 @@ export function normalizeSelection(selection: ScopeSelection): ScopeSelection {
     const targetItems = selection.items[target];
     if (targetItems && targetItems.length > 0) items[target] = sortUnique(targetItems);
   }
-  return { targets, items };
+  return selection.autopilotBranding && hasAutopilotBranding(targets, items)
+    ? { targets, items, autopilotBranding: normalizeAutopilotBrandingCustomization(selection.autopilotBranding) }
+    : { targets, items };
 }
 
 function newProfileId(): string {
@@ -295,5 +315,8 @@ export function resolveSelection(
     items[target] = kept;
   }
 
-  return { selection: { targets, items }, dropped };
+  const resolved: ScopeSelection = selection.autopilotBranding && hasAutopilotBranding(targets, items)
+    ? { targets, items, autopilotBranding: selection.autopilotBranding }
+    : { targets, items };
+  return { selection: resolved, dropped };
 }

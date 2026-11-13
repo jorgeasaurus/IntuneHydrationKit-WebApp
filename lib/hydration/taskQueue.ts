@@ -34,6 +34,24 @@ type TemplateItem = { displayName: string } & Record<string, unknown>;
 type QueueOptions = Omit<BuildTaskQueueOptions, "selectedCategories" | "operationMode">;
 type TemplateLoad = (throwIfCancelled: () => void, report: TemplateLoadReport) => Promise<TemplateItem[]>;
 
+/**
+ * Copy the Autopilot Branding customization of the wizard to its create task. The executor
+ * validates it again and builds the package from it. A delete does not use it.
+ */
+function attachAutopilotBrandingCustomization(
+  tasks: HydrationTask[],
+  operationMode: OperationMode,
+  options?: QueueOptions,
+): HydrationTask[] {
+  const customization = options?.categorySelections?.win32Apps?.autopilotBranding;
+  if (operationMode !== "create" || !customization) return tasks;
+  return tasks.map((task) =>
+    task.category === "win32Apps" && task.itemName === Templates.AUTOPILOT_BRANDING_WIN32_APP.displayName
+      ? { ...task, autopilotBranding: customization }
+      : task,
+  );
+}
+
 function getTaskDedupKey(task: HydrationTask): string {
   return task.templatePath || task.itemName;
 }
@@ -395,7 +413,7 @@ export async function buildTaskQueueAsync(
 
   emit?.(`Deduplication complete. ${deduplicatedTasks.length} tasks ready for execution`, "success");
   console.log(`[Task Queue] Task queue built successfully with ${deduplicatedTasks.length} total tasks`);
-  return deduplicatedTasks;
+  return attachAutopilotBrandingCustomization(deduplicatedTasks, operationMode, options);
 }
 
 /**

@@ -4,6 +4,7 @@ import { deriveExecutionOutcome } from "@/lib/hydration/executionOutcome";
 import { summaryMatchesExecution } from "@/lib/hydration/reporter";
 import { ACTIVITY_MESSAGE_TYPES } from "@/lib/hydration/types";
 import { runLicensesSchema, runScopeSchema } from "@/lib/hydration/runScope";
+import { autopilotBrandingCustomizationSchema } from "@/lib/win32/autopilotBrandingConfig";
 import {
   CLOUD_ENVIRONMENTS,
   OPERATION_MODES,
@@ -49,6 +50,9 @@ const taskBaseShape = {
     id: z.string().min(1),
     policyType: z.string().min(1).optional(),
   }).optional(),
+  // Strict: a record with a customization that the schema cannot read exactly is not restored,
+  // so a retry can never upload a package with other choices than the first attempt.
+  autopilotBranding: autopilotBrandingCustomizationSchema.optional(),
   error: z.string().optional(),
   warning: z.string().optional(),
   startTime: dateSchema.optional(),

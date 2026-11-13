@@ -6,6 +6,8 @@ import type { TargetSelectionViewModel } from "@/components/wizard/targetSelecti
 import type { MouseEvent } from "react";
 import { IMPORT_PREFIX } from "@/lib/utils/hydrationMarker";
 import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { AUTOPILOT_BRANDING_WIN32_APP } from "@/templates/win32Apps";
+import { AutopilotBrandingCustomizeControl } from "@/components/wizard/AutopilotBrandingCustomizeDialog";
 import {
   baselineFileMatchesSearch,
   cisFileMatchesSearch,
@@ -501,6 +503,14 @@ function GenericCategoryPanel({
                 {item.subtype && (
                   <span className="text-xs text-muted-foreground shrink-0">{item.subtype}</span>
                 )}
+                {target.id === "win32Apps" &&
+                  item.displayName === AUTOPILOT_BRANDING_WIN32_APP.displayName &&
+                  model.selection.canCustomizeAutopilotBranding && (
+                    <AutopilotBrandingCustomizeControl
+                      value={model.selection.autopilotBranding}
+                      onChange={model.actions.setAutopilotBranding}
+                    />
+                  )}
               </div>
             ))}
           </div>
