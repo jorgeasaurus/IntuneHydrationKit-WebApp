@@ -496,4 +496,21 @@ describe("executeWin32AppTask", () => {
       .resolves.toMatchObject({ skipped: true, error: "Already exists" });
     expect(mockCreateWin32AppFromPackage).toHaveBeenCalledTimes(1);
   });
+
+  it("reports Not found, not a delete, when the only match is gone when it is read again", async () => {
+    mockGetWin32LobApps.mockResolvedValue([{
+      id: "current-app",
+      displayName: "7-Zip - [IHD]",
+      description: "Imported by Intune Hydration Kit",
+      notes: "Imported from WinGet",
+    }]);
+    const context = createContext();
+    serveApps(context, []);
+
+    const result = await executeWin32AppTask({ ...task, operation: "delete" }, context);
+
+    expect(context.client.delete).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ skipped: true, skipKind: "noOp", error: "Not found in tenant" });
+    expect(context.cachedWin32LobApps).toHaveLength(1);
+  });
 });

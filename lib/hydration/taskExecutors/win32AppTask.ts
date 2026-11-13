@@ -429,8 +429,8 @@ export async function executeWin32AppTask(
         iconBase64
       );
     } catch (error) {
-      // The failed create left its app in the tenant. Remember it, so a retry finds it by ID
-      // and does not make a second app before the collection lists the first.
+      // The app of the failed create can still be in the tenant. Remember it, so a retry looks
+      // for it by ID and does not make a second app before the collection lists the first.
       const incompleteAppId = getIncompleteWin32AppId(error);
       if (incompleteAppId) rememberRecentWin32App({ id: incompleteAppId, displayName: template.displayName });
       throw error;
@@ -515,18 +515,29 @@ export async function executeWin32AppTask(
     appsToDelete.push(existingApp);
   }
 
+  // Every match was gone at the re-read: nothing was deleted, so do not report a delete.
+  // The recent-app hint stays: a 404 on a new app can be a visibility delay.
+  if (appsToDelete.length === 0) {
+    return deleteResolutionResult(
+      task,
+      { action: "skip", skipKind: "noOp", reason: DELETE_REASONS.notFound },
+      context.isPreview
+    );
+  }
+
   await appsToDelete.reduce(
     (previousDelete, existingApp) => previousDelete.then(() =>
       context.client.delete(`/deviceAppManagement/mobileApps/${existingApp.id}`, "beta")
     ),
     Promise.resolve()
   );
-  const deletedIds = new Set(existingApps.map((app) => app.id));
+  const deletedIds = new Set(appsToDelete.map((app) => app.id));
   if (context.cachedWin32LobApps) {
     context.cachedWin32LobApps = context.cachedWin32LobApps.filter(
       (app) => !deletedIds.has(app.id)
     );
   }
-  forgetRecentWin32App(template.displayName);
+  // Keep the hint when an app was not readable: it can be the new app of this session.
+  if (appsToDelete.length === existingApps.length) forgetRecentWin32App(template.displayName);
   return { task, success: true, skipped: false };
 }

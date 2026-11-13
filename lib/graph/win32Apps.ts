@@ -227,12 +227,12 @@ export async function getWin32LobApps(client: GraphClient): Promise<Win32LobApp[
   );
 }
 
-/** On an error of createWin32AppFromPackage when the app that it created is still in the tenant. */
+/** On an error of createWin32AppFromPackage: the app that it created and that can still be in the tenant. */
 export interface IncompleteWin32App {
   incompleteAppId: string;
 }
 
-/** ID of the incomplete app that a failed create left in the tenant, or null. */
+/** ID of the app that a failed create made and that can still be in the tenant, or null. */
 export function getIncompleteWin32AppId(error: unknown): string | null {
   const id = (error as Partial<IncompleteWin32App> | null)?.incompleteAppId;
   return typeof id === "string" && id.length > 0 ? id : null;
@@ -290,12 +290,16 @@ export async function createWin32AppFromPackage(
       () => true,
       () => false
     );
-    if (removed) throw error;
-    // The app is in the tenant without content. The caller gets its ID, so a later create
-    // in this session finds it and does not make a second app.
+    // The caller gets the app ID, so a later create in this session looks for the app by ID
+    // and does not make a second app. This is also done after a DELETE that reported success:
+    // the Graph client reports a 404 as success, and a 404 on a new app can be a visibility
+    // delay, not proof that the app is gone.
     const incomplete: IncompleteWin32App = { incompleteAppId: app.id };
     // A cancelled run stays a cancelled run: the engine reads the type of this error.
-    if (isRunCancelledError(error)) throw Object.assign(error, incomplete);
+    if (error instanceof Error && (removed || isRunCancelledError(error))) {
+      throw Object.assign(error, incomplete);
+    }
+    if (removed) throw error;
     // A later create skips the app as "Already exists", so the error must say that it is there.
     const message = error instanceof Error ? error.message : String(error);
     const status = (error as { status?: unknown } | null)?.status;
