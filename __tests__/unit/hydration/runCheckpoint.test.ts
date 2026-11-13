@@ -214,6 +214,22 @@ describe("startRunCheckpoints", () => {
     expect(sessionStorage.getItem(EXECUTION_RECORD_STORAGE_KEY)).toBe(JSON.stringify(finalRecord));
   });
 
+  it("replaces the checkpoint with the final record as soon as the run completes", () => {
+    const runId = startRun();
+    vi.advanceTimersByTime(0);
+    expect(savedStatuses()).toEqual(["success", "running", "pending"]);
+
+    updateTask(runId, "t2", "success");
+    updateTask(runId, "t3", "failed");
+    finishExecution(runId, { endTime: new Date(), summary: null, outcome: "failed", fatalError: "Stopped" });
+
+    // No timer and no render ran: a refresh now must not restore a checkpoint to resume.
+    const record = readExecutionRecord(sessionStorage);
+    expect(record && isExecutionCheckpoint(record)).toBe(false);
+    expect(record?.outcome).toBe("failed");
+    expect(savedStatuses()).toEqual(["success", "success", "failed"]);
+  });
+
   it("does not stop the run when the storage quota is full", () => {
     const setItem = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
       throw new DOMException("Quota exceeded", "QuotaExceededError");

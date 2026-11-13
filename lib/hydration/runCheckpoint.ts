@@ -58,6 +58,36 @@ export function createCheckpointRecord(state: ExecutionState, at: Date): Executi
   };
 }
 
+/**
+ * Final record of a completed run, or null when the run is not complete.
+ * The dashboard writes the same record (with the full activity log) when it renders the result.
+ */
+export function createTerminalRecord(state: ExecutionState): TerminalExecutionRecord | null {
+  const { configuration, outcome, endTime } = state;
+  if (state.phase !== "completed" || !configuration || !outcome || !endTime) return null;
+  const failed = outcome === "failed";
+  if (failed ? !state.fatalError : !state.summary || !state.startTime) return null;
+  return {
+    tenantId: configuration.tenantId,
+    homeAccountId: configuration.homeAccountId,
+    tenantName: configuration.tenantName,
+    cloudEnvironment: configuration.cloudEnvironment,
+    operationMode: configuration.operationMode,
+    isPreview: configuration.isPreview,
+    selectedObjectCount: configuration.selectedObjectCount,
+    scope: configuration.scope,
+    licenses: configuration.licenses,
+    tasks: state.tasks,
+    activityLog: state.activityLog,
+    startTime: state.startTime,
+    endTime,
+    pausedMs: state.pausedMs,
+    outcome,
+    summary: failed ? null : state.summary,
+    fatalError: failed ? state.fatalError : null,
+  } as TerminalExecutionRecord;
+}
+
 interface CheckpointOptions {
   storage: Storage;
   intervalMs?: number;
@@ -78,6 +108,28 @@ export function startRunCheckpoints({
   let timer: ReturnType<typeof setTimeout> | null = null;
   let lastWriteAt = 0;
   let lastTasks: ExecutionState["tasks"] | null = null;
+  let finishedRunId: number | null = null;
+
+  /**
+   * Replace the last checkpoint with the final record as soon as the run completes. Without
+   * this, a refresh between the last task and the next render would restore a stale
+   * checkpoint and offer to resume work that is complete.
+   */
+  const writeFinalRecord = (state: ExecutionState): void => {
+    if (state.runId === null || state.runId === finishedRunId) return;
+    const record = createTerminalRecord(state);
+    if (!record) return;
+    finishedRunId = state.runId;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    try {
+      writeExecutionRecord(storage, record);
+    } catch (error) {
+      console.warn("[Run checkpoint] Could not save the finished run:", error);
+    }
+  };
 
   const write = (): void => {
     if (timer) {
@@ -99,6 +151,10 @@ export function startRunCheckpoints({
 
   const onStateChange = (): void => {
     const state = getExecutionState();
+    if (state.phase === "completed") {
+      writeFinalRecord(state);
+      return;
+    }
     if (state.tasks === lastTasks || !createCheckpointRecord(state, new Date())) return;
     if (timer) return;
     timer = setTimeout(write, Math.max(0, lastWriteAt + intervalMs - Date.now()));
