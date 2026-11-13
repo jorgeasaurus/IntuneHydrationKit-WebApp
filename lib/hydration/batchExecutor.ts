@@ -1457,6 +1457,11 @@ export async function executeDeletesInParallel(
             task.endTime = new Date();
             context.onTaskComplete?.(task);
             return { task, success: false, skipped: true, skipKind: "cancelled", error: "Cancelled" };
+          case "inUse":
+            markTaskSkipped(task, "blocked", outcome.reason);
+            task.endTime = new Date();
+            context.onTaskComplete?.(task);
+            return { task, success: false, skipped: true, skipKind: "blocked", error: outcome.reason };
           case "failed":
             task.status = "failed";
             task.error = outcome.error.message;
