@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { HomeLanding } from "@/components/landing/HomeLanding";
 import { SignInRequiredNotice } from "@/components/landing/SignInRequiredNotice";
-import { signIn } from "@/lib/auth/authUtils";
+import { isSignInReplaced, signIn } from "@/lib/auth/authUtils";
 import { useWizardState } from "@/hooks/useWizardState";
 import { resetHydrationFlow } from "@/lib/hydration/resetHydrationFlow";
 
@@ -21,6 +21,8 @@ export default function Home() {
       resetHydrationFlow(sessionStorage, resetWizard);
       router.push("/wizard");
     } catch (error) {
+      // A newer click replaced this attempt, and its popup is still open.
+      if (isSignInReplaced(error)) return;
       toast.error("Failed to sign in. Please try again.");
       console.error("Sign in error:", error);
     }

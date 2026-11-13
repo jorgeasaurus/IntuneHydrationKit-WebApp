@@ -28,7 +28,8 @@ vi.mock('@/hooks/useWizardState', () => ({
 }))
 
 vi.mock('@/lib/auth/authUtils', () => ({
-  signIn: vi.fn()
+  signIn: vi.fn(),
+  isSignInReplaced: () => false
 }))
 
 vi.mock('@/components/landing/HomeLanding', () => ({

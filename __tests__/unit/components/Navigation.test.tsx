@@ -42,6 +42,7 @@ vi.mock('next/link', () => ({
 
 vi.mock('@/lib/auth/authUtils', () => ({
   signIn: (...args: unknown[]) => signIn(...args),
+  isSignInReplaced: (error: unknown) => error instanceof Error && error.message === 'replaced',
 }))
 
 vi.mock('sonner', () => ({
@@ -143,6 +144,20 @@ describe('Navigation', () => {
     expect(consoleError).toHaveBeenCalledWith('Sign in error:', expect.any(Error))
 
     consoleError.mockRestore()
+  })
+
+  it('shows no error when a newer sign-in click replaced the attempt', async () => {
+    const user = userEvent.setup()
+    useIsAuthenticated.mockReturnValue(false)
+    signIn.mockRejectedValue(new Error('replaced'))
+
+    render(<Navigation />)
+
+    await user.click(screen.getByRole('button', { name: /sign in/i }))
+
+    await waitFor(() => expect(signIn).toHaveBeenCalled())
+    expect(toastError).not.toHaveBeenCalled()
+    expect(push).not.toHaveBeenCalled()
   })
 
   it('offers the section links in an accessible menu below the desktop breakpoint', async () => {

@@ -36,7 +36,6 @@ vi.mock("@/lib/auth/msalConfig", () => ({
   },
   getAuthorityUrl: mocks.getAuthorityUrl,
   initializeMsal: mocks.initializeMsal,
-  silentRedirectUri: "http://localhost:3000/auth/redirect",
 }));
 
 vi.mock("@/lib/auth/sessionEvents", () => ({
@@ -132,9 +131,10 @@ describe("authUtils", () => {
         account,
         authority: "https://authority.example/global/tenant-id",
         scopes: ["User.Read"],
-        redirectUri: "http://localhost:3000/auth/redirect",
       })
     );
+    // The configured redirect URI (the redirect bridge page) applies to silent requests.
+    expect(mocks.msalInstance.acquireTokenSilent.mock.calls[0][0]).not.toHaveProperty("redirectUri");
   });
 
   it("falls back to popup token acquisition after an interaction required error", async () => {
@@ -201,6 +201,8 @@ describe("authUtils", () => {
     expect(mocks.msalInstance.loginPopup).toHaveBeenCalledWith({
       authority: "https://authority.example/global/common",
       scopes: ["User.Read"],
+      // A new click replaces a popup that the user closed before MSAL timed it out.
+      overrideInteractionInProgress: true,
     });
     expect(mocks.msalInstance.setActiveAccount).toHaveBeenCalledWith(account);
   });

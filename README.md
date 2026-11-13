@@ -127,8 +127,8 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=http://localhost:3000
 2. Create a new registration:
    - **Name**: Intune Hydration Kit Web
    - **Supported account types**: Choose appropriate option
-   - **Redirect URI**: Single-page application (SPA) - `http://localhost:3000`
-3. Go to **Authentication** > **Single-page application** and add `http://localhost:3000/auth/redirect`. MSAL uses this blank page for silent token renewal in a hidden iframe.
+   - **Redirect URI**: Single-page application (SPA) - `http://localhost:3000/auth/redirect`
+3. MSAL uses this redirect bridge page for popup sign-in, silent token renewal in a hidden iframe, and popup sign-out. You do not need the origin (`http://localhost:3000`) as a redirect URI.
 4. Copy the **Application (client) ID** to `NEXT_PUBLIC_MSAL_CLIENT_ID`
 5. Go to **API permissions** > Add the required Graph API permissions listed above
 6. Click **Grant admin consent** for your tenant
@@ -283,7 +283,7 @@ vercel
 vercel --prod
 ```
 
-**Important**: After deployment, update your Entra ID app registration. Register two SPA redirect URIs for each origin that you use (production, each preview alias, and `http://localhost:3000`): `<origin>` for popup sign-in and sign-out, and `<origin>/auth/redirect` for silent token renewal.
+**Important**: After deployment, update your Entra ID app registration. Register `<origin>/auth/redirect` as an SPA redirect URI for each origin that you use (production, each preview alias, and `http://localhost:3000`).
 
 ## Troubleshooting
 
@@ -293,7 +293,7 @@ Make sure you've signed in through the landing page before accessing the wizard.
 
 ### CORS Errors
 
-Make sure that Entra ID has both SPA redirect URIs for the origin in the browser address bar: `<origin>` and `<origin>/auth/redirect`.
+Make sure that Entra ID has the SPA redirect URI `<origin>/auth/redirect` for the origin in the browser address bar.
 
 ### Permission Errors
 

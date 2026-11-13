@@ -2,11 +2,15 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@azure/msal-browser", () => ({
   LogLevel: {},
-  PublicClientApplication: class {},
+  PublicClientApplication: class {
+    initialize() {
+      return Promise.resolve();
+    }
+  },
 }));
 
 import nextConfig from "../../../next.config";
-import { MSAL_SILENT_REDIRECT_PATH } from "@/lib/auth/msalConfig";
+import { MSAL_REDIRECT_BRIDGE_PATH } from "@/lib/auth/msalConfig";
 
 type HeaderEntry = { source: string; headers: { key: string; value: string }[] };
 
@@ -21,11 +25,11 @@ function resolveHeaders(entries: HeaderEntry[], matchingSources: string[]) {
 }
 
 describe("security headers", () => {
-  it("allows only the silent redirect page to be framed, and only by the same origin", async () => {
+  it("allows only the redirect bridge page to be framed, and only by the same origin", async () => {
     const entries = (await nextConfig.headers!()) as HeaderEntry[];
     expect(entries.map((entry) => entry.source)).toEqual([
       "/:path*",
-      MSAL_SILENT_REDIRECT_PATH,
+      MSAL_REDIRECT_BRIDGE_PATH,
     ]);
 
     const site = resolveHeaders(entries, ["/:path*"]);
@@ -35,10 +39,17 @@ describe("security headers", () => {
       "frame-src 'self' https://login.microsoftonline.com"
     );
 
-    const redirect = resolveHeaders(entries, ["/:path*", MSAL_SILENT_REDIRECT_PATH]);
+    const redirect = resolveHeaders(entries, ["/:path*", MSAL_REDIRECT_BRIDGE_PATH]);
     expect(redirect.get("X-Frame-Options")).toBe("SAMEORIGIN");
     expect(redirect.get("Content-Security-Policy")).toBe(
-      "default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
+      "default-src 'none'; script-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'"
     );
+  });
+
+  it("serves no Cross-Origin-Opener-Policy, which would break the MSAL redirect bridge", async () => {
+    const entries = (await nextConfig.headers!()) as HeaderEntry[];
+    const headerKeys = entries.flatMap((entry) => entry.headers.map((header) => header.key));
+
+    expect(headerKeys).not.toContain("Cross-Origin-Opener-Policy");
   });
 });

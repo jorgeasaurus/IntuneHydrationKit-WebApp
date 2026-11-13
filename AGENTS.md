@@ -587,7 +587,7 @@ NEXT_PUBLIC_MSAL_REDIRECT_URI=https://intunehydrationkit.com
 
 **Entra ID App Registration** (production):
 1. Create new app registration in Azure Portal
-2. Register two SPA redirect URIs for each origin that you use (production, each preview alias, and `http://localhost:3000`): `<origin>` for popup sign-in and sign-out, and `<origin>/auth/redirect` for silent token renewal. Both use the Single-page application platform.
+2. Register `<origin>/auth/redirect` as a Single-page application redirect URI for each origin that you use (production, each preview alias, and `http://localhost:3000`). MSAL uses this redirect bridge page for popup sign-in, silent token renewal, and popup sign-out.
 3. Add all required Graph API delegated permissions
 4. Grant admin consent
 5. Configure token claims if needed

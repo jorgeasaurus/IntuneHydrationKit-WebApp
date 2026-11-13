@@ -1,10 +1,14 @@
-import { AccountInfo, InteractionRequiredAuthError, BrowserAuthError } from "@azure/msal-browser";
+import {
+  AccountInfo,
+  InteractionRequiredAuthError,
+  BrowserAuthError,
+  BrowserAuthErrorCodes,
+} from "@azure/msal-browser";
 import {
   msalInstance,
   loginRequest,
   getAuthorityUrl,
   initializeMsal,
-  silentRedirectUri,
 } from "./msalConfig";
 import { markLeavingForSignOut, notifySignOut } from "./sessionEvents";
 import { clearHydrationSession } from "@/lib/hydration/executionRecord";
@@ -55,7 +59,6 @@ export async function getAccessToken(): Promise<string> {
       ...loginRequest,
       account,
       authority,
-      redirectUri: silentRedirectUri,
     });
     return response.accessToken;
   } catch (error) {
@@ -106,6 +109,7 @@ export class InteractionRequiredError extends AuthSessionExpiredError {
 
 /**
  * Sign in the user (global/commercial cloud only).
+ * Call only from a user click: each call cancels a sign-in popup that is still pending.
  */
 export async function signIn(): Promise<AccountInfo> {
   // Public pages render before MSAL finishes startup, so wait for initialization here.
@@ -115,6 +119,9 @@ export async function signIn(): Promise<AccountInfo> {
   const response = await msalInstance.loginPopup({
     ...loginRequest,
     authority,
+    // MSAL detects a closed popup only after its 60-second bridge timeout. Without this,
+    // a new click in that time fails with interaction_in_progress.
+    overrideInteractionInProgress: true,
   });
 
   if (response.account) {
@@ -122,6 +129,17 @@ export async function signIn(): Promise<AccountInfo> {
     return response.account;
   }
   throw new Error("Sign in failed: No account returned");
+}
+
+/**
+ * True when a newer signIn call cancelled this one. The newer popup is still open,
+ * so the caller must not show a sign-in error.
+ */
+export function isSignInReplaced(error: unknown): boolean {
+  return (
+    error instanceof BrowserAuthError &&
+    error.errorCode === BrowserAuthErrorCodes.interactionInProgressCancelled
+  );
 }
 
 /**
