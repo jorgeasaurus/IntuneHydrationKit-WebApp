@@ -2800,9 +2800,45 @@
       "manifestPath": "manifests/n/Notion/Notion",
       "versions": [
         {
-          "version": "7.43.1",
+          "version": "7.43.2",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-12",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.43.2.msix"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.43.2%20arm64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-7.43.2.msix"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.43.2.exe"
+            }
+          ]
+        },
+        {
+          "version": "7.43.1",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-11",
           "installers": [
             {
@@ -2940,42 +2976,6 @@
               "nestedInstallerType": null,
               "scope": "user",
               "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.42.1.exe"
-            }
-          ]
-        },
-        {
-          "version": "7.41.1",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-27",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.41.1.msix"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.41.1%20arm64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-7.41.1.msix"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.41.1.exe"
             }
           ]
         }
