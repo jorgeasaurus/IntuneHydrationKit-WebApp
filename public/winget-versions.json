@@ -270,9 +270,117 @@
       "manifestPath": "manifests/a/Anysphere/Cursor",
       "versions": [
         {
-          "version": "3.29.15",
+          "version": "3.31.11",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-19",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/52fdf018932f1335bc6dd36acc5e33d30759192e/win32/arm64/system-setup/CursorSetup-arm64-3.31.11.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/52fdf018932f1335bc6dd36acc5e33d30759192e/win32/arm64/user-setup/CursorUserSetup-arm64-3.31.11.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/52fdf018932f1335bc6dd36acc5e33d30759192e/win32/x64/system-setup/CursorSetup-x64-3.31.11.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/52fdf018932f1335bc6dd36acc5e33d30759192e/win32/x64/user-setup/CursorUserSetup-x64-3.31.11.exe"
+            }
+          ]
+        },
+        {
+          "version": "3.30.14",
+          "latest": false,
+          "bestEffort": true,
+          "releaseDate": "2026-11-13",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/5f54c8173e5552412beb40702adac16275677fa0/win32/arm64/system-setup/CursorSetup-arm64-3.30.14.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/5f54c8173e5552412beb40702adac16275677fa0/win32/arm64/user-setup/CursorUserSetup-arm64-3.30.14.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/5f54c8173e5552412beb40702adac16275677fa0/win32/x64/system-setup/CursorSetup-x64-3.30.14.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/5f54c8173e5552412beb40702adac16275677fa0/win32/x64/user-setup/CursorUserSetup-x64-3.30.14.exe"
+            }
+          ]
+        },
+        {
+          "version": "3.30.8",
+          "latest": false,
+          "bestEffort": true,
+          "releaseDate": "2026-11-11",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/4a44c846d0b817fab060823f93c63ea2861ac192/win32/arm64/system-setup/CursorSetup-arm64-3.30.8.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/4a44c846d0b817fab060823f93c63ea2861ac192/win32/arm64/user-setup/CursorUserSetup-arm64-3.30.8.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/4a44c846d0b817fab060823f93c63ea2861ac192/win32/x64/system-setup/CursorSetup-x64-3.30.8.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/4a44c846d0b817fab060823f93c63ea2861ac192/win32/x64/user-setup/CursorUserSetup-x64-3.30.8.exe"
+            }
+          ]
+        },
+        {
+          "version": "3.29.15",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-08",
           "installers": [
             {
@@ -340,114 +448,6 @@
               "url": "https://downloads.cursor.com/production/306d153d51d714882ab7b1bc49649cab624e8a31/win32/x64/user-setup/CursorUserSetup-x64-3.29.9.exe"
             }
           ]
-        },
-        {
-          "version": "3.28.7",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-11-03",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/25b52e7d03ebf2d5608914158e119f7992432a34/win32/arm64/system-setup/CursorSetup-arm64-3.28.7.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/25b52e7d03ebf2d5608914158e119f7992432a34/win32/arm64/user-setup/CursorUserSetup-arm64-3.28.7.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/25b52e7d03ebf2d5608914158e119f7992432a34/win32/x64/system-setup/CursorSetup-x64-3.28.7.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/25b52e7d03ebf2d5608914158e119f7992432a34/win32/x64/user-setup/CursorUserSetup-x64-3.28.7.exe"
-            }
-          ]
-        },
-        {
-          "version": "3.27.22",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-27",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/b1aa50cb6db84fd3e8c808259cb172ea73425c1f/win32/arm64/system-setup/CursorSetup-arm64-3.27.22.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/b1aa50cb6db84fd3e8c808259cb172ea73425c1f/win32/arm64/user-setup/CursorUserSetup-arm64-3.27.22.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/b1aa50cb6db84fd3e8c808259cb172ea73425c1f/win32/x64/system-setup/CursorSetup-x64-3.27.22.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/b1aa50cb6db84fd3e8c808259cb172ea73425c1f/win32/x64/user-setup/CursorUserSetup-x64-3.27.22.exe"
-            }
-          ]
-        },
-        {
-          "version": "3.27.14",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-23",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/69b724ebc67ec522c1b5d287a5025f7a7e81be97/win32/arm64/system-setup/CursorSetup-arm64-3.27.14.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/69b724ebc67ec522c1b5d287a5025f7a7e81be97/win32/arm64/user-setup/CursorUserSetup-arm64-3.27.14.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/69b724ebc67ec522c1b5d287a5025f7a7e81be97/win32/x64/system-setup/CursorSetup-x64-3.27.14.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/69b724ebc67ec522c1b5d287a5025f7a7e81be97/win32/x64/user-setup/CursorUserSetup-x64-3.27.14.exe"
-            }
-          ]
         }
       ]
     },
@@ -459,182 +459,182 @@
       "manifestPath": "manifests/a/Anthropic/Claude",
       "versions": [
         {
-          "version": "3.6556.2",
+          "version": "6.28899.2",
           "latest": true,
           "bestEffort": false,
-          "releaseDate": "2026-10-23",
+          "releaseDate": "2026-11-20",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.6556.2/Claude-20c019a1e61fa5b687616af57d31f97bb3181723.exe"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/6.28899.2/Claude-155ca43c0ad5a4bd5734795688543b65b464cf47.exe"
             },
             {
               "architecture": "arm64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.6556.2/Claude-20c019a1e61fa5b687616af57d31f97bb3181723.msix"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/6.28899.2/Claude-155ca43c0ad5a4bd5734795688543b65b464cf47.msix"
             },
             {
               "architecture": "x64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.6556.2/Claude-20c019a1e61fa5b687616af57d31f97bb3181723.exe"
+              "url": "https://downloads.claude.ai/releases/win32/x64/6.28899.2/Claude-155ca43c0ad5a4bd5734795688543b65b464cf47.exe"
             },
             {
               "architecture": "x64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.6556.2/Claude-20c019a1e61fa5b687616af57d31f97bb3181723.msix"
+              "url": "https://downloads.claude.ai/releases/win32/x64/6.28899.2/Claude-155ca43c0ad5a4bd5734795688543b65b464cf47.msix"
             }
           ]
         },
         {
-          "version": "3.6556.1",
+          "version": "5.11492.5",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-10-22",
+          "releaseDate": "2026-11-13",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.6556.1/Claude-8e298a7fb62db44b6c902bdcbbc3bb1a74d147f0.exe"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.11492.5/Claude-1403e2cf44abfb23809c8ae11238d5e9704a41c2.exe"
             },
             {
               "architecture": "arm64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.6556.1/Claude-8e298a7fb62db44b6c902bdcbbc3bb1a74d147f0.msix"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.11492.5/Claude-1403e2cf44abfb23809c8ae11238d5e9704a41c2.msix"
             },
             {
               "architecture": "x64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.6556.1/Claude-8e298a7fb62db44b6c902bdcbbc3bb1a74d147f0.exe"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.11492.5/Claude-1403e2cf44abfb23809c8ae11238d5e9704a41c2.exe"
             },
             {
               "architecture": "x64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.6556.1/Claude-8e298a7fb62db44b6c902bdcbbc3bb1a74d147f0.msix"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.11492.5/Claude-1403e2cf44abfb23809c8ae11238d5e9704a41c2.msix"
             }
           ]
         },
         {
-          "version": "3.1623.4",
+          "version": "5.11492.2",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-10-22",
+          "releaseDate": "2026-11-13",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.1623.4/Claude-c2d2186fc67f536dfb131352c659f99b10840e4b.exe"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.11492.2/Claude-b1edc63367ca6fb5fa8d5a72604951a71b37dd58.exe"
             },
             {
               "architecture": "arm64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.1623.4/Claude-c2d2186fc67f536dfb131352c659f99b10840e4b.msix"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.11492.2/Claude-b1edc63367ca6fb5fa8d5a72604951a71b37dd58.msix"
             },
             {
               "architecture": "x64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.1623.4/Claude-c2d2186fc67f536dfb131352c659f99b10840e4b.exe"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.11492.2/Claude-b1edc63367ca6fb5fa8d5a72604951a71b37dd58.exe"
             },
             {
               "architecture": "x64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.1623.4/Claude-c2d2186fc67f536dfb131352c659f99b10840e4b.msix"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.11492.2/Claude-b1edc63367ca6fb5fa8d5a72604951a71b37dd58.msix"
             }
           ]
         },
         {
-          "version": "3.1623.3",
+          "version": "5.11492.0",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-10-22",
+          "releaseDate": "2026-11-12",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.1623.3/Claude-b5774a678cf8ba9882e729b5e981fe81e434c1be.exe"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.11492.0/Claude-ce4f8dd2e25346b37909530556abd6e2e7b00206.exe"
             },
             {
               "architecture": "arm64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.1623.3/Claude-b5774a678cf8ba9882e729b5e981fe81e434c1be.msix"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.11492.0/Claude-ce4f8dd2e25346b37909530556abd6e2e7b00206.msix"
             },
             {
               "architecture": "x64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.1623.3/Claude-b5774a678cf8ba9882e729b5e981fe81e434c1be.exe"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.11492.0/Claude-ce4f8dd2e25346b37909530556abd6e2e7b00206.exe"
             },
             {
               "architecture": "x64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.1623.3/Claude-b5774a678cf8ba9882e729b5e981fe81e434c1be.msix"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.11492.0/Claude-ce4f8dd2e25346b37909530556abd6e2e7b00206.msix"
             }
           ]
         },
         {
-          "version": "3.1623.1",
+          "version": "5.1231.2",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-10-21",
+          "releaseDate": "2026-11-11",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.1623.1/Claude-99e484be3828a3767e90385312c83202bca35d8c.exe"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.1231.2/Claude-26912242b6649f3e503e012d9b7b9367d09c68e4.exe"
             },
             {
               "architecture": "arm64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/arm64/3.1623.1/Claude-99e484be3828a3767e90385312c83202bca35d8c.msix"
+              "url": "https://downloads.claude.ai/releases/win32/arm64/5.1231.2/Claude-26912242b6649f3e503e012d9b7b9367d09c68e4.msix"
             },
             {
               "architecture": "x64",
               "installerType": "exe",
               "nestedInstallerType": null,
               "scope": "user",
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.1623.1/Claude-99e484be3828a3767e90385312c83202bca35d8c.exe"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.1231.2/Claude-26912242b6649f3e503e012d9b7b9367d09c68e4.exe"
             },
             {
               "architecture": "x64",
               "installerType": "msix",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/releases/win32/x64/3.1623.1/Claude-99e484be3828a3767e90385312c83202bca35d8c.msix"
+              "url": "https://downloads.claude.ai/releases/win32/x64/5.1231.2/Claude-26912242b6649f3e503e012d9b7b9367d09c68e4.msix"
             }
           ]
         }
@@ -648,112 +648,112 @@
       "manifestPath": "manifests/a/Anthropic/ClaudeCode",
       "versions": [
         {
-          "version": "2.1.318",
+          "version": "2.1.330",
           "latest": true,
           "bestEffort": false,
-          "releaseDate": "2026-11-03",
+          "releaseDate": "2026-11-20",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.318/win32-arm64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.330/win32-arm64/claude.exe"
             },
             {
               "architecture": "x64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.318/win32-x64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.330/win32-x64/claude.exe"
             }
           ]
         },
         {
-          "version": "2.1.317",
+          "version": "2.1.329",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-11-02",
+          "releaseDate": "2026-11-19",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.317/win32-arm64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.329/win32-arm64/claude.exe"
             },
             {
               "architecture": "x64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.317/win32-x64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.329/win32-x64/claude.exe"
             }
           ]
         },
         {
-          "version": "2.1.316",
+          "version": "2.1.327",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-10-30",
+          "releaseDate": "2026-11-17",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.316/win32-arm64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.327/win32-arm64/claude.exe"
             },
             {
               "architecture": "x64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.316/win32-x64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.327/win32-x64/claude.exe"
             }
           ]
         },
         {
-          "version": "2.1.314",
+          "version": "2.1.326",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-10-29",
+          "releaseDate": "2026-11-16",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.314/win32-arm64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.326/win32-arm64/claude.exe"
             },
             {
               "architecture": "x64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.314/win32-x64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.326/win32-x64/claude.exe"
             }
           ]
         },
         {
-          "version": "2.1.312",
+          "version": "2.1.323",
           "latest": false,
           "bestEffort": true,
-          "releaseDate": "2026-10-27",
+          "releaseDate": "2026-11-12",
           "installers": [
             {
               "architecture": "arm64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.312/win32-arm64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.323/win32-arm64/claude.exe"
             },
             {
               "architecture": "x64",
               "installerType": "portable",
               "nestedInstallerType": null,
               "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.312/win32-x64/claude.exe"
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.323/win32-x64/claude.exe"
             }
           ]
         }
@@ -1215,9 +1215,45 @@
       "manifestPath": "manifests/g/Git/Git",
       "versions": [
         {
-          "version": "2.56.0.4",
+          "version": "2.56.1",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-10",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://github.com/git-for-windows/git/releases/download/v2.56.1.windows.1/Git-2.56.1-arm64.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://github.com/git-for-windows/git/releases/download/v2.56.1.windows.1/Git-2.56.1-arm64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://github.com/git-for-windows/git/releases/download/v2.56.1.windows.1/Git-2.56.1-64-bit.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://github.com/git-for-windows/git/releases/download/v2.56.1.windows.1/Git-2.56.1-64-bit.exe"
+            }
+          ]
+        },
+        {
+          "version": "2.56.0.4",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-10-26",
           "installers": [
             {
@@ -1357,42 +1393,6 @@
               "url": "https://github.com/git-for-windows/git/releases/download/v2.56.0.windows.1/Git-2.56.0-64-bit.exe"
             }
           ]
-        },
-        {
-          "version": "2.55.0.5",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-08-20",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-arm64.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-arm64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-64-bit.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://github.com/git-for-windows/git/releases/download/v2.55.0.windows.5/Git-2.55.0.5-64-bit.exe"
-            }
-          ]
         }
       ]
     },
@@ -1404,9 +1404,45 @@
       "manifestPath": "manifests/g/GitHub/GitHubDesktop",
       "versions": [
         {
-          "version": "3.6.11",
+          "version": "3.7.0",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-19",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "exe",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.0-f13859b6/GitHubDesktopSetup-arm64.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "wix",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.0-f13859b6/GitHubDesktopSetup-arm64.msi"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "exe",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.0-f13859b6/GitHubDesktopSetup-x64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "wix",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.0-f13859b6/GitHubDesktopSetup-x64.msi"
+            }
+          ]
+        },
+        {
+          "version": "3.6.11",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-11",
           "installers": [
             {
@@ -1546,42 +1582,6 @@
               "url": "https://desktop.githubusercontent.com/releases/3.6.8-c5923f66/GitHubDesktopSetup-x64.msi"
             }
           ]
-        },
-        {
-          "version": "3.6.7",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-08",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "exe",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.7-dbc92f97/GitHubDesktopSetup-arm64.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "wix",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.7-dbc92f97/GitHubDesktopSetup-arm64.msi"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "exe",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.7-dbc92f97/GitHubDesktopSetup-x64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "wix",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.7-dbc92f97/GitHubDesktopSetup-x64.msi"
-            }
-          ]
         }
       ]
     },
@@ -1593,7 +1593,7 @@
       "manifestPath": "manifests/g/Google/Chrome",
       "versions": [
         {
-          "version": "157.0.8103.79",
+          "version": "158.0.8127.37",
           "latest": true,
           "bestEffort": false,
           "releaseDate": "2026-11-11",
@@ -1976,6 +1976,42 @@
           ]
         },
         {
+          "version": "0.102.2933.0",
+          "latest": false,
+          "bestEffort": true,
+          "releaseDate": "2026-10-21",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "burn",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.102.2933.0/PowerToysSetup-0.102.2933.0-arm64.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "burn",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.102.2933.0/PowerToysUserSetup-0.102.2933.0-arm64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "burn",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.102.2933.0/PowerToysSetup-0.102.2933.0-x64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "burn",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.102.2933.0/PowerToysUserSetup-0.102.2933.0-x64.exe"
+            }
+          ]
+        },
+        {
           "version": "0.101.2362.0",
           "latest": false,
           "bestEffort": true,
@@ -2044,42 +2080,6 @@
               "nestedInstallerType": null,
               "scope": "user",
               "url": "https://github.com/microsoft/PowerToys/releases/download/v0.100.2/PowerToysUserSetup-0.100.2-x64.exe"
-            }
-          ]
-        },
-        {
-          "version": "0.100.1",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-06-24",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "burn",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.100.1/PowerToysSetup-0.100.1-arm64.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "burn",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.100.1/PowerToysUserSetup-0.100.1-arm64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "burn",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.100.1/PowerToysSetup-0.100.1-x64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "burn",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://github.com/microsoft/PowerToys/releases/download/v0.100.1/PowerToysUserSetup-0.100.1-x64.exe"
             }
           ]
         }
@@ -2352,9 +2352,38 @@
       "manifestPath": "manifests/m/Mozilla/Firefox",
       "versions": [
         {
-          "version": "160.0",
+          "version": "160.0.1",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-17",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://download-installer.cdn.mozilla.net/pub/firefox/releases/160.0.1/win64-aarch64/en-US/Firefox%20Setup%20160.0.1.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://download-installer.cdn.mozilla.net/pub/firefox/releases/160.0.1/win64/en-US/Firefox%20Setup%20160.0.1.exe"
+            },
+            {
+              "architecture": "x86",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://download-installer.cdn.mozilla.net/pub/firefox/releases/160.0.1/win32/en-US/Firefox%20Setup%20160.0.1.exe"
+            }
+          ]
+        },
+        {
+          "version": "160.0",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-10",
           "installers": [
             {
@@ -2464,35 +2493,6 @@
               "nestedInstallerType": null,
               "scope": "machine",
               "url": "https://download-installer.cdn.mozilla.net/pub/firefox/releases/158.0.1/win32/en-US/Firefox%20Setup%20158.0.1.exe"
-            }
-          ]
-        },
-        {
-          "version": "158.0",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-13",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://download-installer.cdn.mozilla.net/pub/firefox/releases/158.0/win64-aarch64/en-US/Firefox%20Setup%20158.0.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://download-installer.cdn.mozilla.net/pub/firefox/releases/158.0/win64/en-US/Firefox%20Setup%20158.0.exe"
-            },
-            {
-              "architecture": "x86",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://download-installer.cdn.mozilla.net/pub/firefox/releases/158.0/win32/en-US/Firefox%20Setup%20158.0.exe"
             }
           ]
         }
@@ -2800,9 +2800,117 @@
       "manifestPath": "manifests/n/Notion/Notion",
       "versions": [
         {
-          "version": "7.43.1",
+          "version": "7.44.1",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-19",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.44.1.msix"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.44.1%20arm64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-7.44.1.msix"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.44.1.exe"
+            }
+          ]
+        },
+        {
+          "version": "7.44.0",
+          "latest": false,
+          "bestEffort": true,
+          "releaseDate": "2026-11-16",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.44.0.msix"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.44.0%20arm64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-7.44.0.msix"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.44.0.exe"
+            }
+          ]
+        },
+        {
+          "version": "7.43.2",
+          "latest": false,
+          "bestEffort": true,
+          "releaseDate": "2026-11-12",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.43.2.msix"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.43.2%20arm64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://desktop-release.notion-static.com/Notion-7.43.2.msix"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "nullsoft",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.43.2.exe"
+            }
+          ]
+        },
+        {
+          "version": "7.43.1",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-11",
           "installers": [
             {
@@ -2868,114 +2976,6 @@
               "nestedInstallerType": null,
               "scope": "user",
               "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.43.0.exe"
-            }
-          ]
-        },
-        {
-          "version": "7.42.3",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-11-05",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.42.3.msix"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.42.3%20arm64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-7.42.3.msix"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.42.3.exe"
-            }
-          ]
-        },
-        {
-          "version": "7.42.1",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-11-03",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.42.1.msix"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.42.1%20arm64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-7.42.1.msix"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.42.1.exe"
-            }
-          ]
-        },
-        {
-          "version": "7.41.1",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-27",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-arm64-7.41.1.msix"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.41.1%20arm64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://desktop-release.notion-static.com/Notion-7.41.1.msix"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "nullsoft",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop-release.notion-static.com/Notion%20Setup%207.41.1.exe"
             }
           ]
         }
@@ -3419,9 +3419,38 @@
       "manifestPath": "manifests/s/SlackTechnologies/Slack",
       "versions": [
         {
-          "version": "4.53.287",
+          "version": "4.53.292",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-13",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://downloads.slack-edge.com/desktop-releases/windows/arm64/4.53.292/Slack.msix"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "exe",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.slack-edge.com/desktop-releases/windows/x64/4.53.292/SlackSetup.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://downloads.slack-edge.com/desktop-releases/windows/x64/4.53.292/Slack.msix"
+            }
+          ]
+        },
+        {
+          "version": "4.53.287",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-06",
           "installers": [
             {
@@ -3531,35 +3560,6 @@
               "nestedInstallerType": null,
               "scope": null,
               "url": "https://downloads.slack-edge.com/desktop-releases/windows/x64/4.53.269/Slack.msix"
-            }
-          ]
-        },
-        {
-          "version": "4.52.182",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-20",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://downloads.slack-edge.com/desktop-releases/windows/arm64/4.52.182/Slack.msix"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "exe",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.slack-edge.com/desktop-releases/windows/x64/4.52.182/SlackSetup.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://downloads.slack-edge.com/desktop-releases/windows/x64/4.52.182/Slack.msix"
             }
           ]
         }
@@ -4075,9 +4075,38 @@
       "manifestPath": "manifests/m/Microsoft/WindowsApp",
       "versions": [
         {
-          "version": "2.0.1489.0",
+          "version": "2.0.1601.0",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-16",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://res.cdn.office.net/remote-desktop-windows-client/d033471c-e07f-4377-827f-cef8e98f49fb/WindowsApp_arm64_Release_2.0.1601.0.msix"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://res.cdn.office.net/remote-desktop-windows-client/5f9edc46-1694-43ed-8b20-696dbe91c087/WindowsApp_x64_Release_2.0.1601.0.msix"
+            },
+            {
+              "architecture": "x86",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://res.cdn.office.net/remote-desktop-windows-client/e1017c5a-7284-4f22-8fc3-3fe6425df5d1/WindowsApp_x86_Release_2.0.1601.0.msix"
+            }
+          ]
+        },
+        {
+          "version": "2.0.1489.0",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-10",
           "installers": [
             {
@@ -4187,35 +4216,6 @@
               "nestedInstallerType": null,
               "scope": null,
               "url": "https://res.cdn.office.net/remote-desktop-windows-client/477617b7-ba1e-48b9-a2c8-14cd1c2722d5/WindowsApp_x86_Release_2.0.1482.0.msix"
-            }
-          ]
-        },
-        {
-          "version": "2.0.1375.0",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-09-07",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://res.cdn.office.net/remote-desktop-windows-client/425b3f67-d578-416b-a64d-b7dc94f722fa/WindowsApp_arm64_Release_2.0.1375.0.msix"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://res.cdn.office.net/remote-desktop-windows-client/f293068a-5d1c-4817-bbf0-540d1ab02938/WindowsApp_x64_Release_2.0.1375.0.msix"
-            },
-            {
-              "architecture": "x86",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://res.cdn.office.net/remote-desktop-windows-client/f3c552ac-3383-4111-9385-aeea8d0ab6a1/WindowsApp_x86_Release_2.0.1375.0.msix"
             }
           ]
         }
