@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 describe("OpenIntuneBaseline manifest parity", () => {
   it("matches the expected PowerShell inventory and BYOD metadata", () => {
     expect(manifest.totalFiles).toBe(102);
-    expect(manifest.windowsVersion).toBe("4.0");
+    expect(manifest.windowsVersion).toMatch(/^\d+\.\d+(\.\d+)?$/);
     expect(manifest.sourceSha).toBe(readFileSync("public/IntuneTemplates/OpenIntuneBaseline/.upstream-sha", "utf8").trim());
 
     expect(

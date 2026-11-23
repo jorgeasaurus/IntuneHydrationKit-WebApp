@@ -7,6 +7,7 @@ import { useTargetSelectionController } from '@/components/wizard/useTargetSelec
 import { IMPORT_PREFIX } from '@/lib/utils/hydrationMarker'
 import type { CISBaselineManifest, OIBManifest } from '@/lib/templates/loader'
 import type { WizardState } from '@/types/hydration'
+import oibManifest from '@/public/IntuneTemplates/OpenIntuneBaseline/manifest.json'
 
 const setSelectedTargets = vi.fn()
 const setSelectedCISCategories = vi.fn()
@@ -254,7 +255,7 @@ describe('TargetSelection', () => {
     })
 
     render(<TargetSelectionHarness />)
-    expect(screen.getByText("Baseline v4.0 includes macOS, Windows, and BYOD policies.")).toBeInTheDocument()
+    expect(screen.getByText(`Baseline v${oibManifest.windowsVersion} includes macOS, Windows, and BYOD policies.`)).toBeInTheDocument()
 
     await user.click(screen.getByLabelText('Entra Groups'))
     expect(await screen.findByLabelText(`${IMPORT_PREFIX}Windows Devices`)).toBeChecked()

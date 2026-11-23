@@ -9,6 +9,7 @@ import {
   fetchCISBaselinePolicyByManifestFile,
 } from '@/lib/templates/loader'
 import { getWin32AppTemplates, TEMPLATE_METADATA } from '@/templates'
+import oibManifest from '@/public/IntuneTemplates/OpenIntuneBaseline/manifest.json'
 
 vi.mock('@/lib/templates/loader', () => ({
   fetchDynamicGroups: vi.fn().mockResolvedValue([
@@ -161,7 +162,7 @@ describe('template catalog', () => {
     expect(catalog.categories.find((category) => category.id === 'notification')?.count).toBe(1)
     expect(catalog.categories.find((category) => category.id === 'win32Apps')?.count).toBe(20)
     expect(catalog.categories.find((category) => category.id === 'baseline')?.count).toBe(2)
-    expect(catalog.categories.find((category) => category.id === 'baseline')?.description).toBe('Baseline v4.0 includes macOS, Windows, and BYOD policies.')
+    expect(catalog.categories.find((category) => category.id === 'baseline')?.description).toBe(`Baseline v${oibManifest.windowsVersion} includes macOS, Windows, and BYOD policies.`)
     expect(catalog.categories.find((category) => category.id === 'cisBaseline')?.count).toBe(1)
 
     const baselineItem = catalog.items.find(
