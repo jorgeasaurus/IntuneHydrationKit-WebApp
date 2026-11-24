@@ -40,6 +40,14 @@ export function AnimatedCounter({
   });
   const isInView = useInView(ref, { once: true, margin: IN_VIEW_MARGIN });
   const [displayValue, setDisplayValue] = useState(startValue);
+  // The server cannot read the reduced-motion preference, so it renders the
+  // start value. Use the same value in the first client render to prevent a
+  // hydration mismatch. Apply the preference only after mount.
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isInView && !prefersReducedMotion) {
@@ -54,7 +62,8 @@ export function AnimatedCounter({
     return () => unsubscribe();
   }, [springValue]);
 
-  const renderedValue = prefersReducedMotion ? endValue : displayValue;
+  const renderedValue =
+    hasMounted && prefersReducedMotion ? endValue : displayValue;
 
   return (
     <span ref={ref} className={className}>
