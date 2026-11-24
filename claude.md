@@ -340,7 +340,7 @@ interface HydrationSummary {
 **Design System**:
 - Use shadcn/ui components (same as reference project)
 - Tailwind CSS for styling
-- Fixed glass theme over an animated dither backdrop in water colors (2D canvas, no libraries). There is no light/dark toggle.
+- Fixed glass theme over an animated ASCII backdrop with a water motion (2D canvas, no libraries). Put `data-quiet` on text that sits directly on the backdrop. There is no light/dark toggle.
 - Responsive design (desktop-first, mobile-friendly)
 
 **Color Coding**:
@@ -447,11 +447,11 @@ The source folders are at the repository root (there is no `src/` folder). Main 
 │   ├── dashboard/                 # DashboardRunView, ProgressBar, TaskList, TaskRow, ExecutionControls, ResultsSummary, ReportComparison, ...
 │   ├── landing/                   # HomeLanding
 │   ├── templates/                 # TemplateCatalogPage
-│   ├── SettingsModal.tsx, Navigation.tsx, WaterBackdrop.tsx, ...
+│   ├── SettingsModal.tsx, Navigation.tsx, AsciiBackdrop.tsx, ...
 │   └── ui/                        # shadcn components
 ├── lib/
 │   ├── auth/                      # msalConfig.ts, authUtils.ts
-│   ├── backdrop/waterDither.ts    # Dither frame renderer for WaterBackdrop
+│   ├── backdrop/asciiWater.ts     # Glyph frame logic for AsciiBackdrop
 │   ├── config/batchConfig.ts      # Graph $batch sizes and delays
 │   ├── graph/                     # client.ts, batch.ts, endpoints.ts, prerequisites.ts, and one module per object type
 │   ├── hydration/                 # engine.ts, batchExecutor.ts, taskQueue.ts, reporter.ts, taskExecutors/, ...

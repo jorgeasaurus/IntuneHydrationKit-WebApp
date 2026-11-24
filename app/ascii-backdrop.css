@@ -1,6 +1,6 @@
 /*
- * Base for the water backdrop on all pages. This color shows before the canvas draws.
- * components/WaterBackdrop.tsx draws the animated dither field.
+ * Base for the ASCII backdrop on all pages. This color shows before the canvas draws.
+ * components/AsciiBackdrop.tsx draws the animated glyph field.
  */
 :root {
   --water-deep: #041826;
@@ -16,7 +16,7 @@ body {
   background-color: transparent;
 }
 
-.water-backdrop {
+.ascii-backdrop {
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -28,22 +28,23 @@ body {
 
 /* Phone browsers draw the page under their toolbars. Cover the largest viewport. */
 @supports (height: 100lvh) {
-  .water-backdrop {
+  .ascii-backdrop {
     bottom: auto;
     height: 100lvh;
   }
 }
 
-/* One canvas pixel is one dither cell. The browser scales it up without smoothing. */
-.water-backdrop__canvas {
+/* The component reads the glyph color and font from this element. */
+.ascii-backdrop__canvas {
   position: absolute;
-  top: 0;
-  left: 0;
-  image-rendering: pixelated;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  color: #8fe3f2;
   opacity: 0;
   transition: opacity 600ms ease-out;
 }
 
-.water-backdrop__canvas[data-ready] {
+.ascii-backdrop__canvas[data-ready] {
   opacity: 1;
 }

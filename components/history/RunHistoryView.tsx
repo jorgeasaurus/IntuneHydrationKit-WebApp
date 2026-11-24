@@ -75,7 +75,7 @@ export function RunHistoryView(): React.JSX.Element {
 
       <main className="container mx-auto max-w-5xl space-y-6 px-4 py-8">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div>
+          <div data-quiet>
             <h2 ref={headingRef} tabIndex={-1} className="text-2xl font-bold tracking-tight outline-none">
               {selected ? "Run results" : "Past runs"}
             </h2>

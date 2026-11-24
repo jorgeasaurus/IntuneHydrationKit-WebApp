@@ -96,3 +96,4 @@
 - Use the requested baseline release wording in docs and the wizard: include macOS, Windows, and BYOD without a Windows-only release qualifier.
 
 - Treat omitted Graph type annotations as metadata, not missing policy settings. Show a short decision summary first; keep repeated names, object IDs, and raw comparison paths in expandable details.
+- When the user names a reference project for a visual effect, port the technique of that project before you design a different effect.

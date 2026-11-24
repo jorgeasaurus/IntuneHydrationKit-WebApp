@@ -1975,17 +1975,22 @@ Cleanup inventory: keep main, dev, the dev backup, production, and dev deploymen
 
 Merge review fixes: 15 report-comparison tests and 19 baseline-evidence tests pass. Type check and diff check pass. Fresh review and production results will be reported after completion.
 
-# Water Dither Backdrop
+# ASCII Water Backdrop
 
-- [x] Replace the Vanta Waves wallpaper with an animated dither backdrop in water colors on all pages.
+- [x] Replace the Vanta Waves wallpaper with an animated ASCII field with a water motion on all pages.
 - [x] Remove `three`, `vanta`, `@types/three`, and the route wallpaper components and tests.
-- [x] Remove the earlier CSS blob backdrop that the user rejected.
-- [x] Tune the shared glass so the dither cells show through panels and text stays readable.
-- [x] Show one static frame when the user asks for reduced motion.
+- [x] Remove the CSS blob backdrop and the dither backdrop that the user rejected.
+- [x] Use the PSIndex method: a glyph atlas, a density ramp, PowerShell sigils, quiet zones, a header fade, a pointer glow, and click ripples.
+- [x] Restore the frosted glass from `dev`. Make the landing hero panel clear glass so that the field shows in the first viewport.
+- [x] Mark text that sits directly on the backdrop with `data-quiet`.
+- [x] Keep a static field when the user asks for reduced motion.
 
 ## Result
 
-- `WaterBackdrop` draws a low-resolution canvas. One canvas pixel is one square dither cell. CSS scales it with `image-rendering: pixelated`.
-- `lib/backdrop/waterDither.ts` makes each frame from value noise and a 4x4 Bayer pattern in five ocean tones. The highlight tone shows only on caustic lines and short glints.
-- The animation runs at 20 frames per second and stops when the tab is hidden. One frame takes approximately 3 ms at 1920x1080.
-- Browser checks at 1440px and 375px: backdrop visible, text readable, no horizontal overflow.
+- `AsciiBackdrop` draws one canvas. Each glyph is drawn one time into an atlas. Each frame only copies glyphs from the atlas to whole-pixel cells (14 px, 12 px on phones).
+- `lib/backdrop/asciiWater.ts` makes each frame. The level is a contour map of a moving water surface: swells move down the page, and a current bends them. Dense cells show `$|{}<>;°` at intervals.
+- The field is strongest in the top 504 px of the viewport and has a calm floor below. The pointer and click ripples have full strength at all heights.
+- The field fades to nothing within 18 px (6 px on phones) of each `data-quiet` element. The component measures these elements on each animation frame, so the quiet zones follow scroll and layout changes.
+- The animation runs at 30 frames per second. The browser stops it when the tab is hidden. With reduced motion, the field does not move and has no pointer glow or ripple. It draws again only when a quiet zone moves.
+- Frame cost at 1920x1080: 2.2 ms for the field math. The test browser uses a software renderer (SwiftShader), where one frame takes 16-27 ms in total. The PSIndex field takes 24 ms in the same browser.
+- Browser checks at 1440px and 375px, scrolled, `/templates`, and the 404 page: glyphs are crisp at 1x and 2x, no glyph is under text, and there is no horizontal overflow.

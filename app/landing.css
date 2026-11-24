@@ -14,6 +14,9 @@
 }
 
 .landing-glass-shell .landing-hero-panel {
+  /* Clear glass: the ASCII field shows through. Elements with data-quiet keep the text clean. */
+  -webkit-backdrop-filter: brightness(0.8);
+  backdrop-filter: brightness(0.8);
   min-height: clamp(420px, 48vw, 560px);
   padding: clamp(24px, 4vw, 46px);
   border-radius: 32px;
@@ -88,8 +91,7 @@
 .landing-glass-shell section.border-y,
 .landing-glass-shell .border-y {
   border-color: rgb(246 251 255 / 0.14);
-  /* Copy in these bands sits on the dither backdrop. The tint keeps it readable over light cells. */
-  background: rgb(4 18 28 / 0.42);
+  background: rgb(6 18 24 / 0.08);
 }
 
 .landing-glass-shell footer {

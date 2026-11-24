@@ -21,9 +21,9 @@ test.describe("Landing Page", () => {
     await expect(page.getByText(/^v\d+\.\d+\.\d+$/, { exact: true })).toBeVisible();
   });
 
-  test("draws the water backdrop", async ({ page }) => {
+  test("draws the ASCII backdrop", async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator(".water-backdrop__canvas[data-ready]")).toBeAttached();
+    await expect(page.locator(".ascii-backdrop__canvas[data-ready]")).toBeAttached();
   });
 
   test("has no unexpected console errors on load", async ({ page }) => {

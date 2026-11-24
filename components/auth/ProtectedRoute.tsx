@@ -19,7 +19,7 @@ export const SIGN_IN_REQUIRED_PATH = "/?signin=required";
 function AuthUnavailablePage({ message }: { message: string }) {
   return (
     <main className="flex min-h-[60vh] items-center justify-center px-4">
-      <div role="alert" className="max-w-md space-y-4 text-center">
+      <div role="alert" data-quiet className="max-w-md space-y-4 text-center">
         <h1 className="text-2xl font-semibold">Sign-in is unavailable</h1>
         <p className="text-muted-foreground">{message}</p>
         <Button asChild>

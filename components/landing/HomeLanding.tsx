@@ -129,7 +129,7 @@ function PrimaryAction({
 
 function SectionEyebrow({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-7 flex items-center gap-4">
+    <div data-quiet className="mb-7 flex items-center gap-4">
       <div className="h-px flex-1 bg-border" />
       <p className="font-mono text-xs uppercase text-muted-foreground">
         {children}
@@ -141,7 +141,7 @@ function SectionEyebrow({ children }: { children: ReactNode }) {
 
 function MobileRunPreview() {
   return (
-    <div className="landing-mobile-preview glass-surface rounded-lg border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur xl:hidden">
+    <div data-quiet className="landing-mobile-preview glass-surface rounded-lg border border-border/80 bg-card/80 p-4 shadow-sm backdrop-blur xl:hidden">
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="font-mono text-xs uppercase text-muted-foreground">
@@ -190,7 +190,7 @@ function Hero({
       <div className="container relative mx-auto px-4 sm:px-6">
         <div className="landing-hero-panel glass-panel grid items-center gap-6 sm:gap-10 xl:grid-cols-[minmax(0,0.95fr)_minmax(520px,1.05fr)]">
           <div className="space-y-5 sm:space-y-8">
-            <div className="flex flex-wrap items-center gap-3">
+            <div data-quiet className="flex flex-wrap items-center gap-3">
               <span className="landing-version-badge inline-flex items-center gap-2 rounded-md border border-hydrate/35 bg-hydrate/10 px-3 py-1.5 font-mono text-xs uppercase text-hydrate">
                 <span className="size-2 rounded-full bg-hydrate" />
                 {APP_VERSION}
@@ -202,17 +202,17 @@ function Hero({
             </div>
 
             <div className="max-w-3xl space-y-5">
-              <h1 className="hero-title text-4xl sm:text-7xl lg:text-8xl">
+              <h1 data-quiet className="hero-title text-4xl sm:text-7xl lg:text-8xl">
                 Intune Hydration Kit
               </h1>
-              <p className="landing-lead max-w-2xl text-base leading-7 text-muted-foreground sm:text-xl sm:leading-8">
+              <p data-quiet className="landing-lead max-w-2xl text-base leading-7 text-muted-foreground sm:text-xl sm:leading-8">
                 A guided Microsoft Graph console for bootstrapping Intune
                 tenants with policy templates, safety checks, preview mode, and
                 deployable evidence.
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 sm:flex sm:flex-row sm:flex-wrap">
+            <div data-quiet className="grid grid-cols-2 gap-3 sm:flex sm:flex-row sm:flex-wrap">
               <PrimaryAction
                 isAuthenticated={isAuthenticated}
                 onSignInClick={onSignInClick}
@@ -249,7 +249,7 @@ function Hero({
 
             <MobileRunPreview />
 
-            <div className="landing-stat-rail glass-surface hidden gap-2 rounded-lg border border-border/80 bg-card/70 p-2 backdrop-blur sm:grid sm:grid-cols-4">
+            <div data-quiet className="landing-stat-rail glass-surface hidden gap-2 rounded-lg border border-border/80 bg-card/70 p-2 backdrop-blur sm:grid sm:grid-cols-4">
               {HERO_STATS.map((stat) => (
                 <div
                   key={stat.label}
@@ -267,7 +267,7 @@ function Hero({
           </div>
 
           <div className="landing-demo-column relative hidden min-h-[465px] xl:block">
-            <div className="relative mx-auto max-w-2xl">
+            <div data-quiet className="relative mx-auto max-w-2xl">
               <div className="landing-preview-bar glass-surface mb-3 flex items-center justify-between rounded-lg border border-border/80 bg-background/75 px-4 py-3 backdrop-blur">
                 <div>
                   <p className="font-mono text-xs uppercase text-muted-foreground">
@@ -298,7 +298,7 @@ function FeaturesSection() {
         <div className="mx-auto max-w-6xl">
           <SectionEyebrow>Operating Model</SectionEyebrow>
           <div className="grid gap-6 lg:grid-cols-[0.8fr_1.2fr]">
-            <div className="space-y-4">
+            <div data-quiet className="space-y-4">
               <h2 className="text-3xl font-bold sm:text-4xl">
                 Built for repeatable tenant work, not a one-off wizard.
               </h2>
@@ -345,7 +345,7 @@ function WorkflowSection() {
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto max-w-6xl">
           <div className="mb-10 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-            <div>
+            <div data-quiet>
               <p className="mb-3 font-mono text-xs uppercase text-hydrate">
                 Guided execution
               </p>
@@ -353,7 +353,7 @@ function WorkflowSection() {
                 Four checkpoints from consent to evidence.
               </h2>
             </div>
-            <p className="max-w-xl text-sm leading-6 text-muted-foreground">
+            <p data-quiet className="max-w-xl text-sm leading-6 text-muted-foreground">
               Each stage exists to make the next one safer: connect the tenant,
               scope the work, execute intentionally, then export results.
             </p>
@@ -437,7 +437,7 @@ function ConfigurationsSection() {
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto max-w-6xl">
           <SectionEyebrow>Available Configurations</SectionEyebrow>
-          <div className="mb-8 grid gap-4 md:grid-cols-[0.75fr_1.25fr]">
+          <div data-quiet className="mb-8 grid gap-4 md:grid-cols-[0.75fr_1.25fr]">
             <h2 className="text-3xl font-bold sm:text-4xl">
               A large template library with precise operator controls.
             </h2>
@@ -514,7 +514,7 @@ function FaqSection() {
     <section id="faq" className="scroll-mt-20 border-y border-border/80 bg-muted/25 py-16 sm:py-20">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto max-w-4xl">
-          <div className="mb-10 text-center">
+          <div data-quiet className="mb-10 text-center">
             <p className="mb-3 font-mono text-xs uppercase text-hydrate">
               Field Notes
             </p>
@@ -556,7 +556,7 @@ function FinalCta({
     <section className="py-16 sm:py-20">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto max-w-5xl">
-          <div className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
+          <div data-quiet className="overflow-hidden rounded-lg border border-border bg-card text-card-foreground">
             <div className="h-1 bg-gradient-to-r from-hydrate via-primary to-hydrate" />
             <div className="grid gap-6 p-6 sm:p-8 md:grid-cols-[1fr_auto] md:items-center">
               <div>
