@@ -1975,14 +1975,17 @@ Cleanup inventory: keep main, dev, the dev backup, production, and dev deploymen
 
 Merge review fixes: 15 report-comparison tests and 19 baseline-evidence tests pass. Type check and diff check pass. Fresh review and production results will be reported after completion.
 
-# Aurora Backdrop
+# Water Dither Backdrop
 
-- [x] Replace the Vanta Waves wallpaper with a CSS aurora backdrop on all pages.
+- [x] Replace the Vanta Waves wallpaper with an animated dither backdrop in water colors on all pages.
 - [x] Remove `three`, `vanta`, `@types/three`, and the route wallpaper components and tests.
-- [x] Tune the shared glass fill, lines, and blur for the new backdrop.
-- [x] Stop backdrop motion when the user asks for reduced motion.
+- [x] Remove the earlier CSS blob backdrop that the user rejected.
+- [x] Tune the shared glass so the dither cells show through panels and text stays readable.
+- [x] Show one static frame when the user asks for reduced motion.
 
 ## Result
 
-- `AuroraBackdrop` is a server component. `app/aurora.css` draws the blobs, caustics, waves, and grain.
+- `WaterBackdrop` draws a low-resolution canvas. One canvas pixel is one square dither cell. CSS scales it with `image-rendering: pixelated`.
+- `lib/backdrop/waterDither.ts` makes each frame from value noise and a 4x4 Bayer pattern in five ocean tones. The highlight tone shows only on caustic lines and short glints.
+- The animation runs at 20 frames per second and stops when the tab is hidden. One frame takes approximately 3 ms at 1920x1080.
 - Browser checks at 1440px and 375px: backdrop visible, text readable, no horizontal overflow.

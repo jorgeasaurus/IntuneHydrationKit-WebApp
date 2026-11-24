@@ -1,0 +1,49 @@
+/*
+ * Base for the water backdrop on all pages. This color shows before the canvas draws.
+ * components/WaterBackdrop.tsx draws the animated dither field.
+ */
+:root {
+  --water-deep: #041826;
+  --water-base: linear-gradient(180deg, #041826 0%, #09314b 46%, #052431 100%);
+}
+
+/* Areas that the backdrop does not reach (overscroll, translucent toolbars) show the deep color. */
+html {
+  background-color: var(--water-deep);
+}
+
+body {
+  background-color: transparent;
+}
+
+.water-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--water-base);
+  contain: strict;
+}
+
+/* Phone browsers draw the page under their toolbars. Cover the largest viewport. */
+@supports (height: 100lvh) {
+  .water-backdrop {
+    bottom: auto;
+    height: 100lvh;
+  }
+}
+
+/* One canvas pixel is one dither cell. The browser scales it up without smoothing. */
+.water-backdrop__canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  image-rendering: pixelated;
+  opacity: 0;
+  transition: opacity 600ms ease-out;
+}
+
+.water-backdrop__canvas[data-ready] {
+  opacity: 1;
+}

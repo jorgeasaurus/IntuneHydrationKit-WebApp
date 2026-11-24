@@ -2,12 +2,12 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./landing.css";
-import "./aurora.css";
+import "./water-backdrop.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
-import { AuroraBackdrop } from "@/components/AuroraBackdrop";
+import { WaterBackdrop } from "@/components/WaterBackdrop";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { SITE_URL } from "@/lib/siteUrl";
 import { Analytics } from "@vercel/analytics/next";
@@ -99,7 +99,7 @@ export default function RootLayout({
         <MsalProvider>
           <SettingsProvider>
             <WizardProvider>
-              <AuroraBackdrop />
+              <WaterBackdrop />
               <ExecutionRouteGuard>{children}</ExecutionRouteGuard>
               <Toaster />
               <Analytics />

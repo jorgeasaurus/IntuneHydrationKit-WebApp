@@ -20,7 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
-- **Site background** - A CSS aurora backdrop with water colors replaces the Vanta Waves wallpaper. The backdrop shows on all pages and stops its motion when the user asks for reduced motion.
+- **Site background** - An animated dither backdrop in water colors replaces the Vanta Waves wallpaper. A small canvas draws the backdrop on all pages. The backdrop shows one static frame when the user asks for reduced motion.
 - **Dynamic groups expanded** - 12 → 50 groups across 6 categories: OS (20), Autopilot (2), Ownership (2), Manufacturer (5), User (9), VM (12).
 - **Device filters expanded** - 12 → 29 filters covering Windows, iOS, Android, macOS, and CPU architecture targeting.
 - **Compliance policies replaced** - 10 generic policies → 8 platform-aligned policies matching PS project (Android FullyManaged basic/strict, Windows standard/custom, iOS basic/strict, macOS basic/strict). Linux excluded (Settings Catalog format).
