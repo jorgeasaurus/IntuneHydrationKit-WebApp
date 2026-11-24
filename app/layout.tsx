@@ -2,11 +2,12 @@ import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import "./landing.css";
+import "./aurora.css";
 import { MsalProvider } from "@/components/auth/MsalProvider";
 import { WizardProvider } from "@/hooks/useWizardState";
 import { SettingsProvider } from "@/hooks/useSettings";
 import { Toaster } from "@/components/ui/sonner";
-import { RouteWallpaper } from "@/components/RouteWallpaper";
+import { AuroraBackdrop } from "@/components/AuroraBackdrop";
 import { StructuredData } from "@/components/seo/StructuredData";
 import { SITE_URL } from "@/lib/siteUrl";
 import { Analytics } from "@vercel/analytics/next";
@@ -82,7 +83,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#005588",
+  themeColor: "#06283a",
 };
 
 export default function RootLayout({
@@ -98,7 +99,7 @@ export default function RootLayout({
         <MsalProvider>
           <SettingsProvider>
             <WizardProvider>
-              <RouteWallpaper />
+              <AuroraBackdrop />
               <ExecutionRouteGuard>{children}</ExecutionRouteGuard>
               <Toaster />
               <Analytics />

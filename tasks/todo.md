@@ -1974,3 +1974,15 @@ Fix validation: 685 tests, type check, lint, and diff check passed. The fresh re
 Cleanup inventory: keep main, dev, the dev backup, production, and dev deployments. Preserve the PR 71 backup and five previews because its exact tip has no merge proof.
 
 Merge review fixes: 15 report-comparison tests and 19 baseline-evidence tests pass. Type check and diff check pass. Fresh review and production results will be reported after completion.
+
+# Aurora Backdrop
+
+- [x] Replace the Vanta Waves wallpaper with a CSS aurora backdrop on all pages.
+- [x] Remove `three`, `vanta`, `@types/three`, and the route wallpaper components and tests.
+- [x] Tune the shared glass fill, lines, and blur for the new backdrop.
+- [x] Stop backdrop motion when the user asks for reduced motion.
+
+## Result
+
+- `AuroraBackdrop` is a server component. `app/aurora.css` draws the blobs, caustics, waves, and grain.
+- Browser checks at 1440px and 375px: backdrop visible, text readable, no horizontal overflow.

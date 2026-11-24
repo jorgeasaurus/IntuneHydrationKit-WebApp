@@ -1,0 +1,172 @@
+/*
+ * Aurora backdrop for all pages. Soft color blobs move slowly over deep water.
+ * A grain layer stops color banding. Motion stops when the user asks for reduced motion.
+ */
+:root {
+  --aurora-base: linear-gradient(180deg, #041826 0%, #06283a 46%, #052431 100%);
+  --aurora-canvas: #041826;
+  --aurora-cyan: 34 211 238;
+  --aurora-sky: 56 189 248;
+  --aurora-teal: 45 212 191;
+  --aurora-lavender: 129 140 248;
+  --aurora-wave: 186 230 253;
+  --aurora-grain-opacity: 0.07;
+}
+
+/* Areas that the backdrop does not reach (overscroll, translucent toolbars) show the canvas color. */
+html {
+  background-color: var(--aurora-canvas);
+}
+
+body {
+  background-color: transparent;
+}
+
+.aurora-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: var(--aurora-base);
+  contain: strict;
+}
+
+/* Phone browsers draw the page under their toolbars. Cover the largest viewport. */
+@supports (height: 100lvh) {
+  .aurora-backdrop {
+    bottom: auto;
+    height: 100lvh;
+  }
+}
+
+.aurora-backdrop__blob {
+  position: absolute;
+  border-radius: 50%;
+  will-change: transform;
+}
+
+.aurora-backdrop__blob--cyan {
+  top: -22vmax;
+  left: -14vmax;
+  width: 70vmax;
+  height: 70vmax;
+  background: radial-gradient(
+    circle at center,
+    rgb(var(--aurora-cyan) / 0.4) 0%,
+    rgb(var(--aurora-cyan) / 0.14) 38%,
+    transparent 68%
+  );
+  animation: aurora-drift-a 42s ease-in-out infinite alternate;
+}
+
+.aurora-backdrop__blob--sky {
+  top: -10vmax;
+  right: -20vmax;
+  width: 64vmax;
+  height: 64vmax;
+  background: radial-gradient(
+    circle at center,
+    rgb(var(--aurora-sky) / 0.36) 0%,
+    rgb(var(--aurora-sky) / 0.12) 40%,
+    transparent 68%
+  );
+  animation: aurora-drift-b 52s ease-in-out infinite alternate;
+}
+
+.aurora-backdrop__blob--teal {
+  bottom: -26vmax;
+  left: 12vmax;
+  width: 72vmax;
+  height: 72vmax;
+  background: radial-gradient(
+    circle at center,
+    rgb(var(--aurora-teal) / 0.3) 0%,
+    rgb(var(--aurora-teal) / 0.1) 40%,
+    transparent 68%
+  );
+  animation: aurora-drift-c 60s ease-in-out infinite alternate;
+}
+
+.aurora-backdrop__blob--lavender {
+  bottom: -18vmax;
+  right: -8vmax;
+  width: 52vmax;
+  height: 52vmax;
+  background: radial-gradient(circle at center, rgb(var(--aurora-lavender) / 0.24) 0%, transparent 66%);
+  animation: aurora-drift-a 68s ease-in-out infinite alternate-reverse;
+}
+
+.aurora-backdrop__caustics {
+  position: absolute;
+  inset: -20%;
+  opacity: 0.5;
+  will-change: transform;
+  background:
+    radial-gradient(ellipse 40% 14% at 30% 20%, rgb(var(--aurora-wave) / 0.07), transparent 70%),
+    radial-gradient(ellipse 34% 10% at 70% 34%, rgb(var(--aurora-wave) / 0.05), transparent 70%),
+    radial-gradient(ellipse 46% 12% at 48% 62%, rgb(var(--aurora-wave) / 0.04), transparent 70%);
+  animation: aurora-caustics 36s ease-in-out infinite alternate;
+}
+
+.aurora-backdrop__waves {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 200%;
+  height: 22vh;
+  min-height: 140px;
+  opacity: 0.6;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 200' preserveAspectRatio='none'%3E%3Cpath fill='%23bae6fd' fill-opacity='.05' d='M0 90 C240 40 480 140 720 90 S1200 40 1440 90 V200 H0Z'/%3E%3Cpath fill='%2322d3ee' fill-opacity='.05' d='M0 130 C240 90 480 170 720 130 S1200 90 1440 130 V200 H0Z'/%3E%3C/svg%3E")
+    repeat-x 0 100% / 50% 100%;
+  -webkit-mask-image: linear-gradient(180deg, transparent, #000 45%);
+  mask-image: linear-gradient(180deg, transparent, #000 45%);
+  will-change: transform;
+  animation: aurora-wave-slide 70s linear infinite;
+}
+
+.aurora-backdrop__grain {
+  position: absolute;
+  inset: 0;
+  opacity: var(--aurora-grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 160px 160px;
+}
+
+@keyframes aurora-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(9vmax, 6vmax, 0) scale(1.12); }
+}
+
+@keyframes aurora-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.05); }
+  to { transform: translate3d(-10vmax, 8vmax, 0) scale(0.94); }
+}
+
+@keyframes aurora-drift-c {
+  from { transform: translate3d(0, 0, 0) scale(0.96); }
+  to { transform: translate3d(7vmax, -8vmax, 0) scale(1.1); }
+}
+
+@keyframes aurora-caustics {
+  from { transform: translate3d(-3%, -2%, 0) rotate(-2deg); }
+  to { transform: translate3d(3%, 2%, 0) rotate(2deg); }
+}
+
+@keyframes aurora-wave-slide {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-backdrop__blob,
+  .aurora-backdrop__caustics,
+  .aurora-backdrop__waves {
+    animation: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .aurora-backdrop__caustics {
+    display: none;
+  }
+}

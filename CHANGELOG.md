@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- **Site background** - A CSS aurora backdrop with water colors replaces the Vanta Waves wallpaper. The backdrop shows on all pages and stops its motion when the user asks for reduced motion.
 - **Dynamic groups expanded** - 12 → 50 groups across 6 categories: OS (20), Autopilot (2), Ownership (2), Manufacturer (5), User (9), VM (12).
 - **Device filters expanded** - 12 → 29 filters covering Windows, iOS, Android, macOS, and CPU architecture targeting.
 - **Compliance policies replaced** - 10 generic policies → 8 platform-aligned policies matching PS project (Android FullyManaged basic/strict, Windows standard/custom, iOS basic/strict, macOS basic/strict). Linux excluded (Settings Catalog format).
@@ -32,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Removed
 
+- **Wallpaper dependencies** - The `three` and `vanta` dependencies and the route wallpaper components.
 - Apple DEP enrollment profiles (iOS/macOS) - not present in the PowerShell project.
 - Secure account recovery with identity verification - requires tenant authorization for the AccountRecovery private preview.
 - Generic CA001–CA013 conditional access policy templates.

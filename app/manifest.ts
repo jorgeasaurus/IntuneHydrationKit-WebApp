@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Bootstrap Microsoft Intune tenants with OpenIntuneBaseline policies, compliance, and conditional access.",
     start_url: "/",
     display: "standalone",
-    background_color: "#005588",
-    theme_color: "#005588",
+    background_color: "#041826",
+    theme_color: "#06283a",
     icons: [
       {
         src: "/icon-192.png",

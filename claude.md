@@ -340,7 +340,7 @@ interface HydrationSummary {
 **Design System**:
 - Use shadcn/ui components (same as reference project)
 - Tailwind CSS for styling
-- Fixed glass theme over an animated wallpaper (three.js + Vanta). There is no light/dark toggle.
+- Fixed glass theme over a CSS aurora backdrop. There is no light/dark toggle.
 - Responsive design (desktop-first, mobile-friendly)
 
 **Color Coding**:
@@ -420,7 +420,6 @@ interface AppSettings {
 - Lucide React (icons)
 - Sonner (toast notifications)
 - Framer Motion (animation)
-- three.js + Vanta (animated wallpaper)
 - Progress bars are plain components. Recharts is not used.
 
 **Utilities**:
@@ -448,7 +447,7 @@ The source folders are at the repository root (there is no `src/` folder). Main 
 │   ├── dashboard/                 # DashboardRunView, ProgressBar, TaskList, TaskRow, ExecutionControls, ResultsSummary, ReportComparison, ...
 │   ├── landing/                   # HomeLanding
 │   ├── templates/                 # TemplateCatalogPage
-│   ├── SettingsModal.tsx, Navigation.tsx, DynamicWallpaper.tsx, ...
+│   ├── SettingsModal.tsx, Navigation.tsx, AuroraBackdrop.tsx, ...
 │   └── ui/                        # shadcn components
 ├── lib/
 │   ├── auth/                      # msalConfig.ts, authUtils.ts
