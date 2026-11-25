@@ -36,3 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Secure account recovery with identity verification - requires tenant authorization for the AccountRecovery private preview.
 - Generic CA001–CA013 conditional access policy templates.
 - Old compliance policy names (e.g., "Windows 10 - Security Baseline") replaced by PS-aligned names.
+
+### Fixed
+
+- **Landing page hydration error with reduced motion** - When the browser requests reduced motion, the home page no longer shows React error #418. The animated counter now renders the server value in the first client render. It shows the final value after mount.
