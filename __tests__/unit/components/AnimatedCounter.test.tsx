@@ -1,7 +1,9 @@
 import React from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-import { render, screen } from '@testing-library/react'
+import { act, render, screen } from '@testing-library/react'
+import { hydrateRoot } from 'react-dom/client'
+import { renderToString } from 'react-dom/server'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 
 let isInView = true
@@ -103,5 +105,35 @@ describe('AnimatedCounter', () => {
     render(<AnimatedCounter value={2500} direction="down" />)
 
     expect(screen.getByText('0')).toBeInTheDocument()
+  })
+
+  it('hydrates server HTML without a mismatch when the user prefers reduced motion', async () => {
+    // The server cannot read the preference, so it renders the start value.
+    prefersReducedMotion = null
+    const serverHtml = renderToString(<AnimatedCounter value={798} />)
+    expect(serverHtml).toContain('>0<')
+
+    const container = document.createElement('div')
+    container.innerHTML = serverHtml
+    document.body.appendChild(container)
+
+    prefersReducedMotion = true
+    const onRecoverableError = vi.fn()
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    let root: ReturnType<typeof hydrateRoot> | undefined
+    await act(async () => {
+      root = hydrateRoot(container, <AnimatedCounter value={798} />, {
+        onRecoverableError,
+      })
+    })
+
+    expect(onRecoverableError).not.toHaveBeenCalled()
+    expect(consoleError).not.toHaveBeenCalled()
+    expect(container.textContent).toBe('798')
+
+    act(() => root?.unmount())
+    container.remove()
+    consoleError.mockRestore()
   })
 })
