@@ -1,0 +1,64 @@
+name: Weekly dev to main PR
+
+on:
+  schedule:
+    # Mondays at 15:00 UTC (07:00 PT in PST, 08:00 PT in PDT)
+    - cron: "0 15 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-dev-to-main-pr
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  open-pr:
+    name: Open pull request if needed
+    runs-on: ubuntu-latest
+    steps:
+      - name: Open dev to main pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          repo="$GITHUB_REPOSITORY"
+
+          existing="$(gh pr list --repo "$repo" --base main --head dev --state open --json number --jq 'length')"
+          if [ "$existing" -gt 0 ]; then
+            echo "An open dev -> main pull request already exists."
+            exit 0
+          fi
+
+          compare="$(gh api "repos/${repo}/compare/main...dev" --jq '{ahead_by, commits: [.commits[] | {sha, subject: (.commit.message | split("\n")[0])}]}')"
+          ahead_by="$(printf '%s' "$compare" | jq '.ahead_by')"
+          if [ "$ahead_by" -eq 0 ]; then
+            echo "dev has no commits that are not on main."
+            exit 0
+          fi
+
+          commits="$(printf '%s' "$compare" | jq -r '.commits[] | "- \(.sha[0:7]) \(.subject)"')"
+          listed="$(printf '%s' "$compare" | jq '.commits | length')"
+
+          {
+            echo "dev is ${ahead_by} commit(s) ahead of main."
+            echo
+            echo "Commits:"
+            printf '%s\n' "$commits"
+            if [ "$listed" -lt "$ahead_by" ]; then
+              echo
+              echo "Commit list truncated to the first ${listed} of ${ahead_by}."
+            fi
+            echo
+            echo "Compare: https://github.com/${repo}/compare/main...dev"
+          } > "$RUNNER_TEMP/pr-body.md"
+
+          gh pr create \
+            --repo "$repo" \
+            --base main \
+            --head dev \
+            --title "Weekly merge: dev -> main" \
+            --body-file "$RUNNER_TEMP/pr-body.md"
