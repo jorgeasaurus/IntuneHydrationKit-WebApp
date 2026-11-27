@@ -26,9 +26,8 @@ jobs:
           set -euo pipefail
 
           repo="$GITHUB_REPOSITORY"
-          owner="$GITHUB_REPOSITORY_OWNER"
 
-          existing="$(gh pr list --repo "$repo" --base main --head "${owner}:dev" --state open --json number --jq 'length')"
+          existing="$(gh pr list --repo "$repo" --base main --head dev --state open --json number --jq 'length')"
           if [ "$existing" -gt 0 ]; then
             echo "An open dev -> main pull request already exists."
             exit 0
