@@ -270,9 +270,45 @@
       "manifestPath": "manifests/a/Anysphere/Cursor",
       "versions": [
         {
-          "version": "3.31.15",
+          "version": "3.32.10",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-26",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/0d3b96e46ce65af82ed74bc6f14883b33e1a0597/win32/arm64/system-setup/CursorSetup-arm64-3.32.10.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/0d3b96e46ce65af82ed74bc6f14883b33e1a0597/win32/arm64/user-setup/CursorUserSetup-arm64-3.32.10.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://downloads.cursor.com/production/0d3b96e46ce65af82ed74bc6f14883b33e1a0597/win32/x64/system-setup/CursorSetup-x64-3.32.10.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://downloads.cursor.com/production/0d3b96e46ce65af82ed74bc6f14883b33e1a0597/win32/x64/user-setup/CursorUserSetup-x64-3.32.10.exe"
+            }
+          ]
+        },
+        {
+          "version": "3.31.15",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-20",
           "installers": [
             {
@@ -410,42 +446,6 @@
               "nestedInstallerType": null,
               "scope": "user",
               "url": "https://downloads.cursor.com/production/4a44c846d0b817fab060823f93c63ea2861ac192/win32/x64/user-setup/CursorUserSetup-x64-3.30.8.exe"
-            }
-          ]
-        },
-        {
-          "version": "3.29.15",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-11-08",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/86776fcb52ca505783155631089b65d646f9b03f/win32/arm64/system-setup/CursorSetup-arm64-3.29.15.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/86776fcb52ca505783155631089b65d646f9b03f/win32/arm64/user-setup/CursorUserSetup-arm64-3.29.15.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://downloads.cursor.com/production/86776fcb52ca505783155631089b65d646f9b03f/win32/x64/system-setup/CursorSetup-x64-3.29.15.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://downloads.cursor.com/production/86776fcb52ca505783155631089b65d646f9b03f/win32/x64/user-setup/CursorUserSetup-x64-3.29.15.exe"
             }
           ]
         }
@@ -648,9 +648,53 @@
       "manifestPath": "manifests/a/Anthropic/ClaudeCode",
       "versions": [
         {
-          "version": "2.1.330",
+          "version": "2.1.332",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-24",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "portable",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.332/win32-arm64/claude.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "portable",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.332/win32-x64/claude.exe"
+            }
+          ]
+        },
+        {
+          "version": "2.1.331",
+          "latest": false,
+          "bestEffort": true,
+          "releaseDate": "2026-11-23",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "portable",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.331/win32-arm64/claude.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "portable",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://downloads.claude.ai/claude-code-releases/2.1.331/win32-x64/claude.exe"
+            }
+          ]
+        },
+        {
+          "version": "2.1.330",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-20",
           "installers": [
             {
@@ -712,50 +756,6 @@
               "url": "https://downloads.claude.ai/claude-code-releases/2.1.328/win32-x64/claude.exe"
             }
           ]
-        },
-        {
-          "version": "2.1.327",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-11-17",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "portable",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.327/win32-arm64/claude.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "portable",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.327/win32-x64/claude.exe"
-            }
-          ]
-        },
-        {
-          "version": "2.1.326",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-11-16",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "portable",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.326/win32-arm64/claude.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "portable",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://downloads.claude.ai/claude-code-releases/2.1.326/win32-x64/claude.exe"
-            }
-          ]
         }
       ]
     },
@@ -767,9 +767,31 @@
       "manifestPath": "manifests/d/Docker/DockerDesktop",
       "versions": [
         {
-          "version": "4.100.0",
+          "version": "4.100.1",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-20",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "exe",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://desktop.docker.com/win/main/arm64/247138/Docker%20Desktop%20Installer.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "exe",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://desktop.docker.com/win/main/amd64/247138/Docker%20Desktop%20Installer.exe"
+            }
+          ]
+        },
+        {
+          "version": "4.100.0",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-19",
           "installers": [
             {
@@ -851,28 +873,6 @@
               "nestedInstallerType": null,
               "scope": "machine",
               "url": "https://desktop.docker.com/win/main/amd64/244584/Docker%20Desktop%20Installer.exe"
-            }
-          ]
-        },
-        {
-          "version": "4.96.3",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-22",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "exe",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://desktop.docker.com/win/main/arm64/244472/Docker%20Desktop%20Installer.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "exe",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://desktop.docker.com/win/main/amd64/244472/Docker%20Desktop%20Installer.exe"
             }
           ]
         }
@@ -1404,9 +1404,45 @@
       "manifestPath": "manifests/g/GitHub/GitHubDesktop",
       "versions": [
         {
-          "version": "3.7.0",
+          "version": "3.7.1",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-26",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "exe",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.1-534cde99/GitHubDesktopSetup-arm64.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "wix",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.1-534cde99/GitHubDesktopSetup-arm64.msi"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "exe",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.1-534cde99/GitHubDesktopSetup-x64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "wix",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://desktop.githubusercontent.com/releases/3.7.1-534cde99/GitHubDesktopSetup-x64.msi"
+            }
+          ]
+        },
+        {
+          "version": "3.7.0",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-19",
           "installers": [
             {
@@ -1546,42 +1582,6 @@
               "url": "https://desktop.githubusercontent.com/releases/3.6.9-e0ba6bb8/GitHubDesktopSetup-x64.msi"
             }
           ]
-        },
-        {
-          "version": "3.6.8",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-22",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "exe",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.8-c5923f66/GitHubDesktopSetup-arm64.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "wix",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.8-c5923f66/GitHubDesktopSetup-arm64.msi"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "exe",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.8-c5923f66/GitHubDesktopSetup-x64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "wix",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://desktop.githubusercontent.com/releases/3.6.8-c5923f66/GitHubDesktopSetup-x64.msi"
-            }
-          ]
         }
       ]
     },
@@ -1593,10 +1593,10 @@
       "manifestPath": "manifests/g/Google/Chrome",
       "versions": [
         {
-          "version": "158.0.8127.37",
+          "version": "158.0.8127.89",
           "latest": true,
           "bestEffort": false,
-          "releaseDate": "2026-11-11",
+          "releaseDate": "2026-11-23",
           "installers": [
             {
               "architecture": "arm64",
@@ -2093,9 +2093,59 @@
       "manifestPath": "manifests/m/Microsoft/Teams",
       "versions": [
         {
-          "version": "26288.2004.5269.3420",
+          "version": "26304.1207.5384.858",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-17",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-arm64/26304.1207.5384.858/MSTeams-arm64.msix"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "zip",
+              "nestedInstallerType": "portable",
+              "scope": null,
+              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-arm64/26304.1207.5384.858/MSTeams-arm64.msix?p"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x64/26304.1207.5384.858/MSTeams-x64.msix"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "zip",
+              "nestedInstallerType": "portable",
+              "scope": null,
+              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x64/26304.1207.5384.858/MSTeams-x64.msix?p"
+            },
+            {
+              "architecture": "x86",
+              "installerType": "msix",
+              "nestedInstallerType": null,
+              "scope": null,
+              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x86/26304.1207.5384.858/MSTeams-x86.msix"
+            },
+            {
+              "architecture": "x86",
+              "installerType": "zip",
+              "nestedInstallerType": "portable",
+              "scope": null,
+              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x86/26304.1207.5384.858/MSTeams-x86.msix?p"
+            }
+          ]
+        },
+        {
+          "version": "26288.2004.5269.3420",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-10-23",
           "installers": [
             {
@@ -2289,56 +2339,6 @@
               "nestedInstallerType": "portable",
               "scope": null,
               "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x86/26198.304.4946.9672/MSTeams-x86.msix?p"
-            }
-          ]
-        },
-        {
-          "version": "26183.1903.4892.4448",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-07-09",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-arm64/26183.1903.4892.4448/MSTeams-arm64.msix"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "zip",
-              "nestedInstallerType": "portable",
-              "scope": null,
-              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-arm64/26183.1903.4892.4448/MSTeams-arm64.msix?p"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x64/26183.1903.4892.4448/MSTeams-x64.msix"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "zip",
-              "nestedInstallerType": "portable",
-              "scope": null,
-              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x64/26183.1903.4892.4448/MSTeams-x64.msix?p"
-            },
-            {
-              "architecture": "x86",
-              "installerType": "msix",
-              "nestedInstallerType": null,
-              "scope": null,
-              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x86/26183.1903.4892.4448/MSTeams-x86.msix"
-            },
-            {
-              "architecture": "x86",
-              "installerType": "zip",
-              "nestedInstallerType": "portable",
-              "scope": null,
-              "url": "https://teamsinstaller.public.onecdn.static.microsoft/production-windows-x86/26183.1903.4892.4448/MSTeams-x86.msix?p"
             }
           ]
         }
@@ -2989,9 +2989,24 @@
       "manifestPath": "manifests/m/Microsoft/PowerBI",
       "versions": [
         {
-          "version": "2.159.1231.0",
+          "version": "2.160.1151.0",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-23",
+          "installers": [
+            {
+              "architecture": "x64",
+              "installerType": "burn",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://download.microsoft.com/download/8/8/0/880BCA75-79DD-466A-927D-1ABF1F5454B0/PBIDesktopSetup-2026-11_x64.exe"
+            }
+          ]
+        },
+        {
+          "version": "2.159.1231.0",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-02",
           "installers": [
             {
@@ -3045,21 +3060,6 @@
               "nestedInstallerType": null,
               "scope": "machine",
               "url": "https://download.microsoft.com/download/8/8/0/880BCA75-79DD-466A-927D-1ABF1F5454B0/PBIDesktopSetup-2026-07_x64.exe"
-            }
-          ]
-        },
-        {
-          "version": "2.155.756.0",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": null,
-          "installers": [
-            {
-              "architecture": "x64",
-              "installerType": "burn",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://download.microsoft.com/download/8/8/0/880BCA75-79DD-466A-927D-1ABF1F5454B0/PBIDesktopSetup-2026-06_x64.exe"
             }
           ]
         }
@@ -3300,9 +3300,31 @@
       "manifestPath": "manifests/s/ShareX/ShareX",
       "versions": [
         {
-          "version": "22.4.0",
+          "version": "22.5.0",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-26",
+          "installers": [
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://github.com/ShareX/ShareX/releases/download/v22.5.0/ShareX-22.5.0-setup-x64.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://github.com/ShareX/ShareX/releases/download/v22.5.0/ShareX-22.5.0-setup-x64.exe"
+            }
+          ]
+        },
+        {
+          "version": "22.4.0",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-08",
           "installers": [
             {
@@ -3384,28 +3406,6 @@
               "nestedInstallerType": null,
               "scope": "user",
               "url": "https://github.com/ShareX/ShareX/releases/download/v21.0.0/ShareX-21.0.0-setup-x64.exe"
-            }
-          ]
-        },
-        {
-          "version": "20.2.0",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-05-22",
-          "installers": [
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://github.com/ShareX/ShareX/releases/download/v20.2.0/ShareX-20.2.0-setup-x64.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://github.com/ShareX/ShareX/releases/download/v20.2.0/ShareX-20.2.0-setup-x64.exe"
             }
           ]
         }
@@ -3641,9 +3641,45 @@
       "manifestPath": "manifests/m/Microsoft/VisualStudioCode",
       "versions": [
         {
-          "version": "1.146.0",
+          "version": "1.148.0",
           "latest": true,
           "bestEffort": false,
+          "releaseDate": "2026-11-24",
+          "installers": [
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/661626d0e72f97806550790a98fb87116c9db825/VSCodeSetup-arm64-1.148.0.exe"
+            },
+            {
+              "architecture": "arm64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/661626d0e72f97806550790a98fb87116c9db825/VSCodeUserSetup-arm64-1.148.0.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "machine",
+              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/661626d0e72f97806550790a98fb87116c9db825/VSCodeSetup-x64-1.148.0.exe"
+            },
+            {
+              "architecture": "x64",
+              "installerType": "inno",
+              "nestedInstallerType": null,
+              "scope": "user",
+              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/661626d0e72f97806550790a98fb87116c9db825/VSCodeUserSetup-x64-1.148.0.exe"
+            }
+          ]
+        },
+        {
+          "version": "1.146.0",
+          "latest": false,
+          "bestEffort": true,
           "releaseDate": "2026-11-11",
           "installers": [
             {
@@ -3781,42 +3817,6 @@
               "nestedInstallerType": null,
               "scope": "user",
               "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/2c33b50b16c472efe58357d1d2a8a5414bc23fbf/VSCodeUserSetup-x64-1.144.0.exe"
-            }
-          ]
-        },
-        {
-          "version": "1.143.1",
-          "latest": false,
-          "bestEffort": true,
-          "releaseDate": "2026-10-22",
-          "installers": [
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/e646868227c3e3a9e3f24277c8c7220be42c0be7/VSCodeSetup-arm64-1.143.1.exe"
-            },
-            {
-              "architecture": "arm64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/e646868227c3e3a9e3f24277c8c7220be42c0be7/VSCodeUserSetup-arm64-1.143.1.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "machine",
-              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/e646868227c3e3a9e3f24277c8c7220be42c0be7/VSCodeSetup-x64-1.143.1.exe"
-            },
-            {
-              "architecture": "x64",
-              "installerType": "inno",
-              "nestedInstallerType": null,
-              "scope": "user",
-              "url": "https://vscode.download.prss.microsoft.com/dbazure/download/stable/e646868227c3e3a9e3f24277c8c7220be42c0be7/VSCodeUserSetup-x64-1.143.1.exe"
             }
           ]
         }
